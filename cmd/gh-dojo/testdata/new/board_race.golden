@@ -1,0 +1,5 @@
+code: 0
+--- stdout
+#15 "Fix login redirect" created, labels bug, area:cli, no status → Backlog
+--- stderr
+warning: GitHub refused adding #15 to the board, but a re-read found it there

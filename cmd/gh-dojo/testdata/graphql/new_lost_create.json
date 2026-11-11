@@ -134,7 +134,7 @@
     },
     {
       "operation": "CreateIssue",
-      "query": "mutation CreateIssue($repo: ID!, $title: String!, $body: String!, $labels: [ID!], $projects: [ID!]) {\n  createIssue(input: {repositoryId: $repo, title: $title, body: $body, labelIds: $labels, projectV2Ids: $projects}) {\n    issue {\n      id\n      number\n      projectItems(first: 20) { nodes { id project { id } } }\n    }\n  }\n}",
+      "query": "mutation CreateIssue($repo: ID!, $title: String!, $body: String!, $labels: [ID!]) {\n  createIssue(input: {repositoryId: $repo, title: $title, body: $body, labelIds: $labels}) {\n    issue { id number }\n  }\n}",
       "variables": {
         "repo": "R_kgDOVq9iIg",
         "title": "Fix login redirect",
@@ -142,9 +142,6 @@
         "labels": [
           "LA_kwDOVq9iIs8AAAADCYId4A",
           "LA_kwDOVq9iIs8AAAADCaREAc"
-        ],
-        "projects": [
-          "PVT_kwHOBFGd5c4BrMYF"
         ]
       },
       "status": 502,

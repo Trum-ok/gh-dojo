@@ -1,5 +1,5 @@
 {
-  "comment": "Hand-crafted: new creates #15 with labels bug, area:cli on the board, then sets Backlog. Shapes: the read is new_context.json (recorded) cut to issues #13-#14, with labels area:board and area:cli added; mutation payloads follow the GraphQL schema (createIssue.issue, updateProjectV2ItemFieldValue.projectV2Item, addProjectV2ItemById.item, addLabelsToLabelable); mutations are never sent to GitHub.",
+  "comment": "Hand-crafted: new creates #15 with labels bug, area:cli, adds it to the board, then sets Backlog. Shapes: the read is new_context.json (recorded) cut to issues #13-#14, with labels area:board and area:cli added; mutation payloads follow the GraphQL schema (createIssue.issue, updateProjectV2ItemFieldValue.projectV2Item, addProjectV2ItemById.item, addLabelsToLabelable); mutations are never sent to GitHub.",
   "handcrafted": true,
   "interactions": [
     {
@@ -134,7 +134,7 @@
     },
     {
       "operation": "CreateIssue",
-      "query": "mutation CreateIssue($repo: ID!, $title: String!, $body: String!, $labels: [ID!], $projects: [ID!]) {\n  createIssue(input: {repositoryId: $repo, title: $title, body: $body, labelIds: $labels, projectV2Ids: $projects}) {\n    issue {\n      id\n      number\n      projectItems(first: 20) { nodes { id project { id } } }\n    }\n  }\n}",
+      "query": "mutation CreateIssue($repo: ID!, $title: String!, $body: String!, $labels: [ID!]) {\n  createIssue(input: {repositoryId: $repo, title: $title, body: $body, labelIds: $labels}) {\n    issue { id number }\n  }\n}",
       "variables": {
         "repo": "R_kgDOVq9iIg",
         "title": "Fix login redirect",
@@ -142,9 +142,6 @@
         "labels": [
           "LA_kwDOVq9iIs8AAAADCYId4A",
           "LA_kwDOVq9iIs8AAAADCaREAc"
-        ],
-        "projects": [
-          "PVT_kwHOBFGd5c4BrMYF"
         ]
       },
       "response": {
@@ -152,17 +149,24 @@
           "createIssue": {
             "issue": {
               "id": "I_kwDOVq9iIs8AAAABfNEW15",
-              "number": 15,
-              "projectItems": {
-                "nodes": [
-                  {
-                    "id": "PVTI_lAHOBFGd5c4BrMYFzhNEW15",
-                    "project": {
-                      "id": "PVT_kwHOBFGd5c4BrMYF"
-                    }
-                  }
-                ]
-              }
+              "number": 15
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "AddToBoard",
+      "query": "mutation AddToBoard($project: ID!, $issue: ID!) {\n  addProjectV2ItemById(input: {projectId: $project, contentId: $issue}) { item { id } }\n}",
+      "variables": {
+        "project": "PVT_kwHOBFGd5c4BrMYF",
+        "issue": "I_kwDOVq9iIs8AAAABfNEW15"
+      },
+      "response": {
+        "data": {
+          "addProjectV2ItemById": {
+            "item": {
+              "id": "PVTI_lAHOBFGd5c4BrMYFzhNEW15"
             }
           }
         }

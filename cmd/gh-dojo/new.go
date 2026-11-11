@@ -22,8 +22,18 @@ import (
 // initial status.
 //
 // Requests with a warm schema cache: one read (newContextQuery: repo ID,
-// labels, recent issues), createIssue (labels and board in one go), then
-// the status. Without statuses.initial the status write is skipped.
+// labels, recent issues), createIssue (with its labels),
+// addProjectV2ItemById, then the status: four. Without statuses.initial the
+// status write is skipped.
+//
+// The board item is added explicitly rather than with createIssue's
+// projectV2Ids: GitHub adds those asynchronously, so the createIssue answer
+// often had no item yet, and the addProjectV2ItemById then sent was refused
+// in live runs (issue #17), likely racing that add. addProjectV2ItemById is
+// synchronous and returns the existing item for content already on the
+// board. Should it still be refused (the board's auto-add workflow racing
+// it, say), the issue's board items are re-read once (newRecheckDelay
+// later) and an item found there is used.
 //
 // Retries are safe (principle 5): the body ends with a hidden marker
 // <!-- gh-dojo:new:<hash> --> of the normalized title (newDedupKey), and the
@@ -51,7 +61,8 @@ const (
 )
 
 // newRecheckDelay is the pause before re-reading after a lost createIssue
-// answer, so the issue, if created, shows up. Tests set it to 0.
+// answer or a refused addProjectV2ItemById, so the issue or its board item,
+// if there, shows up. Tests set it to 0.
 var newRecheckDelay = time.Second
 
 // newContextQuery reads what new needs before writing: the repo ID, its
@@ -98,15 +109,11 @@ const newLabelsQuery = `query RepoLabels($owner: String!, $repo: String!, $curso
   }
 }`
 
-// newCreateMutation creates the issue with its labels and on the board, and
-// returns the board item: the status write needs its ID.
-const newCreateMutation = `mutation CreateIssue($repo: ID!, $title: String!, $body: String!, $labels: [ID!], $projects: [ID!]) {
-  createIssue(input: {repositoryId: $repo, title: $title, body: $body, labelIds: $labels, projectV2Ids: $projects}) {
-    issue {
-      id
-      number
-      projectItems(first: 20) { nodes { id project { id } } }
-    }
+// newCreateMutation creates the issue with its labels. It is put on the
+// board by newAddToBoardMutation, not projectV2Ids (see the top of the file).
+const newCreateMutation = `mutation CreateIssue($repo: ID!, $title: String!, $body: String!, $labels: [ID!]) {
+  createIssue(input: {repositoryId: $repo, title: $title, body: $body, labelIds: $labels}) {
+    issue { id number }
   }
 }`
 
@@ -124,6 +131,23 @@ const newUnarchiveMutation = `mutation Unarchive($project: ID!, $item: ID!) {
 // it is there already.
 const newAddToBoardMutation = `mutation AddToBoard($project: ID!, $issue: ID!) {
   addProjectV2ItemById(input: {projectId: $project, contentId: $issue}) { item { id } }
+}`
+
+// newBoardItemsQuery re-reads an issue's board items after
+// addProjectV2ItemById was refused. $status is the board's status field name.
+const newBoardItemsQuery = `query IssueBoardItems($issue: ID!, $status: String!) {
+  node(id: $issue) {
+    ... on Issue {
+      projectItems(first: 20) {
+        nodes {
+          id
+          isArchived
+          project { id }
+          fieldValueByName(name: $status) { ... on ProjectV2ItemFieldSingleSelectValue { name } }
+        }
+      }
+    }
+  }
 }`
 
 // newSetStatusMutation sets the status of a board item.
@@ -396,7 +420,7 @@ func (r *newRun) run(ctx context.Context) error {
 	found := nc.find(marker, s.ID)
 	if found != nil {
 		r.resumed = true
-	} else if err := r.create(ctx, nc.RepoID, withMarker(r.opts.Body, marker), labels, s.ID); err != nil {
+	} else if err := r.create(ctx, nc.RepoID, withMarker(r.opts.Body, marker), labels); err != nil {
 		if r.number != 0 || !errors.Is(err, graph.ErrUnknownOutcome) {
 			return err
 		}
@@ -431,22 +455,9 @@ func (r *newRun) run(ctx context.Context) error {
 		r.unarchived = true
 	}
 	if r.itemID == "" {
-		var out struct {
-			Add *struct {
-				Item *struct {
-					ID string `json:"id"`
-				} `json:"item"`
-			} `json:"addProjectV2ItemById"`
-		}
-		vars := map[string]any{"project": s.ID, "issue": r.id}
-		err := r.Client.Mutate(ctx, newAddToBoardMutation, vars, &out)
-		if err == nil && (out.Add == nil || out.Add.Item == nil || out.Add.Item.ID == "") {
-			err = render.Internal("addProjectV2ItemById returned no item")
-		}
-		if err != nil {
+		if err := r.addToBoard(ctx, s.ID, statusField.Name); err != nil {
 			return &newStepError{"adding it to board " + s.Ref().String() + " failed", err}
 		}
-		r.itemID = out.Add.Item.ID
 	}
 	// A resumed issue keeps a status it already has: someone may have
 	// moved it on purpose.
@@ -460,18 +471,91 @@ func (r *newRun) run(ctx context.Context) error {
 	return nil
 }
 
+// addToBoard puts the issue on the board projectID and sets r.itemID (and
+// r.status, when a re-read finds the item with one). A refusal that is not
+// a lost answer is followed by one re-read of the issue's board items: the
+// item may be there all the same, added by GitHub or the board's automation.
+func (r *newRun) addToBoard(ctx context.Context, projectID, statusField string) error {
+	var out struct {
+		Add *struct {
+			Item *struct {
+				ID string `json:"id"`
+			} `json:"item"`
+		} `json:"addProjectV2ItemById"`
+	}
+	vars := map[string]any{"project": projectID, "issue": r.id}
+	err := r.Client.Mutate(ctx, newAddToBoardMutation, vars, &out)
+	if err == nil {
+		if out.Add == nil || out.Add.Item == nil || out.Add.Item.ID == "" {
+			return render.Internal("addProjectV2ItemById returned no item")
+		}
+		r.itemID = out.Add.Item.ID
+		return nil
+	}
+	if errors.Is(err, graph.ErrUnknownOutcome) || ctx.Err() != nil {
+		// A lost answer or an interrupted run: the re-run finds the item.
+		return err
+	}
+	it := r.recheckItem(ctx, projectID, statusField)
+	if it == nil {
+		return err
+	}
+	r.itemID = it.ID
+	if it.Status != nil {
+		r.status = it.Status.Name
+	}
+	r.warnings = append(r.warnings, fmt.Sprintf("GitHub refused adding #%d to the board, but a re-read found it there", r.number))
+	return nil
+}
+
+// recheckItem re-reads the issue's board items after a refused
+// addProjectV2ItemById and returns its unarchived item on projectID, or nil
+// when there is none or the read fails.
+func (r *newRun) recheckItem(ctx context.Context, projectID, statusField string) *newItemJSON {
+	if !recheckPause(ctx) {
+		return nil
+	}
+	var out struct {
+		Node *struct {
+			ProjectItems struct {
+				Nodes []*newItemJSON `json:"nodes"`
+			} `json:"projectItems"`
+		} `json:"node"`
+	}
+	vars := map[string]any{"issue": r.id, "status": statusField}
+	if err := r.Client.Query(ctx, newBoardItemsQuery, vars, &out); err != nil || out.Node == nil {
+		return nil
+	}
+	for _, it := range out.Node.ProjectItems.Nodes {
+		if it != nil && !it.IsArchived && it.Project != nil && it.Project.ID == projectID && it.ID != "" {
+			return it
+		}
+	}
+	return nil
+}
+
+// recheckPause waits newRecheckDelay before a re-read; false when ctx ends
+// first.
+func recheckPause(ctx context.Context) bool {
+	if newRecheckDelay <= 0 {
+		return ctx.Err() == nil
+	}
+	t := time.NewTimer(newRecheckDelay)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-t.C:
+		return true
+	}
+}
+
 // recheck re-reads the newest issues after a lost createIssue answer and
 // returns the issue with marker, or nil when it is not there or the read
 // fails.
 func (r *newRun) recheck(ctx context.Context, repo issue.Repo, statusField, marker, projectID string) *foundIssue {
-	if newRecheckDelay > 0 {
-		t := time.NewTimer(newRecheckDelay)
-		select {
-		case <-ctx.Done():
-			t.Stop()
-			return nil
-		case <-t.C:
-		}
+	if !recheckPause(ctx) {
+		return nil
 	}
 	nc, err := readNewContext(ctx, r.Client, repo, statusField)
 	if err != nil {
@@ -483,7 +567,7 @@ func (r *newRun) recheck(ctx context.Context, repo issue.Repo, statusField, mark
 // create sends createIssue. On an error with the issue in the payload (a
 // part of the input GitHub refused) the issue exists: r.number is set and
 // the error is returned for a partial result.
-func (r *newRun) create(ctx context.Context, repoID, body string, labels []newLabel, projectID string) error {
+func (r *newRun) create(ctx context.Context, repoID, body string, labels []newLabel) error {
 	ids := make([]string, len(labels))
 	for i, l := range labels {
 		ids[i] = l.ID
@@ -491,16 +575,13 @@ func (r *newRun) create(ctx context.Context, repoID, body string, labels []newLa
 	var out struct {
 		Create *struct {
 			Issue *struct {
-				ID           string `json:"id"`
-				Number       int    `json:"number"`
-				ProjectItems struct {
-					Nodes []*newItemJSON `json:"nodes"`
-				} `json:"projectItems"`
+				ID     string `json:"id"`
+				Number int    `json:"number"`
 			} `json:"issue"`
 		} `json:"createIssue"`
 	}
 	vars := map[string]any{
-		"repo": repoID, "title": r.opts.Title, "body": body, "labels": ids, "projects": []string{projectID},
+		"repo": repoID, "title": r.opts.Title, "body": body, "labels": ids,
 	}
 	err := r.Client.Mutate(ctx, newCreateMutation, vars, &out)
 	if out.Create == nil || out.Create.Issue == nil || out.Create.Issue.Number == 0 {
@@ -511,13 +592,8 @@ func (r *newRun) create(ctx context.Context, repoID, body string, labels []newLa
 	}
 	is := out.Create.Issue
 	r.number, r.id = is.Number, is.ID
-	for _, it := range is.ProjectItems.Nodes {
-		if it != nil && it.Project != nil && it.Project.ID == projectID {
-			r.itemID = it.ID
-		}
-	}
 	if err != nil {
-		return &newStepError{"GitHub refused part of the request (labels or board)", err}
+		return &newStepError{"GitHub refused part of the request (labels)", err}
 	}
 	return nil
 }

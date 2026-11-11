@@ -70,6 +70,22 @@ is set too; only use that against a sandbox board. Fixtures marked
 are skipped in record mode. Tests point the schema cache at a temporary
 directory through `GH_DOJO_CACHE_DIR`.
 
+## Debugging GitHub errors
+
+Errors never print GitHub's raw response, so a GraphQL error of a type
+gh-dojo does not map shows only as "GitHub API rejected the request". To see what GitHub actually answered, run the command again with
+go-gh's debug logging, which gh-dojo's client keeps on:
+
+```sh
+GH_DEBUG=api gh dojo <command> 2> debug.log
+```
+
+`GH_DEBUG=api` logs every request and response, headers and bodies, to
+stderr; the `errors` array of the failing response holds the type and
+message. The `Authorization` header is redacted, but bodies are logged as
+is, so review the log before sharing it. Any other `GH_DEBUG` value except
+`0`, `false` and `no` logs only the request lines and timings.
+
 ## Working on gh-dojo with gh-dojo
 
 gh-dojo tracks its own development on its board with the repository's

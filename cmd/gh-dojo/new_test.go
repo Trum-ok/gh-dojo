@@ -71,8 +71,8 @@ func TestNewSuccess(t *testing.T) {
 	if code != render.ExitOK {
 		t.Errorf("code = %d", code)
 	}
-	if n := srv.Requests() - before; n != 3 {
-		t.Errorf("requests with a warm schema = %d, want 3 (read, createIssue, status)", n)
+	if n := srv.Requests() - before; n != 4 {
+		t.Errorf("requests with a warm schema = %d, want 4 (read, createIssue, addProjectV2ItemById, status)", n)
 	}
 }
 
@@ -121,8 +121,8 @@ func TestNewStaleAfterCreate(t *testing.T) {
 	if code != render.ExitPartial {
 		t.Errorf("code = %d, want %d", code, render.ExitPartial)
 	}
-	if n := srv.Requests() - before; n != 3 {
-		t.Errorf("requests = %d, want 3 (read, create, status): no second attempt", n)
+	if n := srv.Requests() - before; n != 4 {
+		t.Errorf("requests = %d, want 4 (read, create, add, status): no second attempt", n)
 	}
 	// The schema cache was dropped, so the re-run reads the board afresh.
 	before = srv.Requests()
@@ -134,20 +134,71 @@ func TestNewStaleAfterCreate(t *testing.T) {
 	}
 }
 
-// TestNewStaleBeforeCreate: a stale schema ID before anything was written
-// re-reads the board and tries once more.
-func TestNewStaleBeforeCreate(t *testing.T) {
+// TestNewBoardRace reproduces issue #17: createIssue answers with no board
+// item, GitHub refuses addProjectV2ItemById, and the item is on the board all
+// the same (put there by GitHub or the board's automation). One re-read of
+// the issue's board items finds it, so the run sets the status and succeeds
+// instead of exiting with code 5.
+func TestNewBoardRace(t *testing.T) {
+	noRecheckDelay(t)
 	withConfig(t, dojoConfig)
-	srv := withApp(t, boardFixture, "testdata/graphql/new_stale_create.json")
+	srv := withApp(t, boardFixture, "testdata/graphql/new_board_race.json")
 	before := warmSchema(t, srv)
 	code, out := runOut(newFixArgs...)
-	testutil.Golden(t, "new/success", out)
+	testutil.Golden(t, "new/board_race", out)
 	if code != render.ExitOK {
-		t.Errorf("code = %d", code)
+		t.Errorf("code = %d, want %d", code, render.ExitOK)
 	}
-	if n := srv.Requests() - before; n != 6 {
-		t.Errorf("requests = %d, want 6 (read, create, board, read, create, status)", n)
+	if n := srv.Requests() - before; n != 5 {
+		t.Errorf("requests = %d, want 5 (read, create, add, re-read, status)", n)
 	}
+}
+
+// TestNewBoardFails: when addProjectV2ItemById fails, the run stops with
+// exit code 5 before the status. A refusal is followed by one re-read of the
+// issue's board items; a lost answer is not (the re-run finds the item). A
+// stale project ID also drops the schema cache.
+func TestNewBoardFails(t *testing.T) {
+	noRecheckDelay(t)
+	tests := []struct {
+		name, fixture string
+		requests      int
+		stale         bool
+	}{
+		{"board_refused", "testdata/graphql/new_board_refused.json", 4, false}, // read, create, add, re-read
+		{"board_lost", "testdata/graphql/new_board_lost.json", 3, false},       // read, create, add
+		{"stale_board", "testdata/graphql/new_stale_board.json", 4, true},      // read, create, add, re-read
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			withConfig(t, dojoConfig)
+			srv := withApp(t, boardFixture, tt.fixture)
+			before := warmSchema(t, srv)
+			code, out := runOut(newFixArgs...)
+			testutil.Golden(t, "new/"+tt.name, out)
+			if code != render.ExitPartial {
+				t.Errorf("code = %d, want %d", code, render.ExitPartial)
+			}
+			if n := srv.Requests() - before; n != tt.requests {
+				t.Errorf("requests = %d, want %d", n, tt.requests)
+			}
+			before = srv.Requests()
+			if _, err := newApp().Schema(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			if dropped := srv.Requests() != before; dropped != tt.stale {
+				t.Errorf("schema cache dropped = %v, want %v", dropped, tt.stale)
+			}
+		})
+	}
+}
+
+// noRecheckDelay makes re-reads after a lost or refused write immediate.
+func noRecheckDelay(t *testing.T) {
+	t.Helper()
+	saved := newRecheckDelay
+	t.Cleanup(func() { newRecheckDelay = saved })
+	newRecheckDelay = 0
 }
 
 // TestNewPartialKeepsFix: exit 5 keeps the fix of a cause a re-run alone
@@ -165,9 +216,7 @@ func TestNewPartialKeepsFix(t *testing.T) {
 // TestNewLostCreate: a lost createIssue answer is followed by one re-read;
 // the issue found there is finished, else the error stands (exit 4).
 func TestNewLostCreate(t *testing.T) {
-	saved := newRecheckDelay
-	t.Cleanup(func() { newRecheckDelay = saved })
-	newRecheckDelay = 0
+	noRecheckDelay(t)
 	tests := []struct {
 		name, fixture string
 		code          render.Code
@@ -227,8 +276,8 @@ func TestNewNoInitialStatus(t *testing.T) {
 	if code != render.ExitOK {
 		t.Errorf("code = %d", code)
 	}
-	if n := srv.Requests(); n != 3 {
-		t.Errorf("requests = %d, want 3 (schema, read, createIssue)", n)
+	if n := srv.Requests(); n != 4 {
+		t.Errorf("requests = %d, want 4 (schema, read, createIssue, addProjectV2ItemById)", n)
 	}
 }
 

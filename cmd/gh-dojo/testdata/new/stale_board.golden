@@ -1,0 +1,6 @@
+code: 5
+--- stdout
+--- stderr
+error: #15 created, but adding it to board Trum-ok/5 failed
+GitHub API: not found
+fix: re-run the same gh dojo new command: it finds #15 and finishes it
