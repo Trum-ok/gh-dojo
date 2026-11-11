@@ -1,7 +1,10 @@
 #42 Backlog → In progress, comment left
 #42 In progress (unchanged), comment already present
-#57 created, no status → Backlog, blocked by #42
+#57 "Fix login redirect" created, no status → Backlog, blocked by #42
 #7 comment left
 #8
-#9 created: very long title very long title very long title very long title very long title very long title very long title very long title very long title ver…
-#10 title with newline
+#8 "Only a title"
+#9 "very long title very long title very long title very long title very long title ve…" created, no status → Backlog, labels bug, area:api, blocked by #42, #43
+#10 "title with newline" created
+#11 "Заголовок задачи éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé…" created
+#12 effect, effect, effect, effect, effect, effect, effect, effect, effect, effect, effect, effect, effect, effect, effect, effect, effect, effect, last effect

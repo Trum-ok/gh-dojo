@@ -43,6 +43,26 @@ func TestErrorFormat(t *testing.T) {
 		{"graphql_scopes", &api.GraphQLError{Errors: []api.GraphQLErrorItem{{Type: "INSUFFICIENT_SCOPES", Message: "Your token has not been granted the required scopes."}}}, ExitNetwork},
 		{"timeout", fmt.Errorf("post: %w", context.DeadlineExceeded), ExitNetwork},
 		{"net_error", &url.Error{Op: "Post", URL: "https://api.github.com/graphql", Err: errors.New("dial tcp: no such host")}, ExitNetwork},
+		{"canceled", fmt.Errorf("post: %w", context.Canceled), ExitNetwork},
+		{"internal", Internal("assignment to entry in nil map"), ExitUsage},
+		{"typed_nil", error((*Error)(nil)), ExitUsage},
+		{"typed_nil_wrapped", fmt.Errorf("load: %w", (*Error)(nil)), ExitUsage},
+		{"blank_lines", Usage("line one\n\n  \nline two\n\nline three\nline four").WithFix("gh dojo --help"), ExitUsage},
+		{"allowed_newlines", Usage("unknown status %q", "Doing").WithAllowed("In\nprogress", "Done\r\n", "a\nb\nc\nd").WithFix("gh dojo describe"), ExitUsage},
+		{"long_fix_kept", Usage("bad title").WithFix("gh dojo new " + strings.Repeat("x", 250)), ExitUsage},
+		{"too_long_fix_dropped", Usage("bad title").WithFix("gh dojo new " + strings.Repeat("x", 500)), ExitUsage},
+		{"graphql_unknown_type", &api.GraphQLError{Errors: []api.GraphQLErrorItem{{Message: "Could not resolve to a node with the global id of 'PVTF_lADOBn1234567zM4A'"}}}, ExitUsage},
+		{"graphql_validation", &api.GraphQLError{Errors: []api.GraphQLErrorItem{{Type: "UNPROCESSABLE", Message: "Field 'singleSelectOptionId' got invalid value 'f75ad846' for PVTSSF_lADOBn1234567zgABC"}}}, ExitUsage},
+		{"graphql_not_found_id", &api.GraphQLError{Errors: []api.GraphQLErrorItem{{Type: "NOT_FOUND", Message: "Could not resolve to a node with the global id of 'PVTI_lADOBn1234567zgXYZ'."}}}, ExitNotFound},
+		{"graphql_not_found_legacy_id", &api.GraphQLError{Errors: []api.GraphQLErrorItem{{Type: "NOT_FOUND", Message: "Could not resolve to a node with the global id of 'MDU6SXNzdWUxMjM0NTY3ODk='."}}}, ExitNotFound},
+		{"graphql_scopes_second", &api.GraphQLError{Errors: []api.GraphQLErrorItem{{Message: "Something else"}, {Type: "INSUFFICIENT_SCOPES", Message: "Your token has not been granted the required scopes."}}}, ExitNetwork},
+		{"graphql_not_found_second", &api.GraphQLError{Errors: []api.GraphQLErrorItem{{Message: "Something else"}, {Type: "NOT_FOUND", Message: "Could not resolve to an Issue with the number of 999."}}}, ExitNotFound},
+		{"graphql_rate_limited", &api.GraphQLError{Errors: []api.GraphQLErrorItem{{Type: "NOT_FOUND", Message: "x"}, {Type: "RATE_LIMITED", Message: "API rate limit exceeded"}}}, ExitNetwork},
+		{"graphql_wrapped", fmt.Errorf("move #42: %w", &api.GraphQLError{Errors: []api.GraphQLErrorItem{{Message: "Argument 'fieldId' on InputObject has an invalid value (PVTF_lADOBn1234567zM4A)"}}}), ExitUsage},
+		{"http_secondary_rate_limit", &api.HTTPError{StatusCode: 403, Message: "You have exceeded a secondary rate limit. Please wait a few minutes before you try again.", RequestURL: mustURL("https://api.github.com/graphql")}, ExitNetwork},
+		{"http_retry_after", &api.HTTPError{StatusCode: 403, Message: "Forbidden", Headers: http.Header{"Retry-After": {"60"}}, RequestURL: mustURL("https://api.github.com/graphql")}, ExitNetwork},
+		{"http_403_forbidden", &api.HTTPError{StatusCode: 403, Message: "Resource not accessible by integration", RequestURL: mustURL("https://api.github.com/graphql")}, ExitNetwork},
+		{"http_422_id", &api.HTTPError{StatusCode: 422, Message: "Validation failed for PVT_kwHOAbc12345", RequestURL: mustURL("https://api.github.com/x")}, ExitUsage},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -65,6 +85,71 @@ func TestWriteErrorNil(t *testing.T) {
 	}
 }
 
+// TestErrorNeverLeaksIDs checks that node IDs and raw GraphQL text of unknown
+// error types never reach the output.
+func TestErrorNeverLeaksIDs(t *testing.T) {
+	raw := "Field 'x' doesn't exist on type 'ProjectV2' PVTF_lADOBn1234567zM4A"
+	for _, err := range []error{
+		&api.GraphQLError{Errors: []api.GraphQLErrorItem{{Message: raw}}},
+		&api.GraphQLError{Errors: []api.GraphQLErrorItem{{Type: "NOT_FOUND", Message: raw}}},
+		&api.GraphQLError{Errors: []api.GraphQLErrorItem{{Type: "FORBIDDEN", Message: raw}}},
+		&api.GraphQLError{Errors: []api.GraphQLErrorItem{{Type: "INSUFFICIENT_SCOPES", Message: raw}}},
+		&api.HTTPError{StatusCode: 403, Message: raw, RequestURL: mustURL("https://api.github.com/x")},
+		&api.HTTPError{StatusCode: 401, Message: raw, RequestURL: mustURL("https://api.github.com/x")},
+		&api.HTTPError{StatusCode: 400, Message: raw, RequestURL: mustURL("https://api.github.com/x")},
+	} {
+		text := FromError(err).Text()
+		if strings.Contains(text, "PVTF_") || strings.Contains(text, "doesn't exist") {
+			t.Errorf("raw API text leaked for %T: %q", err, text)
+		}
+	}
+}
+
+func TestErrorTextLimits(t *testing.T) {
+	values := []string{"a\nb", "c\r\nd", "e"}
+	text := Usage("one\n\n\ntwo\n\nthree\nfour").WithAllowed(values...).WithFix("gh dojo\n--help").Text()
+	lines := strings.Split(text, "\n")
+	if len(lines) != 5 {
+		t.Fatalf("got %d lines, want 5:\n%s", len(lines), text)
+	}
+	if lines[2] != "three" {
+		t.Errorf("blank lines took the message budget: line 3 = %q, want %q", lines[2], "three")
+	}
+	if lines[3] != "allowed: a b, c d, e" {
+		t.Errorf("allowed line = %q", lines[3])
+	}
+}
+
+func TestClipGraphemes(t *testing.T) {
+	family := "\U0001F468\u200D\U0001F469\u200D\U0001F467" // one cluster, five runes
+	accent := "e\u0301"                                    // é as e + combining acute: one cluster, two runes
+	for _, tt := range []struct{ s, want string }{
+		{strings.Repeat("x", 6) + family, "xxxxxx…"},
+		{strings.Repeat("x", 8) + accent + "yy", "xxxxxxxx…"},
+		{strings.Repeat("x", 7) + accent + "yy", "xxxxxxx" + accent + "…"},
+		{"short", "short"},
+		{"abcdefgh ijk", "abcdefgh…"},
+	} {
+		if got := clip(tt.s, 10); got != tt.want {
+			t.Errorf("clip(%q, 10) = %q, want %q", tt.s, got, tt.want)
+		}
+		if n := runeLen(clip(tt.s, 10)); n > 10 {
+			t.Errorf("clip(%q, 10) has %d runes", tt.s, n)
+		}
+	}
+}
+
+func TestErrorFixNeverCut(t *testing.T) {
+	fix := "gh dojo new " + strings.Repeat("y", 300)
+	text := Usage("x").WithFix(fix).Text()
+	if !strings.HasSuffix(text, "fix: "+fix) {
+		t.Errorf("fix line was changed:\n%s", text)
+	}
+	if text := Usage("x").WithFix(fix + strings.Repeat("y", 200)).Text(); strings.Contains(text, "fix:") {
+		t.Errorf("too long fix printed:\n%s", text)
+	}
+}
+
 func TestFromErrorKeepsCause(t *testing.T) {
 	cause := &api.HTTPError{StatusCode: 404, RequestURL: mustURL("https://api.github.com/x")}
 	var httpErr *api.HTTPError
@@ -75,21 +160,48 @@ func TestFromErrorKeepsCause(t *testing.T) {
 
 func TestConfirm(t *testing.T) {
 	long := strings.Repeat("very long title ", 20)
+	effects := []string{"created", Transition("", "Backlog"), "labels bug, area:api", "blocked by #42, #43"}
 	lines := []string{
-		Confirm("#42", Transition("Backlog", "In progress"), "comment left"),
-		Confirm("#42", Transition("In progress", "In progress"), "comment already present"),
-		Confirm("#57", "created", Transition("", "Backlog"), "", "blocked by #42"),
-		Confirm("#7", "comment left"),
-		Confirm("#8"),
-		Confirm("#9", "created: "+long),
-		Confirm("#10", "title with\nnewline"),
+		Confirm("#42", "", Transition("Backlog", "In progress"), "comment left"),
+		Confirm("#42", "", Transition("In progress", "In progress"), "comment already present"),
+		Confirm("#57", "Fix login redirect", "created", Transition("", "Backlog"), "", "blocked by #42"),
+		Confirm("#7", "", "comment left"),
+		Confirm("#8", ""),
+		Confirm("#8", "Only a title"),
+		Confirm("#9", long, effects...),
+		Confirm("#10", "title with\nnewline", "created"),
+		Confirm("#11", "Заголовок задачи "+strings.Repeat("é", 200), "created"),
+		Confirm("#12", long, strings.Repeat("effect, ", 18)+"last effect"),
 	}
-	for _, l := range lines {
+	for _, l := range lines[:len(lines)-1] {
 		if n := utf8.RuneCountInString(l); n > MaxConfirmRunes {
 			t.Errorf("confirmation is %d runes, want at most %d: %q", n, MaxConfirmRunes, l)
 		}
 	}
+	// Effects are never cut, even past the limit; the title is dropped then.
+	for _, l := range lines[len(lines)-2:] {
+		if !strings.HasSuffix(l, "last effect") && !strings.HasSuffix(l, "created") {
+			t.Errorf("effects were cut: %q", l)
+		}
+	}
+	if l := Confirm("#9", long, effects...); !strings.HasSuffix(l, strings.Join(effects, ", ")) {
+		t.Errorf("effects were cut: %q", l)
+	}
 	testutil.Golden(t, "confirm", []byte(strings.Join(lines, "\n")+"\n"))
+}
+
+func TestTransition(t *testing.T) {
+	for _, tt := range []struct{ from, to, want string }{
+		{"Backlog", "In progress", "Backlog → In progress"},
+		{"Done", "Done", "Done (unchanged)"},
+		{"", "Backlog", "no status → Backlog"},
+		{"Backlog", "", "Backlog → no status"},
+		{"", "", "no status (unchanged)"},
+	} {
+		if got := Transition(tt.from, tt.to); got != tt.want {
+			t.Errorf("Transition(%q, %q) = %q, want %q", tt.from, tt.to, got, tt.want)
+		}
+	}
 }
 
 func TestWarn(t *testing.T) {

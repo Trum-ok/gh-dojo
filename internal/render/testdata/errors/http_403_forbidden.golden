@@ -1,0 +1,2 @@
+error: GitHub API: HTTP 403 Resource not accessible by integration
+fix: gh auth refresh -s project

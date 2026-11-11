@@ -4,34 +4,61 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"unicode/utf8"
+
+	"github.com/rivo/uniseg"
 )
 
 // MaxConfirmRunes is the length limit of a confirmation line.
 const MaxConfirmRunes = 160
 
+// minTitleRunes is the shortest cut title worth printing; below it the title
+// is left out.
+const minTitleRunes = 8
+
 // Confirm builds the single confirmation line printed after a write: the
-// subject followed by comma-separated parts, cut to MaxConfirmRunes.
+// subject, the optional title in quotes, then the comma-separated effects.
 //
-//	Confirm("#42", Transition("Backlog", "In progress"), "comment left")
+//	Confirm("#42", "", Transition("Backlog", "In progress"), "comment left")
 //	// #42 Backlog → In progress, comment left
-func Confirm(subject string, parts ...string) string {
-	line := subject
-	if rest := strings.Join(nonEmpty(parts), ", "); rest != "" {
-		line += " " + rest
+//	Confirm("#57", "Fix login redirect", "created", Transition("", "Backlog"))
+//	// #57 "Fix login redirect" created, no status → Backlog
+//
+// Only the title is shortened to keep the line within MaxConfirmRunes, and
+// left out if too little of it would fit. The subject and effects are never
+// cut: they say what was done, so a line without a title may be longer.
+func Confirm(subject, title string, effects ...string) string {
+	head := oneLine(subject)
+	tail := oneLine(strings.Join(nonEmpty(effects), ", "))
+	if title = oneLine(title); title != "" {
+		// room left for `"title"` between head and tail, with separators.
+		room := MaxConfirmRunes - runeLen(head) - runeLen(tail) - 2
+		if head != "" {
+			room--
+		}
+		if tail != "" {
+			room--
+		}
+		if room >= minTitleRunes || room >= runeLen(title) {
+			head = strings.TrimSpace(head + ` "` + clip(title, room) + `"`)
+		}
 	}
-	return clip(oneLine(line), MaxConfirmRunes)
+	return strings.TrimSpace(head + " " + tail)
 }
 
-// Transition describes a status change for a confirmation line.
+// Transition describes a status change for a confirmation line. An empty
+// status reads "no status".
 func Transition(from, to string) string {
-	switch {
-	case from == to:
-		return to + " (unchanged)"
-	case from == "":
-		return "no status → " + to
-	default:
-		return from + " → " + to
+	if from == "" {
+		from = "no status"
 	}
+	if to == "" {
+		to = "no status"
+	}
+	if from == to {
+		return to + " (unchanged)"
+	}
+	return from + " → " + to
 }
 
 // Warn prints a one-line warning to w, which should be stderr.
@@ -78,11 +105,28 @@ func nonEmpty(ss []string) []string {
 // oneLine collapses all whitespace runs, including newlines, to single spaces.
 func oneLine(s string) string { return strings.Join(strings.Fields(s), " ") }
 
-// clip cuts s to at most n runes, ending with "…" when cut.
+// runeLen is the length of s in runes, the unit of all length limits.
+func runeLen(s string) int { return utf8.RuneCountInString(s) }
+
+// clip cuts s to at most n runes, ending with "…" when cut. It cuts between
+// grapheme clusters, so an accented letter or emoji is never split.
 func clip(s string, n int) string {
-	r := []rune(s)
-	if len(r) <= n {
+	if runeLen(s) <= n {
 		return s
 	}
-	return string(r[:n-1]) + "…"
+	if n <= 0 {
+		return ""
+	}
+	var b strings.Builder
+	used := 0
+	g := uniseg.NewGraphemes(s)
+	for g.Next() {
+		r := g.Runes()
+		if used+len(r) > n-1 { // keep one rune for "…"
+			break
+		}
+		b.WriteString(g.Str())
+		used += len(r)
+	}
+	return strings.TrimRight(b.String(), " \t") + "…"
 }
