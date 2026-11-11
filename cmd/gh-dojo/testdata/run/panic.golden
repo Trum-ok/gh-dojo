@@ -1,2 +1,2 @@
-error: internal error: index out of range [3] with length 3
-fix: gh issue create -R Trum-ok/gh-dojo
+error: internal error (not your arguments): index out of range [3] with length 3
+fix: re-run the command; if it repeats, report it to the user

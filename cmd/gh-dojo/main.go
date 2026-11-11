@@ -12,22 +12,33 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// reportCmd is the fix suggested for internal errors.
-const reportCmd = "gh issue create -R Trum-ok/gh-dojo"
+// version is set at build time with -ldflags "-X main.version=..." (see the
+// Makefile); plain go build leaves "dev".
+var version = "dev"
 
 func main() {
-	os.Exit(int(run(newRootCmd(), os.Args[1:], os.Stdout, os.Stderr)))
+	os.Exit(int(run(newRootCmd, os.Args[1:], os.Stdout, os.Stderr)))
 }
 
-// run executes root with args and returns the exit code. Errors and panics
-// are printed to stderr as a short error block.
-func run(root *cobra.Command, args []string, stdout, stderr io.Writer) (code render.Code) {
+// run builds the root command with newRoot, executes it with args and returns
+// the exit code. Errors, including those of building the commands, are
+// printed to stderr as a short error block.
+//
+// A panic while building or running the commands becomes the same short
+// internal error. Only panics on this goroutine are caught: a panic in a
+// goroutine started by a command still crashes the process with a trace, so
+// such goroutines must recover themselves and return an error.
+func run(newRoot func() (*cobra.Command, error), args []string, stdout, stderr io.Writer) (code render.Code) {
 	defer func() {
 		if r := recover(); r != nil {
 			msg, _, _ := strings.Cut(fmt.Sprint(r), "\n") // never print a trace
-			code = render.WriteError(stderr, render.Usage("internal error: %s", msg).WithFix(reportCmd))
+			code = render.WriteError(stderr, render.Internal("%s", msg))
 		}
 	}()
+	root, err := newRoot()
+	if err != nil {
+		return render.WriteError(stderr, err)
+	}
 	if args == nil {
 		args = []string{} // cobra reads os.Args for nil
 	}

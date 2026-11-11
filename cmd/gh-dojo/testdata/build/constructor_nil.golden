@@ -1,0 +1,2 @@
+error: internal error (not your arguments): a command constructor returned nil
+fix: re-run the command; if it repeats, report it to the user

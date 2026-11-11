@@ -1,6 +1,9 @@
 package main
 
 import (
+	"errors"
+	"strconv"
+
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/spf13/cobra"
 )
@@ -10,41 +13,61 @@ import (
 //
 //	func init() { register(newShowCmd) }
 //
-//	func newShowCmd() *cobra.Command {
+//	func newShowCmd() (*cobra.Command, error) {
 //		return &cobra.Command{
 //			Use:   "show <number>...",
 //			Short: "Show issues with status, sprint, blockers and comments",
 //			Args:  cobra.MinimumNArgs(1),
 //			RunE:  func(cmd *cobra.Command, args []string) error { ... },
-//		}
+//		}, nil
 //	}
 //
 // A file that produces several commands at once, such as the verbs built
-// from the config, uses registerAll with a func() []*cobra.Command.
+// from the config, uses registerAll with a func() ([]*cobra.Command, error).
+//
+// A constructor error stops gh dojo before any command runs and is printed
+// like a command error: return render errors (a broken dojo.toml is a
+// render.Usage error, code 1). Two commands with the same name or alias,
+// such as a config verb named like a built-in command, are an error too.
 //
 // Commands return errors built with internal/render (render.Usage,
 // render.NotFound, ...) so the agent gets the right exit code and a short
-// message; Args validation failures become usage errors automatically.
-// Write results to cmd.OutOrStdout() and warnings to cmd.ErrOrStderr().
+// message; Args validation failures become usage errors automatically. A
+// command with subcommands needs no RunE: it prints its help, and an unknown
+// subcommand is a usage error. Write results to cmd.OutOrStdout() and
+// warnings to cmd.ErrOrStderr().
 
-var constructors []func() []*cobra.Command
+// constructor builds one or more top-level commands.
+type constructor func() ([]*cobra.Command, error)
+
+var constructors []constructor
 
 // register adds a constructor of one top-level command.
-func register(newCmd func() *cobra.Command) {
-	registerAll(func() []*cobra.Command { return []*cobra.Command{newCmd()} })
+func register(newCmd func() (*cobra.Command, error)) {
+	registerAll(func() ([]*cobra.Command, error) {
+		c, err := newCmd()
+		if err != nil {
+			return nil, err
+		}
+		return []*cobra.Command{c}, nil
+	})
 }
 
 // registerAll adds a constructor of several top-level commands.
-func registerAll(newCmds func() []*cobra.Command) {
+func registerAll(newCmds func() ([]*cobra.Command, error)) {
 	constructors = append(constructors, newCmds)
 }
 
-func newRootCmd() *cobra.Command {
+// newRootCmd builds the root command with every registered command.
+func newRootCmd() (*cobra.Command, error) { return buildRoot(constructors) }
+
+func buildRoot(ctors []constructor) (*cobra.Command, error) {
 	root := &cobra.Command{
 		Use:   "gh-dojo",
 		Short: "Process verbs for GitHub Projects, built for AI agents",
 		Long: "gh dojo moves issues through a GitHub Projects board with process verbs\n" +
 			"defined in .github/dojo.toml, so agents never deal with field or option IDs.",
+		Version:                    version,
 		Annotations:                map[string]string{cobra.CommandDisplayNameAnnotation: "gh dojo"},
 		SilenceUsage:               true,
 		SilenceErrors:              true,
@@ -56,17 +79,62 @@ func newRootCmd() *cobra.Command {
 	root.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		return render.Usage("%s", err).WithFix(cmd.CommandPath() + " --help")
 	})
-	for _, newCmds := range constructors {
-		root.AddCommand(newCmds()...)
+	// Added explicitly: cobra adds its help command only to a root that
+	// already has subcommands, so `gh dojo help` would fail without verbs.
+	help := newHelpCmd()
+	root.SetHelpCommand(help)
+	root.AddCommand(help)
+
+	// Names taken so far, by the built-in help command and earlier commands.
+	taken := map[string]bool{help.Name(): true}
+	for _, newCmds := range ctors {
+		cmds, err := newCmds()
+		if err != nil {
+			return nil, err
+		}
+		for _, c := range cmds {
+			if c == nil {
+				return nil, render.Internal("a command constructor returned nil")
+			}
+			for _, name := range append([]string{c.Name()}, c.Aliases...) {
+				if taken[name] {
+					// No fix line: every command, --help included, fails until
+					// the name is changed.
+					return nil, render.Usage("command name %q is used twice; "+
+						"a verb in .github/dojo.toml cannot reuse a command name", name)
+				}
+				taken[name] = true
+			}
+			root.AddCommand(c)
+		}
 	}
-	for _, c := range root.Commands() {
-		wrapArgs(c)
-	}
-	return root
+	prepare(root)
+	return root, nil
 }
 
-// unknownCommand rejects arguments to the root command, listing every
-// available command and suggesting close matches.
+// newHelpCmd replaces cobra's help command, which prints the root help and
+// exits 0 for an unknown topic; this one fails with a usage error.
+func newHelpCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "help [command]",
+		Short: "Help about any command",
+		RunE: func(c *cobra.Command, args []string) error {
+			cmd, rest, err := c.Root().Find(args)
+			if err != nil {
+				return err
+			}
+			if len(rest) > 0 {
+				return unknownCommand(cmd, rest)
+			}
+			cmd.InitDefaultHelpFlag()
+			cmd.InitDefaultVersionFlag()
+			return cmd.Help()
+		},
+	}
+}
+
+// unknownCommand rejects arguments to a command that only groups others,
+// listing its available subcommands and suggesting close matches.
 func unknownCommand(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return nil
@@ -77,26 +145,44 @@ func unknownCommand(cmd *cobra.Command, args []string) error {
 			allowed = append(allowed, c.Name())
 		}
 	}
-	e := render.Usage("unknown command %q", args[0])
-	if s := cmd.SuggestionsFor(args[0]); len(s) > 0 {
-		e = render.Usage("unknown command %q, did you mean %q?", args[0], s[0])
+	what := "unknown command " + strconv.Quote(args[0])
+	if cmd.HasParent() {
+		what += " for " + strconv.Quote(cmd.CommandPath())
 	}
-	return e.WithAllowed(allowed...).WithFix(cmd.CommandPath() + " --help")
+	if s := cmd.SuggestionsFor(args[0]); len(s) > 0 {
+		what += ", did you mean " + strconv.Quote(s[0]) + "?"
+	}
+	return render.Usage("%s", what).WithAllowed(allowed...).WithFix(cmd.CommandPath() + " --help")
 }
 
-// wrapArgs turns plain Args validation errors of c and its subcommands into
+// prepare walks c and its subcommands. Plain Args validation errors become
 // usage errors pointing at the command's help; *render.Error passes through.
-func wrapArgs(c *cobra.Command) {
+// A command with subcommands rejects unknown ones unless it validates its own
+// args, and prints its help when it has no RunE: cobra would otherwise print
+// the help and exit 0 on a mistyped subcommand.
+func prepare(c *cobra.Command) {
+	if c.HasSubCommands() {
+		if c.Args == nil {
+			c.Args = unknownCommand
+		}
+		if c.SuggestionsMinimumDistance <= 0 {
+			c.SuggestionsMinimumDistance = 2 // cobra's default, applied only in its own errors
+		}
+		if !c.Runnable() {
+			c.RunE = func(cmd *cobra.Command, _ []string) error { return cmd.Help() }
+		}
+	}
 	if validate := c.Args; validate != nil {
 		c.Args = func(cmd *cobra.Command, args []string) error {
 			err := validate(cmd, args)
-			if _, ok := err.(*render.Error); err == nil || ok {
+			var e *render.Error
+			if err == nil || errors.As(err, &e) {
 				return err
 			}
 			return render.Usage("%s", err).WithFix(cmd.CommandPath() + " --help")
 		}
 	}
 	for _, sub := range c.Commands() {
-		wrapArgs(sub)
+		prepare(sub)
 	}
 }

@@ -1,0 +1,3 @@
+error: unknown command "synk" for "gh dojo board", did you mean "sync"?
+allowed: sync
+fix: gh dojo board --help

@@ -5,4 +5,5 @@ Usage:
   gh dojo [flags]
 
 Flags:
-  -h, --help   help for gh dojo
+  -h, --help      help for gh dojo
+  -v, --version   version for gh dojo

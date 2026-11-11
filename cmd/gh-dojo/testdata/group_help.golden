@@ -1,0 +1,13 @@
+Board commands
+
+Usage:
+  gh dojo board [flags]
+  gh dojo board [command]
+
+Available Commands:
+  sync        Sync the board
+
+Flags:
+  -h, --help   help for board
+
+Use "gh dojo board [command] --help" for more information about a command.

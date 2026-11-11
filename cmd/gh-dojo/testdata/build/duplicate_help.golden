@@ -1,0 +1,1 @@
+error: command name "help" is used twice; a verb in .github/dojo.toml cannot reuse a command name
