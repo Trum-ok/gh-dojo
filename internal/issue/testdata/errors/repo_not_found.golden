@@ -1,0 +1,2 @@
+error: repository Trum-ok/no-such-repo-xyz not found, or the token cannot see it
+fix: gh repo view Trum-ok/no-such-repo-xyz

@@ -1,0 +1,3 @@
+error: .github/dojo.toml: verbs.park.to: unknown status "Parked"
+allowed: Backlog, Ready, In progress, In review, Waiting, Done
+fix: edit verbs.park.to in .github/dojo.toml

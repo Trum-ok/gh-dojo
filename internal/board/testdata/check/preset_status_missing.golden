@@ -1,0 +1,4 @@
+error: .github/dojo.toml: statuses.final (from preset kanban): unknown status "Done"
+and 4 more problems: verbs.start.from, verbs.wait.to, verbs.ready.from, verbs.done.to
+allowed: Backlog, Ready, In progress
+fix: set statuses.final in .github/dojo.toml to override preset kanban

@@ -1,0 +1,3 @@
+error: .github/dojo.toml: fields.status: unknown field "status" on board Trum-ok/5; did you mean "Status"?
+allowed: Status, Priority, Size, Estimate, Start date, Target date
+fix: edit fields.status in .github/dojo.toml

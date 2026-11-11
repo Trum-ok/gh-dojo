@@ -1,0 +1,23 @@
+card Trum-ok/gh-dojo#42 "Fix login redirect" id=I_kwDOVq9iIs8AAAABeLong42
+state CLOSED reason="COMPLETED" closed=true url=https://github.com/Trum-ok/gh-dojo/issues/42
+author "Trum-ok" created 2026-11-11T18:19:10Z closed 2026-11-12T10:00:00Z incomplete=false
+labels [bug area:cli] (2)
+assignees [Trum-ok] (1)
+blocked by (1):
+  acme/auth#7 CLOSED "Auth library upgrade"
+blocking (0):
+item PVTI_lAHOBFGd5c4BrMYFzhLong42 archived=false status="Ready"
+  Status [SINGLE_SELECT] "Ready" option=61e4505c iteration= /0 field=PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ
+  Size [SINGLE_SELECT] "M" option=7515a9f1 iteration= /0 field=PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4
+  Sprint [ITERATION] "Sprint 12" option= iteration=c0ffee12 2026-11-09/14 field=PVTIF_lAHOBFGd5c4BrMYFzhSprint
+  Estimate [NUMBER] "2.5" option= iteration= /0 field=PVTF_lAHOBFGd5c4BrMYFzhpgLF8
+  Target date [DATE] "2026-11-20" option= iteration= /0 field=PVTF_lAHOBFGd5c4BrMYFzhpgLGE
+history (truncated=true):
+  2026-11-11T18:19:14Z "" → "Backlog" by "github-project-automation" automated=false
+  2026-11-11T18:42:17Z "Backlog" → "In progress" by "Trum-ok" automated=false
+  2026-11-11T19:02:20Z "In progress" → "Ready" by "Trum-ok" automated=false
+comments 3 of 45:
+  IC_kwDOVq9iIs7long43 2026-11-12T08:00:00Z by "octocat" mine=false: "Still happens on Safari."
+  IC_kwDOVq9iIs7long44 2026-11-12T09:00:00Z by "Trum-ok" mine=true: "Started. Session: abc\n\n<!-- gh-dojo:start:1a2b3c -->"
+  IC_kwDOVq9iIs7long45 2026-11-12T09:30:00Z by "" mine=false: "Fixed in #43."
+body: "Login redirects to /home instead of the page the user came from."

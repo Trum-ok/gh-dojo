@@ -1,0 +1,4 @@
+error: .github/dojo.toml: fields.sprint: unknown field "Sprint" on board Trum-ok/5
+and 2 more problems: statuses.final, verbs.start.to
+allowed: Status, Priority, Size, Estimate, Start date, Target date
+fix: edit fields.sprint in .github/dojo.toml

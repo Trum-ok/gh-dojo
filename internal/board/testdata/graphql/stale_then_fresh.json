@@ -1,0 +1,358 @@
+{
+  "comment": "Hand-crafted from user_board.json: the first read lacks the Waiting status (a stale cache), the second is the board as recorded.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "BoardSchema",
+      "query": "query BoardSchema($owner: String!, $number: Int!) {\n  repositoryOwner(login: $owner) {\n    __typename\n    login\n    ... on User { projectV2(number: $number) { ...board } }\n    ... on Organization { projectV2(number: $number) { ...board } }\n  }\n}\n\nfragment board on ProjectV2 {\n  id\n  title\n  url\n  closed\n  fields(first: 100) {\n    nodes {\n      ... on ProjectV2FieldCommon { id name dataType }\n      ... on ProjectV2SingleSelectField { options { id name } }\n      ... on ProjectV2IterationField {\n        configuration {\n          iterations { id title startDate duration }\n          completedIterations { id title startDate duration }\n        }\n      }\n    }\n  }\n}",
+      "variables": {
+        "number": 5,
+        "owner": "Trum-ok"
+      },
+      "response": {
+        "data": {
+          "repositoryOwner": {
+            "__typename": "User",
+            "login": "Trum-ok",
+            "projectV2": {
+              "id": "PVT_kwHOBFGd5c4BrMYF",
+              "title": "gh-dojo",
+              "url": "https://github.com/users/Trum-ok/projects/5",
+              "closed": false,
+              "fields": {
+                "nodes": [
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzI",
+                    "name": "Title",
+                    "dataType": "TITLE"
+                  },
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzM",
+                    "name": "Assignees",
+                    "dataType": "ASSIGNEES"
+                  },
+                  {
+                    "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                    "name": "Status",
+                    "dataType": "SINGLE_SELECT",
+                    "options": [
+                      {
+                        "id": "f75ad846",
+                        "name": "Backlog"
+                      },
+                      {
+                        "id": "61e4505c",
+                        "name": "Ready"
+                      },
+                      {
+                        "id": "47fc9ee4",
+                        "name": "In progress"
+                      },
+                      {
+                        "id": "df73e18b",
+                        "name": "In review"
+                      },
+                      {
+                        "id": "98236657",
+                        "name": "Done"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzU",
+                    "name": "Labels",
+                    "dataType": "LABELS"
+                  },
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzY",
+                    "name": "Linked pull requests",
+                    "dataType": "LINKED_PULL_REQUESTS"
+                  },
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzc",
+                    "name": "Milestone",
+                    "dataType": "MILESTONE"
+                  },
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzg",
+                    "name": "Repository",
+                    "dataType": "REPOSITORY"
+                  },
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzo",
+                    "name": "Reviewers",
+                    "dataType": "REVIEWERS"
+                  },
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzs",
+                    "name": "Parent issue",
+                    "dataType": "PARENT_ISSUE"
+                  },
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzw",
+                    "name": "Sub-issues progress",
+                    "dataType": "SUB_ISSUES_PROGRESS"
+                  },
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKz0",
+                    "name": "Created",
+                    "dataType": "CREATED"
+                  },
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKz4",
+                    "name": "Updated",
+                    "dataType": "UPDATED"
+                  },
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgK0A",
+                    "name": "Closed",
+                    "dataType": "CLOSED"
+                  },
+                  {
+                    "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLFw",
+                    "name": "Priority",
+                    "dataType": "SINGLE_SELECT",
+                    "options": [
+                      {
+                        "id": "79628723",
+                        "name": "P0"
+                      },
+                      {
+                        "id": "0a877460",
+                        "name": "P1"
+                      },
+                      {
+                        "id": "da944a9c",
+                        "name": "P2"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
+                    "name": "Size",
+                    "dataType": "SINGLE_SELECT",
+                    "options": [
+                      {
+                        "id": "6c6483d2",
+                        "name": "XS"
+                      },
+                      {
+                        "id": "f784b110",
+                        "name": "S"
+                      },
+                      {
+                        "id": "7515a9f1",
+                        "name": "M"
+                      },
+                      {
+                        "id": "817d0097",
+                        "name": "L"
+                      },
+                      {
+                        "id": "db339eb2",
+                        "name": "XL"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgLF8",
+                    "name": "Estimate",
+                    "dataType": "NUMBER"
+                  },
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgLGA",
+                    "name": "Start date",
+                    "dataType": "DATE"
+                  },
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgLGE",
+                    "name": "Target date",
+                    "dataType": "DATE"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "BoardSchema",
+      "query": "query BoardSchema($owner: String!, $number: Int!) {\n  repositoryOwner(login: $owner) {\n    __typename\n    login\n    ... on User { projectV2(number: $number) { ...board } }\n    ... on Organization { projectV2(number: $number) { ...board } }\n  }\n}\n\nfragment board on ProjectV2 {\n  id\n  title\n  url\n  closed\n  fields(first: 100) {\n    nodes {\n      ... on ProjectV2FieldCommon { id name dataType }\n      ... on ProjectV2SingleSelectField { options { id name } }\n      ... on ProjectV2IterationField {\n        configuration {\n          iterations { id title startDate duration }\n          completedIterations { id title startDate duration }\n        }\n      }\n    }\n  }\n}",
+      "variables": {
+        "number": 5,
+        "owner": "Trum-ok"
+      },
+      "response": {
+        "data": {
+          "repositoryOwner": {
+            "__typename": "User",
+            "login": "Trum-ok",
+            "projectV2": {
+              "id": "PVT_kwHOBFGd5c4BrMYF",
+              "title": "gh-dojo",
+              "url": "https://github.com/users/Trum-ok/projects/5",
+              "closed": false,
+              "fields": {
+                "nodes": [
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzI",
+                    "name": "Title",
+                    "dataType": "TITLE"
+                  },
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzM",
+                    "name": "Assignees",
+                    "dataType": "ASSIGNEES"
+                  },
+                  {
+                    "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                    "name": "Status",
+                    "dataType": "SINGLE_SELECT",
+                    "options": [
+                      {
+                        "id": "f75ad846",
+                        "name": "Backlog"
+                      },
+                      {
+                        "id": "61e4505c",
+                        "name": "Ready"
+                      },
+                      {
+                        "id": "47fc9ee4",
+                        "name": "In progress"
+                      },
+                      {
+                        "id": "df73e18b",
+                        "name": "In review"
+                      },
+                      {
+                        "id": "f3ad4205",
+                        "name": "Waiting"
+                      },
+                      {
+                        "id": "98236657",
+                        "name": "Done"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzU",
+                    "name": "Labels",
+                    "dataType": "LABELS"
+                  },
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzY",
+                    "name": "Linked pull requests",
+                    "dataType": "LINKED_PULL_REQUESTS"
+                  },
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzc",
+                    "name": "Milestone",
+                    "dataType": "MILESTONE"
+                  },
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzg",
+                    "name": "Repository",
+                    "dataType": "REPOSITORY"
+                  },
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzo",
+                    "name": "Reviewers",
+                    "dataType": "REVIEWERS"
+                  },
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzs",
+                    "name": "Parent issue",
+                    "dataType": "PARENT_ISSUE"
+                  },
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzw",
+                    "name": "Sub-issues progress",
+                    "dataType": "SUB_ISSUES_PROGRESS"
+                  },
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKz0",
+                    "name": "Created",
+                    "dataType": "CREATED"
+                  },
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKz4",
+                    "name": "Updated",
+                    "dataType": "UPDATED"
+                  },
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgK0A",
+                    "name": "Closed",
+                    "dataType": "CLOSED"
+                  },
+                  {
+                    "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLFw",
+                    "name": "Priority",
+                    "dataType": "SINGLE_SELECT",
+                    "options": [
+                      {
+                        "id": "79628723",
+                        "name": "P0"
+                      },
+                      {
+                        "id": "0a877460",
+                        "name": "P1"
+                      },
+                      {
+                        "id": "da944a9c",
+                        "name": "P2"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
+                    "name": "Size",
+                    "dataType": "SINGLE_SELECT",
+                    "options": [
+                      {
+                        "id": "6c6483d2",
+                        "name": "XS"
+                      },
+                      {
+                        "id": "f784b110",
+                        "name": "S"
+                      },
+                      {
+                        "id": "7515a9f1",
+                        "name": "M"
+                      },
+                      {
+                        "id": "817d0097",
+                        "name": "L"
+                      },
+                      {
+                        "id": "db339eb2",
+                        "name": "XL"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgLF8",
+                    "name": "Estimate",
+                    "dataType": "NUMBER"
+                  },
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgLGA",
+                    "name": "Start date",
+                    "dataType": "DATE"
+                  },
+                  {
+                    "id": "PVTF_lAHOBFGd5c4BrMYFzhpgLGE",
+                    "name": "Target date",
+                    "dataType": "DATE"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

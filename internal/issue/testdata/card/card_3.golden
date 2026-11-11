@@ -1,0 +1,23 @@
+card Trum-ok/gh-dojo#3 "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)" id=I_kwDOVq9iIs8AAAABeZKr9A
+state OPEN reason="" closed=false url=https://github.com/Trum-ok/gh-dojo/issues/3
+author "Trum-ok" created 2026-11-11T18:19:10Z closed - incomplete=false
+labels [] (0)
+assignees [] (0)
+blocked by (2):
+  #2 OPEN "Коды выхода и короткие ошибки (internal/render)"
+  #1 OPEN "Каркас: Go-модуль, cobra и установка как расширение gh"
+blocking (5):
+  #11 OPEN "Глаголы из конфига: проверки и план эффектов (internal/workflow)"
+  #8 OPEN "Команда list"
+  #7 OPEN "Команда show <N>…"
+  #6 OPEN "Сверка конфига с доской"
+  #4 OPEN "Пресет kanban через embed.FS"
+item PVTI_lAHOBFGd5c4BrMYFzhH6Jn8 archived=false status="Ready"
+  Status [SINGLE_SELECT] "Ready" option=61e4505c iteration= /0 field=PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ
+  Size [SINGLE_SELECT] "M" option=7515a9f1 iteration= /0 field=PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4
+history (truncated=false):
+  2026-11-11T18:19:14Z "" → "Backlog" by "github-project-automation" automated=false
+  2026-11-11T18:42:17Z "Backlog" → "In progress" by "Trum-ok" automated=false
+  2026-11-11T19:02:20Z "In progress" → "Ready" by "Trum-ok" automated=false
+comments 0 of 0:
+body: "## Зачем\nПроцесс проекта — данные в конфиге, а не код. Все команды читают конфиг.\n\n## Что сделать\n- Поиск `.github/dojo.toml` вверх от текущей папки.\n- Разбор `version`, `preset`, `[board]` (owner, project, repos, assignee), `[fields]` (`status` обязателен), `[session]` (env, link), `[verbs.*]`.\n- Для глаголов в v0.0: `when`, `to`, `from`, `require`, `require_one_of`, `comment` (шаблон). Остальные ключи из спеки распознаются, но дают понятную ошибку «не поддерживается в этой версии», а не молча игнорируются.\n- Ошибки валидации — код 1, с указанием ключа и допустимых значений.\n- Сверка с доской — отдельная задача.\n\n## Готово, когда\n- Пример конфига из спеки (без неподдерживаемых ключей) загружается.\n- Тесты на отсутствие файла, неизвестный ключ, пустой `fields.status`, глагол без `when`.\n\nСпека: `docs/spec.md`: «Модель и конфиг».\n"
