@@ -1,0 +1,4 @@
+code: 0
+--- stdout
+wrote .github/dojo.toml for board acme/3 "Shop" with preset sprints, repo acme/shop, matches the board
+--- stderr

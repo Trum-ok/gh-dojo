@@ -1,0 +1,8 @@
+code: 0
+--- stdout
+dry run: start #43 "Pay with gift cards"
+  status: Waiting → In progress
+  sprint: Sprint 11 → Sprint 12
+  comment: "Card form first"
+--- stderr
+warning: #43 has unresolved blockers: #41 (In progress)

@@ -1,0 +1,8 @@
+code: 0
+--- stdout
+dry run: done #44 "Show prices with tax"
+  status: In progress → Done
+  sprint: Sprint 11 → Sprint 12
+  close: as completed
+--- stderr
+warning: #44 never entered Ready; using today's sprint

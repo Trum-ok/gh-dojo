@@ -1,0 +1,3 @@
+error: .github/dojo.toml: fields.sprint (from preset sprints): unknown field "Sprint" on board Trum-ok/5
+allowed: Status, Priority, Size, Estimate, Start date, Target date
+fix: add an iteration field "Sprint" on the board (https://github.com/users/Trum-ok/projects/5), or set fields.sprint in .github/dojo.toml to override preset sprints

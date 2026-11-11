@@ -1,0 +1,64 @@
+# sprints: the kanban flow, with work counted in sprints.
+#
+# Board statuses: Backlog, In progress, Waiting, Ready, Done.
+#   Ready = done, verified and committed, but not released yet.
+#   Done  = shipped: done also closes the issue as completed.
+# Board fields: Status (the built-in one: by_status_date reads its history)
+# and Sprint, an iteration field.
+#
+# An issue's sprint is the one it is worked in, and in the end the one in
+# which it became Ready: start takes it into today's sprint, ready and done
+# set the sprint of the day it entered Ready, so work released in a later
+# sprint still counts where it was finished.
+
+version = 1
+
+[fields]
+status = "Status"
+sprint = "Sprint"
+
+[statuses]
+initial = "Backlog"
+final = ["Done"]
+resolved = ["Ready", "Done"]  # a blocker in these no longer blocks
+
+[labels]
+types = []
+area_prefix = "area:"
+
+[verbs.start]
+when = "You begin working on the issue"
+to = "In progress"
+from = ["Backlog", "Waiting", "Ready"]
+iteration = "current"          # taken into today's sprint
+blockers = "warn"              # a blocked issue may not finish in this sprint
+comment = """
+Started. Session: {session}
+
+{comment}"""
+
+[verbs.wait]
+when = "Work is stuck: waiting for another issue or an outside decision"
+to = "Waiting"                 # keeps the sprint: the issue is still planned
+from = ["In progress"]
+require_one_of = ["by", "comment"]
+blockers = "link"              # --by 12 also marks the issue blocked by #12
+comment = """
+Waiting for {by}.
+
+{comment}"""
+
+[verbs.ready]
+when = "The work is done, verified and committed, but not released yet"
+to = "Ready"
+from = ["In progress", "Waiting"]
+iteration = "by_status_date:Ready"  # today's sprint; a repeat keeps the original
+comment = "{comment}"
+
+[verbs.done]
+when = "The change is released"
+to = "Done"
+from = ["Ready", "In progress"]  # never in Ready: today's sprint, with a warning
+iteration = "by_status_date:Ready"  # the sprint in which the work was finished
+close = "completed"
+comment = "{comment}"

@@ -215,6 +215,11 @@ status = "Status"
 	}
 	r := &doctorReport{}
 	checkSprint(r, cfg, s, testNow, nil) // no fields.sprint: no line
+	sprints, err := config.Parse([]byte(sprintsPresetConfig), ".github/dojo.toml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkSprint(r, sprints, s, testNow, nil) // the sprints preset's Sprint field
 	for _, tt := range []struct {
 		field string
 		now   time.Time

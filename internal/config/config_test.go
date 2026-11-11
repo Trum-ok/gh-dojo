@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -70,6 +71,16 @@ project = 1
 
 [fields]
 status = "Status"
+`
+
+// sprintsOnly is the sprints preset with only [board], as init writes it.
+const sprintsOnly = `
+preset = "sprints"
+
+[board]
+owner = "acme"
+project = 3
+repos = ["acme/shop"]
 `
 
 // writeConfig creates dir/.github/dojo.toml and returns dir.
@@ -147,6 +158,28 @@ func TestLoad(t *testing.T) {
 	}{
 		{"spec_example", specExample},
 		{"preset_only", presetOnly},
+		{"sprints_only", sprintsOnly},
+		// Overrides on top of sprints: another iteration field, start
+		// without the sprint and the blockers warning, done only from
+		// Ready into today's sprint, keeping the issue open, and a verb of
+		// its own.
+		{"sprints_override", sprintsOnly + `
+[fields]
+sprint = "Iteration"
+
+[verbs.start]
+iteration = ""
+blockers = false
+
+[verbs.done]
+from = ["Ready"]
+iteration = "current"
+close = false
+
+[verbs.plan]
+when = "The issue is taken into the current sprint"
+iteration = "current"
+`},
 		{"blockers_off", presetOnly + "[verbs.wait]\nblockers = false\n"},
 		{"blockers_deny", presetOnly + "[verbs.start]\nblockers = \"deny\"\n[verbs.wait]\nblockers = \"warn\"\n"},
 		{"override_verb_key", presetOnly + `
@@ -446,25 +479,65 @@ func TestPresetsValid(t *testing.T) {
 			}
 		})
 	}
-	if got := strings.Join(Presets(), ","); got != "kanban" {
+	if got := strings.Join(Presets(), ","); got != "kanban,sprints" {
 		t.Errorf("Presets() = %s", got)
 	}
 }
 
-func TestKanbanStatuses(t *testing.T) {
-	c := mustLoad(t, presetOnly)
-	seen := map[string]bool{}
-	for _, r := range c.StatusRefs() {
-		seen[r.Status] = true
-	}
-	for _, s := range []string{"Backlog", "In progress", "Waiting", "Ready", "Done"} {
-		if !seen[s] {
-			t.Errorf("kanban does not use status %q", s)
+// TestPresetStatuses keeps the presets on the statuses README.md
+// documents for their boards.
+func TestPresetStatuses(t *testing.T) {
+	for _, tt := range []struct{ name, content string }{{"kanban", presetOnly}, {"sprints", sprintsOnly}} {
+		c := mustLoad(t, tt.content)
+		seen := map[string]bool{}
+		for _, r := range c.StatusRefs() {
+			seen[r.Status] = true
 		}
-		delete(seen, s)
+		for _, s := range []string{"Backlog", "In progress", "Waiting", "Ready", "Done"} {
+			if !seen[s] {
+				t.Errorf("%s does not use status %q", tt.name, s)
+			}
+			delete(seen, s)
+		}
+		if len(seen) > 0 {
+			t.Errorf("%s uses undocumented statuses %v", tt.name, seen)
+		}
 	}
-	if len(seen) > 0 {
-		t.Errorf("kanban uses undocumented statuses %v", seen)
+}
+
+// TestSprintsPreset: sprints is kanban's flow with the sprint field set by
+// start, ready and done, and start warning about blockers; the rest of
+// each verb, the statuses and labels are kanban's.
+func TestSprintsPreset(t *testing.T) {
+	kanban, sprints := mustLoad(t, presetOnly), mustLoad(t, sprintsOnly)
+	if got := sprints.SprintField(); got != "Sprint" {
+		t.Errorf("fields.sprint = %q, want Sprint", got)
+	}
+	if !reflect.DeepEqual(kanban.Statuses, sprints.Statuses) || !reflect.DeepEqual(kanban.Labels, sprints.Labels) {
+		t.Error("sprints statuses or labels differ from kanban's")
+	}
+	want := map[string]struct{ iteration, blockers string }{
+		"start": {"current", "warn"},
+		"wait":  {"", "link"},
+		"ready": {"by_status_date:Ready", ""},
+		"done":  {"by_status_date:Ready", ""},
+	}
+	if len(sprints.Verbs) != len(want) {
+		t.Errorf("sprints has %d verbs, want %d", len(sprints.Verbs), len(want))
+	}
+	for name, w := range want {
+		k, _ := kanban.Verb(name)
+		v, ok := sprints.Verb(name)
+		if !ok {
+			t.Fatalf("sprints has no verb %s", name)
+		}
+		if v.IterationRule() != w.iteration || string(v.Blockers) != w.blockers {
+			t.Errorf("%s: iteration %q, blockers %q; want %q, %q", name, v.IterationRule(), v.Blockers, w.iteration, w.blockers)
+		}
+		if v.When != k.When || v.To != k.To || v.Comment != k.Comment || v.Close != k.Close ||
+			!reflect.DeepEqual(v.RequireOneOf, k.RequireOneOf) || !reflect.DeepEqual(v.From, k.From) {
+			t.Errorf("%s differs from kanban's beyond the sprint:\nkanban  %+v\nsprints %+v", name, k, v)
+		}
 	}
 }
 

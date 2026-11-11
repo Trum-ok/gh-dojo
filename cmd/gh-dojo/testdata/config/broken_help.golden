@@ -5,7 +5,7 @@ defined in .github/dojo.toml, so agents never deal with field or option IDs.
 
 No process verbs: .github/dojo.toml could not be loaded:
   error: .github/dojo.toml: unknown preset "kanbn"
-  allowed: kanban
+  allowed: kanban, sprints
 
 Usage:
   gh dojo [flags]

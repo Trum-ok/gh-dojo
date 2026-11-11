@@ -66,6 +66,7 @@ func TestDescribe(t *testing.T) {
 		code   render.Code
 	}{
 		{"kanban", dojoConfig, render.ExitOK},
+		{"sprints", sprintsPresetConfig, render.ExitOK},
 		{"custom", customConfig, render.ExitOK},
 		{"no_preset", noPresetConfig, render.ExitOK},
 		{"effects", effectsDojoConfig, render.ExitOK}, // confirm, close, reopen, labels, assign

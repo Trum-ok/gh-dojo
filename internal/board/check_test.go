@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/Trum-ok/gh-dojo/internal/board"
@@ -192,6 +194,58 @@ Notes = "released"
 `)
 	if err := board.Check(c, it); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// sprintsBoard is a config on the sprints preset pointing at the
+// hand-crafted acme/3 board with a Sprint iteration field.
+const sprintsBoard = `version = 1
+preset = "sprints"
+
+[board]
+owner = "acme"
+project = 3
+repos = ["acme/shop"]
+`
+
+// TestCheckSprintsPreset: the sprints preset with only [board] matches a
+// board with its statuses and an iteration field named Sprint, and
+// overrides on top of it are checked too. The gh-dojo board has the
+// statuses but no Sprint field.
+func TestCheckSprintsPreset(t *testing.T) {
+	l, srv, _ := newLoader(t, fixture("iteration_board"))
+	it, err := l.LoadChecked(context.Background(), parseConfig(t, sprintsBoard))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := srv.Requests(); n != 1 {
+		t.Errorf("requests = %d, want 1", n)
+	}
+	if err := board.Check(parseConfig(t, sprintsBoard+`[verbs.done]
+from = ["Ready", "Waiting"]
+[verbs.triage]
+when = "Triaged"
+to = "Todo"
+[verbs.triage.field]
+Priority = "P1"
+`), it); err != nil {
+		t.Errorf("overrides: %v", err)
+	}
+	tests := []struct {
+		name   string
+		toml   string
+		schema *board.Schema
+	}{
+		{"sprints_no_sprint_field", "", loadSchema(t)},
+		{"sprints_override_status", "[verbs.ready]\nto = \"Verified\"\n", it},
+		{"sprints_sprint_field_type", "[fields]\nsprint = \"Priority\"\n", it},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			toml := strings.Replace(sprintsBoard, "owner = \"acme\"\nproject = 3", "owner = \""+tt.schema.Owner+"\"\nproject = "+strconv.Itoa(tt.schema.Number), 1)
+			err := board.Check(parseConfig(t, toml+tt.toml), tt.schema)
+			assertError(t, err, render.ExitUsage, "check/"+tt.name)
+		})
 	}
 }
 

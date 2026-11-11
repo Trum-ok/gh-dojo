@@ -82,6 +82,41 @@ func withSprintApp(t *testing.T, now time.Time, fixtures ...string) (*graphtest.
 	return srv, srv.Requests()
 }
 
+// sprintsPresetConfig is the sprints preset with only [board], as init
+// writes it, on the acme/3 board.
+const sprintsPresetConfig = `
+version = 1
+preset = "sprints"
+
+[board]
+owner = "acme"
+project = 3
+repos = ["acme/shop"]
+`
+
+// TestSprintsPresetDryRun runs the sprints preset's verbs as dry runs, one
+// card read each, nothing written: start takes #43 out of Waiting into
+// today's Sprint 12 (it was in Sprint 11) and warns about its blocker;
+// ready and done put #42, Ready since 2026-11-05, into Sprint 11, the
+// sprint it was finished in, and done closes it; done takes #44 straight
+// from In progress, never in Ready, into today's Sprint 12 with a
+// warning; done refuses #43, which is Waiting.
+func TestSprintsPresetDryRun(t *testing.T) {
+	withConfig(t, sprintsPresetConfig)
+	srv := withApp(t, iterationBoardFixture, verbFixture("sprints_start_card"), verbFixture("sprint_done_card"),
+		verbFixture("sprints_done_card"))
+	if _, err := newApp().Schema(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	checkRuns(t, srv, srv.Requests(),
+		runs{[]string{"start", "43", "--comment", "Card form first", "--dry-run"}, render.ExitOK, 1, "sprints_start_dry_run"},
+		runs{[]string{"ready", "42", "--dry-run"}, render.ExitOK, 1, "sprints_ready_dry_run"},
+		runs{[]string{"done", "42", "--dry-run"}, render.ExitOK, 1, "sprints_done_dry_run"},
+		runs{[]string{"done", "44", "--dry-run"}, render.ExitOK, 1, "sprints_done_not_ready"},
+		runs{[]string{"done", "43", "--dry-run"}, render.ExitDenied, 1, "sprints_done_waiting"},
+	)
+}
+
 // TestSprintDone is the spec's done: #42 entered Ready on 2026-11-05, so
 // the status and Sprint 11 (not today's Sprint 12) go in one mutation
 // after one read. The repeat finds both in place: one read.

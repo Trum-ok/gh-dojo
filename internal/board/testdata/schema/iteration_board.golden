@@ -1,8 +1,10 @@
 board acme/3 Organization "Shop" PVT_kwDOacme0003 https://github.com/orgs/acme/projects/3 closed=false
   Title [TITLE] PVTF_acme_title
   Status [SINGLE_SELECT] PVTSSF_acme_status
+    option "Backlog" c3d9a1b0
     option "Todo" f75ad846
     option "In progress" 47fc9ee4
+    option "Waiting" 5e0b7c2a
     option "Ready" 61e4505c
     option "Done" 98236657
   Sprint [ITERATION] PVTIF_acme_sprint

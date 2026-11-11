@@ -153,6 +153,40 @@ func TestInitWrite(t *testing.T) {
 	}
 }
 
+// TestInitSprints: --preset sprints on a board with the statuses and a
+// Sprint iteration field writes a config that loads and matches; on the
+// gh-dojo board, which has no iteration field, the file is kept with the
+// missing field as its one problem.
+func TestInitSprints(t *testing.T) {
+	root, requests := withInit(t, "acme/shop", iterationBoardFixture)
+	code, out := runOut("init", "--preset", "sprints", "--owner", "acme", "--project", "3")
+	if code != render.ExitOK {
+		t.Errorf("code = %d, want 0", code)
+	}
+	testutil.Golden(t, "init/sprints_write", out)
+	testutil.Golden(t, "init/sprints_write_file", []byte(readConfig(t, root)))
+	if n := requests(); n != 1 {
+		t.Errorf("requests = %d, want 1 (the schema)", n)
+	}
+	cfg, err := config.Load(root)
+	if err != nil {
+		t.Fatalf("the written config does not load: %v", err)
+	}
+	if cfg.Preset != "sprints" || cfg.SprintField() != "Sprint" || cfg.Board.Owner != "acme" || cfg.Board.Project != 3 {
+		t.Errorf("board %+v, preset %q, sprint field %q", cfg.Board, cfg.Preset, cfg.SprintField())
+	}
+
+	root, _ = withInit(t, "Trum-ok/gh-dojo", boardFixture)
+	code, out = runOut("init", "--preset", "sprints", "--project", "5")
+	if code != render.ExitUsage {
+		t.Errorf("no sprint field: code = %d, want 1", code)
+	}
+	testutil.Golden(t, "init/sprints_no_sprint_field", out)
+	if _, err := config.Load(root); err != nil {
+		t.Errorf("the config is not kept or does not load: %v", err)
+	}
+}
+
 func TestInitForce(t *testing.T) {
 	// The schema cached by the first run is not used: init reads the board.
 	root, requests := withInit(t, "Trum-ok/gh-dojo", boardFixture, boardFixture)

@@ -1,0 +1,9 @@
+code: 1
+--- stdout
+wrote .github/dojo.toml for board Trum-ok/5 "gh-dojo" with preset sprints, repo Trum-ok/gh-dojo
+--- stderr
+problem: board Trum-ok/5 has no field "Sprint" (fields.sprint)
+  fix: add an iteration field "Sprint" on the board (https://github.com/users/Trum-ok/projects/5), or set [fields] sprint = "…" in .github/dojo.toml
+error: .github/dojo.toml does not match board Trum-ok/5: 1 problem above; the file is kept, fix the board or the file
+allowed: Backlog, Ready, In progress, In review, Waiting, Done
+fix: gh dojo list

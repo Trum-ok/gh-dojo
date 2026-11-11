@@ -385,13 +385,16 @@ func boardProblems(cfg *config.Config, s *board.Schema) []initProblem {
 		f, err := s.Field(cfg.Fields[name])
 		switch {
 		case err != nil:
-			kind := "field"
-			if name == "status" {
-				kind = "single-select field"
+			kind := "a field"
+			switch name {
+			case "status":
+				kind = "a single-select field"
+			case "sprint":
+				kind = "an iteration field"
 			}
 			problems = append(problems, initProblem{
 				what: fmt.Sprintf("board %s has no field %q (%s)%s", s.Ref(), cfg.Fields[name], key, suggestion(err)),
-				fix: fmt.Sprintf("add a %s %q on the board (%s), or set [fields] %s = \"…\" in %s",
+				fix: fmt.Sprintf("add %s %q on the board (%s), or set [fields] %s = \"…\" in %s",
 					kind, cfg.Fields[name], s.URL, name, cfg.Display),
 			})
 		case name == "status" && f.Type != board.TypeSingleSelect:
@@ -401,6 +404,11 @@ func boardProblems(cfg *config.Config, s *board.Schema) []initProblem {
 			})
 		case name == "status":
 			status = f
+		case name == "sprint" && f.Type != board.TypeIteration:
+			problems = append(problems, initProblem{
+				what: fmt.Sprintf("field %q on board %s is %s, not an iteration field (%s)", f.Name, s.Ref(), f.Type, key),
+				fix:  fmt.Sprintf("set [fields] %s = \"…\" in %s to an iteration field", name, cfg.Display),
+			})
 		}
 	}
 	if status == nil {

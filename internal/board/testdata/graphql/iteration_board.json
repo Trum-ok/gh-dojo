@@ -1,5 +1,5 @@
 {
-  "comment": "Organization board with an iteration field. Shape follows the recorded org_board.json plus ProjectV2IterationField.configuration from the GraphQL schema; IDs are made up. Priority and Estimate are for the field effect; Ready for iteration = \"by_status_date:Ready\".",
+  "comment": "Organization board with an iteration field. Shape follows the recorded org_board.json plus ProjectV2IterationField.configuration from the GraphQL schema; IDs are made up. Status has the sprints preset's statuses (Backlog, In progress, Waiting, Ready, Done) and Todo; Priority and Estimate are for the field effect; Ready for iteration = \"by_status_date:Ready\".",
   "handcrafted": true,
   "interactions": [
     {
@@ -32,12 +32,20 @@
                     "dataType": "SINGLE_SELECT",
                     "options": [
                       {
+                        "id": "c3d9a1b0",
+                        "name": "Backlog"
+                      },
+                      {
                         "id": "f75ad846",
                         "name": "Todo"
                       },
                       {
                         "id": "47fc9ee4",
                         "name": "In progress"
+                      },
+                      {
+                        "id": "5e0b7c2a",
+                        "name": "Waiting"
                       },
                       {
                         "id": "61e4505c",

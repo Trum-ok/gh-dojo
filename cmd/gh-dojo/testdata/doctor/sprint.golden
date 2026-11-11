@@ -1,4 +1,5 @@
 ok       sprint   Sprint: today (2026-11-11, UTC) is in Sprint 12
+ok       sprint   Sprint: today (2026-11-11, UTC) is in Sprint 12
 problem  sprint   Sprint has no iteration for today (2026-12-20, UTC)
                   fix: add one in the Sprint field settings: https://github.com/orgs/acme/projects/3/settings
 ok       sprint   Sprint: today (2026-11-01, UTC) is in Sprint 11

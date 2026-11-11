@@ -1,2 +1,2 @@
 error: .github/dojo.toml: unknown preset "scrum"
-allowed: kanban
+allowed: kanban, sprints

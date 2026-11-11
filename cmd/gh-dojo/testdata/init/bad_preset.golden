@@ -2,5 +2,5 @@ code: 1
 --- stdout
 --- stderr
 error: unknown preset "scrum"
-allowed: kanban
+allowed: kanban, sprints
 fix: gh dojo init --help

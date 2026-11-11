@@ -1,0 +1,3 @@
+error: .github/dojo.toml: fields.sprint: field "Priority" on board acme/3 is SINGLE_SELECT, not an iteration field
+allowed: Sprint
+fix: edit fields.sprint in .github/dojo.toml

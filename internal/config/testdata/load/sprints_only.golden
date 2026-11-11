@@ -1,0 +1,58 @@
+file: .github/dojo.toml
+version: 1
+preset: "sprints"
+board: owner=acme project=3 repos=[acme/shop] assignee=""
+fields.status: "Status"
+fields.sprint: "Sprint"
+statuses: initial="Backlog" final=["Done"] resolved=["Ready" "Done"]
+labels: types=[] area_prefix="area:"
+session: env=[] link="{id}"
+verb start
+  when: You begin working on the issue
+  to: "In progress"
+  from: ["Backlog" "Waiting" "Ready"]
+  require: [] require_one_of: []
+  comment: "Started. Session: {session}\n\n{comment}"
+  iteration: "current" fields: 
+  blockers: "warn"
+verb wait
+  when: Work is stuck: waiting for another issue or an outside decision
+  to: "Waiting"
+  from: ["In progress"]
+  require: [] require_one_of: ["by" "comment"]
+  comment: "Waiting for {by}.\n\n{comment}"
+  blockers: "link"
+verb ready
+  when: The work is done, verified and committed, but not released yet
+  to: "Ready"
+  from: ["In progress" "Waiting"]
+  require: [] require_one_of: []
+  comment: "{comment}"
+  iteration: "by_status_date:Ready" fields: 
+verb done
+  when: The change is released
+  to: "Done"
+  from: ["Ready" "In progress"]
+  require: [] require_one_of: []
+  comment: "{comment}"
+  labels: add=[] remove=[] assign: "" close: "completed" reopen: false confirm: false
+  iteration: "by_status_date:Ready" fields: 
+status refs:
+  "Backlog"    statuses.initial (from preset sprints)
+  "Done"       statuses.final (from preset sprints)
+  "Ready"      statuses.resolved (from preset sprints)
+  "Done"       statuses.resolved (from preset sprints)
+  "In progress" verbs.start.to (from preset sprints)
+  "Backlog"    verbs.start.from (from preset sprints)
+  "Waiting"    verbs.start.from (from preset sprints)
+  "Ready"      verbs.start.from (from preset sprints)
+  "Waiting"    verbs.wait.to (from preset sprints)
+  "In progress" verbs.wait.from (from preset sprints)
+  "Ready"      verbs.ready.to (from preset sprints)
+  "In progress" verbs.ready.from (from preset sprints)
+  "Waiting"    verbs.ready.from (from preset sprints)
+  "Ready"      verbs.ready.iteration (from preset sprints)
+  "Done"       verbs.done.to (from preset sprints)
+  "Ready"      verbs.done.from (from preset sprints)
+  "In progress" verbs.done.from (from preset sprints)
+  "Ready"      verbs.done.iteration (from preset sprints)

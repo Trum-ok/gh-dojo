@@ -105,6 +105,10 @@ func Problems(c *config.Config, s *Schema) []Problem {
 		switch {
 		case err != nil:
 			add(key, err)
+			if name == "sprint" { // e.g. the sprints preset on a board without sprints
+				e := problems[len(problems)-1].Err
+				e.Fix = fmt.Sprintf("add an iteration field %q on the board (%s), or %s", c.Fields[name], s.URL, e.Fix)
+			}
 		case name == "status" && f.Type != TypeSingleSelect:
 			add(key, s.notSingleSelect(f))
 		case name == "status":
