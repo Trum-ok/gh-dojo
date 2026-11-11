@@ -6,8 +6,8 @@ assignees [Trum-ok] (1)
 blocked by (1):
   acme/auth#7 CLOSED "Auth library upgrade"
 blocking (0):
-item: not on the board
-history (truncated=true):
+item: board membership unknown: GitHub withheld some of the issue's projects from this token
+history (truncated=true untracked=false):
   2026-11-11T18:19:14Z "" → "Backlog" by "github-project-automation" automated=false
   2026-11-11T18:42:17Z "Backlog" → "In progress" by "Trum-ok" automated=false
   2026-11-11T19:02:20Z "In progress" → "Ready" by "Trum-ok" automated=false

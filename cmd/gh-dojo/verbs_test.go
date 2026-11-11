@@ -30,6 +30,12 @@ func TestMain(m *testing.M) {
 	getenv = func(string) string { return "" }
 	newApp = noApp // see withApp
 	code := m.Run()
+	if stray := strayAppFailures(); len(stray) > 0 {
+		for _, line := range stray {
+			fmt.Fprintln(os.Stderr, "FAIL:", line)
+		}
+		code = 1
+	}
 	os.RemoveAll(dir)
 	os.Exit(code)
 }

@@ -2,7 +2,10 @@ package issue_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -19,6 +22,10 @@ var (
 	// dojoBoard is the recorded gh-dojo board (user Trum-ok, project 5);
 	// the reader only needs its ID.
 	dojoBoard = &board.Schema{Owner: "Trum-ok", OwnerType: board.OwnerUser, Number: 5, ID: "PVT_kwHOBFGd5c4BrMYF"}
+	// statusID is the ID of the board's Status field.
+	statusID = "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ"
+	// dojoStatus is how App.Card asks for the board's status.
+	dojoStatus = issue.Request{Repo: dojo, Board: dojoBoard, StatusField: "Status", StatusFieldID: statusID}
 )
 
 func fixture(name string) string { return "testdata/graphql/" + name + ".json" }
@@ -26,9 +33,9 @@ func fixture(name string) string { return "testdata/graphql/" + name + ".json" }
 func read(t *testing.T, file string, number, comments int) (*issue.Card, error) {
 	t.Helper()
 	srv := graphtest.New(t, fixture(file))
-	card, err := issue.Read(context.Background(), srv.Client(), issue.Request{
-		Repo: dojo, Number: number, Board: dojoBoard, StatusField: "Status", Comments: comments,
-	})
+	req := dojoStatus
+	req.Number, req.Comments = number, comments
+	card, err := issue.Read(context.Background(), srv.Client(), req)
 	if n := srv.Requests(); n != 1 {
 		t.Errorf("requests = %d, want exactly 1", n)
 	}
@@ -84,7 +91,269 @@ func TestReadPartial(t *testing.T) {
 	if !card.Incomplete || card.Title == "" {
 		t.Errorf("incomplete %v, title %q", card.Incomplete, card.Title)
 	}
+	// The withheld project may be this board: not "not on the board".
+	if card.OnBoard() || !card.BoardUnknown || !card.StatusUnknown() {
+		t.Errorf("on board %v, board unknown %v, status unknown %v", card.OnBoard(), card.BoardUnknown, card.StatusUnknown())
+	}
 	testutil.Golden(t, "card/partial", dump(card))
+}
+
+// variant writes a hand-crafted copy of the recorded card_3.json, changed
+// by edit (given the issue object of the response), and returns its path.
+func variant(t *testing.T, edit func(issue map[string]any)) string {
+	t.Helper()
+	data, err := os.ReadFile(fixture("card_3"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var f map[string]any
+	if err := json.Unmarshal(data, &f); err != nil {
+		t.Fatal(err)
+	}
+	f["handcrafted"] = true // nothing to record
+	in := f["interactions"].([]any)[0].(map[string]any)
+	delete(in, "variables") // any request
+	edit(in["response"].(map[string]any)["data"].(map[string]any)["repository"].(map[string]any)["issueOrPullRequest"].(map[string]any))
+	if data, err = json.Marshal(f); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "card.json")
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// boardItem returns the recorded item of the gh-dojo board.
+func boardItem(is map[string]any) map[string]any {
+	return is["projectItems"].(map[string]any)["nodes"].([]any)[0].(map[string]any)
+}
+
+// renameStatus renames the Status field to name in the item's values, as
+// GitHub returns it after the field is renamed: the lookup by the old name
+// finds nothing.
+func renameStatus(is map[string]any, name string) {
+	item := boardItem(is)
+	item["status"] = nil
+	for _, v := range item["fieldValues"].(map[string]any)["nodes"].([]any) {
+		if f, ok := v.(map[string]any)["field"].(map[string]any); ok && f["id"] == statusID {
+			f["name"] = name
+		}
+	}
+}
+
+// dropStatusValue removes the Status value from the fieldValues window and
+// marks the window truncated.
+func dropStatusValue(is map[string]any) {
+	fv := boardItem(is)["fieldValues"].(map[string]any)
+	var kept []any
+	for _, v := range fv["nodes"].([]any) {
+		if f, ok := v.(map[string]any)["field"].(map[string]any); !ok || f["id"] != statusID {
+			kept = append(kept, v)
+		}
+	}
+	fv["nodes"], fv["totalCount"] = kept, 120
+}
+
+func readVariant(t *testing.T, req issue.Request, edit func(map[string]any)) *issue.Card {
+	t.Helper()
+	srv := graphtest.New(t, variant(t, edit))
+	req.Number = 3
+	card, err := issue.Read(context.Background(), srv.Client(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return card
+}
+
+func TestReadStatus(t *testing.T) {
+	byName := dojoStatus
+	byName.StatusFieldID = ""
+	tests := []struct {
+		name    string
+		req     issue.Request
+		edit    func(map[string]any)
+		status  string
+		unknown bool
+	}{
+		{"recorded", dojoStatus, func(map[string]any) {}, "Ready", false},
+		// The field was renamed after the schema was cached: matched by ID.
+		{"renamed", dojoStatus, func(is map[string]any) { renameStatus(is, "Stage") }, "Ready", false},
+		{"renamed_by_name", byName, func(is map[string]any) { renameStatus(is, "Stage") }, "", false},
+		// Another field took the old name: its value is not the status.
+		{"renamed_name_reused", dojoStatus, func(is map[string]any) {
+			renameStatus(is, "Stage")
+			boardItem(is)["status"] = map[string]any{
+				"__typename": "ProjectV2ItemFieldSingleSelectValue", "name": "Urgent", "optionId": "o1",
+				"field": map[string]any{"id": "PVTSSF_new", "name": "Status", "dataType": "SINGLE_SELECT"},
+			}
+		}, "Ready", false},
+		// More values than the window: the lookup by name still has it.
+		{"outside_window", dojoStatus, dropStatusValue, "Ready", false},
+		// Renamed and outside the window: neither finds it.
+		{"renamed_outside_window", dojoStatus, func(is map[string]any) {
+			renameStatus(is, "Stage")
+			dropStatusValue(is)
+		}, "", true},
+		{"unset", dojoStatus, func(is map[string]any) {
+			boardItem(is)["status"] = nil
+			dropStatusValue(is)
+			boardItem(is)["fieldValues"].(map[string]any)["totalCount"] = 4
+		}, "", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			card := readVariant(t, tt.req, tt.edit)
+			if card.Status() != tt.status || card.StatusUnknown() != tt.unknown || !card.OnBoard() {
+				t.Errorf("status %q unknown %v on board %v, want %q unknown %v",
+					card.Status(), card.StatusUnknown(), card.OnBoard(), tt.status, tt.unknown)
+			}
+		})
+	}
+}
+
+func TestReadArchived(t *testing.T) {
+	card := readVariant(t, dojoStatus, func(is map[string]any) { boardItem(is)["isArchived"] = true })
+	if !card.OnBoard() || !card.Archived() || card.Status() != "Ready" {
+		t.Errorf("on board %v, archived %v, status %q", card.OnBoard(), card.Archived(), card.Status())
+	}
+	if card := readVariant(t, dojoStatus, func(map[string]any) {}); card.Archived() {
+		t.Error("recorded item archived")
+	}
+}
+
+func TestReadBoardUnknown(t *testing.T) {
+	// On 25 projects; the 20 read are other boards.
+	card := readVariant(t, dojoStatus, func(is map[string]any) {
+		pi := is["projectItems"].(map[string]any)
+		boardItem(is)["project"] = map[string]any{"id": "PVT_other"}
+		pi["totalCount"] = 25
+	})
+	if card.OnBoard() || !card.BoardUnknown || !card.StatusUnknown() || card.Incomplete {
+		t.Errorf("on board %v, board unknown %v, status unknown %v, incomplete %v",
+			card.OnBoard(), card.BoardUnknown, card.StatusUnknown(), card.Incomplete)
+	}
+	if want := "the issue is on 25 projects and only the first 1 were read"; card.BoardUnknownReason != want {
+		t.Errorf("reason %q, want %q", card.BoardUnknownReason, want)
+	}
+
+	// Truncated, but the board's item is among those read.
+	card = readVariant(t, dojoStatus, func(is map[string]any) { is["projectItems"].(map[string]any)["totalCount"] = 25 })
+	if !card.OnBoard() || card.BoardUnknown {
+		t.Errorf("on board %v, board unknown %v", card.OnBoard(), card.BoardUnknown)
+	}
+
+	// Not on any board: known.
+	card = readVariant(t, dojoStatus, func(is map[string]any) {
+		is["projectItems"] = map[string]any{"totalCount": 0, "nodes": []any{}}
+	})
+	if card.OnBoard() || card.BoardUnknown || card.StatusUnknown() {
+		t.Errorf("on board %v, board unknown %v", card.OnBoard(), card.BoardUnknown)
+	}
+}
+
+// withheldAt makes GitHub withhold the response at path (below the issue)
+// with a FORBIDDEN error.
+func withheldAt(path ...any) func(f map[string]any) {
+	return func(f map[string]any) {
+		full := append([]any{"repository", "issueOrPullRequest"}, path...)
+		f["errors"] = []any{map[string]any{"type": "FORBIDDEN", "path": full, "message": "Resource not accessible by integration"}}
+	}
+}
+
+func TestReadWithheldValues(t *testing.T) {
+	// GitHub withheld the board item's values: the status is unknown, the
+	// item is known.
+	path := variant(t, func(is map[string]any) {
+		item := boardItem(is)
+		item["status"], item["fieldValues"] = nil, nil
+	})
+	data, _ := os.ReadFile(path)
+	var f map[string]any
+	_ = json.Unmarshal(data, &f)
+	withheldAt("projectItems", "nodes", 0, "fieldValues")(f["interactions"].([]any)[0].(map[string]any)["response"].(map[string]any))
+	data, _ = json.Marshal(f)
+	_ = os.WriteFile(path, data, 0o644)
+
+	srv := graphtest.New(t, path)
+	req := dojoStatus
+	req.Number = 3
+	card, err := issue.Read(context.Background(), srv.Client(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !card.Incomplete || !card.OnBoard() || card.BoardUnknown || !card.StatusUnknown() || card.Status() != "" {
+		t.Errorf("incomplete %v on board %v board unknown %v status unknown %v status %q",
+			card.Incomplete, card.OnBoard(), card.BoardUnknown, card.StatusUnknown(), card.Status())
+	}
+}
+
+// event is a status change in the timeline JSON.
+func event(at, project, from, to string) map[string]any {
+	return map[string]any{
+		"createdAt": at, "previousStatus": from, "status": to, "wasAutomated": false,
+		"actor": map[string]any{"login": "Trum-ok"}, "project": map[string]any{"id": project},
+	}
+}
+
+func TestReadHistoryTruncated(t *testing.T) {
+	// The item was added at 2026-11-11T18:19:12Z (recorded).
+	board, other := dojoBoard.ID, "PVT_other"
+	tests := []struct {
+		name      string
+		total     int
+		events    []any
+		truncated bool
+	}{
+		{"all_read", 1, []any{
+			event("2026-11-11T18:19:14Z", board, "", "Backlog"),
+		}, false},
+		// Older events exist, but the window reaches past the item's
+		// creation: they are other boards'.
+		{"older_other_boards", 40, []any{
+			event("2026-11-01T09:00:00Z", other, "Todo", "Done"),
+			event("2026-11-11T18:19:14Z", board, "", "Backlog"),
+		}, false},
+		// Older events exist and the window starts after the item was
+		// added: some may be this board's.
+		{"older_may_be_ours", 40, []any{
+			event("2026-11-11T18:42:17Z", other, "Todo", "Done"),
+			event("2026-11-11T19:02:20Z", board, "In progress", "Ready"),
+		}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			card := readVariant(t, dojoStatus, func(is map[string]any) {
+				is["timelineItems"] = map[string]any{"totalCount": tt.total, "nodes": tt.events}
+			})
+			if card.HistoryTruncated != tt.truncated {
+				t.Errorf("truncated %v, want %v (history %v)", card.HistoryTruncated, tt.truncated, card.History)
+			}
+		})
+	}
+
+	// Not on the board: any older event may be this board's.
+	card := readVariant(t, dojoStatus, func(is map[string]any) {
+		is["projectItems"] = map[string]any{"totalCount": 0, "nodes": []any{}}
+		is["timelineItems"] = map[string]any{"totalCount": 40, "nodes": []any{event("2026-11-01T09:00:00Z", other, "Todo", "Done")}}
+	})
+	if !card.HistoryTruncated {
+		t.Error("not on the board, older events: not truncated")
+	}
+}
+
+func TestReadHistoryUntracked(t *testing.T) {
+	// fields.status names a custom field: GitHub records no status changes
+	// for it, so the Status field's events are not its history.
+	req := dojoStatus
+	req.StatusField, req.StatusFieldID = "Size", "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4"
+	card := readVariant(t, req, func(is map[string]any) { boardItem(is)["status"] = nil })
+	if !card.HistoryUntracked || len(card.History) != 0 || card.HistoryTruncated {
+		t.Errorf("untracked %v, history %v, truncated %v", card.HistoryUntracked, card.History, card.HistoryTruncated)
+	}
+	if card.Status() != "M" {
+		t.Errorf("status %q, want the Size value M", card.Status())
+	}
 }
 
 func TestReadErrors(t *testing.T) {
@@ -173,15 +442,19 @@ func dump(c *issue.Card) []byte {
 			p("  %s %s %q", l.Ref(c.Repo), l.State, l.Title)
 		}
 	}
-	if c.Item == nil {
+	switch {
+	case c.Item == nil && c.BoardUnknown:
+		p("item: board membership unknown: %s", c.BoardUnknownReason)
+	case c.Item == nil:
 		p("item: not on the board")
-	} else {
-		p("item %s archived=%v status=%q", c.Item.ID, c.Item.Archived, c.Item.Status)
+	default:
+		p("item %s archived=%v created %s status=%q unknown=%v values truncated=%v",
+			c.Item.ID, c.Item.Archived, ts(c.Item.CreatedAt), c.Item.Status, c.Item.StatusUnknown, c.Item.ValuesTruncated)
 		for _, v := range c.Item.Values {
 			p("  %s [%s] %q option=%s iteration=%s %s/%d field=%s", v.Field, v.Type, v.Text, v.OptionID, v.IterationID, v.StartDate, v.Duration, v.FieldID)
 		}
 	}
-	p("history (truncated=%v):", c.HistoryTruncated)
+	p("history (truncated=%v untracked=%v):", c.HistoryTruncated, c.HistoryUntracked)
 	for _, h := range c.History {
 		p("  %s %q → %q by %q automated=%v", ts(h.At), h.From, h.To, h.Actor, h.Automated)
 	}

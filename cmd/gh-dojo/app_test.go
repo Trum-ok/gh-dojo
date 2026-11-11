@@ -2,9 +2,18 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
+	"regexp"
+	"runtime/debug"
+	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/spf13/cobra"
 
 	"github.com/Trum-ok/gh-dojo/internal/board"
 	"github.com/Trum-ok/gh-dojo/internal/graph/graphtest"
@@ -62,8 +71,59 @@ func withApp(t *testing.T, fixtures ...string) *graphtest.Server {
 	return srv
 }
 
-// noApp is newApp outside withApp: commands must not reach GitHub in tests.
-func noApp() *App { panic("this test reaches GitHub; set it up with withApp") }
+// noApp is newApp outside withApp (TestMain installs it): commands must
+// not reach GitHub in tests. It records the call, so the test run fails
+// (strayAppFailures) even when the command's internal error is what a
+// golden file expects, and panics to stop the command.
+func noApp() *App {
+	strayApps.Lock()
+	strayApps.stacks = append(strayApps.stacks, string(debug.Stack()))
+	strayApps.Unlock()
+	panic("this test reaches GitHub; set it up with withApp")
+}
+
+// strayApps are the stacks of noApp calls.
+var strayApps struct {
+	sync.Mutex
+	stacks []string
+}
+
+// testFuncRE finds test functions in a stack.
+var testFuncRE = regexp.MustCompile(`\.(Test[A-Za-z0-9_]*)\(`)
+
+// strayAppFailures names the tests that called noApp, one line each, and
+// forgets them. TestMain fails the run when there are any.
+func strayAppFailures() []string {
+	strayApps.Lock()
+	defer strayApps.Unlock()
+	var lines []string
+	for _, stack := range strayApps.stacks {
+		name := "a test"
+		if m := testFuncRE.FindAllStringSubmatch(stack, -1); m != nil {
+			name = m[len(m)-1][1]
+		}
+		lines = append(lines, name+" reached GitHub (newApp without withApp)")
+	}
+	strayApps.stacks = nil
+	return lines
+}
+
+func TestNoAppRecorded(t *testing.T) {
+	strayAppFailures() // none so far, or TestMain reports them anyway
+	root := func() (*cobra.Command, error) {
+		return &cobra.Command{Use: "gh-dojo", RunE: func(*cobra.Command, []string) error {
+			newApp()
+			return nil
+		}}, nil
+	}
+	if code, out := runRootOut(root); code != render.ExitUsage || !strings.Contains(string(out), "internal error") {
+		t.Errorf("code = %d, want an internal error:\n%s", code, out)
+	}
+	got := strayAppFailures()
+	if len(got) != 1 || got[0] != "TestNoAppRecorded reached GitHub (newApp without withApp)" {
+		t.Errorf("stray calls = %q", got)
+	}
+}
 
 func TestAppCardWarmCache(t *testing.T) {
 	withConfig(t, dojoConfig)
@@ -112,6 +172,28 @@ func TestAppBoardMismatch(t *testing.T) {
 	}
 }
 
+// TestAppResetSchemaConcurrent runs Schema and ResetSchema together: a
+// schema kept after both is never the dropped cache.
+func TestAppResetSchemaConcurrent(t *testing.T) {
+	withConfig(t, dojoConfig)
+	withApp(t, boardFixture)
+	ctx := context.Background()
+	for range 200 {
+		if _, err := newApp().Schema(ctx); err != nil { // warm the cache
+			t.Fatal(err)
+		}
+		a := newApp()
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() { defer wg.Done(); _, _ = a.Schema(ctx) }()
+		go func() { defer wg.Done(); _ = a.ResetSchema() }()
+		wg.Wait()
+		if a.schema != nil && a.schema.Cached {
+			t.Fatal("the App kept the schema ResetSchema dropped")
+		}
+	}
+}
+
 func TestAppResetSchema(t *testing.T) {
 	withConfig(t, dojoConfig)
 	srv := withApp(t, boardFixture)
@@ -131,6 +213,84 @@ func TestAppResetSchema(t *testing.T) {
 	}
 }
 
+func TestAppCardResolvesRepoFirst(t *testing.T) {
+	withConfig(t, "\nversion = 1\npreset = \"kanban\"\n[board]\nowner = \"Trum-ok\"\nproject = 5\n")
+	var q countingClient
+	a := &App{
+		Client: &q, Loader: board.NewLoader(&q),
+		CurrentRepo: func() (string, error) { return "", errors.New("no git remote") },
+	}
+	_, err := a.Card(context.Background(), 3, 0)
+	if render.FromError(err).Code != render.ExitUsage {
+		t.Errorf("err = %v, want a config error", err)
+	}
+	if q.n != 0 {
+		t.Errorf("requests = %d, want 0: the repository is resolved before the schema", q.n)
+	}
+}
+
+// countingClient counts requests and fails them.
+type countingClient struct{ n int }
+
+func (c *countingClient) Query(context.Context, string, map[string]any, any) error {
+	c.n++
+	return errors.New("no network in tests")
+}
+
+func (c *countingClient) Mutate(context.Context, string, map[string]any, any) error {
+	c.n++
+	return errors.New("no network in tests")
+}
+
+func TestAppCardStatusByFieldID(t *testing.T) {
+	// The cached schema still names the field Status; GitHub has renamed it
+	// to Stage since. The card's status is matched by the field's ID.
+	withConfig(t, dojoConfig)
+	srv := withApp(t, boardFixture, renamedStatusFixture(t))
+	card, err := newApp().Card(context.Background(), 3, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if card.Status() != "Ready" || card.StatusUnknown() {
+		t.Errorf("status %q, unknown %v; want Ready", card.Status(), card.StatusUnknown())
+	}
+	if n := srv.Requests(); n != 2 {
+		t.Errorf("requests = %d, want 2", n)
+	}
+}
+
+// renamedStatusFixture writes card3Fixture as GitHub returns it after the
+// Status field is renamed to Stage, and returns its path.
+func renamedStatusFixture(t *testing.T) string {
+	t.Helper()
+	data, err := os.ReadFile(card3Fixture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var f map[string]any
+	if err := json.Unmarshal(data, &f); err != nil {
+		t.Fatal(err)
+	}
+	f["handcrafted"] = true
+	resp := f["interactions"].([]any)[0].(map[string]any)["response"].(map[string]any)
+	is := resp["data"].(map[string]any)["repository"].(map[string]any)["issueOrPullRequest"].(map[string]any)
+	item := is["projectItems"].(map[string]any)["nodes"].([]any)[0].(map[string]any)
+	item["status"] = nil // nothing is named Status any more
+	for _, v := range item["fieldValues"].(map[string]any)["nodes"].([]any) {
+		if field, ok := v.(map[string]any)["field"].(map[string]any); ok && field["name"] == "Status" {
+			field["name"] = "Stage"
+		}
+	}
+	if data, err = json.Marshal(f); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "card_3_renamed.json")
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
 func TestAppRepo(t *testing.T) {
 	noRepos := "\nversion = 1\npreset = \"kanban\"\n[board]\nowner = \"Trum-ok\"\nproject = 5\n"
 	withConfig(t, noRepos)
@@ -147,6 +307,27 @@ func TestAppRepo(t *testing.T) {
 	if r, err := (&App{}).Repo(); err != nil || r.String() != "Trum-ok/gh-dojo" {
 		t.Errorf("Repo from board.repos = %v, %v", r, err)
 	}
+}
+
+// TestAppRepoGHRepo runs the real CurrentRepo: GH_REPO is the current
+// repository, but board.repos wins over it, and a malformed one is
+// reported as such, not as a missing remote.
+func TestAppRepoGHRepo(t *testing.T) {
+	a := &App{CurrentRepo: gitRepo}
+	t.Setenv("GH_REPO", "acme/shop")
+	withConfig(t, dojoConfig)
+	if r, err := a.Repo(); err != nil || r.String() != "Trum-ok/gh-dojo" {
+		t.Errorf("board.repos with GH_REPO set = %v, %v", r, err)
+	}
+
+	withConfig(t, "\nversion = 1\npreset = \"kanban\"\n[board]\nowner = \"Trum-ok\"\nproject = 5\n")
+	if r, err := a.Repo(); err != nil || r.String() != "acme/shop" {
+		t.Errorf("GH_REPO = %v, %v", r, err)
+	}
+
+	t.Setenv("GH_REPO", "acme")
+	_, err := a.Repo()
+	assertCode(t, err, render.ExitUsage, "app/bad_gh_repo")
 }
 
 func TestAppMissingConfig(t *testing.T) {

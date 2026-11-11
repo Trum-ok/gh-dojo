@@ -5,12 +5,17 @@
 // history on that board.
 //
 //	card, err := issue.Read(ctx, client, issue.Request{
-//		Repo: repo, Number: 42, Board: schema, StatusField: cfg.StatusField(),
+//		Repo: repo, Number: 42, Board: schema,
+//		StatusField: cfg.StatusField(), StatusFieldID: statusField.ID,
 //	})
 //
 // Lists are graph.Page values: the nodes read and GitHub's totalCount, for
 // "showing 20 of 73". Node IDs (Card.ID, Item.ID) are for mutations only and
 // must never be printed.
+//
+// What the card cannot know it says so: BoardUnknown (the issue may be on
+// the board), StatusUnknown, HistoryTruncated and HistoryUntracked are not
+// "no" answers.
 package issue
 
 import (
@@ -73,6 +78,12 @@ type Request struct {
 	// StatusField is the board name of the status field
 	// (config.StatusField()); it fills Item.Status.
 	StatusField string
+	// StatusFieldID is the node ID of that field on Board. The status is
+	// matched by ID, so a field renamed on the board since Board was cached
+	// still yields the right status; StatusField is then only the name the
+	// value is looked up by first. Empty matches by StatusField alone (the
+	// name a stale schema may get wrong).
+	StatusFieldID string
 	// Comments is how many of the latest comments to read: 0 means
 	// DefaultComments; more than MaxComments reads MaxComments.
 	Comments int
@@ -106,13 +117,36 @@ type Card struct {
 	Blocking  graph.Page[Link]
 
 	// Item is the issue's item on Request.Board, nil when the issue is not
-	// on that board (see OnBoard).
+	// on that board or BoardUnknown (see OnBoard). An archived item is still
+	// on the board (see Archived).
 	Item *Item
+	// BoardUnknown is set when Item is nil but the reader cannot tell that
+	// the issue is not on Request.Board: the issue is an item of more
+	// boards than the window read (20), or GitHub withheld some of its
+	// project items or their projects (also Incomplete). Status is then
+	// unknown, not unset: show "board membership unknown", and a verb must
+	// not plan from "not on the board". BoardUnknownReason says why, as a
+	// lowercase phrase for messages.
+	BoardUnknown       bool
+	BoardUnknownReason string
+
 	// History is the status changes on Request.Board, oldest first, from the
-	// issue's last 20 status changes on any board; HistoryTruncated says
-	// older ones exist.
+	// issue's last 20 status changes on any board.
+	//
+	// HistoryTruncated says older status changes on Request.Board may
+	// exist: the window is full, older events exist, and none of the events
+	// read predates the item (when it does, everything older belongs to
+	// other boards or to an earlier, removed item). An issue not on the
+	// board counts as truncated whenever older events exist.
+	//
+	// GitHub records status changes (ProjectV2ItemStatusChangedEvent) for a
+	// board's built-in Status field only: changes of other single-select
+	// fields leave no event. When Request.StatusField names another field,
+	// History is empty and HistoryUntracked is set: say "not tracked", not
+	// "no changes".
 	History          []StatusChange
 	HistoryTruncated bool
+	HistoryUntracked bool
 
 	// Incomplete is set when GitHub withheld part of the card, e.g. a
 	// project or blocker the token cannot see; the rest is accurate. Item is
@@ -123,9 +157,24 @@ type Card struct {
 // Closed reports whether the issue is closed.
 func (c *Card) Closed() bool { return c.State == StateClosed }
 
-// OnBoard reports whether the issue is an item of the configured board. An
-// issue that is not needs addProjectV2ItemById before its status can be set.
+// OnBoard reports whether the issue is an item of the configured board,
+// archived or not (see Archived). An issue that is not needs
+// addProjectV2ItemById before its status can be set. False is not "not on
+// the board" when BoardUnknown is set.
 func (c *Card) OnBoard() bool { return c.Item != nil }
+
+// Archived reports whether the issue's item on the board is archived: on
+// the board, with its status and values, but hidden from board views until
+// unarchived (unarchiveProjectV2Item).
+func (c *Card) Archived() bool { return c.Item != nil && c.Item.Archived }
+
+// StatusUnknown reports whether the reader could not tell the issue's
+// status on the board: BoardUnknown, or the item's Status could not be read
+// (Item.StatusUnknown). Status() is "" then, but the issue may have one; a
+// verb must not check `from` against it.
+func (c *Card) StatusUnknown() bool {
+	return c.BoardUnknown || c.Item != nil && c.Item.StatusUnknown
+}
 
 // ItemID returns the board item node ID, "" when the issue is not on the
 // board. Never print it.
@@ -136,8 +185,8 @@ func (c *Card) ItemID() string {
 	return c.Item.ID
 }
 
-// Status returns the issue's status on the board, "" when it has none or is
-// not on the board.
+// Status returns the issue's status on the board, "" when it has none, is
+// not on the board, or StatusUnknown.
 func (c *Card) Status() string {
 	if c.Item == nil {
 		return ""
@@ -191,20 +240,41 @@ func (l Link) Ref(repo Repo) string {
 type Item struct {
 	// ID is the project item node ID, for updateProjectV2ItemFieldValue.
 	// Never print it.
-	ID       string
+	ID string
+	// Archived items are still on the board; see Card.Archived.
 	Archived bool
-	// Status is the option name of the status field, "" when unset.
+	// CreatedAt is when the issue was added to the board.
+	CreatedAt time.Time
+	// Status is the option name of the status field, "" when unset or
+	// StatusUnknown. It is matched by Request.StatusFieldID.
 	Status string
+	// StatusUnknown is set when the status could not be read: GitHub
+	// withheld the item's values, or the field (renamed since the schema was
+	// cached) is not among the values read and ValuesTruncated.
+	StatusUnknown bool
 	// Values are the item's set values of single-select, iteration, text,
 	// number and date fields, in GitHub's order. Unset fields and built-in
-	// ones (Title, Labels, ...) are absent.
-	Values []Value
+	// ones (Title, Labels, ...) are absent. ValuesTruncated says the item
+	// has more values than were read (100).
+	Values          []Value
+	ValuesTruncated bool
 }
 
 // Value returns the item's value of the board field with this name.
 func (it *Item) Value(field string) (Value, bool) {
 	for _, v := range it.Values {
 		if v.Field == field {
+			return v, true
+		}
+	}
+	return Value{}, false
+}
+
+// ValueByID returns the item's value of the board field with this node ID:
+// unlike a name, an ID survives renaming the field.
+func (it *Item) ValueByID(fieldID string) (Value, bool) {
+	for _, v := range it.Values {
+		if v.FieldID == fieldID {
 			return v, true
 		}
 	}
@@ -251,7 +321,10 @@ func Read(ctx context.Context, q graph.Querier, req Request) (*Card, error) {
 		n = DefaultComments
 	}
 	n = min(n, MaxComments)
-	vars := map[string]any{"owner": req.Repo.Owner, "repo": req.Repo.Name, "number": req.Number, "comments": n}
+	vars := map[string]any{
+		"owner": req.Repo.Owner, "repo": req.Repo.Name, "number": req.Number,
+		"comments": n, "status": req.StatusField,
+	}
 
 	var resp cardResponse
 	err := q.Query(ctx, cardQuery, vars, &resp)
@@ -259,11 +332,11 @@ func Read(ctx context.Context, q graph.Querier, req Request) (*Card, error) {
 	if resp.Repository != nil {
 		node = resp.Repository.IssueOrPullRequest
 	}
-	incomplete := false
+	var hidden [][]any // paths below the issue that GitHub withheld
 	switch {
 	case err == nil:
 	case node != nil && node.ID != "" && onlyNested(err):
-		incomplete = true // e.g. a project or blocker the token can't see
+		hidden = nestedPaths(err) // e.g. a project or blocker the token can't see
 	case render.FromError(err).Code == render.ExitNotFound && resp.Repository == nil:
 		return nil, render.NotFound("repository %s not found, or the token cannot see it", req.Repo).
 			WithFix("gh repo view " + req.Repo.String()).WithCause(err)
@@ -279,8 +352,8 @@ func Read(ctx context.Context, q graph.Querier, req Request) (*Card, error) {
 		return nil, render.NotFound("#%d in %s is a pull request, not an issue", req.Number, req.Repo).
 			WithFix(fmt.Sprintf("gh pr view %d -R %s", req.Number, req.Repo))
 	}
-	c := node.card(req)
-	c.Incomplete = incomplete
+	c := node.card(req, hidden)
+	c.Incomplete = len(hidden) > 0
 	return c, nil
 }
 
@@ -309,7 +382,51 @@ func onlyNested(err error) bool {
 	return true
 }
 
-func (n *issueJSON) card(req Request) *Card {
+// nestedPaths returns the error paths below the issue, without the leading
+// repository.issueOrPullRequest; list indexes are ints.
+func nestedPaths(err error) [][]any {
+	var gqlErr *api.GraphQLError
+	if !errors.As(err, &gqlErr) || gqlErr == nil {
+		return nil
+	}
+	var paths [][]any
+	for _, item := range gqlErr.Errors {
+		if len(item.Path) < 3 {
+			continue
+		}
+		path := make([]any, 0, len(item.Path)-2)
+		for _, p := range item.Path[2:] {
+			if f, ok := p.(float64); ok {
+				p = int(f)
+			}
+			path = append(path, p)
+		}
+		paths = append(paths, path)
+	}
+	return paths
+}
+
+// withheld reports whether GitHub withheld something at or below prefix.
+func withheld(hidden [][]any, prefix ...any) bool {
+	for _, path := range hidden {
+		if len(path) < len(prefix) {
+			continue
+		}
+		match := true
+		for i, p := range prefix {
+			if path[i] != p {
+				match = false
+				break
+			}
+		}
+		if match {
+			return true
+		}
+	}
+	return false
+}
+
+func (n *issueJSON) card(req Request, hidden [][]any) *Card {
 	c := &Card{
 		ID:          n.ID,
 		Repo:        req.Repo,
@@ -347,21 +464,11 @@ func (n *issueJSON) card(req Request) *Card {
 	if req.Board == nil {
 		return c
 	}
-	for _, it := range n.ProjectItems.Nodes {
-		if it == nil || it.Project == nil || it.Project.ID != req.Board.ID {
-			continue
-		}
-		item := &Item{ID: it.ID, Archived: it.IsArchived}
-		for _, v := range it.FieldValues.Nodes {
-			if val, ok := v.value(); ok {
-				item.Values = append(item.Values, val)
-			}
-		}
-		if v, ok := item.Value(req.StatusField); ok && v.Type == board.TypeSingleSelect {
-			item.Status = v.Text
-		}
-		c.Item = item
-		break
+	c.Item, c.BoardUnknownReason = n.boardItem(req, hidden)
+	c.BoardUnknown = c.BoardUnknownReason != ""
+	if req.StatusField != builtinStatus {
+		c.HistoryUntracked = true
+		return c
 	}
 	for _, ev := range n.TimelineItems.Nodes {
 		if ev == nil || ev.Project == nil || ev.Project.ID != req.Board.ID {
@@ -375,8 +482,93 @@ func (n *issueJSON) card(req Request) *Card {
 			Automated: ev.WasAutomated,
 		})
 	}
-	c.HistoryTruncated = n.TimelineItems.TotalCount > len(n.TimelineItems.Nodes)
+	c.HistoryTruncated = n.historyTruncated(c.Item)
 	return c
+}
+
+// builtinStatus is the name of a board's built-in status field, the only
+// one GitHub records ProjectV2ItemStatusChangedEvent for.
+const builtinStatus = "Status"
+
+// historyTruncated reports whether status changes of the board may precede
+// the timeline window: older events exist (of any board) and the oldest
+// event read is not older than the item, so older ones may be the item's.
+func (n *issueJSON) historyTruncated(item *Item) bool {
+	tl := n.TimelineItems
+	if tl.TotalCount <= len(tl.Nodes) {
+		return false
+	}
+	if item == nil || item.CreatedAt.IsZero() {
+		return true
+	}
+	for _, ev := range tl.Nodes { // oldest first
+		if ev == nil {
+			continue
+		}
+		at := parseTime(ev.CreatedAt)
+		return at.IsZero() || !at.Before(item.CreatedAt)
+	}
+	return true
+}
+
+// boardItem finds the issue's item on req.Board. When there is none it
+// returns why the issue may still be on the board, "" when it is not.
+func (n *issueJSON) boardItem(req Request, hidden [][]any) (*Item, string) {
+	items := n.ProjectItems
+	unseen := false // an item whose project GitHub withheld
+	for i, it := range items.Nodes {
+		if it == nil || it.Project == nil {
+			unseen = true
+			continue
+		}
+		if it.Project.ID != req.Board.ID {
+			continue
+		}
+		item := &Item{ID: it.ID, Archived: it.IsArchived, CreatedAt: parseTime(it.CreatedAt)}
+		for _, v := range it.FieldValues.Nodes {
+			if val, ok := v.value(); ok {
+				item.Values = append(item.Values, val)
+			}
+		}
+		item.ValuesTruncated = it.FieldValues.TotalCount > len(it.FieldValues.Nodes)
+		item.Status, item.StatusUnknown = it.status(req, item, withheld(hidden, "projectItems", "nodes", i))
+		return item, ""
+	}
+	switch {
+	case unseen || items.Nodes == nil && withheld(hidden, "projectItems"):
+		return nil, "GitHub withheld some of the issue's projects from this token"
+	case items.TotalCount > len(items.Nodes):
+		return nil, fmt.Sprintf("the issue is on %d projects and only the first %d were read", items.TotalCount, len(items.Nodes))
+	}
+	return nil, ""
+}
+
+// status returns the item's status option name, or unknown when it cannot
+// be read. The value looked up by name counts only if its field is the
+// configured one (by ID); otherwise the field may have been renamed, and
+// its ID is looked up among the values read.
+func (it *itemJSON) status(req Request, item *Item, hidden bool) (status string, unknown bool) {
+	match := func(v Value) bool {
+		if v.Type != board.TypeSingleSelect {
+			return false
+		}
+		if req.StatusFieldID != "" {
+			return v.FieldID == req.StatusFieldID
+		}
+		return v.Field == req.StatusField
+	}
+	if v, ok := it.Status.value(); ok && match(v) {
+		return v.Text, false
+	}
+	for _, v := range item.Values {
+		if match(v) {
+			return v.Text, false
+		}
+	}
+	if hidden || item.ValuesTruncated && req.StatusFieldID != "" {
+		return "", true
+	}
+	return "", false
 }
 
 func links(in conn[*linkJSON]) graph.Page[Link] {

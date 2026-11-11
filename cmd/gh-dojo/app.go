@@ -30,8 +30,9 @@ type App struct {
 	Client graph.Doer
 	// Loader reads board schemas through the cache; its Client is Client.
 	Loader *board.Loader
-	// CurrentRepo returns "owner/name" of the current directory's GitHub
-	// remote (or GH_REPO). It is used when board.repos is empty.
+	// CurrentRepo returns "owner/name" of the current repository: GH_REPO
+	// when set, else the current directory's GitHub remote. It is used only
+	// when board.repos is empty.
 	CurrentRepo func() (string, error)
 
 	mu     sync.Mutex
@@ -83,19 +84,26 @@ func (a *App) Schema(ctx context.Context) (*board.Schema, error) {
 // ResetSchema drops the schema, cached on disk and kept by the App, so the
 // next Schema re-reads the board. Call it once when GitHub rejects a schema
 // ID (board.IsStale), then rebuild what used the old one and retry.
+//
+// The cache file is removed under the lock Schema holds while loading, so
+// a concurrent Schema either finishes before (and its result is dropped) or
+// starts after and re-reads the board: it never keeps the old cache.
 func (a *App) ResetSchema() error {
 	cfg, err := a.Config()
 	if err != nil {
 		return err
 	}
 	a.mu.Lock()
+	defer a.mu.Unlock()
 	a.schema = nil
-	a.mu.Unlock()
 	return a.Loader.Invalidate(board.RefOf(cfg))
 }
 
-// Repo returns the default repository: board.repos[0], else the current
-// directory's GitHub remote. Neither is a config error (exit code 1).
+// Repo returns the default repository: board.repos[0] when set, else the
+// current repository (CurrentRepo: GH_REPO, else the git remote). The
+// config wins: GH_REPO does not override board.repos. When neither gives a
+// repository it is a config error (exit code 1) that says why the current
+// one is unknown, e.g. a malformed GH_REPO.
 func (a *App) Repo() (issue.Repo, error) {
 	cfg, err := a.Config()
 	if err != nil {
@@ -106,7 +114,7 @@ func (a *App) Repo() (issue.Repo, error) {
 	}
 	name, err := a.CurrentRepo()
 	if err != nil {
-		return issue.Repo{}, cfg.Errorf("board.repos is empty and the current directory has no GitHub remote").
+		return issue.Repo{}, cfg.Errorf("board.repos is empty and the current repository is unknown: %v", err).
 			WithFix(`add repos = ["owner/name"] under [board] in ` + cfg.Display).WithCause(err)
 	}
 	return issue.ParseRepo(name)
@@ -115,13 +123,17 @@ func (a *App) Repo() (issue.Repo, error) {
 // Card reads issue n of the default repository with its item on the board:
 // one GraphQL request with a warm schema cache. comments is how many of
 // the latest comments to read; 0 means issue.DefaultComments. A missing
-// issue is exit code 3.
+// issue is exit code 3. The repository is resolved first, so a config
+// without one sends no request.
+//
+// The status is matched by the status field's ID from the schema, so a
+// field renamed since the schema was cached still reads right.
 func (a *App) Card(ctx context.Context, n, comments int) (*issue.Card, error) {
-	s, err := a.Schema(ctx)
+	repo, err := a.Repo()
 	if err != nil {
 		return nil, err
 	}
-	repo, err := a.Repo()
+	s, err := a.Schema(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -129,15 +141,24 @@ func (a *App) Card(ctx context.Context, n, comments int) (*issue.Card, error) {
 	if err != nil {
 		return nil, err
 	}
-	return issue.Read(ctx, a.Client, issue.Request{
+	req := issue.Request{
 		Repo: repo, Number: n, Board: s, StatusField: cfg.StatusField(), Comments: comments,
-	})
+	}
+	if f, err := s.Field(req.StatusField); err == nil { // Schema checked it
+		req.StatusFieldID = f.ID
+	}
+	return issue.Read(ctx, a.Client, req)
 }
 
 // workflowIssue is the state workflow plans with. Ref keeps the card, so an
 // executor finds the node IDs it needs there: card.ID for the issue,
 // card.ItemID() for the board item ("" when not on the board: add it with
 // addProjectV2ItemById first, which returns the item ID).
+//
+// workflow.Issue cannot say "unknown": when card.StatusUnknown() (board
+// membership or status could not be read) it shows the issue off the board
+// or without a status, so check that before planning. An archived item
+// (card.Archived()) is OnBoard.
 func workflowIssue(c *issue.Card) workflow.Issue {
 	is := workflow.Issue{
 		Number:  c.Number,

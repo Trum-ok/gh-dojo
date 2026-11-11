@@ -2,14 +2,22 @@ package issue
 
 // cardQuery reads a whole card in one request (principle 6). Windows:
 // labels 20, assignees 10, blockers 20 each way, project items 20 (each with
-// up to 50 field values), the last 20 status changes and the last $comments
-// comments; every list keeps its totalCount.
+// up to 100 field values), the last 20 status changes and the last
+// $comments comments; every list keeps its totalCount, so the reader can
+// tell "none" from "not read".
+//
+// Each project item also reads the value of the field named $status
+// directly (fieldValueByName), so the status is there whatever the size of
+// the fieldValues window; the reader trusts it only when its field ID is
+// the configured status field's, and otherwise looks the ID up among
+// fieldValues (a field renamed since the schema was cached). GitHub has no
+// lookup by field ID. The item's createdAt bounds its status history.
 //
 // issueOrPullRequest tells a pull request from a missing number.
 // stateReason(enableDuplicate: true) reports DUPLICATE instead of
 // NOT_PLANNED. Status changes come from the timeline across all projects;
 // the reader keeps those of the configured board.
-const cardQuery = `query IssueCard($owner: String!, $repo: String!, $number: Int!, $comments: Int!) {
+const cardQuery = `query IssueCard($owner: String!, $repo: String!, $number: Int!, $comments: Int!, $status: String!) {
   repository(owner: $owner, name: $repo) {
     issueOrPullRequest(number: $number) {
       __typename
@@ -37,17 +45,10 @@ const cardQuery = `query IssueCard($owner: String!, $repo: String!, $number: Int
           nodes {
             id
             isArchived
+            createdAt
             project { id }
-            fieldValues(first: 50) {
-              nodes {
-                __typename
-                ... on ProjectV2ItemFieldSingleSelectValue { name optionId field { ...field } }
-                ... on ProjectV2ItemFieldIterationValue { title iterationId startDate duration field { ...field } }
-                ... on ProjectV2ItemFieldTextValue { text field { ...field } }
-                ... on ProjectV2ItemFieldNumberValue { number field { ...field } }
-                ... on ProjectV2ItemFieldDateValue { date field { ...field } }
-              }
-            }
+            status: fieldValueByName(name: $status) { ...value }
+            fieldValues(first: 100) { totalCount nodes { ...value } }
           }
         }
         timelineItems(last: 20, itemTypes: [PROJECT_V2_ITEM_STATUS_CHANGED_EVENT]) {
@@ -69,6 +70,15 @@ const cardQuery = `query IssueCard($owner: String!, $repo: String!, $number: Int
 }
 
 fragment link on Issue { number title state repository { nameWithOwner } }
+
+fragment value on ProjectV2ItemFieldValue {
+  __typename
+  ... on ProjectV2ItemFieldSingleSelectValue { name optionId field { ...field } }
+  ... on ProjectV2ItemFieldIterationValue { title iterationId startDate duration field { ...field } }
+  ... on ProjectV2ItemFieldTextValue { text field { ...field } }
+  ... on ProjectV2ItemFieldNumberValue { number field { ...field } }
+  ... on ProjectV2ItemFieldDateValue { date field { ...field } }
+}
 
 fragment field on ProjectV2FieldCommon { id name dataType }`
 
@@ -113,16 +123,9 @@ type issueJSON struct {
 		ViewerDidAuthor bool   `json:"viewerDidAuthor"`
 		Body            string `json:"body"`
 	}] `json:"comments"`
-	BlockedBy    conn[*linkJSON] `json:"blockedBy"`
-	Blocking     conn[*linkJSON] `json:"blocking"`
-	ProjectItems conn[*struct {
-		ID         string `json:"id"`
-		IsArchived bool   `json:"isArchived"`
-		Project    *struct {
-			ID string `json:"id"`
-		} `json:"project"`
-		FieldValues conn[*valueJSON] `json:"fieldValues"`
-	}] `json:"projectItems"`
+	BlockedBy     conn[*linkJSON] `json:"blockedBy"`
+	Blocking      conn[*linkJSON] `json:"blocking"`
+	ProjectItems  conn[*itemJSON] `json:"projectItems"`
 	TimelineItems conn[*struct {
 		CreatedAt      string `json:"createdAt"`
 		PreviousStatus string `json:"previousStatus"`
@@ -133,6 +136,17 @@ type issueJSON struct {
 			ID string `json:"id"`
 		} `json:"project"`
 	}] `json:"timelineItems"`
+}
+
+type itemJSON struct {
+	ID         string `json:"id"`
+	IsArchived bool   `json:"isArchived"`
+	CreatedAt  string `json:"createdAt"`
+	Project    *struct {
+		ID string `json:"id"`
+	} `json:"project"`
+	Status      *valueJSON       `json:"status"`
+	FieldValues conn[*valueJSON] `json:"fieldValues"`
 }
 
 type linkJSON struct {
