@@ -405,13 +405,15 @@ func configNote() string {
 }
 
 // processHelp is the lifecycle section of the root help: the statuses each
-// verb moves an issue from and to, in config order, then the initial and
-// final statuses. It is empty when the config cannot be loaded (see
+// verb moves an issue from and to, in config order, then the initial,
+// final and resolved statuses. It is empty when the config cannot be loaded (see
 // configNote).
 //
 //	Lifecycle (from → to):
 //	  start       Backlog, Waiting, Ready → In progress
 //	  Initial:    Backlog (new issues; also an issue with no status or not on the board)
+//	  Final:      Done (gh dojo list hides it unless --all)
+//	  Resolved:   Ready, Done (a blocker in these no longer blocks)
 func processHelp() string {
 	cfg, err := loadConfig()
 	if err != nil {
@@ -440,6 +442,9 @@ func processHelp() string {
 	}
 	if s := cfg.Statuses.Final; len(s) > 0 {
 		line("Final:", "%s (gh dojo list hides it unless --all)", strings.Join(s, ", "))
+	}
+	if s := cfg.Statuses.Resolved; len(s) > 0 {
+		line("Resolved:", "%s (a blocker in these no longer blocks)", strings.Join(s, ", "))
 	}
 	if b.Len() == 0 {
 		return ""

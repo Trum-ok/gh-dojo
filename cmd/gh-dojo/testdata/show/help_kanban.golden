@@ -1,0 +1,41 @@
+code: 0
+--- stdout
+Read issues before working on them: board status, blockers, history, description, comments.
+
+Prints per issue: state, board status and fields, milestone, labels,
+assignees, blockers both ways with their board status, status history on
+the board, the description and the latest comments, indented. Times are
+UTC.
+
+A blocker is resolved, no longer blocking, when it is closed or its board
+status is in statuses.resolved, here: Ready, Done.
+Unresolved blockers are listed first; a blocker whose board status could
+not be read counts as unresolved.
+
+Folding, always with a note saying what is hidden:
+  - the last 5 comments are printed; --comments N prints the last N,
+    --comments all up to 100 (the most gh dojo reads);
+  - a description is cut at 2000 characters, and the comments shown share
+    1500 (200 to 600 each); --full prints them whole.
+--brief prints three lines per issue (four when GitHub hid part of it):
+title; state, status, milestone, labels, assignees; blockers and counts.
+It takes neither --comments nor --full.
+
+Several numbers are read in one request (up to 20 issues per request).
+A missing issue or a pull request number is reported after the others are
+printed, with exit code 3.
+
+Usage:
+  gh dojo show <N>... [flags]
+
+Examples:
+  gh dojo show 42
+  gh dojo show 42 43 57 --brief
+  gh dojo show 42 --comments all
+
+Flags:
+      --brief            three lines per issue: no description, history or comments
+      --comments N|all   how many of the latest comments to print, or all (up to 100) (default 5)
+      --full             print descriptions and comments without cutting them
+  -h, --help             help for show
+--- stderr

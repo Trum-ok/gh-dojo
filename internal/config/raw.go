@@ -109,6 +109,43 @@ const (
 	fieldsLaterNote = "sprint fields and iteration effects come in v0.1"
 )
 
+// fieldError is the error for a [fields] entry other than status: status
+// in another case is a typo, anything else a field this version does not
+// use yet. Nil for status itself.
+func fieldError(display, name string) error {
+	switch {
+	case name == statusField:
+		return nil
+	case strings.EqualFold(name, statusField):
+		return render.Usage("%s: unknown key fields.%s; did you mean fields.%s?", display, name, statusField).
+			WithFix(fmt.Sprintf("rename %s to %s in [fields] of %s", name, statusField, display))
+	}
+	return unsupported(display, "fields."+name, fieldsLaterNote)
+}
+
+// fieldsKeyError returns the fieldError of the first [fields] entry that is
+// not status, in file order, nil when there is none or data does not parse.
+// It reads [fields] values of any type, so an unsupported field written as
+// a table ([fields.sprint]) is reported as unsupported rather than as a
+// type mismatch.
+func fieldsKeyError(data []byte, display string) error {
+	var probe struct {
+		Fields map[string]any `toml:"fields"`
+	}
+	md, err := toml.Decode(string(data), &probe)
+	if err != nil {
+		return nil
+	}
+	for _, key := range md.Keys() {
+		if len(key) == 2 && key[0] == "fields" {
+			if err := fieldError(display, key[1]); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // unsupported is the error for a key this version recognizes but does not
 // implement; note says what the key is for and when it comes.
 func unsupported(display, path, note string) error {
@@ -121,6 +158,9 @@ func parseRaw(data []byte, display string, preset bool) (*rawFile, error) {
 	var raw rawFile
 	md, err := toml.Decode(string(data), &raw)
 	if err != nil {
+		if ferr := fieldsKeyError(data, display); ferr != nil {
+			return nil, ferr
+		}
 		return nil, decodeError(display, err)
 	}
 	// The decoder silently skips a non-table value for a map.
@@ -139,7 +179,7 @@ func parseRaw(data []byte, display string, preset bool) (*rawFile, error) {
 	for _, key := range md.Keys() { // file order: the first problem wins
 		switch {
 		case len(key) == 2 && key[0] == "fields" && key[1] != statusField:
-			return nil, unsupported(display, key.String(), fieldsLaterNote)
+			return nil, fieldError(display, key[1])
 		case undecoded[key.String()]:
 			return nil, undecodedError(display, key)
 		}

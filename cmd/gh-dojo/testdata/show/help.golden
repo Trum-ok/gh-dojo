@@ -5,9 +5,12 @@ Read issues before working on them: board status, blockers, history, description
 Prints per issue: state, board status and fields, milestone, labels,
 assignees, blockers both ways with their board status, status history on
 the board, the description and the latest comments, indented. Times are
-UTC. A blocker is resolved, no longer blocking, when it is closed or its
-board status is in statuses.resolved (kanban: Ready, Done); unresolved
-blockers are listed first.
+UTC.
+
+A blocker is resolved, no longer blocking, when it is closed or its board
+status is in statuses.resolved of .github/dojo.toml.
+Unresolved blockers are listed first; a blocker whose board status could
+not be read counts as unresolved.
 
 Folding, always with a note saying what is hidden:
   - the last 5 comments are printed; --comments N prints the last N,

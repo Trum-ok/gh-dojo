@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/issue"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/spf13/cobra"
@@ -30,9 +31,12 @@ func newShowCmd() (*cobra.Command, error) {
 Prints per issue: state, board status and fields, milestone, labels,
 assignees, blockers both ways with their board status, status history on
 the board, the description and the latest comments, indented. Times are
-UTC. A blocker is resolved, no longer blocking, when it is closed or its
-board status is in statuses.resolved (kanban: Ready, Done); unresolved
-blockers are listed first.
+UTC.
+
+A blocker is resolved, no longer blocking, when it is closed or its board
+status is in statuses.resolved` + resolvedHelp() + `.
+Unresolved blockers are listed first; a blocker whose board status could
+not be read counts as unresolved.
 
 Folding, always with a note saying what is hidden:
   - the last ` + strconv.Itoa(defaultShownComments) + ` comments are printed; --comments N prints the last N,
@@ -112,6 +116,19 @@ printed, with exit code 3.`,
 	f.Var(&comments, "comments", "how many of the latest comments to print, or all (up to "+strconv.Itoa(issue.MaxComments)+")")
 	f.BoolVar(&full, "full", false, "print descriptions and comments without cutting them")
 	return cmd, nil
+}
+
+// resolvedHelp ends show's sentence on resolved blockers with the
+// configured statuses.resolved.
+func resolvedHelp() string {
+	cfg, err := loadConfig()
+	switch {
+	case err != nil:
+		return " of " + config.FileName
+	case len(cfg.Statuses.Resolved) == 0:
+		return ", here: none (only closing resolves a blocker)"
+	}
+	return ", here: " + strings.Join(cfg.Statuses.Resolved, ", ")
 }
 
 // cardSeparator separates full cards of several issues.

@@ -1,0 +1,2 @@
+error: .github/dojo.toml: unknown key fields.Status; did you mean fields.status?
+fix: rename Status to status in [fields] of .github/dojo.toml

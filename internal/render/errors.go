@@ -24,7 +24,7 @@ const (
 	ExitOK       Code = 0 // everything applied
 	ExitUsage    Code = 1 // bad arguments or config: fix per the error text
 	ExitDenied   Code = 2 // a process check refused: ask a human, don't work around it
-	ExitNotFound Code = 3 // issue or board not found: check the number
+	ExitNotFound Code = 3 // issue or board not found: check the number or the board config
 	ExitNetwork  Code = 4 // network, rate limit or auth: retry later or refresh auth
 	ExitPartial  Code = 5 // partially applied: re-run the same command to finish
 )
@@ -38,7 +38,7 @@ var ExitCodes = []struct {
 	{ExitOK, "everything applied", "go on"},
 	{ExitUsage, "bad arguments or config", "fix them as the error says"},
 	{ExitDenied, "a process check refused", "don't work around it; ask the user"},
-	{ExitNotFound, "issue or board not found", "check the number with gh dojo list"},
+	{ExitNotFound, "issue or board not found", "check the number (gh dojo list) or board.owner/project in .github/dojo.toml"},
 	{ExitNetwork, "network, rate limit or auth", "retry later, or gh auth refresh -s project"},
 	{ExitPartial, "partially applied", "re-run the same command; it finishes the rest"},
 }

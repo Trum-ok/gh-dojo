@@ -196,6 +196,8 @@ func TestLoadErrors(t *testing.T) {
 		{"unsupported_assignee", "preset = \"kanban\"\n" + board + "assignee = \"@me\"\n"},
 		{"unsupported_field", presetOnly + "sprint = \"Sprint\"\n"},
 		{"unsupported_field_first", presetOnly + "sprint = \"Sprint\"\n[verbs.start]\nwhen_ = \"x\"\n"},
+		{"field_wrong_case", strings.Replace(presetOnly, `status = "Status"`, `Status = "Status"`, 1)},
+		{"unsupported_field_table", presetOnly + "[fields.sprint]\nname = \"Sprint\"\n"},
 		{"bad_version", "version = 2\npreset = \"kanban\"\n" + board},
 		{"unknown_preset", "preset = \"scrum\"\n" + board},
 		{"missing_owner", "preset = \"kanban\"\n[board]\nproject = 3\n"},

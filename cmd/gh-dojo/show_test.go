@@ -170,6 +170,33 @@ func TestShowHelp(t *testing.T) {
 	testutil.Golden(t, "show/help", out)
 }
 
+// TestShowHelpResolved: show's help names the configured statuses.resolved,
+// not the kanban preset's.
+func TestShowHelpResolved(t *testing.T) {
+	tests := []struct {
+		name, statuses, want string
+	}{
+		{"kanban", "", "statuses.resolved, here: Ready, Done.\n"},
+		{"one", "[statuses]\nresolved = [\"Done\"]\n", "statuses.resolved, here: Done.\n"},
+		{"none", "[statuses]\nresolved = []\n", "statuses.resolved, here: none (only closing resolves a blocker).\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			withConfig(t, verbsConfig+tt.statuses)
+			code, out := runOut("show", "--help")
+			if code != render.ExitOK {
+				t.Fatalf("code %d", code)
+			}
+			if !strings.Contains(string(out), tt.want) {
+				t.Errorf("help does not contain %q:\n%s", tt.want, out)
+			}
+			if tt.name == "kanban" {
+				testutil.Golden(t, "show/help_kanban", out)
+			}
+		})
+	}
+}
+
 // TestCardText covers what the fixtures don't: cut descriptions and
 // comments, a thread longer than gh dojo reads, truncated lists, hidden
 // parts, an archived item, a reopened issue.
