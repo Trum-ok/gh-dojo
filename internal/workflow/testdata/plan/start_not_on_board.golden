@@ -1,6 +1,6 @@
 dry run: start #42 "Fix login redirect"
   add to the board
-  status: no status → In progress
+  status: not on the board → In progress
   comment: "Started. Session: claude://s/abc"
-confirm: #42 added to the board, no status → In progress, comment left
+confirm: #42 not on the board → In progress, comment left
 post: "Started. Session: claude://s/abc\n\n<!-- gh-dojo:start:c1bb1323 -->"

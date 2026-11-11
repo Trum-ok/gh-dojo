@@ -1,0 +1,5 @@
+dry run: start #42
+  status: In progress (unchanged)
+  comment: "Started. Session: claude://s/abc"
+confirm: #42 In progress (unchanged), comment left
+post: "Started. Session: claude://s/abc\n\n<!-- gh-dojo:start:c1bb1323 -->"

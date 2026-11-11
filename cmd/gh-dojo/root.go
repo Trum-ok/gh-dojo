@@ -74,17 +74,15 @@ func buildRoot(ctors []constructor) (*cobra.Command, error) {
 		SilenceUsage:               true,
 		SilenceErrors:              true,
 		CompletionOptions:          cobra.CompletionOptions{DisableDefaultCmd: true},
-		Args:                       rootArgs,
+		Args:                       unknownCommand,
 		SuggestionsMinimumDistance: 2,
 		RunE:                       func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
 	}
 	root.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		// `gh dojo start 42 --dry-run` without a loadable config fails on the
-		// verb's flag before rootArgs sees "start".
+		// verb's flag before the root's Args see "start".
 		if args := cmd.Flags().Args(); !cmd.HasParent() && len(args) > 0 {
-			if err := rootArgs(cmd, args); err != nil {
-				return err
-			}
+			return unknownCommand(cmd, args)
 		}
 		return render.Usage("%s", err).WithFix(cmd.CommandPath() + " --help")
 	})
@@ -136,9 +134,6 @@ func newHelpCmd() *cobra.Command {
 				return err
 			}
 			if len(rest) > 0 {
-				if !cmd.HasParent() {
-					return rootArgs(cmd, rest) // may name a verb of a broken config
-				}
 				return unknownCommand(cmd, rest)
 			}
 			cmd.InitDefaultHelpFlag()
@@ -148,20 +143,10 @@ func newHelpCmd() *cobra.Command {
 	}
 }
 
-// rootArgs rejects an unknown command name. A name that is not close to a
-// built-in command may be a verb, so when the config cannot be loaded the
-// error is the config's (see verbs.go).
-func rootArgs(cmd *cobra.Command, args []string) error {
-	if len(args) > 0 && len(cmd.SuggestionsFor(args[0])) == 0 {
-		if err := verbsUnavailable(args[0]); err != nil {
-			return err
-		}
-	}
-	return unknownCommand(cmd, args)
-}
-
 // unknownCommand rejects arguments to a command that only groups others,
-// listing its available subcommands and suggesting close matches.
+// listing its available subcommands and suggesting close matches. At the
+// root, a name not close to a built-in command may be a verb, so the error
+// also says why no verbs are loaded, if so (see verbs.go).
 func unknownCommand(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return nil
@@ -178,6 +163,8 @@ func unknownCommand(cmd *cobra.Command, args []string) error {
 	}
 	if s := cmd.SuggestionsFor(args[0]); len(s) > 0 {
 		what += ", did you mean " + strconv.Quote(s[0]) + "?"
+	} else if why := verbsUnavailable(); why != "" && !cmd.HasParent() {
+		what += "; verbs unavailable: " + why
 	}
 	return render.Usage("%s", what).WithAllowed(allowed...).WithFix(cmd.CommandPath() + " --help")
 }

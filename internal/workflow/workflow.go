@@ -33,12 +33,13 @@ type Issue struct {
 	OnBoard bool
 	Status  string
 
-	// Comments are the issue's latest comments, oldest first, bodies
-	// verbatim (GraphQL comments(last: N) returns them in this order). They
-	// are only searched for gh-dojo markers (see LastMarker): the most recent
-	// marker of a verb must be in the window for a repeated verb not to post
-	// its comment twice. A window of the last 20 comments is enough for an
-	// immediate retry; an older marker only means the comment is posted again.
+	// Comments are the issue's latest comments, oldest first (GraphQL
+	// comments(last: N) returns them in this order), each with its body
+	// verbatim and ViewerDidAuthor. They are only searched for gh-dojo
+	// markers (see LastMarker): the most recent marker must be in the window
+	// for a retried verb not to post its comment twice. The last 20 comments
+	// are enough for an immediate retry; a marker outside the window only
+	// means the comment is posted again.
 	Comments []Comment
 
 	// Ref is opaque to this package: the reader may keep the node IDs the
@@ -49,6 +50,10 @@ type Issue struct {
 // Comment is an issue comment.
 type Comment struct {
 	Body string
+	// ViewerDidAuthor is GraphQL IssueComment.viewerDidAuthor: the comment
+	// was written by the authenticated user. Markers in other users'
+	// comments are ignored, so nobody else can suppress a verb's comment.
+	ViewerDidAuthor bool
 }
 
 // Args are the verb arguments from the command line.
@@ -81,9 +86,6 @@ func (a Args) value(arg string) string {
 
 // Engine plans verbs with the rules of one config.
 type Engine struct {
-	// Verbs are all verbs of the config. Only used to suggest a verb that
-	// leads to an allowed status when a from check fails.
-	Verbs []config.Verb
 	// Initial is the status assumed for an issue that is not on the board or
 	// has no status (statuses.initial); may be "".
 	Initial string
@@ -99,7 +101,7 @@ type Engine struct {
 
 // New returns an Engine with the rules of c.
 func New(c *config.Config) *Engine {
-	return &Engine{Verbs: c.Verbs, Initial: c.Statuses.Initial, Final: c.Statuses.Final, Session: c.Session}
+	return &Engine{Initial: c.Statuses.Initial, Final: c.Statuses.Final, Session: c.Session}
 }
 
 // byNumberRE matches an issue reference given to --by: "12" or "#12".
@@ -253,21 +255,23 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 		config.VarComment: a.value(config.ArgComment),
 		config.VarBy:      NormalizeBy(a.By),
 	}
+	noSession := false
 	if v.Uses(config.VarSession) {
 		link, ok := e.Session.Resolve(e.Getenv)
 		vars[config.VarSession] = link
-		if !ok && e.Session.Configured() {
-			p.Warnings = append(p.Warnings, fmt.Sprintf(
-				"no agent session: %s is not set, so the comment has no session link",
-				join(e.Session.Env, "or")))
-		}
+		noSession = !ok && e.Session.Configured()
 	}
 	if body := config.Render(v.Comment, vars); body != "" {
 		marker := Marker(v.Name, body)
-		if AlreadyPosted(is.Comments, v.Name, marker) {
+		if AlreadyPosted(is.Comments, marker) {
 			p.CommentPresent = true
 		} else {
 			p.Ops = append(p.Ops, AddComment{Body: body, Marker: marker})
+			if noSession {
+				p.Warnings = append(p.Warnings, fmt.Sprintf(
+					"no agent session: %s is not set, so the comment has no session link",
+					join(e.Session.Env, "or")))
+			}
 		}
 	}
 	return p, nil
@@ -282,47 +286,28 @@ func (e *Engine) checkFrom(v config.Verb, is Issue) error {
 	if len(v.From) == 0 || slices.Contains(v.From, current) {
 		return nil
 	}
-	var what string
+	// The same words as the dry run and confirmation line use.
+	var from string
 	switch {
-	case current == "":
-		what = fmt.Sprintf("%s cannot move #%d: it has no status", v.Name, is.Number)
 	case !is.OnBoard:
-		what = fmt.Sprintf("%s cannot move #%d from %s: it is not on the board, which counts as %s", v.Name, is.Number, current, current)
+		from = ": " + notOnBoard
 	case is.Status == "":
-		what = fmt.Sprintf("%s cannot move #%d from %s: it has no status, which counts as %s", v.Name, is.Number, current, current)
+		from = ": " + noStatus
 	default:
-		what = fmt.Sprintf("%s cannot move #%d from %s", v.Name, is.Number, current)
+		from = " from " + is.Status
 	}
-	err := render.Denied("%s", what).WithAllowed(v.From...)
-	if u, ok := e.leadsTo(v, current, is.Closed); ok {
-		return err.WithFix(Example(u, is.Number))
+	if is.Status == "" && current != "" {
+		from += ", which counts as " + current
 	}
-	err.What += "\nthis is a process rule: ask the user how to proceed"
-	return err
+	// No fix line and no allowed line: a refusal ends with asking the user,
+	// never with a command that works around the process.
+	return render.Denied("%s cannot move #%d%s; it starts only from %s\n"+
+		"this is a process rule: ask the user how to proceed",
+		v.Name, is.Number, from, join(v.From, "or"))
 }
 
 // runsOnClosed reports whether v may run on a closed issue: its target
 // status is final.
 func (e *Engine) runsOnClosed(v config.Verb) bool {
 	return v.To != "" && slices.Contains(e.Final, v.To)
-}
-
-// leadsTo finds the first other verb that moves an issue from current to a
-// status v starts from, and that may run on it if it is closed.
-func (e *Engine) leadsTo(v config.Verb, current string, closed bool) (config.Verb, bool) {
-	if current == "" {
-		return config.Verb{}, false
-	}
-	for _, u := range e.Verbs {
-		if u.Name == v.Name || u.To == "" || u.To == current || !slices.Contains(v.From, u.To) {
-			continue
-		}
-		if closed && !e.runsOnClosed(u) {
-			continue
-		}
-		if len(u.From) == 0 || slices.Contains(u.From, current) {
-			return u, true
-		}
-	}
-	return config.Verb{}, false
 }

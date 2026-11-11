@@ -25,9 +25,10 @@ import (
 //   - no verb commands are registered;
 //   - the root help ends with the config error (see configNote), so a broken
 //     file is visible right where an agent looks for verbs;
-//   - a command name that is neither built-in nor close to one (a verb the
-//     user expected) fails with the config error, not "unknown command" (see
-//     verbsUnavailable);
+//   - an unknown command that is not close to a built-in one (maybe a verb)
+//     fails with "unknown command" plus the first line of the reason, the
+//     built-ins as allowed values and gh dojo --help as the fix (see
+//     verbsUnavailable and unknownCommand);
 //   - built-in commands that need the config load it themselves through
 //     loadConfig and return its error.
 
@@ -51,14 +52,27 @@ var getenv = os.Getenv
 
 // Backend reads issues and applies plans; it is the only part of a verb that
 // talks to GitHub.
+//
+// Requests: one query for ReadIssue and one mutation for Apply, so 2 with a
+// warm board cache. An issue not on the board needs a second mutation:
+// addProjectV2ItemById returns the item ID that the status update needs, so
+// that case takes 3 requests.
+//
+// Retries: after a stale ID or a partial failure, the way to resume is to
+// run ReadIssue → Plan → Apply again (in runVerb), never to replay the old
+// plan: the fresh plan leaves out what is already done, including a comment
+// already posted (see workflow.AlreadyPosted). That loop is for the #12
+// implementer to add.
 type Backend interface {
-	// ReadIssue returns the state of issue n in the board's default repo,
-	// filled as workflow.Issue documents, with a render error on failure
-	// (render.NotFound for a missing issue).
+	// ReadIssue returns the state of issue n in the default repo, filled as
+	// workflow.Issue documents (comments with viewerDidAuthor), with a
+	// render error on failure (render.NotFound for a missing issue). The
+	// default repo comes from the app wiring: board.repos[0], or the git
+	// remote of the current directory.
 	ReadIssue(ctx context.Context, n int) (workflow.Issue, error)
-	// Apply applies every op of a non-empty plan. On success the command
-	// prints p.Confirm(); a partial failure is a render.Partial error that
-	// says what was done.
+	// Apply applies every op of a non-empty plan, finding the issue's node
+	// IDs in p.Issue.Ref. On success the command prints p.Confirm(); a
+	// partial failure is a render.Partial error that says what was done.
 	Apply(ctx context.Context, p *workflow.Plan) error
 }
 
@@ -76,7 +90,7 @@ func (pendingBackend) ReadIssue(context.Context, int) (workflow.Issue, error) {
 func (pendingBackend) Apply(context.Context, *workflow.Plan) error { return errNotImplemented() }
 
 func errNotImplemented() error {
-	return render.Usage("verbs cannot reach GitHub yet: not implemented in this build")
+	return render.Internal("verbs cannot reach GitHub yet, the backend is not implemented in this build")
 }
 
 func newVerbCmds() ([]*cobra.Command, error) {
@@ -160,27 +174,32 @@ func runVerb(cmd *cobra.Command, cfg *config.Config, v config.Verb, n int, args 
 
 var issueRE = regexp.MustCompile(`^#?[1-9][0-9]*$`)
 
-// parseIssue parses an issue number: "42" or "#42".
+// parseIssue parses an issue number, "42" or "#42", up to GitHub's maximum
+// (a GraphQL Int, 2^31-1).
 func parseIssue(s string) (int, bool) {
 	if !issueRE.MatchString(s) {
 		return 0, false
 	}
-	n, err := strconv.Atoi(strings.TrimPrefix(s, "#"))
-	return n, err == nil
+	n, err := strconv.ParseInt(strings.TrimPrefix(s, "#"), 10, 32)
+	return int(n), err == nil
 }
+
+// issueExamples shows how to pass an issue number. A bare #42 is a comment
+// in the shell, so the # form is quoted.
+const issueExamples = `42 or "#42"`
 
 // issueArg accepts exactly one issue number.
 func issueArg(cmd *cobra.Command, args []string) error {
 	help := cmd.CommandPath() + " --help"
 	switch {
 	case len(args) == 0:
-		return render.Usage("%s needs an issue number, like 42 or #42", cmd.Name()).WithFix(help)
+		return render.Usage("%s needs an issue number, like %s", cmd.Name(), issueExamples).WithFix(help)
 	case len(args) > 1:
 		return render.Usage("%s takes one issue number, got %d; several at once are not supported yet",
 			cmd.Name(), len(args)).WithFix(help)
 	}
 	if _, ok := parseIssue(args[0]); !ok {
-		return render.Usage("%q is not an issue number; pass one like 42 or #42", args[0]).WithFix(help)
+		return render.Usage("%q is not an issue number; pass one like %s", args[0], issueExamples).WithFix(help)
 	}
 	return nil
 }
@@ -240,7 +259,7 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 	line("Board", "adds the issue if it is not there")
 	if v.Comment != "" {
 		line("Comment", "%s", strconv.Quote(v.Comment))
-		line("", "skipped when it renders empty or repeats the last %s comment", v.Name)
+		line("", "skipped when it renders empty or is already the latest gh-dojo comment")
 	}
 	return b.String()
 }
@@ -259,14 +278,16 @@ func configNote() string {
 	return "\n\nNo process verbs: " + config.FileName + " could not be loaded:\n  " + text
 }
 
-// verbsUnavailable returns the config error for an unknown command name,
-// which may be a verb, or nil when the config loads.
-func verbsUnavailable(name string) error {
+// verbsUnavailable says in one line why no verbs are loaded, or returns ""
+// when the config loads. The root help has the full error.
+func verbsUnavailable() string {
 	_, err := loadConfig()
-	if err == nil {
-		return nil
+	switch {
+	case err == nil:
+		return ""
+	case errors.Is(err, config.ErrNoConfig):
+		return "no " + config.FileName + " found"
 	}
-	e := *render.FromError(err)
-	e.What = fmt.Sprintf("unknown command %q; verbs are unavailable: %s", name, e.What)
-	return &e
+	what, _, _ := strings.Cut(render.FromError(err).What, "\n")
+	return what
 }

@@ -1,5 +1,5 @@
 code: 1
 --- stdout
 --- stderr
-error: "0" is not an issue number; pass one like 42 or #42
+error: "0" is not an issue number; pass one like 42 or "#42"
 fix: gh dojo start --help

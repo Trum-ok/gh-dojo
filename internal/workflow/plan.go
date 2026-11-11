@@ -23,7 +23,7 @@ type Plan struct {
 	Ops []Op
 
 	StatusUnchanged bool // the issue is already in Target; no SetStatus
-	CommentPresent  bool // the same comment is the verb's latest already; no AddComment
+	CommentPresent  bool // the same comment is the latest gh-dojo comment already; no AddComment
 
 	// Warnings are for stderr, one line each, such as a missing agent
 	// session. They never stop the verb.
@@ -69,8 +69,12 @@ func (AddComment) op()            {}
 // Text is the comment body to post: Body, a blank line and Marker.
 func (c AddComment) Text() string { return c.Body + "\n\n" + c.Marker }
 
-// noChanges stands for an empty list of effects.
-const noChanges = "no changes"
+// Wording shared by the dry run, the confirmation line and the from check.
+const (
+	noChanges  = "no changes"       // an empty list of effects
+	noStatus   = "no status"        // as render.Transition says it
+	notOnBoard = "not on the board" // the "status" of an issue not on the board
+)
 
 // commentSkipped is the effect of a comment found already posted. It is never
 // in Plan.Ops; it only gives the dry-run and confirmation wording.
@@ -84,18 +88,26 @@ func (commentSkipped) op()              {}
 func (p *Plan) Empty() bool { return len(p.Ops) == 0 }
 
 // lines returns one entry per effect, through pick, in a fixed order: board,
-// status, comment. Effects already in place are included.
-func (p *Plan) lines(pick func(Op) string) []string {
+// status, comment. Effects already in place are included. The status change
+// of an issue not on the board reads "not on the board → In progress"; with
+// short set, that line alone stands for adding the issue to the board.
+func (p *Plan) lines(pick func(Op) string, short bool) []string {
 	var board, status, comment []string
 	for _, op := range p.Ops {
-		switch op.(type) {
+		switch op := op.(type) {
 		case AddToBoard:
 			board = append(board, pick(op))
 		case SetStatus:
+			if !p.Issue.OnBoard {
+				op.From = notOnBoard
+			}
 			status = append(status, pick(op))
 		case AddComment:
 			comment = append(comment, pick(op))
 		}
+	}
+	if short && len(status) > 0 {
+		board = nil
 	}
 	if p.StatusUnchanged {
 		status = append(status, pick(SetStatus{From: p.Target, To: p.Target}))
@@ -115,7 +127,7 @@ func (p *Plan) lines(pick func(Op) string) []string {
 func (p *Plan) DryRun() string {
 	var b strings.Builder
 	b.WriteString(render.Confirm(fmt.Sprintf("dry run: %s #%d", p.Verb, p.Issue.Number), p.Issue.Title))
-	lines := p.lines(Op.Describe)
+	lines := p.lines(Op.Describe, false)
 	if len(lines) == 0 {
 		lines = []string{noChanges}
 	}
@@ -128,17 +140,20 @@ func (p *Plan) DryRun() string {
 // Confirm is the confirmation line of a fully applied plan:
 //
 //	#42 Backlog → In progress, comment left
+//	#42 not on the board → In progress, comment left
 //	#42 In progress (unchanged), comment already present
 func (p *Plan) Confirm() string {
-	effects := p.lines(Op.Effect)
+	effects := p.lines(Op.Effect, true)
 	if len(effects) == 0 {
 		effects = []string{noChanges}
 	}
 	return render.Confirm(fmt.Sprintf("#%d", p.Issue.Number), "", effects...)
 }
 
-// markerRE matches the hidden marker gh-dojo appends to a verb's comment.
-var markerRE = regexp.MustCompile(`<!-- gh-dojo:([a-z][a-z0-9-]*):([0-9a-f]{8,64}) -->`)
+// markerRE matches the hidden marker gh-dojo puts at the end of a verb's
+// comment, after a blank line (see AddComment.Text). A marker anywhere else,
+// such as one quoted in the middle of a comment, does not count.
+var markerRE = regexp.MustCompile(`\r?\n\r?\n(<!-- gh-dojo:[a-z][a-z0-9-]*:[0-9a-f]{8} -->)\s*$`)
 
 // Marker returns the hidden marker of a comment that verb posts with body:
 // "<!-- gh-dojo:<verb>:<hash> -->", where hash is the first 8 hex digits of
@@ -148,26 +163,27 @@ func Marker(verb, body string) string {
 	return fmt.Sprintf("<!-- gh-dojo:%s:%s -->", verb, hex.EncodeToString(sum[:4]))
 }
 
-// LastMarker returns the marker of the most recent comment that carries a
-// marker of verb; comments are oldest first. A comment with several markers
-// counts by its last one.
-func LastMarker(comments []Comment, verb string) (string, bool) {
+// LastMarker returns the marker of the most recent gh-dojo comment, of any
+// verb; comments are oldest first. Only comments the viewer wrote count, and
+// only a marker that ends the comment (see markerRE).
+func LastMarker(comments []Comment) (string, bool) {
 	for i := len(comments) - 1; i >= 0; i-- {
-		ms := markerRE.FindAllStringSubmatch(comments[i].Body, -1)
-		for j := len(ms) - 1; j >= 0; j-- {
-			if ms[j][1] == verb {
-				return ms[j][0], true
-			}
+		if !comments[i].ViewerDidAuthor {
+			continue
+		}
+		if m := markerRE.FindStringSubmatch(comments[i].Body); m != nil {
+			return m[1], true
 		}
 	}
 	return "", false
 }
 
-// AlreadyPosted reports whether the verb's latest marked comment carries
-// marker, so posting the comment again would duplicate it. An earlier comment
-// with the same marker does not count: after a different comment of the verb
-// the same text is posted again.
-func AlreadyPosted(comments []Comment, verb, marker string) bool {
-	last, ok := LastMarker(comments, verb)
+// AlreadyPosted reports whether the most recent gh-dojo comment on the issue
+// carries marker, so posting the comment again would duplicate it. This
+// makes a retry after a partial failure safe, while a new cycle still
+// comments: after start, wait and start again, the second start's comment is
+// posted even if it equals the first.
+func AlreadyPosted(comments []Comment, marker string) bool {
+	last, ok := LastMarker(comments)
 	return ok && last == marker
 }

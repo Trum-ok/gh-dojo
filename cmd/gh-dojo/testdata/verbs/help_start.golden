@@ -8,7 +8,7 @@ You begin working on the issue
   Optional:  --comment
   Board:     adds the issue if it is not there
   Comment:   "Started. Session: {session}\n\n{comment}"
-             skipped when it renders empty or repeats the last start comment
+             skipped when it renders empty or is already the latest gh-dojo comment
 
 Usage:
   gh dojo start <N> [flags]

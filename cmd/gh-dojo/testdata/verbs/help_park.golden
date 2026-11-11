@@ -7,7 +7,7 @@ Put the issue back
   Requires:  nothing besides the issue number
   Board:     adds the issue if it is not there
   Comment:   "Parked."
-             skipped when it renders empty or repeats the last park comment
+             skipped when it renders empty or is already the latest gh-dojo comment
 
 Usage:
   gh dojo park <N> [flags]

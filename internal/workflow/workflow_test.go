@@ -85,8 +85,13 @@ func onBoard(status string) Issue {
 
 func TestPlan(t *testing.T) {
 	_, c := testEngine(t)
-	started := func(body string) Comment { return Comment{Body: body + "\n\n" + Marker("start", body)} }
+	posted := func(verb, body string) Comment {
+		return Comment{Body: body + "\n\n" + Marker(verb, body), ViewerDidAuthor: true}
+	}
+	started := func(body string) Comment { return posted("start", body) }
 	sessionBody := "Started. Session: claude://s/abc"
+	byOther := started(sessionBody)
+	byOther.ViewerDidAuthor = false
 
 	tests := []struct {
 		name   string
@@ -144,12 +149,39 @@ func TestPlan(t *testing.T) {
 			Number: 42, OnBoard: true, Status: "In progress",
 			Comments: []Comment{started(sessionBody), started("Started. Session: claude://s/other")},
 		}},
-		{name: "start_other_verb_marker_ignored", verb: "start", noOps: true, issue: Issue{
+		// start → wait → start: a new cycle comments again, even with the same text.
+		{name: "start_new_cycle_after_wait", verb: "start", hasOps: 2, issue: Issue{
+			Number: 42, OnBoard: true, Status: "Waiting",
+			Comments: []Comment{started(sessionBody), posted("wait", "Waiting for #7.")},
+		}},
+		// Retries: status set but comment failed, so no marker yet.
+		{name: "start_retry_comment_failed", verb: "start", hasOps: 1, issue: Issue{
 			Number: 42, OnBoard: true, Status: "In progress",
-			Comments: []Comment{started(sessionBody), {Body: "x\n\n" + Marker("wait", "x")}},
+			Comments: []Comment{started(sessionBody), posted("wait", "Waiting for #7.")},
+		}},
+		{name: "start_marker_by_other_user", verb: "start", hasOps: 1, issue: Issue{
+			Number: 42, OnBoard: true, Status: "In progress", Comments: []Comment{byOther},
+		}},
+		{name: "start_marker_not_at_end", verb: "start", hasOps: 1, issue: Issue{
+			Number: 42, OnBoard: true, Status: "In progress", Comments: []Comment{{
+				Body:            "quoting:\n\n" + Marker("start", sessionBody) + "\n\nand more",
+				ViewerDidAuthor: true,
+			}},
+		}},
+		{name: "start_marker_trailing_space", verb: "start", noOps: true, issue: Issue{
+			Number: 42, OnBoard: true, Status: "In progress", Comments: []Comment{{
+				Body:            sessionBody + "\r\n\r\n" + Marker("start", sessionBody) + "\n",
+				ViewerDidAuthor: true,
+			}},
 		}},
 		{name: "start_session_unset", verb: "start", issue: onBoard("Backlog"), hasOps: 1,
 			setup: func(e *Engine) { e.Getenv = env(nil) }},
+		{name: "start_session_unset_with_comment", verb: "start", issue: onBoard("Backlog"), hasOps: 2,
+			args: Args{Comment: "on it", HasComment: true}, setup: func(e *Engine) { e.Getenv = env(nil) }},
+		{name: "start_session_unset_comment_present", verb: "start", noOps: true,
+			args:  Args{Comment: "on it", HasComment: true},
+			setup: func(e *Engine) { e.Getenv = env(nil) },
+			issue: Issue{Number: 42, OnBoard: true, Status: "In progress", Comments: []Comment{started("on it")}}},
 		{name: "start_session_second_var", verb: "start", issue: onBoard("Backlog"), hasOps: 2,
 			setup: func(e *Engine) { e.Getenv = env(map[string]string{"DOJO_TEST_SESSION_2": " xyz "}) }},
 		{name: "start_session_not_configured", verb: "start", issue: onBoard("Backlog"), hasOps: 2,
@@ -245,17 +277,28 @@ func TestMarker(t *testing.T) {
 	if m == Marker("start", "Started!") || m == Marker("ready", "Started.") {
 		t.Error("Marker does not depend on the verb and the body")
 	}
-	if !markerRE.MatchString(m) {
-		t.Errorf("Marker %q does not match markerRE", m)
-	}
-	if got, ok := LastMarker([]Comment{{Body: "a " + m + " b"}}, "start"); !ok || got != m {
-		t.Errorf("LastMarker = %q, %v; want %q", got, ok, m)
-	}
-	if _, ok := LastMarker([]Comment{{Body: m}}, "star"); ok {
-		t.Error("LastMarker matched a verb by prefix")
-	}
-	if _, ok := LastMarker(nil, "start"); ok {
-		t.Error("LastMarker found a marker in no comments")
+	text := AddComment{Body: "Started.", Marker: m}.Text()
+	mine := func(body string) Comment { return Comment{Body: body, ViewerDidAuthor: true} }
+	for _, tt := range []struct {
+		name     string
+		comments []Comment
+		want     string // "" means no marker
+	}{
+		{"own comment", []Comment{mine(text)}, m},
+		{"latest wins", []Comment{mine(text), mine(AddComment{Body: "x", Marker: Marker("wait", "x")}.Text())},
+			Marker("wait", "x")},
+		{"plain comment after marker", []Comment{mine(text), mine("thanks")}, m},
+		{"other user", []Comment{{Body: text}}, ""},
+		{"not at the end", []Comment{mine(text + "\n\nP.S.")}, ""},
+		{"no blank line before", []Comment{mine("Started. " + m)}, ""},
+		{"marker alone", []Comment{mine(m)}, ""},
+		{"two markers count by the last", []Comment{mine(text + "\n\n" + Marker("ready", "y"))}, Marker("ready", "y")},
+		{"no comments", nil, ""},
+	} {
+		got, ok := LastMarker(tt.comments)
+		if got != tt.want || ok != (tt.want != "") {
+			t.Errorf("%s: LastMarker = %q, %v; want %q", tt.name, got, ok, tt.want)
+		}
 	}
 }
 

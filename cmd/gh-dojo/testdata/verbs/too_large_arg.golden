@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: "2147483648" is not an issue number; pass one like 42 or "#42"
+fix: gh dojo start --help

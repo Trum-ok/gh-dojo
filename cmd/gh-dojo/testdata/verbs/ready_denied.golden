@@ -1,6 +1,5 @@
 code: 2
 --- stdout
 --- stderr
-error: ready cannot move #42 from Backlog
-allowed: In progress, Waiting
-fix: gh dojo start 42
+error: ready cannot move #42 from Backlog; it starts only from In progress or Waiting
+this is a process rule: ask the user how to proceed

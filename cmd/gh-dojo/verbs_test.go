@@ -120,7 +120,7 @@ func issue42(status string, comments ...workflow.Comment) map[int]workflow.Issue
 }
 
 func TestVerbs(t *testing.T) {
-	present := workflow.Comment{Body: "Started. Session: claude://s/abc\n\n" +
+	present := workflow.Comment{ViewerDidAuthor: true, Body: "Started. Session: claude://s/abc\n\n" +
 		workflow.Marker("start", "Started. Session: claude://s/abc")}
 	tests := []struct {
 		name    string
@@ -148,6 +148,9 @@ func TestVerbs(t *testing.T) {
 		{"no_arg", []string{"start"}, nil, "", render.ExitUsage, 0, 0},
 		{"bad_arg", []string{"start", "abc"}, nil, "", render.ExitUsage, 0, 0},
 		{"zero_arg", []string{"start", "0"}, nil, "", render.ExitUsage, 0, 0},
+		{"max_arg", []string{"start", "2147483647"}, nil, "", render.ExitNotFound, 1, 0},
+		{"too_large_arg", []string{"start", "2147483648"}, nil, "", render.ExitUsage, 0, 0},
+		{"start_not_on_board", []string{"start", "42"}, map[int]workflow.Issue{42: {Number: 42}}, "abc", render.ExitOK, 1, 1},
 		{"two_args", []string{"start", "1", "2"}, nil, "", render.ExitUsage, 0, 0},
 		{"unknown_flag", []string{"start", "42", "--nope"}, nil, "", render.ExitUsage, 0, 0},
 	}
@@ -214,15 +217,30 @@ func TestVerbHelp(t *testing.T) {
 	}
 }
 
-// TestConfigErrorTypo checks that a typo of a built-in command still gets a
-// suggestion with a broken config, not the config error.
-func TestConfigErrorTypo(t *testing.T) {
-	withConfig(t, "version = 1\npreset = \"kanbn\"\n")
-	code, out := runRootOut(rootWith(testCmds), "bom")
-	if code != render.ExitUsage {
-		t.Errorf("exit code = %d, want %d\n%s", code, render.ExitUsage, out)
+// TestConfigErrorBuiltins checks unknown commands next to built-in ones: a
+// typo still gets a suggestion, and a possible verb lists the built-ins
+// with the reason no verbs are loaded.
+func TestConfigErrorBuiltins(t *testing.T) {
+	const broken = "version = 1\npreset = \"kanbn\"\n"
+	for _, tt := range []struct {
+		name, config string
+		args         []string
+	}{
+		{"broken_typo_of_builtin", broken, []string{"bom"}},
+		{"broken_verb_with_builtins", broken, []string{"start", "42"}},
+		{"missing_verb_with_builtins", "", []string{"start", "42"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.config != "" {
+				withConfig(t, tt.config)
+			}
+			code, out := runRootOut(rootWith(testCmds), tt.args...)
+			if code != render.ExitUsage {
+				t.Errorf("exit code = %d, want %d\n%s", code, render.ExitUsage, out)
+			}
+			testutil.Golden(t, "config/"+tt.name, out)
+		})
 	}
-	testutil.Golden(t, "config/broken_typo_of_builtin", out)
 }
 
 // TestConfigErrors checks that a missing or broken config leaves --help and

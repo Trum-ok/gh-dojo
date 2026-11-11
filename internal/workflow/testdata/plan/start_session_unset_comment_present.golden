@@ -1,0 +1,4 @@
+dry run: start #42
+  status: In progress (unchanged)
+  comment: already present, not posted again
+confirm: #42 In progress (unchanged), comment already present

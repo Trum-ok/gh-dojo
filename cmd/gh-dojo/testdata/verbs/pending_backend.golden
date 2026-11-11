@@ -1,4 +1,5 @@
 code: 1
 --- stdout
 --- stderr
-error: verbs cannot reach GitHub yet: not implemented in this build
+error: internal error (not your arguments): verbs cannot reach GitHub yet, the backend is not implemented in this build
+fix: re-run the command; if it repeats, report it to the user

@@ -1,0 +1,4 @@
+code: 3
+--- stdout
+--- stderr
+error: issue #2147483647 not found in acme/shop

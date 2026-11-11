@@ -1,5 +1,5 @@
 code: 1
 --- stdout
 --- stderr
-error: unknown command "start"; verbs are unavailable: .github/dojo.toml: unknown preset "kanbn"
-allowed: kanban
+error: unknown command "start"; verbs unavailable: .github/dojo.toml: unknown preset "kanbn"
+fix: gh dojo --help

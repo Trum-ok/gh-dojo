@@ -1,4 +1,3 @@
 code: 2
-error: done cannot move #42 from Backlog: it is not on the board, which counts as Backlog
+error: done cannot move #42: not on the board, which counts as Backlog; it starts only from Ready or In progress
 this is a process rule: ask the user how to proceed
-allowed: Ready, In progress

@@ -1,4 +1,3 @@
 code: 2
-error: ready cannot move #42 from Backlog: it is not on the board, which counts as Backlog
-allowed: In progress, Waiting
-fix: gh dojo start 42
+error: ready cannot move #42: not on the board, which counts as Backlog; it starts only from In progress or Waiting
+this is a process rule: ask the user how to proceed
