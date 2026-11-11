@@ -337,19 +337,44 @@ func firstErr(errs ...error) error {
 // when there was none): done are those whose fields all came back
 // non-null, missed the rest, each in document order. GraphQL nulls a field
 // that failed, so with a partial error done is what took effect. An op
-// with several fields (SetFields) that took effect in part is missed: a
-// re-run plans the fields still to set.
+// with several fields (SetFields) that took effect in part is split: a
+// SetFields with the fields set is done, one with the rest missed, so a
+// partial report names each field.
 func (m *Mutation) Outcome(data map[string]json.RawMessage) (done, missed []workflow.Op) {
+	answered := func(alias string) bool {
+		v, found := data[alias]
+		return found && !isNull(v)
+	}
 	for i, s := range m.Steps {
 		if i > 0 && m.Steps[i-1].op == s.op {
 			continue // judged with the op's first step
+		}
+		if set, ok := s.Op.(workflow.SetFields); ok {
+			var got, lost []workflow.FieldChange
+			for k, t := range m.Steps[i:] { // a step per change, in order
+				if t.op != s.op {
+					break
+				}
+				if answered(t.Alias) {
+					got = append(got, set.Changes[k])
+				} else {
+					lost = append(lost, set.Changes[k])
+				}
+			}
+			if len(got) > 0 {
+				done = append(done, workflow.SetFields{Changes: got})
+			}
+			if len(lost) > 0 {
+				missed = append(missed, workflow.SetFields{Changes: lost})
+			}
+			continue
 		}
 		ok := true
 		for _, t := range m.Steps[i:] {
 			if t.op != s.op {
 				break
 			}
-			if v, found := data[t.Alias]; !found || isNull(v) {
+			if !answered(t.Alias) {
 				ok = false
 			}
 		}
@@ -389,7 +414,7 @@ func isNull(v json.RawMessage) bool {
 // "not added to the board", "not unarchived", "not reopened", "status not
 // changed", "labels not added", "labels not removed", "not assigned",
 // "not blocked by #12", "comment not posted", "not closed", "sprint not
-// set", "sprint not cleared", "Priority not set" (one field) or "fields
+// set", "sprint not cleared", "Priority not set", "Priority and Estimate
 // not set".
 func Missed(op workflow.Op) string {
 	switch op := op.(type) {
@@ -419,10 +444,14 @@ func Missed(op workflow.Op) string {
 		}
 		return "sprint not set"
 	case workflow.SetFields:
-		if len(op.Changes) == 1 {
-			return op.Changes[0].Field + " not set"
+		names := make([]string, len(op.Changes))
+		for i, c := range op.Changes {
+			names[i] = c.Field
 		}
-		return "fields not set"
+		if n := len(names); n > 1 {
+			return strings.Join(names[:n-1], ", ") + " and " + names[n-1] + " not set"
+		}
+		return strings.Join(names, "") + " not set"
 	}
 	return op.Describe() + " not done"
 }

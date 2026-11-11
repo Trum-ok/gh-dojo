@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -121,7 +122,7 @@ func Problems(c *config.Config, s *Schema) []Problem {
 	}
 	for _, v := range c.Verbs {
 		for _, fv := range v.Fields {
-			if _, _, err := s.FieldInput(fv); err != nil {
+			if _, _, err := s.FieldInput(fv, c.StatusField(), c.SprintField()); err != nil {
 				add(config.FieldKey(v.Name, fv.Field), err)
 			}
 		}
@@ -134,9 +135,23 @@ func Problems(c *config.Config, s *Schema) []Problem {
 // field by name, a text, a number, or a date (YYYY-MM-DD). A field the
 // board does not have, or a value that does not fit its type, is an error
 // that wraps ErrUnknownField, ErrUnknownOption or ErrFieldType.
-func (s *Schema) FieldInput(v config.FieldValue) (*Field, map[string]any, error) {
+//
+// reserved are the fields a field effect may not set, the config's status
+// and sprint fields (which have their own effects): the allowed values of
+// an error leave them out, along with iteration fields.
+func (s *Schema) FieldInput(v config.FieldValue, reserved ...string) (*Field, map[string]any, error) {
+	var settable []string
+	for _, g := range s.Fields {
+		if g.Type.Writable() && g.Type != TypeIteration && !slices.Contains(reserved, g.Name) {
+			settable = append(settable, g.Name)
+		}
+	}
 	f, err := s.Field(v.Field)
 	if err != nil {
+		var e *render.Error
+		if errors.As(err, &e) {
+			e.Allowed = settable
+		}
 		return nil, nil, err
 	}
 	typeError := func(format string, a ...any) error {
@@ -165,14 +180,8 @@ func (s *Schema) FieldInput(v config.FieldValue) (*Field, map[string]any, error)
 	case TypeIteration:
 		return nil, nil, typeError(`set it with iteration = "current" and fields.sprint = %q`, f.Name)
 	}
-	var writable []string
-	for _, g := range s.Fields {
-		if g.Type.Writable() && g.Type != TypeIteration {
-			writable = append(writable, g.Name)
-		}
-	}
 	return nil, nil, render.Usage("field %q on board %s is %s, which a verb cannot set", f.Name, s.Ref(), f.Type).
-		WithAllowed(writable...).WithCause(ErrFieldType)
+		WithAllowed(settable...).WithCause(ErrFieldType)
 }
 
 // tomlKey quotes a field name for a TOML example when it needs quotes.

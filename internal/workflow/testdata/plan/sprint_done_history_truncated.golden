@@ -1,3 +1,6 @@
-code: 2
-error: done cannot pick the sprint of #42 by the day it entered Ready (iteration = "by_status_date:Ready"): it entered Ready before the status changes gh dojo reads
-ask the user how to proceed
+warning: #42 entered Ready before the status changes gh dojo reads; using today's sprint
+dry run: done #42 "Fix login redirect"
+  status: Ready → Done
+  sprint: none → Sprint 12
+  close: as completed
+confirm: #42 Ready → Done, sprint none → Sprint 12, closed as completed

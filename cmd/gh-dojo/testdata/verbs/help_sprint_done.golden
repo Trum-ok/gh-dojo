@@ -6,7 +6,10 @@ code: 0
   To:        Done; an issue already there keeps it, so a repeat is safe
   Requires:  nothing besides the issue number
   Board:     adds the issue if it is not there
-  Sprint:    sets Sprint to the iteration of the day it entered Ready; dates are UTC
+  Sprint:    sets Sprint to the iteration of the day it entered Ready; dates are in UTC
+             never entered Ready, or the day is unknown: today's iteration, with a warning
+             a past day without an iteration is an error, unless the issue has a sprint already
+             none for today is an error, see gh dojo doctor
 
 Usage:
   gh dojo done <N> [flags]

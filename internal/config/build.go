@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	_ "time/tzdata" // board.timezone loads on systems without a zoneinfo database
 )
 
 var (
@@ -84,8 +85,31 @@ func (c *Config) buildBoard(r rawBoard) error {
 		}
 		b.Assignee = *r.Assignee
 	}
+	if r.Timezone != nil {
+		loc, err := c.loadTimezone(*r.Timezone)
+		if err != nil {
+			return err
+		}
+		b.Timezone, b.Location = *r.Timezone, loc
+	}
 	c.Board = b
 	return nil
+}
+
+// loadTimezone validates board.timezone: an IANA time zone name, such as
+// "Europe/Moscow" or "UTC". "Local" is refused: it would make "today"
+// depend on the machine a verb runs on. The time zone database is built
+// into the binary (time/tzdata), so a name loads on every OS.
+func (c *Config) loadTimezone(name string) (*time.Location, error) {
+	fix := `write an IANA time zone name, like timezone = "Europe/Moscow", or remove it for UTC`
+	if strings.TrimSpace(name) == "" || name == "Local" {
+		return nil, c.Errorf("board.timezone: %q is not a time zone name", name).WithFix(fix)
+	}
+	loc, err := time.LoadLocation(name)
+	if err != nil {
+		return nil, c.Errorf("board.timezone: unknown time zone %q", name).WithFix(fix)
+	}
+	return loc, nil
 }
 
 // checkAssignee accepts Me or a GitHub login.
@@ -370,8 +394,10 @@ func (c *Config) buildBlockers(name string, o *rawOff, v *Verb) error {
 
 // buildIteration validates the iteration key: "current", "clear" or
 // "by_status_date:<status>" ("" sets nothing, to turn off a preset's), and
-// that fields.sprint names the field it sets. The status is checked
-// against the board with the others (see StatusRefs).
+// that fields.sprint names the field it sets. by_status_date needs the
+// built-in status field (BuiltinStatus): GitHub keeps no history for
+// another. The status is checked against the board with the others (see
+// StatusRefs).
 func (c *Config) buildIteration(name string, raw *string, v *Verb) error {
 	if raw == nil || *raw == "" {
 		return nil
@@ -386,6 +412,11 @@ func (c *Config) buildIteration(name string, raw *string, v *Verb) error {
 		if problem := nameProblem(status); problem != "" {
 			return c.Errorf("%s: %q: the status %s", key, val, problem).
 				WithFix(fmt.Sprintf(`iteration = "%s:Ready" picks the iteration of the day the issue entered Ready`, IterationByStatusDate))
+		}
+		if f := c.StatusField(); f != BuiltinStatus {
+			return c.Errorf("%s: %q needs the board's built-in %s field, but fields.%s is %q: "+
+				"GitHub keeps a status history only for %s", key, val, BuiltinStatus, statusField, f, BuiltinStatus).
+				WithFix(fmt.Sprintf(`set iteration = %q in verbs.%s`, IterationCurrent, name))
 		}
 		v.Iteration, v.IterationStatus = IterationByStatusDate, status
 	default:

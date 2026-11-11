@@ -1,5 +1,5 @@
 {
-  "comment": "Hand-crafted: the card query from internal/issue/testdata/graphql/card_3.json (recorded), the acme/3 board of internal/board/testdata/graphql/iteration_board.json; mutations are never recorded. plan on #42 on a day without an iteration: one read, no write.",
+  "comment": "Hand-crafted: the card query from internal/issue/testdata/graphql/card_3.json (recorded), the acme/3 board of internal/board/testdata/graphql/iteration_board.json; mutations are never recorded. plan on #42 on a day without an iteration: the card, the board again (the cached schema may lack the iteration) and the card again; no write.",
   "handcrafted": true,
   "interactions": [
     {
@@ -121,7 +121,8 @@
             }
           }
         }
-      }
+      },
+      "repeat": true
     }
   ]
 }

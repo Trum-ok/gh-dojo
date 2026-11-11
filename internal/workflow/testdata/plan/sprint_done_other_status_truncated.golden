@@ -1,0 +1,6 @@
+warning: #42 did not enter Ready in the status changes gh dojo reads; using today's sprint
+dry run: done #42 "Fix login redirect"
+  status: In progress → Done
+  sprint: none → Sprint 12
+  close: as completed
+confirm: #42 In progress → Done, sprint none → Sprint 12, closed as completed

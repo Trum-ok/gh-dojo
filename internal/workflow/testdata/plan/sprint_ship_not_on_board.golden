@@ -1,0 +1,6 @@
+warning: #42 never entered Ready; using today's sprint
+dry run: ship #42 "Fix login redirect"
+  add to the board
+  status: not on the board → Done
+  sprint: none → Sprint 12
+confirm: #42 not on the board → Done, sprint none → Sprint 12

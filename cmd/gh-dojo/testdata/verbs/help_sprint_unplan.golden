@@ -5,7 +5,7 @@ Take the issue out of its sprint
   From:      any status
   To:        the status is not changed
   Requires:  nothing besides the issue number
-  Board:     adds the issue if it is not there
+  Board:     leaves an issue that is not there off the board
   Sprint:    clears Sprint; an issue without one stays as it is
 
 Usage:

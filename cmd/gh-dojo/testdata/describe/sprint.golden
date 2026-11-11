@@ -11,14 +11,14 @@ Verbs:
   plan        Take the issue into the current sprint
               sprint: today's iteration
   unplan      Take the issue out of its sprint
-              clears the sprint
+              clears the sprint; an issue not on the board stays off it
   triage      The issue is triaged
               sets Estimate 3, Priority P1
 
 Every verb adds the issue to the board if it is missing and refuses a
 closed issue unless noted. A repeat is safe: an effect already in place
-(status, comment, labels, assignee, blocked-by link, closed or open) is
-skipped.
+(status, sprint, fields, comment, labels, assignee, blocked-by link,
+closed or open) is skipped.
 
 Lifecycle (from → to):
   start       any status → In progress

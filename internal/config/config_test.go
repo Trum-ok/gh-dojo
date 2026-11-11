@@ -102,6 +102,9 @@ func dump(c *Config) string {
 	w("version: %d", c.Version)
 	w("preset: %q", c.Preset)
 	w("board: owner=%s project=%d repos=%v assignee=%q", c.Board.Owner, c.Board.Project, c.Board.Repos, c.Board.Assignee)
+	if c.Board.Timezone != "" {
+		w("board.timezone: %s (location %s, zone %q)", c.Board.Timezone, c.Board.Loc(), c.Board.Zone())
+	}
 	for _, name := range c.FieldNames() {
 		w("fields.%s: %q", name, c.Fields[name])
 	}
@@ -186,6 +189,7 @@ assign = false
 close = false
 confirm = false
 `},
+		{"timezone", strings.Replace(presetOnly, "project = 1\n", "project = 1\ntimezone = \"Europe/Moscow\"\n", 1)},
 		{"sprint_effects", presetOnly + `sprint = "Sprint"
 
 [verbs.plan]
@@ -278,6 +282,11 @@ func TestLoadErrors(t *testing.T) {
 		{"iteration_bad", presetOnly + "sprint = \"Sprint\"\n[verbs.done]\niteration = \"next\"\n"},
 		{"iteration_by_status_date_blank", presetOnly + "sprint = \"Sprint\"\n[verbs.done]\niteration = \"by_status_date:\"\n"},
 		{"iteration_not_string", presetOnly + "sprint = \"Sprint\"\n[verbs.done]\niteration = true\n"},
+		{"iteration_by_status_date_custom_status", strings.Replace(presetOnly, `status = "Status"`, `status = "Stage"`, 1) +
+			"sprint = \"Sprint\"\n[verbs.done]\niteration = \"by_status_date:Ready\"\n"},
+		{"timezone_unknown", strings.Replace(presetOnly, "project = 1\n", "project = 1\ntimezone = \"Moscow\"\n", 1)},
+		{"timezone_local", strings.Replace(presetOnly, "project = 1\n", "project = 1\ntimezone = \"Local\"\n", 1)},
+		{"timezone_blank", strings.Replace(presetOnly, "project = 1\n", "project = 1\ntimezone = \"\"\n", 1)},
 		{"field_empty_table", presetOnly + "[verbs.done.field]\n"},
 		{"field_not_table", presetOnly + "[verbs.done]\nfield = \"Priority\"\n"},
 		{"field_bad_type", presetOnly + "[verbs.done.field]\nPriority = true\n"},

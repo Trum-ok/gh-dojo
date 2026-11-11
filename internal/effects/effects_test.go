@@ -229,13 +229,16 @@ func TestOutcome(t *testing.T) {
 	}
 }
 
-// TestOutcomeFields: SetFields is done only when every field it sets is.
+// TestOutcomeFields: a SetFields set in part is split into the fields set
+// (done) and the rest (missed), so a partial report names each.
 func TestOutcomeFields(t *testing.T) {
 	m, err := effects.Build([]workflow.Op{status, setFields, comment}, ids)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ok := `{"projectV2Item": {"id": "PVTI_1"}}`
+	estimate := workflow.SetFields{Changes: setFields.Changes[:1]}
+	priority := workflow.SetFields{Changes: setFields.Changes[1:]}
 	for _, tt := range []struct {
 		data         string
 		done, missed []workflow.Op
@@ -243,8 +246,10 @@ func TestOutcomeFields(t *testing.T) {
 		{`{"status": ` + ok + `, "field0": ` + ok + `, "field1": ` + ok + `, "comment": {}}`,
 			[]workflow.Op{status, setFields, comment}, nil},
 		{`{"status": ` + ok + `, "field0": ` + ok + `, "field1": null, "comment": {}}`,
-			[]workflow.Op{status, comment}, []workflow.Op{setFields}},
+			[]workflow.Op{status, estimate, comment}, []workflow.Op{priority}},
 		{`{"status": ` + ok + `, "field0": null, "field1": ` + ok + `}`,
+			[]workflow.Op{status, priority}, []workflow.Op{estimate, comment}},
+		{`{"status": ` + ok + `, "field0": null, "field1": null}`,
 			[]workflow.Op{status}, []workflow.Op{setFields, comment}},
 	} {
 		var d map[string]json.RawMessage
@@ -257,8 +262,8 @@ func TestOutcomeFields(t *testing.T) {
 		}
 	}
 	if got := effects.Missed(sprint) + "; " + effects.Missed(unsprint) + "; " + effects.Missed(setFields) + "; " +
-		effects.Missed(workflow.SetFields{Changes: setFields.Changes[:1]}); got !=
-		"sprint not set; sprint not cleared; fields not set; Estimate not set" {
+		effects.Missed(estimate); got !=
+		"sprint not set; sprint not cleared; Estimate and Priority not set; Estimate not set" {
 		t.Errorf("Missed: %s", got)
 	}
 }

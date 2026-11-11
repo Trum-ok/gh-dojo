@@ -85,7 +85,7 @@ func newListCmd() (*cobra.Command, error) {
 	f := cmd.Flags()
 	f.StringArrayVar(&o.statuses, "status", nil, `only issues in this status ("none": without a status); repeat for several`)
 	f.BoolVar(&o.mine, "mine", false, "only issues assigned to you")
-	f.StringVar(&o.sprint, "sprint", "", `only issues in this sprint (fields.sprint): "current" (today, UTC), a title, or "none"`)
+	f.StringVar(&o.sprint, "sprint", "", `only issues in this sprint (fields.sprint): "current" (today, in board.timezone), a title, or "none"`)
 	f.StringArrayVar(&o.labels, "label", nil, "only issues with this label; repeat to require several")
 	f.BoolVar(&o.all, "all", false, "also show closed issues and issues in a final status")
 	f.IntVar(&o.limit, "limit", defaultListLimit, "print at most this many issues")

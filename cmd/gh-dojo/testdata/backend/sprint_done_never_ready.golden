@@ -1,5 +1,5 @@
-code: 2
+code: 0
 --- stdout
+#42 In progress → Done, sprint none → Sprint 12
 --- stderr
-error: done cannot pick the sprint of #42 by the day it entered Ready (iteration = "by_status_date:Ready"): it never entered Ready on the board
-ask the user how to proceed
+warning: #42 never entered Ready; using today's sprint

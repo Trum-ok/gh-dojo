@@ -33,6 +33,7 @@ type rawBoard struct {
 	Project  *int      `toml:"project"`
 	Repos    *[]string `toml:"repos"`
 	Assignee *string   `toml:"assignee"`
+	Timezone *string   `toml:"timezone"`
 }
 
 type rawStatuses struct {
@@ -152,7 +153,7 @@ func (v *rawVerb) setKeys() []string {
 var (
 	topKeys      = []string{"version", "preset", "board", "fields", "statuses", "labels", "session", "verbs"}
 	presetKeys   = []string{"version", "fields", "statuses", "labels", "session", "verbs"}
-	boardKeys    = []string{"owner", "project", "repos", "assignee"}
+	boardKeys    = []string{"owner", "project", "repos", "assignee", "timezone"}
 	statusesKeys = []string{"initial", "final", "resolved"}
 	labelsKeys   = []string{"types", "area_prefix"}
 	sessionKeys  = []string{"env", "link"}

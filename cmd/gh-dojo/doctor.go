@@ -137,8 +137,9 @@ func (r *doctorReport) err() error {
 }
 
 // runDoctor runs the checks in order. Requests: one Doctor query (token
-// and repositories), plus the board schema when it is not cached, plus
-// one DoctorVerbs query when a verb has labels or assigns someone.
+// and repositories), plus the board schema when it is not cached (or the
+// cached one has no iteration for today), plus one DoctorVerbs query when
+// a verb has labels or assigns someone.
 func runDoctor(ctx context.Context) *doctorReport {
 	r := &doctorReport{}
 	r.ok("version", "gh dojo %s", version)
@@ -179,7 +180,13 @@ func runDoctor(ctx context.Context) *doctorReport {
 	}
 
 	if cfg != nil && schema != nil {
-		checkSprint(r, cfg, schema, doctorClock(a)())
+		checkSprint(r, cfg, schema, doctorClock(a)(), func() (*board.Schema, error) {
+			ref := board.RefOf(cfg)
+			if err := a.Loader.Invalidate(ref); err != nil {
+				return nil, err
+			}
+			return a.Loader.Fetch(ctx, ref)
+		})
 	}
 	if cfg != nil {
 		checkVerbs(ctx, r, a, cfg, repos, reach, viewer)
@@ -560,10 +567,12 @@ func checkVerbs(ctx context.Context, r *doctorReport, a *App, cfg *config.Config
 }
 
 // checkSprint checks that the sprint field has an iteration for today, the
-// UTC date verbs use (iteration = "current"). It runs only when
-// fields.sprint is set.
-func checkSprint(r *doctorReport, cfg *config.Config, s *board.Schema, now time.Time) {
-	now = now.UTC()
+// date in board.timezone verbs use (iteration = "current"), as verbs see
+// it: a completed iteration still covers its days. Without one on a
+// cached schema it re-reads the board once with refetch before reporting
+// a problem. It runs only when fields.sprint is set.
+func checkSprint(r *doctorReport, cfg *config.Config, s *board.Schema, now time.Time, refetch func() (*board.Schema, error)) {
+	now = now.In(cfg.Board.Loc())
 	name := cfg.SprintField()
 	if name == "" {
 		return
@@ -577,15 +586,21 @@ func checkSprint(r *doctorReport, cfg *config.Config, s *board.Schema, now time.
 			WithFix("edit fields.sprint in "+cfg.Display))
 		return
 	}
-	today := now.Format(time.DateOnly)
-	for _, it := range f.Iterations {
-		if !it.Completed && it.Contains(now) {
-			r.ok("sprint", "%s: today (%s) is in %s", f.Name, today, it.Title)
-			return
+	it := f.IterationAt(now)
+	if it == nil && s.Cached && refetch != nil {
+		if fresh, err := refetch(); err == nil {
+			if g, err := fresh.Field(name); err == nil && g.Type == board.TypeIteration {
+				s, f, it = fresh, g, g.IterationAt(now)
+			}
 		}
 	}
-	r.problem("sprint", render.Usage("%s has no iteration for today (%s)", f.Name, today).
-		WithFix(fmt.Sprintf("add one in the %s field settings: %s/settings", f.Name, s.URL)))
+	today := now.Format(time.DateOnly) + ", " + now.Location().String()
+	if it == nil {
+		r.problem("sprint", render.Usage("%s has no iteration for today (%s)", f.Name, today).
+			WithFix(fmt.Sprintf("add one in the %s field settings: %s/settings", f.Name, s.URL)))
+		return
+	}
+	r.ok("sprint", "%s: today (%s) is in %s", f.Name, today, it.Title)
 }
 
 // doctorClock is the App's clock: its loader's, else the system's.

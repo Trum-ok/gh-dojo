@@ -31,6 +31,11 @@ iteration = "by_status_date:Ready"
 [verbs.ready]
 iteration = "by_status_date:Ready"
 
+[verbs.ship]
+when = "Shipped, from anywhere"
+to = "Done"
+iteration = "by_status_date:Ready"
+
 [verbs.plan]
 when = "Take the issue into the current sprint"
 iteration = "current"
@@ -87,13 +92,23 @@ func TestPlanSprint(t *testing.T) {
 	}
 	enteredReady := StatusChange{At: day("2026-10-30T09:00:00Z"), To: "Ready"}
 	started := StatusChange{At: day("2026-10-20T09:00:00Z"), To: "In progress"}
+	moscow, err := time.LoadLocation("Europe/Moscow")
+	if err != nil {
+		t.Fatal(err)
+	}
+	with := func(is Issue, change func(*Issue)) Issue {
+		change(&is)
+		return is
+	}
 
 	tests := []struct {
 		name  string
 		verb  string
 		issue Issue
+		loc   *time.Location
 		code  render.Code
 		ops   int
+		stale bool // the error wraps board.ErrUnknownIteration
 	}{
 		{name: "done_by_ready_date", verb: "done", ops: 3,
 			issue: issue("Ready", "it12", started, enteredReady)},
@@ -101,25 +116,59 @@ func TestPlanSprint(t *testing.T) {
 			StatusChange{At: day("2026-11-02T09:00:00Z"), To: "In progress"},
 			StatusChange{At: day("2026-11-10T23:59:00Z"), To: "Ready"})},
 		{name: "done_in_place", verb: "done", ops: 2, issue: issue("Ready", "it11", enteredReady)},
-		{name: "done_never_ready", verb: "done", code: render.ExitDenied, issue: issue("In progress", "", started)},
-		{name: "done_history_truncated", verb: "done", code: render.ExitDenied, issue: func() Issue {
-			is := issue("Ready", "", started)
+		// In progress straight to Done: today's sprint, with a warning.
+		{name: "done_never_ready", verb: "done", ops: 2, issue: issue("In progress", "it12", started)},
+		{name: "done_never_ready_set", verb: "done", ops: 3, issue: issue("In progress", "it11", started)},
+		// In Ready, but its entry is older than the history read: today.
+		{name: "done_history_truncated", verb: "done", ops: 3, issue: with(issue("Ready", ""), func(is *Issue) {
 			is.HistoryTruncated = true
-			return is
-		}()},
+		})},
+		{name: "done_other_status_truncated", verb: "done", ops: 3,
+			issue: with(issue("In progress", "", started), func(is *Issue) { is.HistoryTruncated = true })},
+		// In Ready, but the last change read is into In progress: the
+		// history lags, so the day is unknown rather than the older entry.
+		{name: "done_history_lags", verb: "done", ops: 3, issue: issue("Ready", "", enteredReady,
+			StatusChange{At: day("2026-11-10T09:00:00Z"), To: "In progress"})},
+		// In Ready since it was added to the board, with nothing else read.
+		{name: "done_added_in_ready", verb: "done", ops: 3, issue: with(issue("Ready", ""), func(is *Issue) {
+			is.AddedAt = day("2026-10-28T10:00:00Z")
+		})},
+		// A Ready entry of an earlier item, removed from the board, is
+		// ignored: the current item was added in Ready on 2026-11-03.
+		{name: "done_earlier_item", verb: "done", ops: 3, issue: with(issue("Ready", "", StatusChange{
+			At: day("2026-10-14T09:00:00Z"), To: "Ready"}), func(is *Issue) {
+			is.AddedAt = day("2026-11-03T10:00:00Z")
+		})},
+		// Not on the board: its history is an earlier item's.
+		{name: "ship_not_on_board", verb: "ship", ops: 3, issue: with(issue("", "", enteredReady), func(is *Issue) {
+			is.OnBoard = false
+		})},
+		{name: "done_no_iteration_today", verb: "done", code: render.ExitUsage, stale: true,
+			issue: with(issue("In progress", "", started), func(is *Issue) { is.ReadAt = day("2026-12-20T09:00:00Z") })},
+		// The user set the sprint, as the past day's error says.
+		{name: "done_no_iteration_sprint_set", verb: "done", ops: 2,
+			issue: issue("Ready", "it10", StatusChange{At: day("2026-09-01T09:00:00Z"), To: "Ready"})},
+		// A past day after the last iteration.
+		{name: "done_no_iteration_after", verb: "done", code: render.ExitUsage, stale: true, issue: with(issue("Ready", "",
+			StatusChange{At: day("2026-12-10T09:00:00Z"), To: "Ready"}), func(is *Issue) {
+			is.ReadAt = day("2027-01-10T09:00:00Z")
+		})},
+		// 23:30 UTC on Nov 8 is Nov 9 in Moscow: Sprint 12, not 11.
+		{name: "done_timezone", verb: "done", ops: 3, loc: moscow, issue: issue("Ready", "",
+			StatusChange{At: day("2026-11-08T23:30:00Z"), To: "Ready"})},
 		{name: "done_history_untracked", verb: "done", code: render.ExitUsage, issue: func() Issue {
 			is := issue("Ready", "")
 			is.HistoryUntracked = true
 			return is
 		}()},
-		{name: "done_no_iteration", verb: "done", code: render.ExitUsage,
+		{name: "done_no_iteration", verb: "done", code: render.ExitUsage, stale: true,
 			issue: issue("Ready", "", StatusChange{At: day("2026-09-01T09:00:00Z"), To: "Ready"})},
 		{name: "ready_enters_now", verb: "ready", ops: 2, issue: issue("In progress", "", started)},
 		{name: "ready_repeat", verb: "ready", issue: issue("Ready", "it12",
 			StatusChange{At: day("2026-11-11T08:00:00Z"), To: "Ready"})},
 		{name: "plan_current", verb: "plan", ops: 1, issue: issue("Backlog", "")},
 		{name: "plan_move", verb: "plan", ops: 1, issue: issue("Backlog", "it11")},
-		{name: "plan_no_iteration_today", verb: "plan", code: render.ExitUsage, issue: func() Issue {
+		{name: "plan_no_iteration_today", verb: "plan", code: render.ExitUsage, stale: true, issue: func() Issue {
 			is := issue("Backlog", "")
 			is.ReadAt = day("2026-12-20T09:00:00Z")
 			return is
@@ -130,13 +179,16 @@ func TestPlanSprint(t *testing.T) {
 			is.ReadAt = day("2026-11-22T23:30:00-05:00")
 			return is
 		}()},
+		// 22:30 UTC on Nov 22 is Nov 23 in Moscow: Sprint 13.
+		{name: "plan_timezone", verb: "plan", ops: 1, loc: moscow, issue: with(issue("Backlog", "it12"), func(is *Issue) {
+			is.ReadAt = day("2026-11-22T22:30:00Z")
+		})},
+		{name: "plan_no_iteration_today_timezone", verb: "plan", code: render.ExitUsage, stale: true, loc: moscow,
+			issue: with(issue("Backlog", ""), func(is *Issue) { is.ReadAt = day("2026-12-20T09:00:00Z") })},
 		{name: "unplan", verb: "unplan", ops: 1, issue: issue("Backlog", "it12")},
 		{name: "unplan_in_place", verb: "unplan", issue: issue("Backlog", "")},
-		{name: "unplan_unknown", verb: "unplan", ops: 1, issue: func() Issue {
-			is := issue("Backlog", "")
-			is.Sprint.Unknown = true
-			return is
-		}()},
+		// Not on the board: nothing to clear, and no reason to add it.
+		{name: "unplan_not_on_board", verb: "unplan", issue: with(issue("", ""), func(is *Issue) { is.OnBoard = false })},
 		{name: "triage_fields", verb: "triage", ops: 1, issue: func() Issue {
 			is := issue("Backlog", "")
 			is.Fields = map[string]string{"Priority": "P2"}
@@ -159,11 +211,16 @@ func TestPlanSprint(t *testing.T) {
 			if !ok {
 				t.Fatalf("no verb %q", tt.verb)
 			}
-			p, err := New(c).Plan(v, tt.issue, Args{})
+			e := New(c)
+			e.Location = tt.loc
+			p, err := e.Plan(v, tt.issue, Args{})
 			switch {
 			case tt.code != 0:
 				if got := render.FromError(err).Code; err == nil || got != tt.code {
 					t.Errorf("error %v, want code %d", err, tt.code)
+				}
+				if board.IsStale(err) != tt.stale {
+					t.Errorf("board.IsStale(%v) = %v, want %v", err, !tt.stale, tt.stale)
 				}
 			case err != nil:
 				t.Fatalf("Plan() error: %v", err)

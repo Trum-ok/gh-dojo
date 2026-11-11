@@ -18,6 +18,7 @@ import (
 	"sort"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/Trum-ok/gh-dojo/internal/render"
 )
@@ -85,6 +86,29 @@ type Board struct {
 	// Assignee is who a verb with assign = true assigns: Me or a login;
 	// "" when not set.
 	Assignee string
+	// Timezone is board.timezone, an IANA time zone name such as
+	// "Europe/Moscow"; "" when not set. Location is that zone, UTC when
+	// not set: the sprint effect's "today" and the days issues entered a
+	// status are dates in it.
+	Timezone string
+	Location *time.Location
+}
+
+// Loc returns the board's time zone (Board.Location), UTC when unset.
+func (b Board) Loc() *time.Location {
+	if b.Location == nil {
+		return time.UTC
+	}
+	return b.Location
+}
+
+// Zone names the board's time zone for output: "" for UTC, which dates
+// leave unsaid, else the IANA name ("Europe/Moscow").
+func (b Board) Zone() string {
+	if loc := b.Loc(); loc != time.UTC {
+		return loc.String()
+	}
+	return ""
 }
 
 // Me is the assignee that stands for the authenticated user.
@@ -108,6 +132,11 @@ const (
 	IterationClear        = "clear"
 	IterationByStatusDate = "by_status_date"
 )
+
+// BuiltinStatus is the name of a board's built-in status field, the only
+// one GitHub keeps a status history (ProjectV2ItemStatusChangedEvent) for,
+// so the only one iteration = "by_status_date:<status>" can date.
+const BuiltinStatus = "Status"
 
 // FieldValue is a board field a verb sets (the field key), with the value
 // from the config. The board decides what the value means: an option name
@@ -208,6 +237,14 @@ type Verb struct {
 // blockers (blockers = "warn" or "deny").
 func (v Verb) ChecksBlockers() bool {
 	return v.Blockers == BlockersWarn || v.Blockers == BlockersDeny
+}
+
+// OnlyClearsSprint reports whether clearing the sprint (iteration =
+// "clear") is the verb's only board effect: no status, no other fields.
+// Such a verb leaves an issue that is not on the board off it: there is
+// no sprint to clear.
+func (v Verb) OnlyClearsSprint() bool {
+	return v.Iteration == IterationClear && v.To == "" && len(v.Fields) == 0
 }
 
 // IterationRule is the verb's iteration key as written in the config:

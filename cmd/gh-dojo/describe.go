@@ -45,6 +45,10 @@ type process struct {
 	Verbs     []processVerb     `json:"verbs"`
 	Statuses  config.Statuses   `json:"statuses"`
 	ExitCodes []processExitCode `json:"exitCodes"`
+
+	// sprint and fields say some verb sets the sprint or other board
+	// fields, for the sentence on repeats.
+	sprint, fields bool
 }
 
 // processVerb is one verb as describe shows it.
@@ -146,6 +150,27 @@ var (
 	}
 )
 
+// wrapText breaks text into lines of at most width bytes at spaces; a
+// longer word gets a line of its own.
+func wrapText(text string, width int) string {
+	var b strings.Builder
+	n := 0
+	for _, w := range strings.Fields(text) {
+		switch {
+		case n == 0:
+		case n+1+len(w) > width:
+			b.WriteByte('\n')
+			n = 0
+		default:
+			b.WriteByte(' ')
+			n++
+		}
+		b.WriteString(w)
+		n += len(w)
+	}
+	return b.String()
+}
+
 // maxTemplateRunes is how much of a comment template describe shows.
 const maxTemplateRunes = 60
 
@@ -182,6 +207,8 @@ func describeProcess(cfg *config.Config) *process {
 			}
 		}
 		p.Verbs = append(p.Verbs, pv)
+		p.sprint = p.sprint || v.Iteration != ""
+		p.fields = p.fields || len(v.Fields) > 0
 	}
 	for _, c := range render.ExitCodes {
 		p.ExitCodes = append(p.ExitCodes, processExitCode{int(c.Code), c.Meaning, c.Next})
@@ -230,11 +257,17 @@ func (p *process) text() string {
 				fmt.Fprintf(&b, "\n  %-*s %s", width, "", facts)
 			}
 		}
-		sections = append(sections, b.String(),
-			"Every verb adds the issue to the board if it is missing and refuses a\n"+
-				"closed issue unless noted. A repeat is safe: an effect already in place\n"+
-				"(status, comment, labels, assignee, blocked-by link, closed or open) is\n"+
-				"skipped.")
+		effects := []string{"status"}
+		if p.sprint {
+			effects = append(effects, "sprint")
+		}
+		if p.fields {
+			effects = append(effects, "fields")
+		}
+		effects = append(effects, "comment", "labels", "assignee", "blocked-by link", "closed or open")
+		sections = append(sections, b.String(), wrapText("Every verb adds the issue to the board if it is missing and refuses a "+
+			"closed issue unless noted. A repeat is safe: an effect already in place ("+
+			strings.Join(effects, ", ")+") is skipped.", 72))
 	}
 	// The root help's sections, each starting with a blank line; the
 	// lifecycle is empty without verbs and statuses.

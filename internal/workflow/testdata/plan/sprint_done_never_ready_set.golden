@@ -1,0 +1,6 @@
+warning: #42 never entered Ready; using today's sprint
+dry run: done #42 "Fix login redirect"
+  status: In progress → Done
+  sprint: Sprint 11 → Sprint 12
+  close: as completed
+confirm: #42 In progress → Done, sprint Sprint 11 → Sprint 12, closed as completed

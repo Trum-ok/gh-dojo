@@ -1,0 +1,114 @@
+{
+  "comment": "The acme/3 board of internal/board/testdata/graphql/iteration_board.json as cached before Sprint 12 (today's, 2026-11-11) was added: a stale schema.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "BoardSchema",
+      "query": "query BoardSchema($owner: String!, $number: Int!) {\n  repositoryOwner(login: $owner) {\n    __typename\n    login\n    ... on User { projectV2(number: $number) { ...board } }\n    ... on Organization { projectV2(number: $number) { ...board } }\n  }\n}\n\nfragment board on ProjectV2 {\n  id\n  title\n  url\n  closed\n  fields(first: 100) {\n    nodes {\n      ... on ProjectV2FieldCommon { id name dataType }\n      ... on ProjectV2SingleSelectField { options { id name } }\n      ... on ProjectV2IterationField {\n        configuration {\n          iterations { id title startDate duration }\n          completedIterations { id title startDate duration }\n        }\n      }\n    }\n  }\n}",
+      "variables": {
+        "owner": "acme",
+        "number": 3
+      },
+      "response": {
+        "data": {
+          "repositoryOwner": {
+            "__typename": "Organization",
+            "login": "acme",
+            "projectV2": {
+              "id": "PVT_kwDOacme0003",
+              "title": "Shop",
+              "url": "https://github.com/orgs/acme/projects/3",
+              "closed": false,
+              "fields": {
+                "nodes": [
+                  {
+                    "id": "PVTF_acme_title",
+                    "name": "Title",
+                    "dataType": "TITLE"
+                  },
+                  {
+                    "id": "PVTSSF_acme_status",
+                    "name": "Status",
+                    "dataType": "SINGLE_SELECT",
+                    "options": [
+                      {
+                        "id": "f75ad846",
+                        "name": "Todo"
+                      },
+                      {
+                        "id": "47fc9ee4",
+                        "name": "In progress"
+                      },
+                      {
+                        "id": "61e4505c",
+                        "name": "Ready"
+                      },
+                      {
+                        "id": "98236657",
+                        "name": "Done"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "PVTIF_acme_sprint",
+                    "name": "Sprint",
+                    "dataType": "ITERATION",
+                    "configuration": {
+                      "iterations": [
+                        {
+                          "id": "it13",
+                          "title": "Sprint 13",
+                          "startDate": "2026-11-23",
+                          "duration": 14
+                        }
+                      ],
+                      "completedIterations": [
+                        {
+                          "id": "it11",
+                          "title": "Sprint 11",
+                          "startDate": "2026-10-26",
+                          "duration": 14
+                        },
+                        {
+                          "id": "it10",
+                          "title": "Sprint 10",
+                          "startDate": "2026-10-12",
+                          "duration": 14
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "PVTF_acme_notes",
+                    "name": "Notes",
+                    "dataType": "TEXT"
+                  },
+                  {
+                    "id": "PVTSSF_acme_priority",
+                    "name": "Priority",
+                    "dataType": "SINGLE_SELECT",
+                    "options": [
+                      {
+                        "id": "0a877460",
+                        "name": "P1"
+                      },
+                      {
+                        "id": "da944a9c",
+                        "name": "P2"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "PVTF_acme_estimate",
+                    "name": "Estimate",
+                    "dataType": "NUMBER"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

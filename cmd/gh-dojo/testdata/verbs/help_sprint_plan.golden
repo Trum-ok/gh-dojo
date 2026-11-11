@@ -6,7 +6,7 @@ Take the issue into the current sprint
   To:        the status is not changed
   Requires:  nothing besides the issue number
   Board:     adds the issue if it is not there
-  Sprint:    sets Sprint to today's iteration (UTC); none for today is an error, see gh dojo doctor
+  Sprint:    sets Sprint to today's iteration (dates in UTC); none for today is an error, see gh dojo doctor
 
 Usage:
   gh dojo plan <N> [flags]

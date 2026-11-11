@@ -1,3 +1,3 @@
 error: .github/dojo.toml: verbs.done.field.Priorty: unknown field "Priorty" on board Trum-ok/5; did you mean "Priority"?
-allowed: Status, Priority, Size, Estimate, Start date, Target date
+allowed: Priority, Size, Estimate, Start date, Target date
 fix: edit verbs.done.field.Priorty in .github/dojo.toml

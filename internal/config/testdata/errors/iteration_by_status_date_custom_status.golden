@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.done.iteration: "by_status_date:Ready" needs the board's built-in Status field, but fields.status is "Stage": GitHub keeps a status history only for Status
+fix: set iteration = "current" in verbs.done

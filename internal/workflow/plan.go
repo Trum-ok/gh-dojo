@@ -115,16 +115,6 @@ type Close struct {
 type SetIteration struct {
 	From, To string
 	Start    string
-	// Unread says the item's iteration was not read (Sprint.Unknown):
-	// From is empty, but the item may have one.
-	Unread bool
-}
-
-func (s SetIteration) transition() string {
-	if s.Unread {
-		return valueTransition("not read", s.To)
-	}
-	return valueTransition(s.From, s.To)
 }
 
 // SetFields sets board fields to the values of the verb's field effect,
@@ -175,12 +165,17 @@ func (AddComment) op()                  {}
 func (c Close) Describe() string        { return "close: as " + ReasonText(c.Reason) }
 func (c Close) Effect() string          { return "closed as " + ReasonText(c.Reason) }
 func (Close) op()                       {}
-func (s SetIteration) Describe() string { return "sprint: " + s.transition() }
-func (s SetIteration) Effect() string   { return "sprint " + s.transition() }
-func (SetIteration) op()                {}
-func (f SetFields) Describe() string    { return strings.Join(f.each(FieldChange.describe), ", ") }
-func (f SetFields) Effect() string      { return strings.Join(f.each(FieldChange.effect), ", ") }
-func (SetFields) op()                   {}
+func (s SetIteration) Describe() string { return "sprint: " + valueTransition(s.From, s.To) }
+func (s SetIteration) Effect() string {
+	if s.From == s.To { // in place: "sprint unchanged (Sprint 11)"
+		return "sprint unchanged (" + orNone(s.To) + ")"
+	}
+	return "sprint " + valueTransition(s.From, s.To)
+}
+func (SetIteration) op()             {}
+func (f SetFields) Describe() string { return strings.Join(f.each(FieldChange.describe), ", ") }
+func (f SetFields) Effect() string   { return strings.Join(f.each(FieldChange.effect), ", ") }
+func (SetFields) op()                {}
 
 func (f SetFields) each(word func(FieldChange) string) []string {
 	out := make([]string, len(f.Changes))
@@ -196,16 +191,19 @@ func (c FieldChange) effect() string   { return c.Field + " " + valueTransition(
 // valueTransition is like render.Transition for a field value: an empty
 // value reads "none".
 func valueTransition(from, to string) string {
-	if from == "" {
-		from = "none"
-	}
-	if to == "" {
-		to = "none"
-	}
+	from, to = orNone(from), orNone(to)
 	if from == to {
 		return to + " (unchanged)"
 	}
 	return from + " → " + to
+}
+
+// orNone is a field value as output says it: "none" when empty.
+func orNone(value string) string {
+	if value == "" {
+		return "none"
+	}
+	return value
 }
 
 func (l AddLabels) signs() []string    { return signed("+", l.Names) }

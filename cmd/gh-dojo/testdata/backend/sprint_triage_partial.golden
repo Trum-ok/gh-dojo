@@ -1,0 +1,5 @@
+code: 5
+--- stdout
+--- stderr
+error: #42 Estimate none → 3; Priority not set: GitHub denied access; gh auth refresh -s project, then re-run the same command
+fix: gh auth refresh -s project

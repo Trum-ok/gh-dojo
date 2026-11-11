@@ -1,0 +1,2 @@
+error: .github/dojo.toml: board.timezone: unknown time zone "Moscow"
+fix: write an IANA time zone name, like timezone = "Europe/Moscow", or remove it for UTC

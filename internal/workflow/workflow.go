@@ -79,18 +79,23 @@ type Issue struct {
 	// for iteration = "by_status_date:<status>". HistoryTruncated says
 	// older changes may exist beyond the window read; HistoryUntracked
 	// that GitHub keeps no history for the status field (it does only for
-	// a board's built-in Status field).
+	// a board's built-in Status field). Changes before AddedAt belong to
+	// an earlier item of the issue, since removed, and are ignored.
 	History          []StatusChange
 	HistoryTruncated bool
 	HistoryUntracked bool
+	// AddedAt is when the issue was added to the board (the item's
+	// createdAt); zero when unknown or not on the board.
+	AddedAt time.Time
 	// Fields are the item's values of the board fields the verb's field
 	// effect sets, by field name, as the board shows them (an option name,
 	// a text, a number, a date); a field without a value, or whose value
 	// was not read, is absent and gets set.
 	Fields map[string]string
-	// ReadAt is when the state was read. Its date in UTC is "today" for
-	// iteration = "current" and for a verb that enters the status of
-	// by_status_date itself. Zero means now.
+	// ReadAt is when the state was read. Its date in the board's time
+	// zone (Engine.Location) is "today" for iteration = "current" and for
+	// a verb that enters the status of by_status_date itself. Zero means
+	// now.
 	ReadAt time.Time
 
 	// Unresolved are the issue's blockers that still block: open and not
@@ -114,14 +119,14 @@ type Issue struct {
 
 // Sprint is the board's sprint field and the item's value of it.
 type Sprint struct {
-	Field      string            // the board name of the iteration field
-	Iterations []board.Iteration // the field's iterations, completed ones included
+	Field string // the board name of the iteration field
+	// Iterations are the field's iterations. A completed one still covers
+	// its days: an issue that entered Ready in a past sprint gets that
+	// sprint.
+	Iterations []board.Iteration
 	// Current is the title of the item's iteration and CurrentID its ID;
-	// both "" when the item has none. Unknown says the item has more
-	// values than were read and the sprint is not among them: it may be
-	// set, so the effect is never taken as in place.
+	// both "" when the item has none.
 	Current, CurrentID string
-	Unknown            bool
 }
 
 // StatusChange is one status change of the issue on the board.
@@ -199,11 +204,15 @@ type Engine struct {
 	Session config.Session
 	// Getenv reads the session variables; os.Getenv when nil.
 	Getenv func(string) string
+	// Location is the board's time zone (board.timezone): the sprint
+	// effect's days are dates in it. UTC when nil.
+	Location *time.Location
 }
 
 // New returns an Engine with the rules of c.
 func New(c *config.Config) *Engine {
-	return &Engine{Initial: c.Statuses.Initial, Final: c.Statuses.Final, Session: c.Session}
+	return &Engine{Initial: c.Statuses.Initial, Final: c.Statuses.Final, Session: c.Session,
+		Location: c.Board.Location}
 }
 
 // byNumberRE matches an issue reference given to --by: "12" or "#12".
@@ -336,7 +345,9 @@ func join(items []string, conj string) string {
 // Moving an issue closed as not planned or duplicate to a final status is
 // allowed with a warning: the verb does not change why it was closed.
 //
-// The plan adds the issue to the board when it is not there, reopens it,
+// The plan adds the issue to the board when it is not there (unless the
+// verb's only board effect clears the sprint, which such an issue has
+// none of), reopens it,
 // sets the target status, sets the sprint (see planIteration; a day
 // without an iteration is exit code 1) and the fields of the field effect,
 // adds and removes labels, assigns, marks the issue blocked by
@@ -387,7 +398,7 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 			is.Number, ReasonText(is.StateReason), v.To))
 	}
 	switch {
-	case !is.OnBoard:
+	case !is.OnBoard && !v.OnlyClearsSprint():
 		p.Ops = append(p.Ops, AddToBoard{})
 	case is.Archived && moves && !slices.Contains(e.Final, v.To):
 		p.Ops = append(p.Ops, Unarchive{})
@@ -406,7 +417,7 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 			p.Ops = append(p.Ops, SetStatus{From: is.Status, To: v.To})
 		}
 	}
-	if err := p.planIteration(v, atTarget); err != nil {
+	if err := p.planIteration(v, atTarget, e.Location); err != nil {
 		return nil, err
 	}
 	p.planFields(v)

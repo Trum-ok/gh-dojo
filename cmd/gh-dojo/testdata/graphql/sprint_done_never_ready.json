@@ -1,5 +1,5 @@
 {
-  "comment": "Hand-crafted: the card query from internal/issue/testdata/graphql/card_3.json (recorded), the acme/3 board of internal/board/testdata/graphql/iteration_board.json; mutations are never recorded. #42 went from In progress to Done's door without entering Ready.",
+  "comment": "Hand-crafted: the card query from internal/issue/testdata/graphql/card_3.json (recorded), the acme/3 board of internal/board/testdata/graphql/iteration_board.json; mutations are never recorded. #42 went from In progress to Done without entering Ready: done takes today's Sprint 12, with a warning.",
   "handcrafted": true,
   "interactions": [
     {
@@ -130,6 +130,32 @@
                   }
                 ]
               }
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "Verb",
+      "query": "mutation Verb($project: ID!, $item: ID!, $field: ID!, $option: String!, $sprintField: ID!, $iteration: String!) {\n  status: updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field, value: {singleSelectOptionId: $option}}) { projectV2Item { id } }\n  sprint: updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $sprintField, value: {iterationId: $iteration}}) { projectV2Item { id } }\n}",
+      "variables": {
+        "project": "PVT_kwDOacme0003",
+        "item": "PVTI_acme0042",
+        "field": "PVTSSF_acme_status",
+        "option": "98236657",
+        "sprintField": "PVTIF_acme_sprint",
+        "iteration": "it12"
+      },
+      "response": {
+        "data": {
+          "status": {
+            "projectV2Item": {
+              "id": "PVTI_acme0042"
+            }
+          },
+          "sprint": {
+            "projectV2Item": {
+              "id": "PVTI_acme0042"
             }
           }
         }

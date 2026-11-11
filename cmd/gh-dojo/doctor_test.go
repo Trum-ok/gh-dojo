@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -213,19 +214,57 @@ status = "Status"
 		t.Fatal(err)
 	}
 	r := &doctorReport{}
-	checkSprint(r, cfg, s, testNow) // no fields.sprint: no line
+	checkSprint(r, cfg, s, testNow, nil) // no fields.sprint: no line
 	for _, tt := range []struct {
 		field string
 		now   time.Time
 	}{
 		{"Sprint", testNow},
 		{"Sprint", time.Date(2026, 12, 20, 9, 0, 0, 0, time.UTC)}, // after the last iteration
+		{"Sprint", time.Date(2026, 11, 1, 9, 0, 0, 0, time.UTC)},  // in Sprint 11, completed: verbs take it
 		{"Status", testNow},
 		{"Nope", testNow}, // board.Problems reports a missing field
 	} {
 		cfg.Fields["sprint"] = tt.field
-		checkSprint(r, cfg, s, tt.now)
+		checkSprint(r, cfg, s, tt.now, nil)
 	}
+
+	// A cached schema without today's iteration is re-read once: Sprint
+	// 12 was added since. A fresh schema is not.
+	cfg.Fields["sprint"] = "Sprint"
+	stale := *s
+	stale.Cached = true
+	stale.Fields = slices.Clone(s.Fields)
+	for i, f := range stale.Fields {
+		if f.Name == "Sprint" {
+			stale.Fields[i].Iterations = slices.DeleteFunc(slices.Clone(f.Iterations),
+				func(it board.Iteration) bool { return it.Title == "Sprint 12" })
+		}
+	}
+	refetches := 0
+	refetch := func() (*board.Schema, error) { refetches++; return s, nil }
+	checkSprint(r, cfg, &stale, testNow, refetch)
+	stale.Cached = false
+	checkSprint(r, cfg, &stale, testNow, refetch)
+	if refetches != 1 {
+		t.Errorf("%d re-reads of the board, want 1 (for the cached schema only)", refetches)
+	}
+
+	// board.timezone: 22:30 UTC on Nov 22 is Nov 23 in Moscow, Sprint 13.
+	tz, err := config.Parse([]byte(`
+version = 1
+[board]
+owner = "acme"
+project = 3
+timezone = "Europe/Moscow"
+[fields]
+status = "Status"
+sprint = "Sprint"
+`), ".github/dojo.toml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkSprint(r, tz, s, time.Date(2026, 11, 22, 22, 30, 0, 0, time.UTC), nil)
 	var b strings.Builder
 	r.write(&b)
 	testutil.Golden(t, "doctor/sprint", []byte(b.String()))

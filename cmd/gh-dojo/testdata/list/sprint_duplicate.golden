@@ -1,0 +1,3 @@
+error: Sprint has 2 iterations titled "Sprint 1"
+allowed: Sprint 1 (2026-11-09 to 2026-11-22), Sprint 1 (2025-11-10 to 2025-11-23)
+fix: rename one in the Sprint field settings on the board: https://github.com/orgs/acme/projects/3/settings

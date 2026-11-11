@@ -164,7 +164,7 @@ func runVerb(cmd *cobra.Command, cfg *config.Config, v config.Verb, n int, args 
 	ctx := cmd.Context()
 	engine := workflow.New(cfg)
 	engine.Getenv = getenv
-	plan, err := readPlan(ctx, be, engine, v, n, args)
+	plan, err := readPlanFresh(ctx, be, engine, v, n, args)
 	if err != nil {
 		return err
 	}
@@ -293,15 +293,36 @@ func reason(err error) string {
 // missing returns the ops of ops that are not among done, compared by
 // content: a re-plan may hold an op of a kind already done with other
 // values, such as a label to add that the first plan did not have, and
-// that one is still to send.
+// that one is still to send. SetFields compares field by field, since
+// GitHub may set some fields of one and not others (see effects.Outcome).
 func missing(ops, done []workflow.Op) []workflow.Op {
 	var out []workflow.Op
 	for _, op := range ops {
+		if set, ok := op.(workflow.SetFields); ok {
+			if rest := missingFields(set, done); len(rest.Changes) > 0 {
+				out = append(out, rest)
+			}
+			continue
+		}
 		if !slices.ContainsFunc(done, func(d workflow.Op) bool { return reflect.DeepEqual(d, op) }) {
 			out = append(out, op)
 		}
 	}
 	return out
+}
+
+// missingFields returns the changes of set that no SetFields of done has.
+func missingFields(set workflow.SetFields, done []workflow.Op) workflow.SetFields {
+	var rest workflow.SetFields
+	for _, c := range set.Changes {
+		if !slices.ContainsFunc(done, func(d workflow.Op) bool {
+			got, ok := d.(workflow.SetFields)
+			return ok && slices.ContainsFunc(got.Changes, func(g workflow.FieldChange) bool { return reflect.DeepEqual(g, c) })
+		}) {
+			rest.Changes = append(rest.Changes, c)
+		}
+	}
+	return rest
 }
 
 // hasKind reports whether ops has an op of the same kind as op.
@@ -316,6 +337,27 @@ func readPlan(ctx context.Context, be Backend, e *workflow.Engine, v config.Verb
 		return nil, err
 	}
 	return e.Plan(v, is, args)
+}
+
+// schemaCacher is a Backend whose board schema may come from the cache.
+type schemaCacher interface {
+	// SchemaCached reports whether the schema in use came from the cache.
+	SchemaCached() bool
+}
+
+// readPlanFresh is readPlan, once more with a fresh board schema when the
+// one used came from the cache and may explain the error (board.IsStale):
+// say, no iteration for today, added on the board since the schema was
+// cached. Nothing was written yet, so a retry is safe.
+func readPlanFresh(ctx context.Context, be Backend, e *workflow.Engine, v config.Verb, n int, args workflow.Args) (*workflow.Plan, error) {
+	plan, err := readPlan(ctx, be, e, v, n, args)
+	if c, ok := be.(schemaCacher); err == nil || !ok || !c.SchemaCached() || !board.IsStale(err) {
+		return plan, err
+	}
+	if be.Reset() != nil {
+		return nil, err
+	}
+	return readPlan(ctx, be, e, v, n, args)
 }
 
 var issueRE = regexp.MustCompile(`^#?[1-9][0-9]*$`)
@@ -405,7 +447,11 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 		line("Confirm", "the user's decision: ask the user first; runs only with --yes")
 	}
 
-	line("Board", "adds the issue if it is not there")
+	if v.OnlyClearsSprint() {
+		line("Board", "leaves an issue that is not there off the board")
+	} else {
+		line("Board", "adds the issue if it is not there")
+	}
 	if v.Reopen {
 		line("Reopen", "reopens a closed issue")
 	}

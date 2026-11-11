@@ -24,6 +24,6 @@ Flags:
       --label stringArray    only issues with this label; repeat to require several
       --limit int            print at most this many issues (default 50)
       --mine                 only issues assigned to you
-      --sprint string        only issues in this sprint (fields.sprint): "current" (today, UTC), a title, or "none"
+      --sprint string        only issues in this sprint (fields.sprint): "current" (today, in board.timezone), a title, or "none"
       --status stringArray   only issues in this status ("none": without a status); repeat for several
 --- stderr
