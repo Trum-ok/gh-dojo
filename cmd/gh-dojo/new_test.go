@@ -109,12 +109,36 @@ func TestNewFailureAfterCreate(t *testing.T) {
 	}
 }
 
-// TestNewStaleSchema: a status write refused for a stale cached option ID
-// re-reads the board and starts over; the second read finds the issue the
-// first attempt created, so it is not created twice.
-func TestNewStaleSchema(t *testing.T) {
+// TestNewStaleAfterCreate: a stale schema ID once the issue exists is exit
+// code 5 with the cache dropped, not an in-process retry: a lagging re-read
+// could miss the new issue and create another.
+func TestNewStaleAfterCreate(t *testing.T) {
 	withConfig(t, dojoConfig)
 	srv := withApp(t, boardFixture, "testdata/graphql/new_stale_status.json")
+	before := warmSchema(t, srv)
+	code, out := runOut(newFixArgs...)
+	testutil.Golden(t, "new/stale_status", out)
+	if code != render.ExitPartial {
+		t.Errorf("code = %d, want %d", code, render.ExitPartial)
+	}
+	if n := srv.Requests() - before; n != 3 {
+		t.Errorf("requests = %d, want 3 (read, create, status): no second attempt", n)
+	}
+	// The schema cache was dropped, so the re-run reads the board afresh.
+	before = srv.Requests()
+	if _, err := newApp().Schema(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if srv.Requests() != before+1 {
+		t.Error("the schema cache was not dropped after a stale ID")
+	}
+}
+
+// TestNewStaleBeforeCreate: a stale schema ID before anything was written
+// re-reads the board and tries once more.
+func TestNewStaleBeforeCreate(t *testing.T) {
+	withConfig(t, dojoConfig)
+	srv := withApp(t, boardFixture, "testdata/graphql/new_stale_create.json")
 	before := warmSchema(t, srv)
 	code, out := runOut(newFixArgs...)
 	testutil.Golden(t, "new/success", out)
@@ -122,7 +146,57 @@ func TestNewStaleSchema(t *testing.T) {
 		t.Errorf("code = %d", code)
 	}
 	if n := srv.Requests() - before; n != 6 {
-		t.Errorf("requests = %d, want 6 (read, create, status, board, read, status)", n)
+		t.Errorf("requests = %d, want 6 (read, create, board, read, create, status)", n)
+	}
+}
+
+// TestNewPartialKeepsFix: exit 5 keeps the fix of a cause a re-run alone
+// cannot cure.
+func TestNewPartialKeepsFix(t *testing.T) {
+	withConfig(t, dojoConfig)
+	withApp(t, boardFixture, "testdata/graphql/new_status_scopes.json")
+	code, out := runOut(newFixArgs...)
+	testutil.Golden(t, "new/status_scopes", out)
+	if code != render.ExitPartial {
+		t.Errorf("code = %d, want %d", code, render.ExitPartial)
+	}
+}
+
+// TestNewLostCreate: a lost createIssue answer is followed by one re-read;
+// the issue found there is finished, else the error stands (exit 4).
+func TestNewLostCreate(t *testing.T) {
+	saved := newRecheckDelay
+	t.Cleanup(func() { newRecheckDelay = saved })
+	newRecheckDelay = 0
+	tests := []struct {
+		name, fixture string
+		code          render.Code
+	}{
+		{"lost_create", "testdata/graphql/new_lost_create.json", render.ExitOK},
+		{"lost_create_missing", "testdata/graphql/new_lost_create_missing.json", render.ExitNetwork},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			withConfig(t, dojoConfig)
+			withApp(t, boardFixture, tt.fixture)
+			code, out := runOut(newFixArgs...)
+			testutil.Golden(t, "new/"+tt.name, out)
+			if code != tt.code {
+				t.Errorf("code = %d, want %d", code, tt.code)
+			}
+		})
+	}
+}
+
+// TestNewSameTitle: the marker hashes the title alone, case and spacing
+// folded, so another body under the same title resumes the open issue.
+func TestNewSameTitle(t *testing.T) {
+	withConfig(t, dojoConfig)
+	withApp(t, boardFixture, newRerunFixture)
+	code, out := runOut("new", "fix LOGIN  redirect", "--type", "bug", "--area", "cli", "--body", "Another body")
+	testutil.Golden(t, "new/same_title", out)
+	if code != render.ExitOK {
+		t.Errorf("code = %d", code)
 	}
 }
 
@@ -130,6 +204,7 @@ func TestNewResume(t *testing.T) {
 	tests := []struct{ name, fixture string }{
 		{"resume_all", newResumeAll}, // labels, board and status left to do
 		{"done", newDoneFixture},     // nothing left; a status someone set stays
+		{"archived", "testdata/graphql/new_resume_archived.json"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -195,7 +270,16 @@ func TestNewConfiguredTypes(t *testing.T) {
 		t.Errorf("code = %d", code)
 	}
 
+	// --area without labels.area_prefix: refused before any request.
+	withConfig(t, dojoConfig+"\n[labels]\narea_prefix = \"\"\n")
+	code, out = runOut("new", "Fix login redirect", "--area", "cli")
+	testutil.Golden(t, "new/area_without_prefix", out)
+	if code != render.ExitUsage {
+		t.Errorf("code = %d", code)
+	}
+
 	// In labels.types but not in the repo: a config problem.
+	withConfig(t, typed)
 	withApp(t, boardFixture, newContextFixture)
 	code, out = runOut("new", "Fix login redirect", "--type", "feature")
 	testutil.Golden(t, "new/type_missing_in_repo", out)

@@ -209,6 +209,9 @@ func (c *Client) mapError(err error, mutation bool) error {
 	}
 	e.What = c.scrub(e.What)
 	e.Fix = c.scrub(e.Fix)
+	if e.Cause == ErrUnknownOutcome {
+		return e.WithCause(errors.Join(ErrUnknownOutcome, err))
+	}
 	return e.WithCause(err)
 }
 
@@ -281,8 +284,15 @@ func describeGraphQL(err *api.GraphQLError) *render.Error {
 	return render.New(render.ExitUsage, "GitHub API rejected the request")
 }
 
+// ErrUnknownOutcome is in the chain of a Mutate error whose outcome is
+// unknown (5xx, timeout, dropped connection, garbled response): the write
+// may have been applied. Test for it with errors.Is; re-read state before
+// sending the write again.
+var ErrUnknownOutcome = errors.New("the write may have been applied")
+
 func mayHaveApplied(reason string) *render.Error {
-	return render.Network("GitHub write failed (%s); it may have been applied, re-run the command to check", reason)
+	return render.Network("GitHub write failed (%s); it may have been applied, re-run the command to check", reason).
+		WithCause(ErrUnknownOutcome) // mapError keeps it next to the original error
 }
 
 // transportReason describes a failed round trip without the request URL.

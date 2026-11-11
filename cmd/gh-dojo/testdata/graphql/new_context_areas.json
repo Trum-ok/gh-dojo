@@ -4,11 +4,12 @@
   "interactions": [
     {
       "operation": "NewIssueContext",
-      "query": "query NewIssueContext($owner: String!, $repo: String!, $status: String!) {\n  repository(owner: $owner, name: $repo) {\n    id\n    labels(first: 100, orderBy: {field: NAME, direction: ASC}) {\n      totalCount\n      pageInfo { hasNextPage endCursor }\n      nodes { id name }\n    }\n    issues(last: 20, orderBy: {field: CREATED_AT, direction: ASC}) {\n      nodes {\n        id\n        number\n        body\n        viewerDidAuthor\n        labels(first: 50) { nodes { name } }\n        projectItems(first: 20) {\n          nodes {\n            id\n            project { id }\n            fieldValueByName(name: $status) { ... on ProjectV2ItemFieldSingleSelectValue { name } }\n          }\n        }\n      }\n    }\n  }\n}",
+      "query": "query NewIssueContext($owner: String!, $repo: String!, $status: String!, $window: Int!) {\n  repository(owner: $owner, name: $repo) {\n    id\n    labels(first: 100, orderBy: {field: NAME, direction: ASC}) {\n      totalCount\n      pageInfo { hasNextPage endCursor }\n      nodes { id name }\n    }\n    issues(last: $window, states: OPEN, orderBy: {field: CREATED_AT, direction: ASC}) {\n      nodes {\n        id\n        number\n        title\n        body\n        viewerDidAuthor\n        labels(first: 50) { nodes { name } }\n        projectItems(first: 20) {\n          nodes {\n            id\n            isArchived\n            project { id }\n            fieldValueByName(name: $status) { ... on ProjectV2ItemFieldSingleSelectValue { name } }\n          }\n        }\n      }\n    }\n  }\n}",
       "variables": {
         "owner": "Trum-ok",
         "repo": "gh-dojo",
-        "status": "Status"
+        "status": "Status",
+        "window": 20
       },
       "response": {
         "data": {
@@ -80,6 +81,7 @@
                 {
                   "id": "I_kwDOVq9iIs8AAAABeZMbcQ",
                   "number": 13,
+                  "title": "Доска и .github/dojo.toml для самого gh-dojo",
                   "body": "## Зачем\ngh-dojo ведёт собственную разработку через себя.\n\n## Что сделать\n- Привести статусы доски gh-dojo (проект №5) к ожиданиям пресета `kanban`.\n- Написать `.github/dojo.toml` для репозитория: доска, поля, пресет и переопределения; тексты комментариев — на языке проекта.\n- Завести метку `dogfood` для неудобств, замеченных по ходу работы, если её ещё нет.\n\n## Готово, когда\n- Конфиг загружается и проходит сверку с доской без ошибок.\n\nСпека: `docs/spec.md`: «Этапы → Самохостинг».\n",
                   "viewerDidAuthor": true,
                   "labels": {
@@ -89,6 +91,7 @@
                     "nodes": [
                       {
                         "id": "PVTI_lAHOBFGd5c4BrMYFzhH6Ltk",
+                        "isArchived": false,
                         "project": {
                           "id": "PVT_kwHOBFGd5c4BrMYF"
                         },
@@ -102,6 +105,7 @@
                 {
                   "id": "I_kwDOVq9iIs8AAAABeZMk6g",
                   "number": 14,
+                  "title": "Skill для агентов и переход на gh dojo (рубеж v0.0)",
                   "body": "## Зачем\nРубеж v0.0: все задачи gh-dojo лежат на его собственной доске, агенты работают с ней только через `gh dojo`.\n\n## Что сделать\n- Написать вручную `.claude/skills/gh-dojo/SKILL.md`: глаголы проекта, когда их применять, коды выхода, правило «неудобство → задача с меткой `dogfood`» (с v0.2 skill генерирует `agent install`).\n- В `CLAUDE.md` указать, что задачи ведутся только через `gh dojo`, а не через `gh issue` и `gh project`.\n- Проверить, что все открытые задачи на доске и `gh dojo list` их показывает.\n- Пройти цикл одной реальной задачи: `new` → `start` → `ready`/`done` → `show`.\n\n## Готово, когда\n- Рубеж выполнен; найденные неудобства заведены с меткой `dogfood`.\n\nСпека: `docs/spec.md`: «Этапы → v0.0, Самохостинг», «Интеграция с агентами».\n",
                   "viewerDidAuthor": true,
                   "labels": {
@@ -111,6 +115,7 @@
                     "nodes": [
                       {
                         "id": "PVTI_lAHOBFGd5c4BrMYFzhH6L4Q",
+                        "isArchived": false,
                         "project": {
                           "id": "PVT_kwHOBFGd5c4BrMYF"
                         },

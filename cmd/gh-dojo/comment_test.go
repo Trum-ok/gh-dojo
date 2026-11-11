@@ -42,6 +42,18 @@ func TestCommentRepeat(t *testing.T) {
 	}
 }
 
+// TestCommentAfterReply: the same text again after someone else's comment
+// is a deliberate repeat and is posted.
+func TestCommentAfterReply(t *testing.T) {
+	withConfig(t, dojoConfig)
+	withApp(t, boardFixture, "testdata/graphql/comment_card_3_replied.json")
+	code, out := runOut("comment", "3", "Reproduced on main.")
+	testutil.Golden(t, "comment/left", out)
+	if code != render.ExitOK {
+		t.Errorf("code = %d", code)
+	}
+}
+
 func TestCommentStdin(t *testing.T) {
 	withConfig(t, dojoConfig)
 	withApp(t, boardFixture, card3Fixture, commentStdinFixture)

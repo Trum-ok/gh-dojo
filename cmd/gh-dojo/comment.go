@@ -31,13 +31,16 @@ func newCommentCmd() (*cobra.Command, error) {
 
 The text comes from the second argument or from --body-file (a file, or - for
 stdin), exactly one of them; empty text is an error. Use --body-file - for
-long or multi-line text.
+long or multi-line text, and put text starting with - after --:
+gh dojo comment 42 -- "-1, still broken".
 
-A repeat is safe: the comment carries a hidden marker, and when the latest
-gh-dojo comment on the issue already has the same text it is not posted again.`,
+A repeat is safe: the comment carries a hidden marker, and when the issue's
+last comment is yours with the same text it is not posted again. The same
+text after someone else's comment is posted.`,
 		Example: `  gh dojo comment 42 "Reproduced on main; the redirect drops the query string"
   gh dojo comment 42 --body-file notes.md
-  echo "Waiting for the API team" | gh dojo comment 42 --body-file -`,
+  echo "Waiting for the API team" | gh dojo comment 42 --body-file -
+  gh dojo comment 42 -- "-1, still broken"`,
 		Args: commentArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			n, _ := parseIssue(args[0]) // validated by commentArgs
@@ -93,9 +96,13 @@ func commentText(cmd *cobra.Command, args []string, bodyFile string) (string, er
 	return text, nil
 }
 
-// runComment posts text on issue n unless the latest gh-dojo comment there
-// already has it, and returns the confirmation line. Requests: the card
-// (one with a warm schema cache) and addComment.
+// runComment posts text on issue n unless the issue's last comment is the
+// viewer's with the same text (marker), and returns the confirmation line.
+// Requests: the card (one with a warm schema cache) and addComment.
+//
+// Unlike a verb's comment (workflow.AlreadyPosted, the latest gh-dojo
+// comment), only the very last comment counts: a plain comment repeated on
+// purpose after others replied is posted.
 func runComment(cmd *cobra.Command, n int, text string) (string, error) {
 	ctx := cmd.Context()
 	a := newApp()
@@ -105,7 +112,8 @@ func runComment(cmd *cobra.Command, n int, text string) (string, error) {
 	}
 	post := workflow.AddComment{Body: text, Marker: workflow.Marker(commentMarkerVerb, text)}
 	subject := fmt.Sprintf("#%d", n)
-	if workflow.AlreadyPosted(workflowIssue(card).Comments, post.Marker) {
+	if comments := workflowIssue(card).Comments; len(comments) > 0 &&
+		workflow.AlreadyPosted(comments[len(comments)-1:], post.Marker) {
 		return render.Confirm(subject, "", "comment already present"), nil
 	}
 	vars := map[string]any{"subject": card.ID, "body": post.Text()}

@@ -3,3 +3,4 @@ code: 1
 --- stderr
 error: unknown area "api": no such label in Trum-ok/gh-dojo
 allowed: board, cli
+fix: gh label list -R Trum-ok/gh-dojo

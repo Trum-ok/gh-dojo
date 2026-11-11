@@ -1,0 +1,5 @@
+code: 0
+--- stdout
+#15 "Fix login redirect" created, labels bug, area:cli, no status → Backlog
+--- stderr
+warning: GitHub's answer to creating the issue was lost; found #15 on a re-read

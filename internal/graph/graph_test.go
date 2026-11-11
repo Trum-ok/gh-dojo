@@ -149,6 +149,9 @@ func TestMutationIsNotRetried(t *testing.T) {
 }`
 	err := srv.Client().Mutate(context.Background(), m, map[string]any{"subject": "I_kwDOexample", "body": "hello"}, nil)
 	assertError(t, err, render.ExitNetwork, "errors/mutation_502")
+	if !errors.Is(err, graph.ErrUnknownOutcome) {
+		t.Error("a 502 on a mutation is not marked graph.ErrUnknownOutcome")
+	}
 	if n := srv.Requests(); n != 1 {
 		t.Errorf("requests = %d, want 1 (mutations are never retried)", n)
 	}
@@ -161,6 +164,9 @@ func TestMutationWithGarbledResponse(t *testing.T) {
 	srv := graphtest.New(t, fixture("set_status_html_200"))
 	err := srv.Client().Mutate(context.Background(), setStatus, setStatusVars, nil)
 	assertError(t, err, render.ExitNetwork, "errors/mutation_garbled")
+	if !errors.Is(err, graph.ErrUnknownOutcome) {
+		t.Error("a garbled mutation answer is not marked graph.ErrUnknownOutcome")
+	}
 }
 
 func TestQueryWithNonJSON200(t *testing.T) {
@@ -201,6 +207,9 @@ func TestTransportErrors(t *testing.T) {
 				err = c.Query(context.Background(), viewerQuery, nil, nil)
 			}
 			assertError(t, err, render.ExitNetwork, "errors/transport_"+tt.name)
+			if errors.Is(err, graph.ErrUnknownOutcome) != tt.mutation {
+				t.Errorf("errors.Is(err, ErrUnknownOutcome) = %v, want %v", !tt.mutation, tt.mutation)
+			}
 			text := render.FromError(err).Text()
 			if strings.Contains(text, "api.github.com") || strings.Contains(text, "://") {
 				t.Errorf("endpoint URL in output: %q", text)

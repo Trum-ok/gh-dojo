@@ -1,0 +1,6 @@
+code: 5
+--- stdout
+--- stderr
+error: #15 created, but setting status Backlog failed
+GitHub API rejected the request
+fix: re-run the same gh dojo new command: it finds #15 and finishes it

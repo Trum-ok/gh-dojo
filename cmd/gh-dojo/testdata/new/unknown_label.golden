@@ -3,3 +3,4 @@ code: 1
 --- stderr
 error: unknown label "dogfod": no such label in Trum-ok/gh-dojo
 allowed: accessibility, bug, documentation, dogfood, duplicate, enhancement, good first issue, help wanted, invalid, question, wontfix
+fix: gh label list -R Trum-ok/gh-dojo

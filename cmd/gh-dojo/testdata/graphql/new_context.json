@@ -1,13 +1,14 @@
 {
-  "comment": "Recorded: what gh dojo new reads before writing in Trum-ok/gh-dojo: repo ID, 11 labels, issues #1-#14 (none with a gh-dojo:new marker), all on board Trum-ok/5.",
+  "comment": "Recorded: what gh dojo new reads before writing in Trum-ok/gh-dojo: repo ID, 11 labels, open issues #1-#14 (none with a gh-dojo:new marker), all on board Trum-ok/5, none archived.",
   "interactions": [
     {
       "operation": "NewIssueContext",
-      "query": "query NewIssueContext($owner: String!, $repo: String!, $status: String!) {\n  repository(owner: $owner, name: $repo) {\n    id\n    labels(first: 100, orderBy: {field: NAME, direction: ASC}) {\n      totalCount\n      pageInfo { hasNextPage endCursor }\n      nodes { id name }\n    }\n    issues(last: 20, orderBy: {field: CREATED_AT, direction: ASC}) {\n      nodes {\n        id\n        number\n        body\n        viewerDidAuthor\n        labels(first: 50) { nodes { name } }\n        projectItems(first: 20) {\n          nodes {\n            id\n            project { id }\n            fieldValueByName(name: $status) { ... on ProjectV2ItemFieldSingleSelectValue { name } }\n          }\n        }\n      }\n    }\n  }\n}",
+      "query": "query NewIssueContext($owner: String!, $repo: String!, $status: String!, $window: Int!) {\n  repository(owner: $owner, name: $repo) {\n    id\n    labels(first: 100, orderBy: {field: NAME, direction: ASC}) {\n      totalCount\n      pageInfo { hasNextPage endCursor }\n      nodes { id name }\n    }\n    issues(last: $window, states: OPEN, orderBy: {field: CREATED_AT, direction: ASC}) {\n      nodes {\n        id\n        number\n        title\n        body\n        viewerDidAuthor\n        labels(first: 50) { nodes { name } }\n        projectItems(first: 20) {\n          nodes {\n            id\n            isArchived\n            project { id }\n            fieldValueByName(name: $status) { ... on ProjectV2ItemFieldSingleSelectValue { name } }\n          }\n        }\n      }\n    }\n  }\n}",
       "variables": {
         "owner": "Trum-ok",
         "repo": "gh-dojo",
-        "status": "Status"
+        "status": "Status",
+        "window": 20
       },
       "response": {
         "data": {
@@ -71,6 +72,7 @@
                 {
                   "id": "I_kwDOVq9iIs8AAAABeZKYjg",
                   "number": 1,
+                  "title": "Каркас: Go-модуль, cobra и установка как расширение gh",
                   "body": "## Зачем\nОснова для всех команд v0.0. Установка из исходников — часть рубежа самохостинга.\n\n## Что сделать\n- Go-модуль на актуальной стабильной Go, точка входа `cmd/gh-dojo`, корневая команда cobra.\n- Зависимости из стека: `github.com/cli/go-gh/v2`, cobra, BurntSushi/toml.\n- Сборка и установка: `gh extension install .` из исходников; бинарник в `.gitignore`.\n- Установленная версия не зависит от текущей ветки: агенты работают на последней установленной сборке, сломанная ветка не ломает учёт задач (например, `make install` собирает в отдельный каталог и ставит оттуда).\n- CI: `go vet`, `go test`, `go build` на push и PR.\n\n## Готово, когда\n- `gh dojo --help` работает после установки по инструкции.\n- Переключение на ветку с ошибкой компиляции не ломает установленный `gh dojo`.\n\nСпека: `docs/spec.md`: «Архитектура на Go», «Этапы → Самохостинг».\n",
                   "viewerDidAuthor": true,
                   "labels": {
@@ -80,6 +82,7 @@
                     "nodes": [
                       {
                         "id": "PVTI_lAHOBFGd5c4BrMYFzhH6JM0",
+                        "isArchived": false,
                         "project": {
                           "id": "PVT_kwHOBFGd5c4BrMYF"
                         },
@@ -93,6 +96,7 @@
                 {
                   "id": "I_kwDOVq9iIs8AAAABeZKieQ",
                   "number": 2,
+                  "title": "Коды выхода и короткие ошибки (internal/render)",
                   "body": "## Зачем\nАгент решает, что делать дальше, по коду выхода и короткому тексту ошибки. Все команды v0.0 опираются на этот слой.\n\n## Что сделать\n- Типы ошибок с кодами 0–5 из таблицы спеки: аргументы/конфиг, отказ проверки процесса, не найдено, сеть/авторизация, применено частично.\n- Ошибка — до 5 строк: что не так, допустимые значения, команда исправления. Без трейсбеков и сырого GraphQL.\n- Любая паника ловится на верхнем уровне и превращается в такую же короткую ошибку.\n- Помощник для строки подтверждения записи (до 160 символов); предупреждения — в stderr.\n- Обрезка списков с явным «показаны N из M».\n\n## Готово, когда\n- Golden-тесты на форматы ошибки, подтверждения и обрезки.\n- Паника в команде даёт короткую ошибку и ненулевой код.\n\nСпека: `docs/spec.md`: «Принципы» 3, 4, 7; «Нефункциональные требования → Вывод, Коды выхода».\n",
                   "viewerDidAuthor": true,
                   "labels": {
@@ -102,6 +106,7 @@
                     "nodes": [
                       {
                         "id": "PVTI_lAHOBFGd5c4BrMYFzhH6Jbk",
+                        "isArchived": false,
                         "project": {
                           "id": "PVT_kwHOBFGd5c4BrMYF"
                         },
@@ -115,6 +120,7 @@
                 {
                   "id": "I_kwDOVq9iIs8AAAABeZKr9A",
                   "number": 3,
+                  "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)",
                   "body": "## Зачем\nПроцесс проекта — данные в конфиге, а не код. Все команды читают конфиг.\n\n## Что сделать\n- Поиск `.github/dojo.toml` вверх от текущей папки.\n- Разбор `version`, `preset`, `[board]` (owner, project, repos, assignee), `[fields]` (`status` обязателен), `[session]` (env, link), `[verbs.*]`.\n- Для глаголов в v0.0: `when`, `to`, `from`, `require`, `require_one_of`, `comment` (шаблон). Остальные ключи из спеки распознаются, но дают понятную ошибку «не поддерживается в этой версии», а не молча игнорируются.\n- Ошибки валидации — код 1, с указанием ключа и допустимых значений.\n- Сверка с доской — отдельная задача.\n\n## Готово, когда\n- Пример конфига из спеки (без неподдерживаемых ключей) загружается.\n- Тесты на отсутствие файла, неизвестный ключ, пустой `fields.status`, глагол без `when`.\n\nСпека: `docs/spec.md`: «Модель и конфиг».\n",
                   "viewerDidAuthor": true,
                   "labels": {
@@ -124,6 +130,7 @@
                     "nodes": [
                       {
                         "id": "PVTI_lAHOBFGd5c4BrMYFzhH6Jn8",
+                        "isArchived": false,
                         "project": {
                           "id": "PVT_kwHOBFGd5c4BrMYF"
                         },
@@ -137,6 +144,7 @@
                 {
                   "id": "I_kwDOVq9iIs8AAAABeZK1lA",
                   "number": 4,
+                  "title": "Пресет kanban через embed.FS",
                   "body": "## Зачем\nБаза глаголов, которую конфиг расширяет или переопределяет. В v0.0 нужен только `kanban`.\n\n## Что сделать\n- Определить статусы и глаголы пресета `kanban` (как минимум `start`, `wait`, `ready`, `done`; с `when`, `to`, `from` и комментариями там, где они нужны).\n- Хранить пресет в бинарнике через `embed.FS`.\n- Слияние: `preset = \"kanban\"` + переопределения из `.github/dojo.toml` (глагол целиком или отдельные ключи).\n- Задокументировать, какие статусы доски ожидает пресет: под них будет настроена доска gh-dojo.\n\n## Готово, когда\n- Конфиг из одной строки `preset = \"kanban\"` плюс `[board]` и `[fields]` даёт рабочий набор глаголов.\n- Тесты на переопределение и добавление глагола поверх пресета.\n\nСпека: `docs/spec.md`: «Модель и конфиг» (Пресет), «Этапы → v0.0».\n",
                   "viewerDidAuthor": true,
                   "labels": {
@@ -146,6 +154,7 @@
                     "nodes": [
                       {
                         "id": "PVTI_lAHOBFGd5c4BrMYFzhH6J1s",
+                        "isArchived": false,
                         "project": {
                           "id": "PVT_kwHOBFGd5c4BrMYF"
                         },
@@ -159,6 +168,7 @@
                 {
                   "id": "I_kwDOVq9iIs8AAAABeZK-9Q",
                   "number": 5,
+                  "title": "GraphQL-клиент и схема доски с кэшем (internal/graph, internal/board)",
                   "body": "## Зачем\nВсе чтения и записи идут через GraphQL; агент никогда не видит ID полей и вариантов.\n\n## Что сделать\n- Клиент на go-gh: авторизация только токеном gh или `GH_TOKEN`, токен никогда не попадает в вывод.\n- Ошибки авторизации и нехватки скоупа `project` → код 4 с подсказкой `gh auth refresh -s project`.\n- Чтение схемы доски: ID проекта, полей, вариантов single select. Владелец user или org определяется сам (достаточно, чтобы работал user; org — если выходит без лишней работы).\n- Кэш схемы в `~/.cache/gh-dojo` на 1 час; сброс при ошибке «нет такого варианта».\n- Пагинация с `totalCount`.\n- Инфраструктура тестов на записанных ответах GraphQL.\n\n## Готово, когда\n- Повторный вызов в течение часа не делает запрос схемы.\n- Тесты на записанных ответах для user-доски и ошибки авторизации.\n\nСпека: `docs/spec.md`: «Нефункциональные требования → Скорость и надёжность, Безопасность», «Архитектура на Go».\n",
                   "viewerDidAuthor": true,
                   "labels": {
@@ -168,6 +178,7 @@
                     "nodes": [
                       {
                         "id": "PVTI_lAHOBFGd5c4BrMYFzhH6J-I",
+                        "isArchived": false,
                         "project": {
                           "id": "PVT_kwHOBFGd5c4BrMYF"
                         },
@@ -181,6 +192,7 @@
                 {
                   "id": "I_kwDOVq9iIs8AAAABeZLJ5Q",
                   "number": 6,
+                  "title": "Сверка конфига с доской",
                   "body": "## Зачем\nОпечатка в имени статуса должна давать ошибку со списком статусов доски, а не молчаливый пропуск.\n\n## Что сделать\n- При загрузке сверять `fields.*` с полями доски, а `to` и `from` глаголов — с вариантами поля статуса.\n- Ошибка — код 1: неверное значение, список допустимых, где исправить.\n- Использовать кэш схемы; при расхождении один раз сбросить кэш и перечитать доску.\n\n## Готово, когда\n- Опечатка `to = \"In progres\"` даёт ошибку со списком статусов доски.\n- Тесты на записанных ответах.\n\nСпека: `docs/spec.md`: «Модель и конфиг» (последний абзац).\n",
                   "viewerDidAuthor": true,
                   "labels": {
@@ -190,6 +202,7 @@
                     "nodes": [
                       {
                         "id": "PVTI_lAHOBFGd5c4BrMYFzhH6KKs",
+                        "isArchived": false,
                         "project": {
                           "id": "PVT_kwHOBFGd5c4BrMYF"
                         },
@@ -203,6 +216,7 @@
                 {
                   "id": "I_kwDOVq9iIs8AAAABeZLXnw",
                   "number": 7,
+                  "title": "Команда show <N>…",
                   "body": "## Зачем\nАгент читает задачу одним запросом и не тратит ходы на gh issue view + project.\n\n## Что сделать\n- `show <N>… [--brief]`: статус на доске, метки, блокеры в обе стороны, описание, комментарии — одним GraphQL-запросом.\n- История статусов — если API отдаёт её в том же запросе; иначе вынести в отдельную задачу.\n- Длинные треды сворачиваются с подсказкой, как развернуть (`--comments all`); обрезка с `totalCount`.\n- Задача не на доске — показать это явно; нет задачи — код 3.\n\n## Готово, когда\n- `show` типичной задачи — до ~2 тыс. токенов.\n- Golden-тесты вывода на записанных ответах.\n\nСпека: `docs/spec.md`: F2.\n",
                   "viewerDidAuthor": true,
                   "labels": {
@@ -212,6 +226,7 @@
                     "nodes": [
                       {
                         "id": "PVTI_lAHOBFGd5c4BrMYFzhH6Kaw",
+                        "isArchived": false,
                         "project": {
                           "id": "PVT_kwHOBFGd5c4BrMYF"
                         },
@@ -225,6 +240,7 @@
                 {
                   "id": "I_kwDOVq9iIs8AAAABeZLhqw",
                   "number": 8,
+                  "title": "Команда list",
                   "body": "## Зачем\nОбзор доски: одна строка на задачу.\n\n## Что сделать\n- `list [--status] [--mine] [--label]` (`--sprint` — в v0.1 вместе с пресетом `sprints`).\n- Закрытые и задачи в финальном статусе скрыты; их число выводится счётчиком.\n- Задачи без статуса показаны отдельной группой.\n- Обрезка «показаны 50 из 73».\n\n## Готово, когда\n- Golden-тесты вывода, включая скрытые и задачи без статуса.\n\nСпека: `docs/spec.md`: F3, «Принципы» 7.\n",
                   "viewerDidAuthor": true,
                   "labels": {
@@ -234,11 +250,12 @@
                     "nodes": [
                       {
                         "id": "PVTI_lAHOBFGd5c4BrMYFzhH6KoQ",
+                        "isArchived": false,
                         "project": {
                           "id": "PVT_kwHOBFGd5c4BrMYF"
                         },
                         "fieldValueByName": {
-                          "name": "In progress"
+                          "name": "Ready"
                         }
                       }
                     ]
@@ -247,6 +264,7 @@
                 {
                   "id": "I_kwDOVq9iIs8AAAABeZLtRg",
                   "number": 9,
+                  "title": "Команда new: issue + метки + доска + стартовый статус",
                   "body": "## Зачем\nЗаведение задачи одной командой вместо `gh issue create` + `gh project item-add` + смены статуса.\n\n## Что сделать\n- `new <заголовок> [--type] [--area] [--body]` (`--blocked-by` — в v0.1 вместе с `block`/`unblock`).\n- Создать issue, повесить метки, добавить на доску, выставить стартовый статус.\n- Неизвестная метка → ошибка со списком допустимых до создания issue.\n- Сбой после создания → номер созданной issue и команда, которая доделает остаток (код 5).\n- Повтор после сбоя не создаёт вторую issue.\n\n## Готово, когда\n- Строка подтверждения: номер, статус, метки.\n- Тесты на записанных ответах: успех, неизвестная метка, сбой после создания.\n\nСпека: `docs/spec.md`: F4, «Принципы» 5.\n",
                   "viewerDidAuthor": true,
                   "labels": {
@@ -256,6 +274,7 @@
                     "nodes": [
                       {
                         "id": "PVTI_lAHOBFGd5c4BrMYFzhH6K1A",
+                        "isArchived": false,
                         "project": {
                           "id": "PVT_kwHOBFGd5c4BrMYF"
                         },
@@ -269,6 +288,7 @@
                 {
                   "id": "I_kwDOVq9iIs8AAAABeZL4lg",
                   "number": 10,
+                  "title": "Команда comment",
                   "body": "## Зачем\nКомментарий к задаче без смены статуса — частое действие агента.\n\n## Что сделать\n- `comment <N> <текст>` (или `--body`/stdin — выбрать и описать в `--help`).\n- Строка подтверждения; задача не найдена — код 3.\n\n## Готово, когда\n- Тесты на записанных ответах.\n\nСпека: `docs/spec.md`: F5 (только `comment`; `block` и `unblock` — v0.1).\n",
                   "viewerDidAuthor": true,
                   "labels": {
@@ -278,6 +298,7 @@
                     "nodes": [
                       {
                         "id": "PVTI_lAHOBFGd5c4BrMYFzhH6LC0",
+                        "isArchived": false,
                         "project": {
                           "id": "PVT_kwHOBFGd5c4BrMYF"
                         },
@@ -291,6 +312,7 @@
                 {
                   "id": "I_kwDOVq9iIs8AAAABeZMFhA",
                   "number": 11,
+                  "title": "Глаголы из конфига: проверки и план эффектов (internal/workflow)",
                   "body": "## Зачем\nГлавная фича: агент пишет `gh dojo start 42`, а CLI сам знает правила. План отделён от исполнения — на этом держатся `--dry-run` и тесты без GitHub.\n\n## Что сделать\n- Строить cobra-команды из глаголов конфига; первая строка `--help` — `when`, дальше обязательные аргументы и что делается заодно.\n- Флаги `--comment`, `--by` и `--dry-run`.\n- Проверки v0.0: `from`, `require`, `require_one_of`. Отказ проверки — код 2; неверные аргументы — код 1 с подсказкой.\n- План — список операций (эффекты `status` и `comment`) без сетевых вызовов.\n- Шаблоны комментариев с `{session}` из `[session]`; нет сессии — предупреждение, а не ошибка.\n- `--dry-run` печатает план.\n\n## Готово, когда\n- Unit-тесты движка на таблице «состояние задачи + глагол + аргументы → план или ошибка».\n- `gh dojo start 42 --dry-run` показывает план.\n\nСпека: `docs/spec.md`: F1, «Архитектура на Go» (ключевое решение), «Интеграция с агентами → Сессия агента».\n",
                   "viewerDidAuthor": true,
                   "labels": {
@@ -300,6 +322,7 @@
                     "nodes": [
                       {
                         "id": "PVTI_lAHOBFGd5c4BrMYFzhH6LWM",
+                        "isArchived": false,
                         "project": {
                           "id": "PVT_kwHOBFGd5c4BrMYF"
                         },
@@ -313,6 +336,7 @@
                 {
                   "id": "I_kwDOVq9iIs8AAAABeZMRMQ",
                   "number": 12,
+                  "title": "Исполнение глагола: эффекты status и comment одной мутацией (internal/effects)",
                   "body": "## Зачем\nГлагол на одну задачу — не больше двух запросов (чтение + мутация), повтор безопасен.\n\n## Что сделать\n- Эффект → фрагмент GraphQL-мутации; все эффекты глагола — одна мутация.\n- Добавить issue на доску, если её там нет.\n- Автокомментарий с маркером `<!-- gh-dojo:<глагол>:<hash> -->`; если последний комментарий с таким маркером уже есть, второй не пишется.\n- Повтор после частичного применения доделывает остаток и сообщает, что уже сделано (код 5).\n- Строка подтверждения: `#42 Backlog → In progress, комментарий оставлен`.\n\n## Готово, когда\n- При тёплом кэше — ровно 2 запроса GraphQL (проверить тестом).\n- Тесты на записанных ответах: успех, задача не на доске, повтор с уже оставленным комментарием.\n\nСпека: `docs/spec.md`: F1, «Комментарии без дублей», «Принципы» 3, 5, 6.\n",
                   "viewerDidAuthor": true,
                   "labels": {
@@ -322,6 +346,7 @@
                     "nodes": [
                       {
                         "id": "PVTI_lAHOBFGd5c4BrMYFzhH6Lio",
+                        "isArchived": false,
                         "project": {
                           "id": "PVT_kwHOBFGd5c4BrMYF"
                         },
@@ -335,6 +360,7 @@
                 {
                   "id": "I_kwDOVq9iIs8AAAABeZMbcQ",
                   "number": 13,
+                  "title": "Доска и .github/dojo.toml для самого gh-dojo",
                   "body": "## Зачем\ngh-dojo ведёт собственную разработку через себя.\n\n## Что сделать\n- Привести статусы доски gh-dojo (проект №5) к ожиданиям пресета `kanban`.\n- Написать `.github/dojo.toml` для репозитория: доска, поля, пресет и переопределения; тексты комментариев — на языке проекта.\n- Завести метку `dogfood` для неудобств, замеченных по ходу работы, если её ещё нет.\n\n## Готово, когда\n- Конфиг загружается и проходит сверку с доской без ошибок.\n\nСпека: `docs/spec.md`: «Этапы → Самохостинг».\n",
                   "viewerDidAuthor": true,
                   "labels": {
@@ -344,6 +370,7 @@
                     "nodes": [
                       {
                         "id": "PVTI_lAHOBFGd5c4BrMYFzhH6Ltk",
+                        "isArchived": false,
                         "project": {
                           "id": "PVT_kwHOBFGd5c4BrMYF"
                         },
@@ -357,6 +384,7 @@
                 {
                   "id": "I_kwDOVq9iIs8AAAABeZMk6g",
                   "number": 14,
+                  "title": "Skill для агентов и переход на gh dojo (рубеж v0.0)",
                   "body": "## Зачем\nРубеж v0.0: все задачи gh-dojo лежат на его собственной доске, агенты работают с ней только через `gh dojo`.\n\n## Что сделать\n- Написать вручную `.claude/skills/gh-dojo/SKILL.md`: глаголы проекта, когда их применять, коды выхода, правило «неудобство → задача с меткой `dogfood`» (с v0.2 skill генерирует `agent install`).\n- В `CLAUDE.md` указать, что задачи ведутся только через `gh dojo`, а не через `gh issue` и `gh project`.\n- Проверить, что все открытые задачи на доске и `gh dojo list` их показывает.\n- Пройти цикл одной реальной задачи: `new` → `start` → `ready`/`done` → `show`.\n\n## Готово, когда\n- Рубеж выполнен; найденные неудобства заведены с меткой `dogfood`.\n\nСпека: `docs/spec.md`: «Этапы → v0.0, Самохостинг», «Интеграция с агентами».\n",
                   "viewerDidAuthor": true,
                   "labels": {
@@ -366,6 +394,7 @@
                     "nodes": [
                       {
                         "id": "PVTI_lAHOBFGd5c4BrMYFzhH6L4Q",
+                        "isArchived": false,
                         "project": {
                           "id": "PVT_kwHOBFGd5c4BrMYF"
                         },

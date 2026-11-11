@@ -8,12 +8,15 @@ when labels.types is empty; --area X adds the label <labels.area_prefix>X;
 --label adds any existing label. An unknown one fails before anything is
 created, listing the allowed values.
 
-The body comes from --body or --body-file (a file, or - for stdin).
+The body comes from --body or --body-file (a file, or - for stdin). A title
+starting with - goes after --: gh dojo new -- "-v is ignored".
 
-A repeat is safe: the body ends with a hidden marker of the title and body,
-and a run that finds it among the repo's 20 newest issues finishes that issue
-(labels, board, status) instead of creating another. If a run fails after
-creating the issue, it exits with code 5: run the same command again.
+A repeat is safe: the body ends with a hidden marker of the title, and a run
+that finds it on one of the repo's 20 newest open issues, written by you,
+finishes that issue (labels, board, status) instead of creating another. So
+filing an open issue again with the same title (ignoring case and spacing)
+resumes it. If a run fails after creating the issue, it exits with code 5:
+run the same command again.
 
 This project:
   --type    any repo label not starting with area:
@@ -26,12 +29,13 @@ Usage:
 Examples:
   gh dojo new "Fix login redirect" --type bug --area cli
   gh dojo new "Support org boards" --label enhancement --body-file - < notes.md
+  gh dojo new -- "-v is ignored by list"
 
 Flags:
-      --area name        area name: adds the label <area_prefix><name>; repeatable
-      --body string      issue body (markdown)
+      --area name        area name: adds the label <labels.area_prefix><name>; repeatable
+      --body string      issue body (markdown); one starting with - goes as --body=...
       --body-file file   read the body from file; - reads stdin
   -h, --help             help for new
       --label label      any existing repo label; repeatable
-      --type string      issue type: a label from labels.types
+      --type string      issue type: any repo label not starting with area:
 --- stderr
