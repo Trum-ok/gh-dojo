@@ -215,11 +215,13 @@ gh dojo unblock <N> --by <M>...
 ```
 
 Marks issue N blocked by the issues `--by` names, or removes those links,
-without changing its status. `--by` takes `12`, `"#12"` or `owner/repo#12`;
-repeat it or separate numbers with commas. A link already there (`block`) or
-already gone (`unblock`) is not an error, and the line says so. An issue that
-does not exist fails before anything is written (exit code 3); an issue
-cannot block itself (exit code 1). One read and one write:
+without changing its status. `--by` takes `12`, `"#12"`, `owner/repo#12` or
+the issue's URL; repeat it or separate them with commas. A link already
+there (`block`) or already gone (`unblock`) is not an error, and the line
+says so. An issue that does not exist, or a pull request, fails before
+anything is written (exit code 3); an issue cannot block itself, nor an
+issue it already blocks: GitHub refuses cycles (exit code 1). One read and
+one write:
 
 ```console
 $ gh dojo block 42 --by 17,18
@@ -230,8 +232,8 @@ $ gh dojo unblock 42 --by 17
 
 A blocker stops blocking once it is closed or in one of
 [`statuses.resolved`](#statuses); [`blockers = "warn"` or `"deny"`](#verbs)
-makes a verb check that. `wait --by 17` of the kanban preset also adds the
-link (`blockers = "link"`).
+makes a verb check that; the kanban preset's `start` warns. `wait --by 17`
+of the kanban preset also adds the link (`blockers = "link"`).
 
 ### init
 
@@ -340,7 +342,7 @@ A verb takes one issue number and, in one command:
    unresolved blockers (a warning on stderr, or exit code 2);
 2. adds the issue to the board if it is not there;
 3. reopens it (`reopen`), sets the status to the verb's `to`, adds and removes
-   `labels`, adds the `assign` user, marks it blocked by the `--by` issue
+   `labels`, adds the `assign` user, marks it blocked by the `--by` issues
    (`blockers = "link"`), posts the rendered
    [comment template](#comment-templates) and closes it (`close`). Each
    effect already in place is skipped: a status already set, labels already
@@ -350,7 +352,7 @@ A verb takes one issue number and, in one command:
 
 Everything is written in one GraphQL mutation (two when the issue is not on
 the board yet: the status needs the new board item). Label and user IDs, and
-the `--by` issue of `blockers = "link"`, are read with the issue, so a verb
+the `--by` issues of `blockers = "link"`, are read with the issue, so a verb
 on an issue on the board costs one read and one write.
 
 The board's built-in workflows run after the verb and may change the status
@@ -370,10 +372,12 @@ verbs reject `--yes`.
 
 `--comment` and `--by` fill `{comment}` and `{by}` in the template; a verb
 whose template does not use one of them rejects that flag. `--by` takes an issue number (`12` or
-`#12`, rendered `#12`) or free text; with `blockers = "link"` an issue
-(`12`, `#12` or `owner/repo#12`) is also marked as blocking this one, while
-free text only goes into the comment. `--dry-run` prints the plan without
-changing anything:
+`#12`, rendered `#12`) or free text; with `blockers = "link"` issues
+(`12`, `#12`, `owner/repo#12` or the issue's URL; several separated by
+commas, rendered `#17, #18`) are also marked as blocking this one, while
+free text only goes into the comment. A pull request is named in the
+comment but not linked, with a warning; issues and text mixed in one `--by`
+are exit code 1. `--dry-run` prints the plan without changing anything:
 
 ```console
 $ gh dojo wait 42 --by 17 --dry-run
@@ -665,17 +669,21 @@ Effects:
 - **blockers**: a check or an effect, one of three values.
   - `"warn"` and `"deny"` look at the issue's unresolved blockers: open, and
     not in one of [`statuses.resolved`](#statuses); a blocker whose board
-    status could not be read, or that was not read at all (more than 20, or
-    hidden from the token), counts as unresolved. `"warn"` prints them on
+    status could not be read, or that was not read at all (hidden from the
+    token; a verb that checks blockers reads up to 50, GitHub's limit),
+    counts as unresolved. `"warn"` prints them on
     stderr and runs; `"deny"` refuses with exit code 2, listing them and
     asking you to ask the user (there is no fix line: don't work around it).
     Like `from`, the check is skipped for an issue already in the verb's
     `to`, so a repeat is safe. `--dry-run` warns or refuses the same way.
-  - `"link"` turns `--by` naming an issue (`12`, `#12`, `owner/repo#12`)
-    into a blocked-by link, written in the verb's one mutation; free text
-    stays comment-only. The `--by` issue must exist (exit code 3) and cannot
-    be the issue itself (exit code 1). The verb's comment template must use
-    `{by}`. `blockers = false` turns off a preset's (kanban's `wait` links).
+  - `"link"` turns `--by` naming issues (`12`, `#12`, `owner/repo#12` or
+    the issue's URL, comma-separated) into blocked-by links, written in the
+    verb's one mutation; free text stays comment-only, and so does a pull
+    request (with a warning). Each `--by` issue must exist (exit code 3), and
+    cannot be the issue itself or an issue it already blocks (exit code 1);
+    issues and text mixed are exit code 1 too. The verb's comment template
+    must use `{by}`. `blockers = false` turns off a preset's (kanban's
+    `wait` links).
 
 ### Comment templates
 
@@ -727,7 +735,7 @@ The board's status field must have these options (other options are fine):
 
 | Verb    | Moves to    | From                     | Needs                 | Comment                          |
 |---------|-------------|--------------------------|-----------------------|----------------------------------|
-| `start` | In progress | Backlog, Waiting, Ready  |                       | session link, `--comment`        |
+| `start` | In progress | Backlog, Waiting, Ready  | warns about blockers  | session link, `--comment`        |
 | `wait`  | Waiting     | In progress              | `--by` or `--comment` | "Waiting for …", `--comment`     |
 | `ready` | Ready       | In progress, Waiting     |                       | `--comment`                      |
 | `done`  | Done        | Ready, In progress       |                       | `--comment`                      |
@@ -735,8 +743,12 @@ The board's status field must have these options (other options are fine):
 `done` also closes the issue as completed: Done means released. An issue a
 pull request already closed stays closed; `done` still moves it to Done.
 To keep issues open in Done, set `close = false` under `[verbs.done]`.
-`wait --by 17` also marks the issue blocked by #17 (`blockers = "link"`);
-`wait --by "the API team"` only comments.
+`start` warns on stderr about unresolved blockers, those not yet Ready,
+Done or closed (`blockers = "warn"`), and still runs; set `blockers =
+"deny"` under `[verbs.start]` to refuse instead, or `false` to skip the
+check. `wait --by 17` also marks the issue blocked by #17, and `wait --by
+17,18` by both (`blockers = "link"`); `wait --by "the API team"` only
+comments.
 
 The preset also sets `fields.status = "Status"`, `statuses.initial =
 "Backlog"`, `statuses.final = ["Done"]`, `statuses.resolved = ["Ready",
