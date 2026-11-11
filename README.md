@@ -90,15 +90,20 @@ Issue numbers are written `42` or `#42` and refer to the default repository
 gh dojo show <N>... [--brief] [--comments N|all] [--full]
 ```
 
-Reads issues before working on them: state, board status and fields, labels,
-assignees, blockers both ways (open first), status history on the board, the
-description and the latest comments. Times are UTC.
+Reads issues before working on them: state, board status and fields,
+milestone, labels, assignees, blockers both ways with their board status,
+status history on the board, the description and the latest comments. Times
+are UTC. A blocker is resolved, no longer blocking, when it is closed or its
+board status is in [`statuses.resolved`](#statuses) (kanban: Ready, Done);
+unresolved blockers are listed first, and `--brief` counts only them as
+blocking.
 
 Long content is folded, always with a note saying what is hidden: the last 5
 comments are printed (`--comments N` for the last N, `--comments all` for up
 to 100); the description is cut at 2000 characters and the comments shown
 share 1500. `--full` prints them whole. `--brief` prints three lines per
-issue: title; state, status, labels and assignees; blockers and counts.
+issue: title; state, status, milestone, labels and assignees; blockers and
+counts.
 
 Several numbers are read in one request (up to 20 issues per request). A
 missing issue or a pull request number is reported after the others are
@@ -243,6 +248,7 @@ status = "Status"            # required (the kanban preset sets "Status")
 [statuses]
 initial = "Backlog"          # set by `new` and assumed for issues not on the board yet
 final = ["Done"]             # hidden by `list`, with a counter
+resolved = ["Ready", "Done"] # a blocker in these no longer blocks
 
 [labels]
 types = ["bug", "feature"]   # labels `new --type` accepts; empty = any label without area_prefix
@@ -298,10 +304,11 @@ they are rejected with "not supported in this version".
 
 ### statuses
 
-| Key       | Meaning                                                                                |
-|-----------|----------------------------------------------------------------------------------------|
-| `initial` | Set by `new`; issues without a status or not on the board count as this one for `from` |
-| `final`   | Statuses `list` hides, with a counter                                                  |
+| Key        | Meaning                                                                                                                                               |
+|------------|-------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `initial`  | Set by `new`; issues without a status or not on the board count as this one for `from`                                                                |
+| `final`    | Statuses `list` hides, with a counter                                                                                                                 |
+| `resolved` | Statuses in which an open blocker no longer blocks: its work is done though the issue stays open (kanban: Ready). A closed blocker is always resolved |
 
 ### labels
 
@@ -364,9 +371,10 @@ your project's language; the CLI itself speaks English.
 
 Every command that talks to GitHub first checks the config against the
 board: `fields.status` must name a single-select board field, and every
-status the config names (`statuses.initial`, `statuses.final`, each verb's
-`to` and `from`) must be one of its options. A typo is an error with the board's statuses and a suggestion, not a silent
-skip. The board schema is cached for an hour in `~/.cache/gh-dojo` (or
+status the config names (`statuses.initial`, `statuses.final`,
+`statuses.resolved`, each verb's `to` and `from`) must be one of its
+options. A typo is an error with the board's statuses and a suggestion, not
+a silent skip. The board schema is cached for an hour in `~/.cache/gh-dojo` (or
 `$XDG_CACHE_HOME/gh-dojo`; override with `GH_DOJO_CACHE_DIR`); a mismatch
 re-reads the board before it is reported, so a status just added on the
 board is picked up.
@@ -399,7 +407,9 @@ The board's status field must have these options (other options are fine):
 | `done`  | Done        | Ready, In progress       |                       | `--comment`                      |
 
 The preset also sets `fields.status = "Status"`, `statuses.initial =
-"Backlog"`, `statuses.final = ["Done"]`, `labels.types = []` (any label
+"Backlog"`, `statuses.final = ["Done"]`, `statuses.resolved = ["Ready",
+"Done"]` (a blocker in Ready is done, so it no longer blocks, though its
+issue stays open until Done), `labels.types = []` (any label
 without the area prefix is a type) and `labels.area_prefix = "area:"`. Its
 source is [`internal/config/presets/kanban.toml`](internal/config/presets/kanban.toml).
 Override `when` and `comment` to write them in your project's language; this

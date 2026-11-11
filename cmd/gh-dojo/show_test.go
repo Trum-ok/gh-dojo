@@ -28,6 +28,13 @@ func TestShow(t *testing.T) {
 	}{
 		{"card_3", card3Fixture, []string{"3"}, render.ExitOK},
 		{"card_3_brief", card3Fixture, []string{"#3", "--brief"}, render.ExitOK},
+		// Recorded: both blockers are open but in Ready, so resolved.
+		{"card_13", issueFixtures + "card_13.json", []string{"13"}, render.ExitOK},
+		{"card_13_brief", issueFixtures + "card_13.json", []string{"13", "--brief"}, render.ExitOK},
+		// The same without statuses.resolved: only closed blockers resolve.
+		{"card_13_brief_no_resolved", issueFixtures + "card_13.json", []string{"13", "--brief"}, render.ExitOK},
+		{"blockers", "testdata/graphql/show_blockers.json", []string{"3"}, render.ExitOK},
+		{"blockers_brief", "testdata/graphql/show_blockers.json", []string{"3", "--brief"}, render.ExitOK},
 		{"not_on_board", issueFixtures + "card_not_on_board.json", []string{"3"}, render.ExitOK},
 		{"partial", issueFixtures + "card_partial.json", []string{"42"}, render.ExitOK},
 		{"long_thread", "testdata/graphql/show_long_thread.json", []string{"42"}, render.ExitOK},
@@ -46,8 +53,11 @@ func TestShow(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := dojoConfig
-			if tt.name == "repo_not_found" {
+			switch tt.name {
+			case "repo_not_found":
 				cfg = strings.Replace(cfg, `"Trum-ok/gh-dojo"`, `"Trum-ok/no-such-repo-xyz"`, 1)
+			case "card_13_brief_no_resolved":
+				cfg += "\n[statuses]\nresolved = []\n"
 			}
 			withConfig(t, cfg)
 			srv := withApp(t, boardFixture, tt.fixture)

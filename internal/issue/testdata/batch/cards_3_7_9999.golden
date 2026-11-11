@@ -4,15 +4,16 @@ state OPEN reason="" closed=false url=https://github.com/Trum-ok/gh-dojo/issues/
 author "Trum-ok" created 2026-11-11T18:19:10Z closed - incomplete=false
 labels [] (0)
 assignees [] (0)
+milestone "v0.0 — самохостинг" due -
 blocked by (2):
-  #2 OPEN "Коды выхода и короткие ошибки (internal/render)"
-  #1 OPEN "Каркас: Go-модуль, cobra и установка как расширение gh"
+  #2 OPEN status="Ready" "Коды выхода и короткие ошибки (internal/render)"
+  #1 OPEN status="Ready" "Каркас: Go-модуль, cobra и установка как расширение gh"
 blocking (5):
-  #11 OPEN "Глаголы из конфига: проверки и план эффектов (internal/workflow)"
-  #8 OPEN "Команда list"
-  #7 OPEN "Команда show <N>…"
-  #6 OPEN "Сверка конфига с доской"
-  #4 OPEN "Пресет kanban через embed.FS"
+  #11 OPEN status="Ready" "Глаголы из конфига: проверки и план эффектов (internal/workflow)"
+  #8 OPEN status="Ready" "Команда list"
+  #7 OPEN status="Ready" "Команда show <N>…"
+  #6 OPEN status="Ready" "Сверка конфига с доской"
+  #4 OPEN status="Ready" "Пресет kanban через embed.FS"
 item PVTI_lAHOBFGd5c4BrMYFzhH6Jn8 archived=false created 2026-11-11T18:19:12Z status="Ready" unknown=false values truncated=false
   Status [SINGLE_SELECT] "Ready" option=61e4505c iteration= /0 field=PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ
   Size [SINGLE_SELECT] "M" option=7515a9f1 iteration= /0 field=PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4
@@ -28,19 +29,22 @@ state OPEN reason="" closed=false url=https://github.com/Trum-ok/gh-dojo/issues/
 author "Trum-ok" created 2026-11-11T18:19:52Z closed - incomplete=false
 labels [] (0)
 assignees [] (0)
+milestone "v0.0 — самохостинг" due -
 blocked by (3):
-  #3 OPEN "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)"
-  #2 OPEN "Коды выхода и короткие ошибки (internal/render)"
-  #5 OPEN "GraphQL-клиент и схема доски с кэшем (internal/graph, internal/board)"
+  #3 OPEN status="Ready" "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)"
+  #2 OPEN status="Ready" "Коды выхода и короткие ошибки (internal/render)"
+  #5 OPEN status="Ready" "GraphQL-клиент и схема доски с кэшем (internal/graph, internal/board)"
 blocking (1):
-  #14 OPEN "Skill для агентов и переход на gh dojo (рубеж v0.0)"
-item PVTI_lAHOBFGd5c4BrMYFzhH6Kaw archived=false created 2026-11-11T18:19:54Z status="In progress" unknown=false values truncated=false
-  Status [SINGLE_SELECT] "In progress" option=47fc9ee4 iteration= /0 field=PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ
+  #14 OPEN status="Ready" "Skill для агентов и переход на gh dojo (рубеж v0.0)"
+item PVTI_lAHOBFGd5c4BrMYFzhH6Kaw archived=false created 2026-11-11T18:19:54Z status="Ready" unknown=false values truncated=false
+  Status [SINGLE_SELECT] "Ready" option=61e4505c iteration= /0 field=PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ
   Size [SINGLE_SELECT] "M" option=7515a9f1 iteration= /0 field=PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4
 history (truncated=false untracked=false):
   2026-11-11T18:19:56Z "" → "Backlog" by "github-project-automation" automated=false
   2026-11-11T19:28:10Z "Backlog" → "In progress" by "Trum-ok" automated=false
-comments 0 of 0:
+  2026-11-11T20:03:31Z "In progress" → "Ready" by "Trum-ok" automated=false
+comments 1 of 1:
+  IC_kwDOVq9iIs8AAAABlatp4A 2026-11-11T20:03:30Z by "Trum-ok" mine=true: "show: одна карточка или несколько номеров одним запросом, сворачивание длинных тредов, удаление только точных маркеров gh-dojo (коммиты 063a5cc, 715bc1f, a9cc50e).\n\n<!-- gh-dojo:ready:1c31bf6a -->"
 body: "## Зачем\nАгент читает задачу одним запросом и не тратит ходы на gh issue view + project.\n\n## Что сделать\n- `show <N>… [--brief]`: статус на доске, метки, блокеры в обе стороны, описание, комментарии — одним GraphQL-запросом.\n- История статусов — если API отдаёт её в том же запросе; иначе вынести в отдельную задачу.\n- Длинные треды сворачиваются с подсказкой, как развернуть (`--comments all`); обрезка с `totalCount`.\n- Задача не на доске — показать это явно; нет задачи — код 3.\n\n## Готово, когда\n- `show` типичной задачи — до ~2 тыс. токенов.\n- Golden-тесты вывода на записанных ответах.\n\nСпека: `docs/spec.md`: F2.\n"
 == #9999
 code 3

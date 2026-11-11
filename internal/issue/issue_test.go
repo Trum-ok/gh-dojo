@@ -58,6 +58,109 @@ func TestReadRecorded(t *testing.T) {
 	}
 }
 
+// TestReadResolvedBlockers reads issue #13 of the gh-dojo repo as
+// recorded: blocked by two open issues that are in Ready on the board, so
+// done though open; in milestone v0.0 without a due date.
+func TestReadResolvedBlockers(t *testing.T) {
+	card, err := read(t, "card_13", 13, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testutil.Golden(t, "card/card_13", dump(card))
+	if len(card.OpenBlockers()) != 2 || len(card.UnresolvedBlockers(nil)) != 2 {
+		t.Errorf("open blockers %v, unresolved without resolved statuses %v", card.OpenBlockers(), card.UnresolvedBlockers(nil))
+	}
+	if u := card.UnresolvedBlockers([]string{"Ready", "Done"}); len(u) != 0 {
+		t.Errorf("unresolved blockers %v, want none: both are in Ready", u)
+	}
+	if m := card.Milestone; m == nil || m.Title == "" || !m.DueOn.IsZero() {
+		t.Errorf("milestone %+v", m)
+	}
+}
+
+// TestReadLinkStatus: a linked issue's status is the one on the configured
+// board, matched by the status field's ID when known.
+func TestReadLinkStatus(t *testing.T) {
+	// item is a project item of a linked issue with a status.
+	item := func(project, field, status string) any {
+		return map[string]any{
+			"project": map[string]any{"id": project},
+			"status":  map[string]any{"name": status, "field": map[string]any{"id": field}},
+		}
+	}
+	byName := dojoStatus
+	byName.StatusFieldID = ""
+	noBoard := dojoStatus
+	noBoard.Board = nil
+	tests := []struct {
+		name  string
+		req   issue.Request
+		items []any
+		want  string
+	}{
+		{"this_board", dojoStatus, []any{item("PVT_other", "F_other", "Done"), item(dojoBoard.ID, statusID, "Ready")}, "Ready"},
+		{"other_board_only", dojoStatus, []any{item("PVT_other", "F_other", "Done")}, ""},
+		{"no_items", dojoStatus, []any{}, ""},
+		{"no_status", dojoStatus, []any{map[string]any{"project": map[string]any{"id": dojoBoard.ID}, "status": nil}}, ""},
+		{"withheld_project", dojoStatus, []any{nil, map[string]any{"project": nil, "status": nil}}, ""},
+		// A field with the status field's old name but another ID: not the status.
+		{"other_field", dojoStatus, []any{item(dojoBoard.ID, "PVTSSF_new", "Urgent")}, ""},
+		{"other_field_by_name", byName, []any{item(dojoBoard.ID, "PVTSSF_new", "Urgent")}, "Urgent"},
+		{"no_board", noBoard, []any{item(dojoBoard.ID, statusID, "Ready")}, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			card := readVariant(t, tt.req, func(is map[string]any) {
+				for _, dir := range []string{"blockedBy", "blocking"} {
+					for _, l := range is[dir].(map[string]any)["nodes"].([]any) {
+						l.(map[string]any)["projectItems"] = map[string]any{"nodes": tt.items}
+					}
+				}
+			})
+			for _, l := range append(card.BlockedBy.Nodes, card.Blocking.Nodes...) {
+				if l.Status != tt.want {
+					t.Errorf("%s status %q, want %q", l.Ref(dojo), l.Status, tt.want)
+				}
+			}
+		})
+	}
+}
+
+func TestLinkResolved(t *testing.T) {
+	resolved := []string{"Ready", "Done"}
+	tests := []struct {
+		link issue.Link
+		want bool
+	}{
+		{issue.Link{State: issue.StateOpen, Status: "In progress"}, false},
+		{issue.Link{State: issue.StateOpen, Status: "Ready"}, true},
+		{issue.Link{State: issue.StateOpen}, false},
+		{issue.Link{State: issue.StateClosed, Status: "In progress"}, true},
+		{issue.Link{State: issue.StateClosed}, true},
+	}
+	for _, tt := range tests {
+		if got := tt.link.Resolved(resolved); got != tt.want {
+			t.Errorf("%+v resolved = %v, want %v", tt.link, got, tt.want)
+		}
+		if got := tt.link.Resolved(nil); got != tt.link.Closed() {
+			t.Errorf("%+v resolved without statuses = %v, want %v", tt.link, got, tt.link.Closed())
+		}
+	}
+}
+
+func TestReadMilestone(t *testing.T) {
+	card := readVariant(t, dojoStatus, func(is map[string]any) {
+		is["milestone"] = map[string]any{"title": "v0.1", "dueOn": "2026-12-01T00:00:00Z"}
+	})
+	if m := card.Milestone; m == nil || m.Title != "v0.1" || !m.DueOn.Equal(time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC)) {
+		t.Errorf("milestone %+v", m)
+	}
+	card = readVariant(t, dojoStatus, func(is map[string]any) { is["milestone"] = nil })
+	if card.Milestone != nil {
+		t.Errorf("milestone %+v, want nil", card.Milestone)
+	}
+}
+
 func TestReadNotOnBoard(t *testing.T) {
 	card, err := read(t, "card_not_on_board", 3, 0)
 	if err != nil {
@@ -432,6 +535,11 @@ func dump(c *issue.Card) []byte {
 	p("author %q created %s closed %s incomplete=%v", c.Author, ts(c.CreatedAt), ts(c.ClosedAt), c.Incomplete)
 	p("labels %v (%d)", c.Labels.Nodes, c.Labels.TotalCount)
 	p("assignees %v (%d)", c.Assignees.Nodes, c.Assignees.TotalCount)
+	if m := c.Milestone; m != nil {
+		p("milestone %q due %s", m.Title, ts(m.DueOn))
+	} else {
+		p("milestone none")
+	}
 	for _, pair := range []struct {
 		name string
 		page []issue.Link
@@ -439,7 +547,7 @@ func dump(c *issue.Card) []byte {
 	}{{"blocked by", c.BlockedBy.Nodes, c.BlockedBy.TotalCount}, {"blocking", c.Blocking.Nodes, c.Blocking.TotalCount}} {
 		p("%s (%d):", pair.name, pair.n)
 		for _, l := range pair.page {
-			p("  %s %s %q", l.Ref(c.Repo), l.State, l.Title)
+			p("  %s %s status=%q %q", l.Ref(c.Repo), l.State, l.Status, l.Title)
 		}
 	}
 	switch {

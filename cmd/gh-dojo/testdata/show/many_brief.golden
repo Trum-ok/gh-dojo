@@ -1,12 +1,12 @@
 code: 3
 --- stdout
 #3 Конфиг: загрузка и валидация .github/dojo.toml (internal/config)
-open · Ready · labels: none · assignees: none
-blocked by 2 open: #2, #1 · blocking 5 open · comments: 0
+open · Ready · milestone: v0.0 — самохостинг · labels: none · assignees: none
+no unresolved blockers (2 resolved) · blocking 5 open · comments: 0
 
 #7 Команда show <N>…
-open · In progress · labels: none · assignees: none
-blocked by 3 open: #3, #2, #5 · blocking 1 open · comments: 0
+open · Ready · milestone: v0.0 — самохостинг · labels: none · assignees: none
+no unresolved blockers (3 resolved) · blocking 1 open · comments: 1
 --- stderr
 error: issue #9999 not found in Trum-ok/gh-dojo
 fix: gh dojo list

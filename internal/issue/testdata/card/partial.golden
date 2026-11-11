@@ -3,8 +3,9 @@ state CLOSED reason="COMPLETED" closed=true url=https://github.com/Trum-ok/gh-do
 author "Trum-ok" created 2026-11-11T18:19:10Z closed 2026-11-12T10:00:00Z incomplete=true
 labels [bug area:cli] (2)
 assignees [Trum-ok] (1)
+milestone none
 blocked by (1):
-  acme/auth#7 CLOSED "Auth library upgrade"
+  acme/auth#7 CLOSED status="" "Auth library upgrade"
 blocking (0):
 item: board membership unknown: GitHub withheld some of the issue's projects from this token
 history (truncated=true untracked=false):

@@ -27,9 +27,12 @@ func newShowCmd() (*cobra.Command, error) {
 		Short: showWhen,
 		Long: showWhen + `.
 
-Prints per issue: state, board status and fields, labels, assignees,
-blockers both ways (open first), status history on the board, the
-description and the latest comments, indented. Times are UTC.
+Prints per issue: state, board status and fields, milestone, labels,
+assignees, blockers both ways with their board status, status history on
+the board, the description and the latest comments, indented. Times are
+UTC. A blocker is resolved, no longer blocking, when it is closed or its
+board status is in statuses.resolved (kanban: Ready, Done); unresolved
+blockers are listed first.
 
 Folding, always with a note saying what is hidden:
   - the last ` + strconv.Itoa(defaultShownComments) + ` comments are printed; --comments N prints the last N,
@@ -37,8 +40,8 @@ Folding, always with a note saying what is hidden:
   - a description is cut at ` + strconv.Itoa(maxBodyRunes) + ` characters, and the comments shown share
     ` + strconv.Itoa(commentBudgetRunes) + ` (` + strconv.Itoa(minCommentRunes) + ` to ` + strconv.Itoa(maxCommentRunes) + ` each); --full prints them whole.
 --brief prints three lines per issue (four when GitHub hid part of it):
-title; state, status, labels, assignees; blockers and counts. It takes
-neither --comments nor --full.
+title; state, status, milestone, labels, assignees; blockers and counts.
+It takes neither --comments nor --full.
 
 Several numbers are read in one request (up to ` + strconv.Itoa(issue.MaxBatch) + ` issues per request).
 A missing issue or a pull request number is reported after the others are
@@ -75,7 +78,7 @@ printed, with exit code 3.`,
 				return readErr
 			}
 			repo, _ := app.Repo() // Cards resolved it already
-			v := cardView{statusField: cfg.StatusField(), comments: shown}
+			v := cardView{statusField: cfg.StatusField(), resolved: cfg.Statuses.Resolved, comments: shown}
 			if !full {
 				v.bodyRunes, v.commentBudget = maxBodyRunes, commentBudgetRunes
 			}

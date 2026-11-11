@@ -83,11 +83,15 @@ type Board struct {
 	Repos   []string // "owner/name"; the first is the default repo; may be empty
 }
 
-// Statuses gives meaning to some board statuses. Both are optional: without a
+// Statuses gives meaning to some board statuses. All are optional: without a
 // preset they are empty unless the config sets them.
 type Statuses struct {
 	Initial string   // set by `new` and assumed for issues not on the board yet
 	Final   []string // hidden by `list`, with a counter
+	// Resolved are the statuses in which an open blocker no longer blocks:
+	// its work is complete (kanban: Ready, Done). A closed blocker is
+	// resolved whatever its status.
+	Resolved []string
 }
 
 // Labels maps `new` flags to label names.
@@ -261,7 +265,8 @@ func (c *Config) FieldNames() []string {
 }
 
 // StatusRefs lists every status the config names, in a stable order:
-// statuses.initial, statuses.final, then each verb's to and from. A status
+// statuses.initial, statuses.final, statuses.resolved, then each verb's to
+// and from. A status
 // named in several places appears once per place, so a check against the
 // board can point at the exact key.
 func (c *Config) StatusRefs() []StatusRef {
@@ -271,6 +276,9 @@ func (c *Config) StatusRefs() []StatusRef {
 	}
 	for _, s := range c.Statuses.Final {
 		refs = append(refs, StatusRef{s, "statuses.final"})
+	}
+	for _, s := range c.Statuses.Resolved {
+		refs = append(refs, StatusRef{s, "statuses.resolved"})
 	}
 	for _, v := range c.Verbs {
 		if v.To != "" {

@@ -2,7 +2,7 @@ code: 3
 --- stdout
 #42 Fix login redirect
 closed (completed) 2026-11-12 · board status unknown (GitHub withheld some of the issue's projects from this token) · labels: bug, area:cli · assignees: Trum-ok
-no open blockers (1 closed) · blocking none · comments: 0
+no unresolved blockers (1 resolved) · blocking none · comments: 0
 note: GitHub withheld part of this issue from the token; the rest is accurate
 --- stderr
 error: #15 in Trum-ok/gh-dojo is a pull request; gh dojo works with issues only

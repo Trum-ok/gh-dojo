@@ -3,7 +3,7 @@ version: 1
 preset: "kanban"
 board: owner=acme project=3 repos=[]
 fields.status: "Stage"
-statuses: initial="Backlog" final=["Done" "Won't do"]
+statuses: initial="Backlog" final=["Done" "Won't do"] resolved=[]
 labels: types=["bug" "feature"] area_prefix=""
 session: env=[] link="{id}"
 verb start

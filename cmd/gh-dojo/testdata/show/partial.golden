@@ -3,9 +3,10 @@ code: 0
 #42 Fix login redirect
 state: closed (completed) 2026-11-12, opened 2026-11-11 by Trum-ok
 board: unknown, may be on it (GitHub withheld some of the issue's projects from this token)
+milestone: none
 labels: bug, area:cli
 assignees: Trum-ok
-blocked by: 1 closed
+blocked by: 1 resolved
   acme/auth#7 Auth library upgrade (closed)
 blocking: none
 status history (latest changes only; older ones are not read):

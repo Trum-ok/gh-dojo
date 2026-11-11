@@ -107,6 +107,12 @@ func (c *Config) buildStatuses(r rawStatuses) error {
 		}
 		c.Statuses.Final = *r.Final
 	}
+	if r.Resolved != nil {
+		if err := c.checkList("statuses.resolved", *r.Resolved); err != nil {
+			return err
+		}
+		c.Statuses.Resolved = *r.Resolved
+	}
 	return nil
 }
 

@@ -1,10 +1,15 @@
 package issue
 
 // cardQuery reads a whole card in one request (principle 6). Windows:
-// labels 20, assignees 10, blockers 20 each way, project items 20 (each with
-// up to 100 field values), the last 20 status changes and the last
-// $comments comments; every list keeps its totalCount, so the reader can
-// tell "none" from "not read".
+// labels 20, assignees 10, blockers 20 each way (each with its first 10
+// project items), project items 20 (each with up to 100 field values), the
+// last 20 status changes and the last $comments comments; every list of
+// the card keeps its totalCount, so the reader can tell "none" from "not
+// read".
+//
+// A linked issue reads only its status on each of its projects: the reader
+// keeps the one on the configured board (Link.Status), which tells a
+// blocker that is done but still open (kanban: Ready) from one that blocks.
 //
 // Each project item also reads the value of the field named $status
 // directly (fieldValueByName), so the status is there whatever the size of
@@ -41,6 +46,7 @@ const cardSelection = `{
         closedAt
         author { login }
         body
+        milestone { title dueOn }
         labels(first: 20) { totalCount nodes { name } }
         assignees(first: 10) { totalCount nodes { login } }
         comments(last: $comments) {
@@ -77,7 +83,20 @@ const cardSelection = `{
     }`
 
 // cardFragments are the fragments cardSelection spreads.
-const cardFragments = `fragment link on Issue { number title state repository { nameWithOwner } }
+const cardFragments = `fragment link on Issue {
+  number
+  title
+  state
+  repository { nameWithOwner }
+  projectItems(first: 10) {
+    nodes {
+      project { id }
+      status: fieldValueByName(name: $status) {
+        ... on ProjectV2ItemFieldSingleSelectValue { name field { ... on ProjectV2FieldCommon { id } } }
+      }
+    }
+  }
+}
 
 fragment value on ProjectV2ItemFieldValue {
   __typename
@@ -120,7 +139,11 @@ type issueJSON struct {
 	ClosedAt    *string `json:"closedAt"`
 	Author      *login  `json:"author"`
 	Body        string  `json:"body"`
-	Labels      conn[struct {
+	Milestone   *struct {
+		Title string  `json:"title"`
+		DueOn *string `json:"dueOn"`
+	} `json:"milestone"`
+	Labels conn[struct {
 		Name string `json:"name"`
 	}] `json:"labels"`
 	Assignees conn[login] `json:"assignees"`
@@ -164,6 +187,17 @@ type linkJSON struct {
 	Repository *struct {
 		NameWithOwner string `json:"nameWithOwner"`
 	} `json:"repository"`
+	ProjectItems conn[*struct {
+		Project *struct {
+			ID string `json:"id"`
+		} `json:"project"`
+		Status *struct {
+			Name  string `json:"name"`
+			Field *struct {
+				ID string `json:"id"`
+			} `json:"field"`
+		} `json:"status"`
+	}] `json:"projectItems"`
 }
 
 type valueJSON struct {

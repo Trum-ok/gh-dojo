@@ -3,7 +3,7 @@ version: 1
 preset: "kanban"
 board: owner=acme project=3 repos=[acme/shop]
 fields.status: "Status"
-statuses: initial="Backlog" final=["Done"]
+statuses: initial="Backlog" final=["Done"] resolved=["Ready" "Done"]
 labels: types=[] area_prefix="area:"
 session: env=["CLAUDE_CODE_HOST_SESSION_ID"] link="claude://claude.ai/epitaxy/{id}"
 verb start
@@ -39,6 +39,8 @@ verb drop
 status refs:
   "Backlog"    statuses.initial (from preset kanban)
   "Done"       statuses.final (from preset kanban)
+  "Ready"      statuses.resolved (from preset kanban)
+  "Done"       statuses.resolved (from preset kanban)
   "In progress" verbs.start.to
   "Backlog"    verbs.start.from (from preset kanban)
   "Waiting"    verbs.start.from (from preset kanban)

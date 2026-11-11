@@ -3,15 +3,16 @@ state OPEN reason="" closed=false url=https://github.com/Trum-ok/gh-dojo/issues/
 author "Trum-ok" created 2026-11-11T18:19:10Z closed - incomplete=false
 labels [] (0)
 assignees [] (0)
+milestone "v0.0 — самохостинг" due -
 blocked by (2):
-  #2 OPEN "Коды выхода и короткие ошибки (internal/render)"
-  #1 OPEN "Каркас: Go-модуль, cobra и установка как расширение gh"
+  #2 OPEN status="Ready" "Коды выхода и короткие ошибки (internal/render)"
+  #1 OPEN status="Ready" "Каркас: Go-модуль, cobra и установка как расширение gh"
 blocking (5):
-  #11 OPEN "Глаголы из конфига: проверки и план эффектов (internal/workflow)"
-  #8 OPEN "Команда list"
-  #7 OPEN "Команда show <N>…"
-  #6 OPEN "Сверка конфига с доской"
-  #4 OPEN "Пресет kanban через embed.FS"
+  #11 OPEN status="Ready" "Глаголы из конфига: проверки и план эффектов (internal/workflow)"
+  #8 OPEN status="Ready" "Команда list"
+  #7 OPEN status="Ready" "Команда show <N>…"
+  #6 OPEN status="Ready" "Сверка конфига с доской"
+  #4 OPEN status="Ready" "Пресет kanban через embed.FS"
 item: not on the board
 history (truncated=false untracked=false):
 comments 0 of 0:

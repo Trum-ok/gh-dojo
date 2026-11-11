@@ -3,7 +3,7 @@ version: 1
 preset: ""
 board: owner=acme project=7 repos=[]
 fields.status: "Status"
-statuses: initial="" final=[]
+statuses: initial="" final=[] resolved=[]
 labels: types=[] area_prefix=""
 session: env=[] link="{id}"
 verb go

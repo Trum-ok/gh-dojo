@@ -1,0 +1,3 @@
+error: .github/dojo.toml: statuses.resolved: unknown status "Redy"; did you mean "Ready"?
+allowed: Backlog, Ready, In progress, In review, Waiting, Done
+fix: edit statuses.resolved in .github/dojo.toml

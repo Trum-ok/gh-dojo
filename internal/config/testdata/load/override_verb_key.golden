@@ -3,7 +3,7 @@ version: 1
 preset: "kanban"
 board: owner=Trum-ok project=1 repos=[]
 fields.status: "Status"
-statuses: initial="Backlog" final=["Done"]
+statuses: initial="Backlog" final=["Done"] resolved=["Ready" "Done"]
 labels: types=[] area_prefix="area:"
 session: env=[] link="{id}"
 verb start
@@ -33,6 +33,8 @@ verb done
 status refs:
   "Backlog"    statuses.initial (from preset kanban)
   "Done"       statuses.final (from preset kanban)
+  "Ready"      statuses.resolved (from preset kanban)
+  "Done"       statuses.resolved (from preset kanban)
   "In progress" verbs.start.to (from preset kanban)
   "Backlog"    verbs.start.from (from preset kanban)
   "Waiting"    verbs.start.from (from preset kanban)

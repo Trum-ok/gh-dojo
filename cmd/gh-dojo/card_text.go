@@ -29,7 +29,7 @@ const (
 	maxCommentRunes    = 600
 	// maxLinkTitleRunes cuts titles of linked issues.
 	maxLinkTitleRunes = 80
-	// maxBriefRefs is how many open blockers --brief names.
+	// maxBriefRefs is how many unresolved blockers --brief names.
 	maxBriefRefs = 5
 )
 
@@ -56,8 +56,9 @@ var bidiControls = strings.NewReplacer(
 
 // cardView renders cards with show's flags.
 type cardView struct {
-	statusField string // board name of the status field, left out of the field list
-	comments    int    // how many of the latest comments to print
+	statusField string   // board name of the status field, left out of the field list
+	resolved    []string // statuses.resolved: an open blocker in these no longer blocks
+	comments    int      // how many of the latest comments to print
 	// bodyRunes cuts the description and commentBudget is shared by the
 	// comments shown (see commentRunes); 0 prints them whole.
 	bodyRunes, commentBudget int
@@ -71,10 +72,11 @@ func (v cardView) card(c *issue.Card) string {
 	line("#%d %s", c.Number, singleLine(c.Title))
 	line("state: %s, opened %s by %s", cardState(c), cardDay(c.CreatedAt), cardLogin(c.Author))
 	line("board: %s", v.board(c, true))
+	line("milestone: %s", cardMilestone(c.Milestone))
 	line("labels: %s", cardNames(c.Labels))
 	line("assignees: %s", cardNames(c.Assignees))
-	writeLinks(&b, "blocked by", c.BlockedBy, c.Repo)
-	writeLinks(&b, "blocking", c.Blocking, c.Repo)
+	v.writeBlockers(&b, c)
+	writeBlocking(&b, c)
 	if c.OnBoard() || c.BoardUnknown && len(c.History) > 0 {
 		writeHistory(&b, c)
 	}
@@ -99,28 +101,36 @@ func (v cardView) card(c *issue.Card) string {
 	return b.String()
 }
 
-// brief renders three lines: title; state, status, labels, assignees;
-// blockers and counts. A fourth notes a partly hidden card.
+// brief renders three lines: title; state, status, milestone (if any),
+// labels, assignees; blockers and counts. A fourth notes a partly hidden card.
 func (v cardView) brief(c *issue.Card) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "#%d %s\n", c.Number, singleLine(c.Title))
-	fmt.Fprintf(&b, "%s · %s · labels: %s · assignees: %s\n", cardState(c), v.board(c, false), cardNames(c.Labels), cardNames(c.Assignees))
+	fmt.Fprintf(&b, "%s · %s", cardState(c), v.board(c, false))
+	if c.Milestone != nil {
+		fmt.Fprintf(&b, " · milestone: %s", cardMilestone(c.Milestone))
+	}
+	fmt.Fprintf(&b, " · labels: %s · assignees: %s\n", cardNames(c.Labels), cardNames(c.Assignees))
 
 	var blocked string
-	open := c.OpenBlockers()
-	closed := len(c.BlockedBy.Nodes) - len(open)
+	unresolved := c.UnresolvedBlockers(v.resolved)
+	resolved := len(c.BlockedBy.Nodes) - len(unresolved)
 	switch {
-	case len(open) > 0:
+	case len(unresolved) > 0:
 		refs := make([]string, 0, maxBriefRefs)
-		for _, l := range open[:min(len(open), maxBriefRefs)] {
+		for _, l := range unresolved[:min(len(unresolved), maxBriefRefs)] {
 			refs = append(refs, l.Ref(c.Repo))
 		}
-		blocked = fmt.Sprintf("blocked by %d open: %s", len(open), strings.Join(refs, ", "))
-		if n := len(open) - len(refs); n > 0 {
+		blocked = fmt.Sprintf("blocked by %d unresolved (%s", len(unresolved), strings.Join(refs, ", "))
+		if n := len(unresolved) - len(refs); n > 0 {
 			blocked += fmt.Sprintf(" and %d more", n)
 		}
-	case closed > 0:
-		blocked = fmt.Sprintf("no open blockers (%d closed)", closed)
+		blocked += ")"
+		if resolved > 0 {
+			blocked += fmt.Sprintf(" and %d resolved", resolved)
+		}
+	case resolved > 0:
+		blocked = fmt.Sprintf("no unresolved blockers (%d resolved)", resolved)
 	default:
 		blocked = "no blockers"
 	}
@@ -219,10 +229,57 @@ func cardNames(p graph.Page[string]) string {
 	return s
 }
 
-// writeLinks writes blockers one per line, open ones first.
-func writeLinks(b *strings.Builder, label string, p graph.Page[issue.Link], repo issue.Repo) {
+// cardMilestone names a milestone with its due date, "none" for nil.
+func cardMilestone(m *issue.Milestone) string {
+	if m == nil {
+		return "none"
+	}
+	s := singleLine(m.Title)
+	if !m.DueOn.IsZero() {
+		s += " (due " + cardDay(m.DueOn) + ")"
+	}
+	return s
+}
+
+// writeBlockers writes the issues blocking this one, one per line:
+// unresolved first, then resolved ones still open (their board status is
+// in statuses.resolved), then closed ones. Only unresolved ones block.
+func (v cardView) writeBlockers(b *strings.Builder, c *issue.Card) {
+	var unresolved, done, closed []issue.Link
+	for _, l := range c.BlockedBy.Nodes {
+		switch {
+		case l.Closed():
+			closed = append(closed, l)
+		case l.Resolved(v.resolved):
+			done = append(done, l)
+		default:
+			unresolved = append(unresolved, l)
+		}
+	}
+	var counts []string
+	if len(unresolved) > 0 {
+		counts = append(counts, fmt.Sprintf("%d unresolved", len(unresolved)))
+	}
+	if n := len(done) + len(closed); n > 0 {
+		counts = append(counts, fmt.Sprintf("%d resolved", n))
+	}
+	writeLinks(b, "blocked by", c.BlockedBy, counts)
+	for _, l := range unresolved {
+		writeLink(b, l, c.Repo, linkStatus(l))
+	}
+	for _, l := range done {
+		writeLink(b, l, c.Repo, l.Status+", resolved")
+	}
+	for _, l := range closed {
+		writeLink(b, l, c.Repo, "closed")
+	}
+}
+
+// writeBlocking writes the issues this one blocks, one per line, open ones
+// first.
+func writeBlocking(b *strings.Builder, c *issue.Card) {
 	var open, closed []issue.Link
-	for _, l := range p.Nodes {
+	for _, l := range c.Blocking.Nodes {
 		if l.Closed() {
 			closed = append(closed, l)
 		} else {
@@ -236,6 +293,26 @@ func writeLinks(b *strings.Builder, label string, p graph.Page[issue.Link], repo
 	if len(closed) > 0 {
 		counts = append(counts, fmt.Sprintf("%d closed", len(closed)))
 	}
+	writeLinks(b, "blocking", c.Blocking, counts)
+	for _, l := range open {
+		writeLink(b, l, c.Repo, linkStatus(l))
+	}
+	for _, l := range closed {
+		writeLink(b, l, c.Repo, "closed")
+	}
+}
+
+// linkStatus is the board status of an open linked issue.
+func linkStatus(l issue.Link) string {
+	if l.Status == "" {
+		return "no board status"
+	}
+	return l.Status
+}
+
+// writeLinks writes the header line of linked issues: label, counts, and a
+// note when not all were read.
+func writeLinks(b *strings.Builder, label string, p graph.Page[issue.Link], counts []string) {
 	if len(counts) == 0 && p.TotalCount == 0 {
 		counts = []string{"none"}
 	}
@@ -243,13 +320,16 @@ func writeLinks(b *strings.Builder, label string, p graph.Page[issue.Link], repo
 		counts = append(counts, note)
 	}
 	fmt.Fprintf(b, "%s: %s\n", label, strings.Join(counts, ", "))
-	for _, l := range append(open, closed...) {
-		fmt.Fprintf(b, "  %s %s", l.Ref(repo), clipRunes(singleLine(l.Title), maxLinkTitleRunes))
-		if l.Closed() {
-			b.WriteString(" (closed)")
-		}
-		b.WriteString("\n")
+}
+
+// writeLink writes a linked issue on its own line, with what to say about
+// it (its board status, closed) in parentheses unless empty.
+func writeLink(b *strings.Builder, l issue.Link, repo issue.Repo, about string) {
+	fmt.Fprintf(b, "  %s %s", l.Ref(repo), clipRunes(singleLine(l.Title), maxLinkTitleRunes))
+	if about = singleLine(about); about != "" {
+		fmt.Fprintf(b, " (%s)", about)
 	}
+	b.WriteString("\n")
 }
 
 // writeHistory writes the status changes on the board, oldest first.

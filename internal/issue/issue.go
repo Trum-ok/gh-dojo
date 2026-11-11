@@ -1,8 +1,8 @@
 // Package issue reads an issue card — everything `show` prints and a verb
 // checks — in one GraphQL request (principle 6): title, state, author,
-// labels, assignees, body, the latest comments, blockers both ways, the
-// item on the configured board with its field values, and the status
-// history on that board.
+// milestone, labels, assignees, body, the latest comments, blockers both
+// ways with their statuses on the configured board, the item on that board
+// with its field values, and the status history on that board.
 //
 //	card, err := issue.Read(ctx, client, issue.Request{
 //		Repo: repo, Number: 42, Board: schema,
@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -106,13 +107,15 @@ type Card struct {
 	CreatedAt   time.Time
 	ClosedAt    time.Time // zero while open
 	Body        string
+	// Milestone is the issue's milestone, nil when it has none.
+	Milestone *Milestone
 
 	Labels    graph.Page[string] // label names
 	Assignees graph.Page[string] // logins
 	// Comments are the latest ones, oldest first; TotalCount counts all.
 	Comments graph.Page[Comment]
 	// BlockedBy are the issues blocking this one, Blocking those it blocks,
-	// open and closed alike (see OpenBlockers).
+	// open and closed alike (see OpenBlockers, UnresolvedBlockers).
 	BlockedBy graph.Page[Link]
 	Blocking  graph.Page[Link]
 
@@ -206,6 +209,25 @@ func (c *Card) OpenBlockers() []Link {
 	return open
 }
 
+// UnresolvedBlockers returns the blockers that still block: open, and not
+// in one of the resolved statuses (config statuses.resolved) on the board.
+// When BlockedBy.Truncated(), more may exist.
+func (c *Card) UnresolvedBlockers(resolved []string) []Link {
+	var out []Link
+	for _, l := range c.BlockedBy.Nodes {
+		if !l.Resolved(resolved) {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+// Milestone is an issue's milestone.
+type Milestone struct {
+	Title string
+	DueOn time.Time // zero when it has no due date
+}
+
 // Comment is an issue comment.
 type Comment struct {
 	ID        string // node ID, for updateIssueComment; never print it
@@ -223,10 +245,21 @@ type Link struct {
 	Number int
 	Title  string
 	State  string // StateOpen or StateClosed
+	// Status is the linked issue's status on Request.Board: "" when it has
+	// none, is not on the board, or the board is not among the first 10
+	// projects of the issue read, or Request.Board is nil.
+	Status string
 }
 
 // Closed reports whether the linked issue is closed.
 func (l Link) Closed() bool { return l.State == StateClosed }
+
+// Resolved reports whether the linked issue, as a blocker, no longer
+// blocks: it is closed, or its board status is one of resolved (config
+// statuses.resolved), its work complete though the issue is still open.
+func (l Link) Resolved(resolved []string) bool {
+	return l.Closed() || l.Status != "" && slices.Contains(resolved, l.Status)
+}
 
 // Ref returns "#N" for an issue in repo, else "owner/name#N".
 func (l Link) Ref(repo Repo) string {
@@ -444,6 +477,9 @@ func (n *issueJSON) card(req Request, hidden [][]any) *Card {
 		ClosedAt:    parseTime(deref(n.ClosedAt)),
 		Body:        n.Body,
 	}
+	if m := n.Milestone; m != nil {
+		c.Milestone = &Milestone{Title: m.Title, DueOn: parseTime(deref(m.DueOn))}
+	}
 	c.Labels.TotalCount = n.Labels.TotalCount
 	for _, l := range n.Labels.Nodes {
 		c.Labels.Nodes = append(c.Labels.Nodes, l.Name)
@@ -462,8 +498,8 @@ func (n *issueJSON) card(req Request, hidden [][]any) *Card {
 			Body:            cm.Body,
 		})
 	}
-	c.BlockedBy = links(n.BlockedBy)
-	c.Blocking = links(n.Blocking)
+	c.BlockedBy = links(n.BlockedBy, req)
+	c.Blocking = links(n.Blocking, req)
 
 	if req.Board == nil {
 		return c
@@ -575,19 +611,38 @@ func (it *itemJSON) status(req Request, item *Item, hidden bool) (status string,
 	return "", false
 }
 
-func links(in conn[*linkJSON]) graph.Page[Link] {
+func links(in conn[*linkJSON], req Request) graph.Page[Link] {
 	out := graph.Page[Link]{TotalCount: in.TotalCount}
 	for _, l := range in.Nodes {
 		if l == nil {
 			continue // hidden from the token
 		}
-		link := Link{Number: l.Number, Title: l.Title, State: l.State}
+		link := Link{Number: l.Number, Title: l.Title, State: l.State, Status: l.status(req)}
 		if l.Repository != nil {
 			link.Repo, _ = ParseRepo(l.Repository.NameWithOwner)
 		}
 		out.Nodes = append(out.Nodes, link)
 	}
 	return out
+}
+
+// status returns the linked issue's status on req.Board, "" when it has
+// none there or it was not read. As for the card, a value whose field is
+// not the configured status field (by ID, when known) does not count.
+func (l *linkJSON) status(req Request) string {
+	if req.Board == nil {
+		return ""
+	}
+	for _, it := range l.ProjectItems.Nodes {
+		if it == nil || it.Project == nil || it.Project.ID != req.Board.ID || it.Status == nil {
+			continue
+		}
+		if req.StatusFieldID != "" && (it.Status.Field == nil || it.Status.Field.ID != req.StatusFieldID) {
+			return ""
+		}
+		return it.Status.Name
+	}
+	return ""
 }
 
 func (v *valueJSON) value() (Value, bool) {

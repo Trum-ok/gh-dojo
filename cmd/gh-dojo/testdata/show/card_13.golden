@@ -1,0 +1,38 @@
+code: 0
+--- stdout
+#13 Доска и .github/dojo.toml для самого gh-dojo
+state: open, opened 2026-11-11 by Trum-ok
+board: Ready · Size: S
+milestone: v0.0 — самохостинг
+labels: none
+assignees: none
+blocked by: 2 resolved
+  #6 Сверка конфига с доской (Ready, resolved)
+  #4 Пресет kanban через embed.FS (Ready, resolved)
+blocking: 1 open
+  #14 Skill для агентов и переход на gh dojo (рубеж v0.0) (Ready)
+status history:
+  2026-11-11 18:21 no status → Backlog (automation)
+  2026-11-11 19:59 Backlog → In progress by Trum-ok
+  2026-11-11 19:59 In progress → Ready by Trum-ok
+
+description:
+  ## Зачем
+  gh-dojo ведёт собственную разработку через себя.
+
+  ## Что сделать
+  - Привести статусы доски gh-dojo (проект №5) к ожиданиям пресета `kanban`.
+  - Написать `.github/dojo.toml` для репозитория: доска, поля, пресет и переопределения; тексты комментариев — на языке проекта.
+  - Завести метку `dogfood` для неудобств, замеченных по ходу работы, если её ещё нет.
+
+  ## Готово, когда
+  - Конфиг загружается и проходит сверку с доской без ошибок.
+
+  Спека: `docs/spec.md`: «Этапы → Самохостинг».
+
+comments (2):
+--- Trum-ok, 2026-11-11 19:59
+  Взял в работу. Сессия: claude://claude.ai/epitaxy/local_8b6e42f7-5194-49a1-bfe7-7e7e491bf84f
+--- Trum-ok, 2026-11-11 19:59
+  Добавлен .github/dojo.toml (коммит d6c5ca9); конфиг проходит сверку с доской, статусы доски уже совпадают с пресетом kanban, метка dogfood есть.
+--- stderr

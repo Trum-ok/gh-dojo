@@ -59,6 +59,7 @@ func TestCheckErrors(t *testing.T) {
 		{"unknown_field", "[fields]\nstatus = \"Stage\"\n"},
 		{"several", "[statuses]\nfinal = [\"Shipped\"]\n[verbs.start]\nto = \"In progres\"\n[verbs.wait]\nto = \"Parked\"\n"},
 		{"two", "[verbs.start]\nto = \"In progres\"\nfrom = [\"Todo\"]\n"},
+		{"resolved_typo", "[statuses]\nresolved = [\"Redy\", \"Done\"]\n"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

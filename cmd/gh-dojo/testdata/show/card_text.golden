@@ -1,10 +1,11 @@
 #42 Fix login redirect
 state: open (reopened), opened 2026-11-12 by ghost
 board: no status · Sprint: Sprint 12 (archived)
+milestone: none
 labels: bug, area:cli (showing 2 of 23)
 assignees: none
-blocked by: 1 open, 1 closed, showing 2 of 25
-  acme/auth#7 Very long title Very long title Very long title Very long title Very long title…
+blocked by: 1 unresolved, 1 resolved, showing 2 of 25
+  acme/auth#7 Very long title Very long title Very long title Very long title Very long title… (no board status)
   #2 Closed one (closed)
 blocking: none
 status history (latest changes only; older ones are not read):
@@ -26,7 +27,7 @@ comments (showing 2 of 130, --comments all prints up to 100):
 ### brief
 #42 Fix login redirect
 open (reopened) · no status (archived) · labels: bug, area:cli (showing 2 of 23) · assignees: none
-blocked by 1 open: acme/auth#7 (showing 2 of 25 blockers) · blocking none · comments: 130
+blocked by 1 unresolved (acme/auth#7) and 1 resolved (showing 2 of 25 blockers) · blocking none · comments: 130
 note: GitHub withheld part of this issue from the token; the rest is accurate
 
 ### --comments all, last lines

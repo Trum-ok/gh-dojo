@@ -100,7 +100,7 @@ func dump(c *Config) string {
 	for _, name := range c.FieldNames() {
 		w("fields.%s: %q", name, c.Fields[name])
 	}
-	w("statuses: initial=%q final=%q", c.Statuses.Initial, c.Statuses.Final)
+	w("statuses: initial=%q final=%q resolved=%q", c.Statuses.Initial, c.Statuses.Final, c.Statuses.Resolved)
 	w("labels: types=%q area_prefix=%q", c.Labels.Types, c.Labels.AreaPrefix)
 	w("session: env=%q link=%q", c.Session.Env, c.Session.Link)
 	for _, v := range c.Verbs {
@@ -155,6 +155,7 @@ project = 3
 status = "Stage"
 [statuses]
 final = ["Done", "Won't do"]
+resolved = []
 [labels]
 area_prefix = ""
 types = ["bug", "feature"]
@@ -228,6 +229,9 @@ func TestLoadErrors(t *testing.T) {
 		{"initial_spaces", presetOnly + "[statuses]\ninitial = \" Backlog\"\n"},
 		{"final_duplicate", presetOnly + "[statuses]\nfinal = [\"Done\", \"Done\"]\n"},
 		{"final_blank", presetOnly + "[statuses]\nfinal = [\"  \"]\n"},
+		{"resolved_duplicate", presetOnly + "[statuses]\nresolved = [\"Ready\", \"Done\", \"Ready\"]\n"},
+		{"resolved_blank", presetOnly + "[statuses]\nresolved = [\"Ready\", \"\"]\n"},
+		{"resolved_not_list", presetOnly + "[statuses]\nresolved = \"Ready\"\n"},
 		{"field_spaces", strings.Replace(presetOnly, `"Status"`, `"Status "`, 1)},
 		{"env_spaces", presetOnly + "[session]\nenv = [\" X\"]\n"},
 		{"env_duplicate", presetOnly + "[session]\nenv = [\"X\", \"X\"]\n"},

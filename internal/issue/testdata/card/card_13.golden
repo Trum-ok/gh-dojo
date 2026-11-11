@@ -1,0 +1,22 @@
+card Trum-ok/gh-dojo#13 "Доска и .github/dojo.toml для самого gh-dojo" id=I_kwDOVq9iIs8AAAABeZMbcQ
+state OPEN reason="" closed=false url=https://github.com/Trum-ok/gh-dojo/issues/13
+author "Trum-ok" created 2026-11-11T18:20:59Z closed - incomplete=false
+labels [] (0)
+assignees [] (0)
+milestone "v0.0 — самохостинг" due -
+blocked by (2):
+  #6 OPEN status="Ready" "Сверка конфига с доской"
+  #4 OPEN status="Ready" "Пресет kanban через embed.FS"
+blocking (1):
+  #14 OPEN status="Ready" "Skill для агентов и переход на gh dojo (рубеж v0.0)"
+item PVTI_lAHOBFGd5c4BrMYFzhH6Ltk archived=false created 2026-11-11T18:21:02Z status="Ready" unknown=false values truncated=false
+  Status [SINGLE_SELECT] "Ready" option=61e4505c iteration= /0 field=PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ
+  Size [SINGLE_SELECT] "S" option=f784b110 iteration= /0 field=PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4
+history (truncated=false untracked=false):
+  2026-11-11T18:21:03Z "" → "Backlog" by "github-project-automation" automated=false
+  2026-11-11T19:59:29Z "Backlog" → "In progress" by "Trum-ok" automated=false
+  2026-11-11T19:59:51Z "In progress" → "Ready" by "Trum-ok" automated=false
+comments 2 of 2:
+  IC_kwDOVq9iIs8AAAABlaoiRQ 2026-11-11T19:59:28Z by "Trum-ok" mine=true: "Взял в работу. Сессия: claude://claude.ai/epitaxy/local_8b6e42f7-5194-49a1-bfe7-7e7e491bf84f\n\n<!-- gh-dojo:start:57d74b39 -->"
+  IC_kwDOVq9iIs8AAAABlapATg 2026-11-11T19:59:50Z by "Trum-ok" mine=true: "Добавлен .github/dojo.toml (коммит d6c5ca9); конфиг проходит сверку с доской, статусы доски уже совпадают с пресетом kanban, метка dogfood есть.\n\n<!-- gh-dojo:ready:55abd90a -->"
+body: "## Зачем\ngh-dojo ведёт собственную разработку через себя.\n\n## Что сделать\n- Привести статусы доски gh-dojo (проект №5) к ожиданиям пресета `kanban`.\n- Написать `.github/dojo.toml` для репозитория: доска, поля, пресет и переопределения; тексты комментариев — на языке проекта.\n- Завести метку `dogfood` для неудобств, замеченных по ходу работы, если её ещё нет.\n\n## Готово, когда\n- Конфиг загружается и проходит сверку с доской без ошибок.\n\nСпека: `docs/spec.md`: «Этапы → Самохостинг».\n"

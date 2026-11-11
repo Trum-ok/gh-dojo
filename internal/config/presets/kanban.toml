@@ -12,6 +12,7 @@ status = "Status"
 [statuses]
 initial = "Backlog"
 final = ["Done"]
+resolved = ["Ready", "Done"]  # a blocker in these no longer blocks
 
 [labels]
 types = []

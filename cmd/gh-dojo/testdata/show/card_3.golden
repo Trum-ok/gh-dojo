@@ -3,17 +3,18 @@ code: 0
 #3 Конфиг: загрузка и валидация .github/dojo.toml (internal/config)
 state: open, opened 2026-11-11 by Trum-ok
 board: Ready · Size: M
+milestone: v0.0 — самохостинг
 labels: none
 assignees: none
-blocked by: 2 open
-  #2 Коды выхода и короткие ошибки (internal/render)
-  #1 Каркас: Go-модуль, cobra и установка как расширение gh
+blocked by: 2 resolved
+  #2 Коды выхода и короткие ошибки (internal/render) (Ready, resolved)
+  #1 Каркас: Go-модуль, cobra и установка как расширение gh (Ready, resolved)
 blocking: 5 open
-  #11 Глаголы из конфига: проверки и план эффектов (internal/workflow)
-  #8 Команда list
-  #7 Команда show <N>…
-  #6 Сверка конфига с доской
-  #4 Пресет kanban через embed.FS
+  #11 Глаголы из конфига: проверки и план эффектов (internal/workflow) (Ready)
+  #8 Команда list (Ready)
+  #7 Команда show <N>… (Ready)
+  #6 Сверка конфига с доской (Ready)
+  #4 Пресет kanban через embed.FS (Ready)
 status history:
   2026-11-11 18:19 no status → Backlog (automation)
   2026-11-11 18:42 Backlog → In progress by Trum-ok
