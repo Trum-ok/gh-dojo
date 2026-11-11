@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -17,9 +18,15 @@ import (
 // never printed.
 
 const (
-	// maxBodyRunes and maxCommentRunes cut long texts unless --full.
-	maxBodyRunes    = 4000
-	maxCommentRunes = 1500
+	// Unless --full, a description is cut at maxBodyRunes and the comments
+	// shown share commentBudgetRunes: each gets an equal part, but at least
+	// minCommentRunes and at most maxCommentRunes. With the default 5
+	// comments that keeps a card near 2k tokens even in Cyrillic (about 2
+	// characters a token).
+	maxBodyRunes       = 2000
+	commentBudgetRunes = 1500
+	minCommentRunes    = 200
+	maxCommentRunes    = 600
 	// maxLinkTitleRunes cuts titles of linked issues.
 	maxLinkTitleRunes = 80
 	// maxBriefRefs is how many open blockers --brief names.
@@ -31,15 +38,29 @@ const (
 // the actor tells them apart too.
 var projectAutomation = map[string]bool{"github-project-automation": true}
 
-// cardMarkerRE matches the hidden markers gh dojo puts in comments.
-var cardMarkerRE = regexp.MustCompile(`(?s)<!--\s*gh-dojo:.*?-->`)
+// cardMarkerRE matches the hidden marker gh-dojo ends its own comments and
+// descriptions with: the grammar workflow's dedup looks for, on its own
+// line after a blank one (or alone), at the very end. A marker quoted in
+// text or left unclosed does not match.
+var cardMarkerRE = regexp.MustCompile(`(?:^|\n\n)<!-- gh-dojo:[a-z][a-z0-9-]*:[0-9a-f]{8} -->[ \t\n]*$`)
+
+// fenceRE matches a line that opens or closes a fenced code block.
+var fenceRE = regexp.MustCompile("(?m)^ {0,3}(```|~~~)")
+
+// bidiControls drops the Unicode embedding, override and isolate controls
+// (U+202A–202E, U+2066–2069), which make text read other than it is.
+var bidiControls = strings.NewReplacer(
+	"\u202a", "", "\u202b", "", "\u202c", "", "\u202d", "", "\u202e", "",
+	"\u2066", "", "\u2067", "", "\u2068", "", "\u2069", "",
+)
 
 // cardView renders cards with show's flags.
 type cardView struct {
 	statusField string // board name of the status field, left out of the field list
 	comments    int    // how many of the latest comments to print
-	// bodyRunes and commentRunes cut longer texts; 0 prints them whole.
-	bodyRunes, commentRunes int
+	// bodyRunes cuts the description and commentBudget is shared by the
+	// comments shown (see commentRunes); 0 prints them whole.
+	bodyRunes, commentBudget int
 }
 
 // card renders the full card.
@@ -62,14 +83,14 @@ func (v cardView) card(c *issue.Card) string {
 	}
 
 	b.WriteString("\n")
-	if body := cleanText(c.Body); body == "" {
+	if body := cleanText(c.Body, true); body == "" {
 		line("description: none")
 	} else {
 		line("description:")
 		text, note := fold(body, v.bodyRunes)
-		line("%s", text)
+		line("%s", indent(text))
 		if note != "" {
-			line("%s", note)
+			line("  %s", note)
 		}
 	}
 
@@ -106,7 +127,23 @@ func (v cardView) brief(c *issue.Card) string {
 	if note := render.Shown(len(c.BlockedBy.Nodes), c.BlockedBy.TotalCount, ""); note != "" {
 		blocked += " (" + note + " blockers)"
 	}
-	fmt.Fprintf(&b, "%s · blocking %d · comments: %d\n", blocked, c.Blocking.TotalCount, c.Comments.TotalCount)
+	blocking := "blocking none"
+	if c.Blocking.TotalCount > 0 || len(c.Blocking.Nodes) > 0 {
+		closed := 0
+		for _, l := range c.Blocking.Nodes {
+			if l.Closed() {
+				closed++
+			}
+		}
+		blocking = fmt.Sprintf("blocking %d open", len(c.Blocking.Nodes)-closed)
+		if closed > 0 {
+			blocking += fmt.Sprintf(" (%d closed)", closed)
+		}
+		if note := render.Shown(len(c.Blocking.Nodes), c.Blocking.TotalCount, ""); note != "" {
+			blocking += " (" + note + ")"
+		}
+	}
+	fmt.Fprintf(&b, "%s · %s · comments: %d\n", blocked, blocking, c.Comments.TotalCount)
 	if c.Incomplete {
 		b.WriteString("note: GitHub withheld part of this issue from the token; the rest is accurate\n")
 	}
@@ -166,12 +203,16 @@ func cardState(c *issue.Card) string {
 	return s
 }
 
-// list joins names, "none" for no names, noting a cut list.
+// cardNames joins names, "none" for no names, noting a cut list.
 func cardNames(p graph.Page[string]) string {
 	if len(p.Nodes) == 0 && p.TotalCount == 0 {
 		return "none"
 	}
-	s := strings.Join(p.Nodes, ", ")
+	names := make([]string, len(p.Nodes))
+	for i, n := range p.Nodes {
+		names[i] = singleLine(n)
+	}
+	s := strings.Join(names, ", ")
 	if note := render.Shown(len(p.Nodes), p.TotalCount, ""); note != "" {
 		s += " (" + note + ")"
 	}
@@ -220,6 +261,9 @@ func writeHistory(b *strings.Builder, c *issue.Card) {
 	case len(c.History) == 0 && !c.HistoryTruncated:
 		b.WriteString("status history: none\n")
 		return
+	case len(c.History) == 0:
+		b.WriteString("status history: none among the latest changes read; older ones are not read\n")
+		return
 	case c.HistoryTruncated:
 		b.WriteString("status history (latest changes only; older ones are not read):\n")
 	default:
@@ -257,18 +301,45 @@ func (v cardView) writeComments(b *strings.Builder, c *issue.Card) {
 	} else {
 		fmt.Fprintf(b, "comments (%d):\n", total)
 	}
-	for _, cm := range shown {
-		fmt.Fprintf(b, "--- %s, %s\n", cardLogin(cm.Author), cardMinute(cm.CreatedAt))
-		body := cleanText(cm.Body)
-		if body == "" {
-			body = "(empty)"
+	bodies := make([]string, len(shown))
+	lengths := make([]int, len(shown))
+	for i, cm := range shown {
+		bodies[i] = cleanText(cm.Body, cm.ViewerDidAuthor)
+		if bodies[i] == "" {
+			bodies[i] = "(empty)"
 		}
-		text, note := fold(body, v.commentRunes)
-		b.WriteString(text + "\n")
+		lengths[i] = utf8.RuneCountInString(bodies[i])
+	}
+	limit := v.commentLimit(lengths)
+	for i, cm := range shown {
+		fmt.Fprintf(b, "--- %s, %s\n", cardLogin(cm.Author), cardMinute(cm.CreatedAt))
+		text, note := fold(bodies[i], limit)
+		b.WriteString(indent(text) + "\n")
 		if note != "" {
-			b.WriteString(note + "\n")
+			b.WriteString("  " + note + "\n")
 		}
 	}
+}
+
+// commentLimit is where comments of these lengths are cut so that together
+// they fit v.commentBudget: short ones stay whole and the longer ones share
+// what is left equally, each within minCommentRunes..maxCommentRunes. 0
+// means no cut.
+func (v cardView) commentLimit(lengths []int) int {
+	if v.commentBudget <= 0 || len(lengths) == 0 {
+		return 0
+	}
+	sorted := slices.Clone(lengths)
+	slices.Sort(sorted)
+	left := v.commentBudget
+	for i, n := range sorted {
+		share := left / (len(sorted) - i)
+		if n > share {
+			return min(maxCommentRunes, max(minCommentRunes, share))
+		}
+		left -= n
+	}
+	return 0 // everything fits
 }
 
 // fold cuts s to at most limit runes (0: no limit), preferring a line
@@ -298,14 +369,41 @@ func lastRune(rs []rune, r rune) int {
 	return -1
 }
 
-// clean drops gh dojo markers and Windows line ends and trims the text.
-func cleanText(s string) string {
+// sanitize makes user text safe to print: every line end becomes \n
+// (a lone \r too) and bidi controls are dropped.
+func sanitize(s string) string {
 	s = strings.ReplaceAll(s, "\r\n", "\n")
-	s = cardMarkerRE.ReplaceAllString(s, "")
-	return strings.TrimSpace(s)
+	s = strings.ReplaceAll(s, "\r", "\n")
+	return bidiControls.Replace(s)
 }
 
-func singleLine(s string) string { return strings.Join(strings.Fields(s), " ") }
+// cleanText sanitizes a description or comment and trims it. With marker
+// set (descriptions, and comments the viewer wrote: the only ones gh-dojo
+// posts) it also drops the gh-dojo marker that ends the text, unless the
+// marker is inside a code block left open.
+func cleanText(s string, marker bool) string {
+	s = sanitize(s)
+	if loc := cardMarkerRE.FindStringIndex(s); marker && loc != nil {
+		if len(fenceRE.FindAllStringIndex(s[:loc[0]], -1))%2 == 0 {
+			s = s[:loc[0]]
+		}
+	}
+	return strings.Trim(s, " \t\n")
+}
+
+// indent prefixes every non-empty line, so a description or comment cannot
+// pass for the card's own lines ("comments (...):", "--- author, date").
+func indent(s string) string {
+	lines := strings.Split(s, "\n")
+	for i, l := range lines {
+		if l != "" {
+			lines[i] = "  " + l
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+func singleLine(s string) string { return strings.Join(strings.Fields(sanitize(s)), " ") }
 
 // clip cuts s to n runes, ending with "…" when cut.
 func clipRunes(s string, n int) string {

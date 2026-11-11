@@ -14,7 +14,7 @@ status history (latest changes only; older ones are not read):
   2026-11-11 19:02 In progress → Ready by Trum-ok
 
 description:
-Login redirects to /home instead of the page the user came from.
+  Login redirects to /home instead of the page the user came from.
 
 comments (showing 0 of 45, --comments N prints the last N):
 --- stderr

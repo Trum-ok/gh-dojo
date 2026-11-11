@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: --brief prints no description or comments; drop --comments
+fix: gh dojo show --help

@@ -15,7 +15,7 @@ status history (latest changes only; older ones are not read):
 note: GitHub withheld part of this issue from the token (a project or linked issue it cannot see); the rest is accurate
 
 description:
-Login redirects to /home instead of the page the user came from.
+  Login redirects to /home instead of the page the user came from.
 
 comments: none
 --- stderr

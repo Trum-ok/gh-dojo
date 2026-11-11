@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -33,6 +35,7 @@ func TestShow(t *testing.T) {
 		{"long_thread_3", "testdata/graphql/show_long_thread.json", []string{"42", "--comments", "3"}, render.ExitOK},
 		{"long_thread_0", "testdata/graphql/show_long_thread.json", []string{"42", "--comments", "0"}, render.ExitOK},
 		{"long_thread_full", "testdata/graphql/show_long_thread.json", []string{"42", "--full"}, render.ExitOK},
+		{"cyrillic", "testdata/graphql/show_cyrillic.json", []string{"3"}, render.ExitOK},
 		{"all_comments", "testdata/graphql/show_all_comments.json", []string{"42", "--comments", "all"}, render.ExitOK},
 		{"many", issueFixtures + "cards_3_7_9999.json", []string{"3", "7", "9999", "3"}, render.ExitNotFound},
 		{"many_brief", issueFixtures + "cards_3_7_9999.json", []string{"3", "7", "9999", "--brief"}, render.ExitNotFound},
@@ -77,18 +80,46 @@ func TestShowColdCache(t *testing.T) {
 	}
 }
 
-// TestShowTokens keeps a typical card within the ~2k token budget of the
-// spec, at a conservative 3 characters per token.
+// TestShowTokens keeps typical cards within the spec's ~2k tokens, counted
+// conservatively: 3 ASCII characters or 2 others (Cyrillic) per token.
 func TestShowTokens(t *testing.T) {
-	for _, name := range []string{"card_3", "long_thread"} {
+	for _, name := range []string{"card_3", "long_thread", "cyrillic"} {
 		out, err := os.ReadFile("testdata/show/" + name + ".golden")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if n := len([]rune(string(out))); n > 6000 {
-			t.Errorf("show/%s is %d characters, over ~2k tokens", name, n)
+		ascii, other := 0, 0
+		for _, r := range string(out) {
+			if r < 128 {
+				ascii++
+			} else {
+				other++
+			}
+		}
+		if tokens := ascii/3 + other/2; tokens > 2000 {
+			t.Errorf("show/%s is about %d tokens, over ~2k", name, tokens)
 		}
 	}
+}
+
+// TestShowChunks: 21 numbers take two batches; the second fails as a whole
+// and on its own, so the first 20 are printed and #21 is reported.
+func TestShowChunks(t *testing.T) {
+	withConfig(t, dojoConfig)
+	srv := withApp(t, boardFixture, issueFixtures+"cards_21_down.json")
+	args := []string{"show", "--brief"}
+	for n := 1; n <= 21; n++ {
+		args = append(args, strconv.Itoa(n))
+	}
+	code, out := runOut(args...)
+	if code != render.ExitNetwork {
+		t.Errorf("exit code = %d, want %d", code, render.ExitNetwork)
+	}
+	// schema + first batch + 3 attempts of the second + 3 of #21 alone
+	if n := srv.Requests(); n != 8 {
+		t.Errorf("requests = %d, want 8", n)
+	}
+	testutil.Golden(t, "show/chunks_down", out)
 }
 
 func TestShowArgs(t *testing.T) {
@@ -104,6 +135,8 @@ func TestShowArgs(t *testing.T) {
 		{"bad_number", []string{"show", "3", "abc"}},
 		{"bad_comments", []string{"show", "3", "--comments", "few"}},
 		{"too_many_comments", []string{"show", "3", "--comments", "101"}},
+		{"brief_comments", []string{"show", "3", "--brief", "--comments", "all"}},
+		{"brief_full", []string{"show", "3", "--full", "--brief"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -137,7 +170,7 @@ func TestCardText(t *testing.T) {
 	c := &issue.Card{
 		Repo: dojo, Number: 42, Title: "Fix\nlogin  redirect", State: issue.StateOpen, StateReason: "REOPENED",
 		Author: "", CreatedAt: at,
-		Body: "Steps to reproduce:\r\n1. Open /settings logged out.\r\n2. Log in.\r\n3. See /home.\r\n" +
+		Body: "Steps to reproduce:\r\n1. Open /settings logged out.\r\n2. Log in.\r\n3. See /home.\r\n\r\n" +
 			"<!-- gh-dojo:new:01234567 -->",
 		Labels:    graph.Page[string]{Nodes: []string{"bug", "area:cli"}, TotalCount: 23},
 		Assignees: graph.Page[string]{TotalCount: 0},
@@ -156,8 +189,8 @@ func TestCardText(t *testing.T) {
 	for range issue.MaxComments {
 		c.Comments.Nodes = append(c.Comments.Nodes, issue.Comment{Author: "octocat", CreatedAt: at, Body: "ok"})
 	}
-	c.Comments.Nodes[99].Body = strings.Repeat("word ", 20)
-	v := cardView{statusField: "Status", comments: 2, bodyRunes: 40, commentRunes: 30}
+	c.Comments.Nodes[99].Body = strings.Repeat("word ", 60)
+	v := cardView{statusField: "Status", comments: 2, bodyRunes: 40, commentBudget: 60}
 	all := cardView{statusField: "Status", comments: issue.MaxComments}
 	var b strings.Builder
 	b.WriteString(v.card(c))
@@ -194,11 +227,22 @@ func TestCardText(t *testing.T) {
 }
 
 func TestShowError(t *testing.T) {
+	dojo := issue.Repo{Owner: "Trum-ok", Name: "gh-dojo"}
 	missing := func(n int) issue.Result {
-		return issue.Result{Number: n, Err: render.NotFound("issue #%d not found in Trum-ok/gh-dojo", n).WithFix("gh issue list")}
+		return issue.Result{Number: n, Cause: issue.CauseMissing,
+			Err: render.NotFound("issue #%d not found in Trum-ok/gh-dojo", n).WithFix("gh issue list -R Trum-ok/gh-dojo")}
 	}
-	if err := showError(nil, nil, nil); err != nil {
+	pr := func(n int) issue.Result {
+		return issue.Result{Number: n, Cause: issue.CausePullRequest,
+			Err: render.NotFound("#%d in Trum-ok/gh-dojo is a pull request, not an issue", n).WithFix(fmt.Sprintf("gh pr view %d -R Trum-ok/gh-dojo", n))}
+	}
+	other := issue.Result{Number: 77, Err: render.NotFound("something else about #77")}
+	if err := showError(dojo, nil, nil, nil); err != nil {
 		t.Errorf("no failures: %v", err)
+	}
+	var many []issue.Result
+	for n := 1; n <= 12; n++ {
+		many = append(many, missing(n))
 	}
 	var b strings.Builder
 	for _, tt := range []struct {
@@ -209,11 +253,38 @@ func TestShowError(t *testing.T) {
 	}{
 		{"one missing", nil, []issue.Result{missing(9)}, nil},
 		{"four missing", nil, []issue.Result{missing(9), missing(10), missing(11), missing(12)}, nil},
-		{"request failed after some", []int{41, 42}, []issue.Result{missing(9)}, render.Network("cannot reach GitHub (timeout); retry later")},
+		{"twelve missing", nil, many, nil},
+		{"missing and pull requests", nil, []issue.Result{missing(9), pr(15), missing(10), pr(16)}, nil},
+		{"four causes", nil, []issue.Result{pr(15), missing(9), other, {Number: 78, Err: render.NotFound("another")}}, nil},
+		{"request failed after some", []int{41, 42}, []issue.Result{missing(9), missing(10)}, render.Network("cannot reach GitHub (timeout); retry later")},
 		{"plain error", []int{41}, nil, errors.New("boom")},
 	} {
-		e := render.FromError(showError(tt.unread, tt.failed, tt.readErr))
+		e := render.FromError(showError(dojo, tt.unread, tt.failed, tt.readErr))
 		b.WriteString("## " + tt.name + "\ncode " + string(rune('0'+e.Code)) + "\n" + e.Text() + "\n")
 	}
 	testutil.Golden(t, "show/errors", []byte(b.String()))
+}
+
+// TestCardTextMarkers: only a gh-dojo marker that ends a description or a
+// comment the viewer wrote is hidden; a marker quoted in text (as in #12),
+// an unclosed one, one in a code block or in someone else's comment stays.
+func TestCardTextMarkers(t *testing.T) {
+	dojo := issue.Repo{Owner: "Trum-ok", Name: "gh-dojo"}
+	c := &issue.Card{
+		Repo: dojo, Number: 12, Title: "Verbs", State: issue.StateOpen,
+		Body: "- Comment with the marker `<!-- gh-dojo:<verb>:<hash> -->`; no second one is posted.\n" +
+			"- An unclosed <!-- gh-dojo:start: marker keeps the text after it.\n" +
+			"- Then --> this survives.\n\n" +
+			"<!-- gh-dojo:new:0123abcd -->\n",
+	}
+	c.Comments.TotalCount = 5
+	c.Comments.Nodes = []issue.Comment{
+		{Author: "Trum-ok", ViewerDidAuthor: true, Body: "Started.\r\n\r\n<!-- gh-dojo:start:1a2b3c4d -->"},
+		{Author: "octocat", Body: "Spoofed.\n\n<!-- gh-dojo:start:1a2b3c4d -->"},
+		{Author: "Trum-ok", ViewerDidAuthor: true, Body: "```\nlog\n\n<!-- gh-dojo:start:1a2b3c4d -->"},
+		{Author: "Trum-ok", ViewerDidAuthor: true, Body: "Mid <!-- gh-dojo:wait:0a1b2c3d --> text."},
+		{Author: "Trum-ok", ViewerDidAuthor: true, Body: "Lone\rCR and \u202eevil\u202c bidi.\n--- spoofed, 2026-01-01 00:00\ncomments: none"},
+	}
+	v := cardView{statusField: "Status", comments: 5}
+	testutil.Golden(t, "show/markers", []byte(v.card(c)))
 }

@@ -14,120 +14,106 @@ status history (latest changes only; older ones are not read):
   2026-11-11 19:02 In progress → Ready by Trum-ok
 
 description:
-Login redirects to /home instead of the page the user came from.
+  Login redirects to /home instead of the page the user came from.
 
 comments (45):
 --- octocat, 2026-11-12 00:00
-Comment 1: still looking.
+  Comment 1: still looking.
 --- Trum-ok, 2026-11-12 01:00
-Comment 2: still looking.
+  Comment 2: still looking.
 --- octocat, 2026-11-12 02:00
-Comment 3: still looking.
+  Comment 3: still looking.
 --- Trum-ok, 2026-11-12 03:00
-Comment 4: still looking.
+  Comment 4: still looking.
 --- octocat, 2026-11-12 04:00
-Comment 5: still looking.
+  Comment 5: still looking.
 --- Trum-ok, 2026-11-12 05:00
-Comment 6: still looking.
+  Comment 6: still looking.
 --- octocat, 2026-11-12 06:00
-Comment 7: still looking.
+  Comment 7: still looking.
 --- Trum-ok, 2026-11-12 07:00
-Comment 8: still looking.
+  Comment 8: still looking.
 --- octocat, 2026-11-12 08:00
-Comment 9: still looking.
+  Comment 9: still looking.
 --- Trum-ok, 2026-11-12 09:00
-Comment 10: still looking.
+  Comment 10: still looking.
 --- octocat, 2026-11-12 10:00
-Comment 11: still looking.
+  Comment 11: still looking.
 --- Trum-ok, 2026-11-12 11:00
-Comment 12: still looking.
+  Comment 12: still looking.
 --- octocat, 2026-11-12 12:00
-Comment 13: still looking.
+  Comment 13: still looking.
 --- Trum-ok, 2026-11-12 13:00
-Comment 14: still looking.
+  Comment 14: still looking.
 --- octocat, 2026-11-12 14:00
-Comment 15: still looking.
+  Comment 15: still looking.
 --- Trum-ok, 2026-11-12 15:00
-Comment 16: still looking.
+  Comment 16: still looking.
 --- octocat, 2026-11-12 16:00
-Comment 17: still looking.
+  Comment 17: still looking.
 --- Trum-ok, 2026-11-12 17:00
-Comment 18: still looking.
+  Comment 18: still looking.
 --- octocat, 2026-11-12 18:00
-Comment 19: still looking.
+  Comment 19: still looking.
 --- Trum-ok, 2026-11-12 19:00
-Comment 20: still looking.
+  Comment 20: still looking.
 --- octocat, 2026-11-12 20:00
-Comment 21: still looking.
+  Comment 21: still looking.
 --- Trum-ok, 2026-11-12 21:00
-Comment 22: still looking.
+  Comment 22: still looking.
 --- octocat, 2026-11-12 22:00
-Comment 23: still looking.
+  Comment 23: still looking.
 --- Trum-ok, 2026-11-12 23:00
-Comment 24: still looking.
+  Comment 24: still looking.
 --- octocat, 2026-11-13 00:00
-Comment 25: still looking.
+  Comment 25: still looking.
 --- Trum-ok, 2026-11-13 01:00
-Comment 26: still looking.
+  Comment 26: still looking.
 --- octocat, 2026-11-13 02:00
-Comment 27: still looking.
+  Comment 27: still looking.
 --- Trum-ok, 2026-11-13 03:00
-Comment 28: still looking.
+  Comment 28: still looking.
 --- octocat, 2026-11-13 04:00
-Comment 29: still looking.
+  Comment 29: still looking.
 --- Trum-ok, 2026-11-13 05:00
-Comment 30: still looking.
+  Comment 30: still looking.
 --- octocat, 2026-11-13 06:00
-Comment 31: still looking.
+  Comment 31: still looking.
 --- Trum-ok, 2026-11-13 07:00
-Comment 32: still looking.
+  Comment 32: still looking.
 --- octocat, 2026-11-13 08:00
-Comment 33: still looking.
+  Comment 33: still looking.
 --- Trum-ok, 2026-11-13 09:00
-Comment 34: still looking.
+  Comment 34: still looking.
 --- octocat, 2026-11-13 10:00
-Comment 35: still looking.
+  Comment 35: still looking.
 --- Trum-ok, 2026-11-13 11:00
-Comment 36: still looking.
+  Comment 36: still looking.
 --- octocat, 2026-11-13 12:00
-Comment 37: still looking.
+  Comment 37: still looking.
 --- octocat, 2026-11-13 13:00
-Can reproduce on Firefox too.
+  Can reproduce on Firefox too.
 --- Trum-ok, 2026-11-13 14:00
-Started. Session: claude://s/abc
+  Started. Session: claude://s/abc
 --- octocat, 2026-11-13 15:00
-Still happens on Safari:
+  Still happens on Safari:
 
-```
-GET /login?next=/settings -> /home
-```
+  ```
+  GET /login?next=/settings -> /home
+  ```
 --- ghost, 2026-11-13 16:00
-Fixed in #43.
+  Fixed in #43.
 --- Trum-ok, 2026-11-13 17:00
-Waiting for #43 review.
+  Waiting for #43 review.
 --- octocat, 2026-11-13 18:00
-(empty)
+  (empty)
 --- octocat, 2026-11-13 19:00
-Log from the staging run:
-001 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-002 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-003 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-004 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-005 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-006 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-007 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-008 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-009 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-010 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-011 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-012 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-013 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-014 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-015 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-016 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-017 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-018 GET /login?next=/settings -> 302 /home (session cookie set, next dropped) …
-[cut: 1429 of 2365 characters shown; --full prints all]
+  Log from the staging run:
+  001 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
+  002 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
+  003 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
+  004 GET /login?next=/settings -> 302 /home (session cookie set, next dropped) …
+  [cut: 337 of 2365 characters shown; --full prints all]
 --- Trum-ok, 2026-11-13 20:00
-Done.
+  Done.
 --- stderr

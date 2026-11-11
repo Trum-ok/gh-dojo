@@ -14,36 +14,25 @@ status history (latest changes only; older ones are not read):
   2026-11-11 19:02 In progress → Ready by Trum-ok
 
 description:
-Login redirects to /home instead of the page the user came from.
+  Login redirects to /home instead of the page the user came from.
 
 comments (showing 5 of 45, --comments all prints up to 100):
 --- ghost, 2026-11-13 16:00
-Fixed in #43.
+  Fixed in #43.
 --- Trum-ok, 2026-11-13 17:00
-Waiting for #43 review.
+  Waiting for #43 review.
 --- octocat, 2026-11-13 18:00
-(empty)
+  (empty)
 --- octocat, 2026-11-13 19:00
-Log from the staging run:
-001 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-002 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-003 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-004 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-005 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-006 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-007 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-008 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-009 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-010 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-011 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-012 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-013 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-014 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-015 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-016 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-017 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
-018 GET /login?next=/settings -> 302 /home (session cookie set, next dropped) …
-[cut: 1429 of 2365 characters shown; --full prints all]
+  Log from the staging run:
+  001 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
+  002 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
+  003 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
+  004 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
+  005 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
+  006 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
+  007 GET /login?next=/settings -> 302 /home (session cookie set, next dropped) …
+  [cut: 571 of 2365 characters shown; --full prints all]
 --- Trum-ok, 2026-11-13 20:00
-Done.
+  Done.
 --- stderr

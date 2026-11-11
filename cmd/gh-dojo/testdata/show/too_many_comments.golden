@@ -1,5 +1,5 @@
 code: 1
 --- stdout
 --- stderr
-error: --comments 101 is more than gh dojo reads (100); use --comments all
+error: invalid argument "101" for "--comments" flag: gh dojo reads at most 100; use --comments all
 fix: gh dojo show --help
