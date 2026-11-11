@@ -6,3 +6,6 @@
 
 # IDE
 .idea/
+
+# agent worktrees
+.claude/worktrees/
