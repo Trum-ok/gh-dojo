@@ -73,4 +73,4 @@ description:
 comments: none
 --- stderr
 error: issue #9999 not found in Trum-ok/gh-dojo
-fix: gh issue list -R Trum-ok/gh-dojo
+fix: gh dojo list

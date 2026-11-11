@@ -9,4 +9,4 @@ open · In progress · labels: none · assignees: none
 blocked by 3 open: #3, #2, #5 · blocking 1 open · comments: 0
 --- stderr
 error: issue #9999 not found in Trum-ok/gh-dojo
-fix: gh issue list -R Trum-ok/gh-dojo
+fix: gh dojo list

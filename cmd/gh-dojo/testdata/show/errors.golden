@@ -1,30 +1,30 @@
 ## one missing
 code 3
 error: issue #9 not found in Trum-ok/gh-dojo
-fix: gh issue list -R Trum-ok/gh-dojo
+fix: gh dojo list
 ## four missing
 code 3
 error: issues #9, #10, #11, #12 not found in Trum-ok/gh-dojo
-fix: gh issue list -R Trum-ok/gh-dojo
+fix: gh dojo list
 ## twelve missing
 code 3
 error: issues #1, #2, #3, #4, #5, #6, #7, #8, #9, #10 and 2 more not found in Trum-ok/gh-dojo
-fix: gh issue list -R Trum-ok/gh-dojo
+fix: gh dojo list
 ## missing and pull requests
 code 3
 error: issues #9, #10 not found in Trum-ok/gh-dojo
-#15, #16 in Trum-ok/gh-dojo are pull requests, not issues (fix: gh pr view 15 -R Trum-ok/gh-dojo)
-fix: gh issue list -R Trum-ok/gh-dojo
+#15, #16 in Trum-ok/gh-dojo are pull requests; gh dojo works with issues only
+fix: gh dojo list
 ## four causes
 code 3
-error: #15 in Trum-ok/gh-dojo is a pull request, not an issue
-issue #9 not found in Trum-ok/gh-dojo (fix: gh issue list -R Trum-ok/gh-dojo)
+error: #15 in Trum-ok/gh-dojo is a pull request; gh dojo works with issues only
+issue #9 not found in Trum-ok/gh-dojo
 and 2 more problems not shown
-fix: gh pr view 15 -R Trum-ok/gh-dojo
+fix: gh dojo list
 ## request failed after some
 code 4
 error: #41, #42 not read: cannot reach GitHub (timeout); retry later
-issues #9, #10 not found in Trum-ok/gh-dojo (fix: gh issue list -R Trum-ok/gh-dojo)
+issues #9, #10 not found in Trum-ok/gh-dojo (fix: gh dojo list)
 ## plain error
 code 1
 error: #41 not read: boom

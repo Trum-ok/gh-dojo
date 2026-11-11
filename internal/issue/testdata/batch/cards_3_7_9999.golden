@@ -45,4 +45,4 @@ body: "## Зачем\nАгент читает задачу одним запро
 == #9999
 code 3
 error: issue #9999 not found in Trum-ok/gh-dojo
-fix: gh issue list -R Trum-ok/gh-dojo
+fix: gh dojo list

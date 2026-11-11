@@ -148,8 +148,8 @@ func readBatch(ctx context.Context, q graph.Querier, req Request, numbers []int)
 }
 
 func pullRequest(req Request) *render.Error {
-	return render.NotFound("#%d in %s is a pull request, not an issue", req.Number, req.Repo).
-		WithFix(fmt.Sprintf("gh pr view %d -R %s", req.Number, req.Repo))
+	return render.NotFound("#%d in %s is a pull request; gh dojo works with issues only", req.Number, req.Repo).
+		WithFix(ListFix)
 }
 
 // perIssueErrors sorts the GraphQL errors of a batch by issue alias: a

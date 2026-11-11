@@ -161,7 +161,7 @@ func (c *commentsFlag) Type() string { return "N|all" }
 // issues left unread by a failed request, then the issues that failed
 // alone, grouped by cause ("issues #9, #10 not found in owner/repo"). The
 // first line decides the exit code and the fix line; the fix of every
-// other cause stays on its own line.
+// other cause stays on its own line, unless it is that same fix.
 func showError(repo issue.Repo, unread []int, failed []issue.Result, readErr error) error {
 	type group struct {
 		cause issue.Cause
@@ -184,7 +184,7 @@ func showError(repo issue.Repo, unread []int, failed []issue.Result, readErr err
 		case g.cause == issue.CauseMissing:
 			return fmt.Sprintf("issues %s not found in %s", issueRefs(g.ns), repo)
 		case g.cause == issue.CausePullRequest:
-			return fmt.Sprintf("%s in %s are pull requests, not issues", issueRefs(g.ns), repo)
+			return fmt.Sprintf("%s in %s are pull requests; gh dojo works with issues only", issueRefs(g.ns), repo)
 		}
 		return g.err.What
 	}
@@ -200,7 +200,7 @@ func showError(repo issue.Repo, unread []int, failed []issue.Result, readErr err
 		switch {
 		case first == nil:
 			first = g.err
-		case g.err.Fix != "":
+		case g.err.Fix != "" && g.err.Fix != first.Fix:
 			line += " (fix: " + g.err.Fix + ")"
 		}
 		lines = append(lines, line)

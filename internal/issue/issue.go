@@ -356,9 +356,14 @@ func Read(ctx context.Context, q graph.Querier, req Request) (*Card, error) {
 	return c, nil
 }
 
+// ListFix is the fix line for a number that is not an issue: the board
+// lists open issues by status and counts the closed and final ones, so it
+// leads to the right number without leaving gh dojo.
+const ListFix = "gh dojo list"
+
 func notFound(req Request) *render.Error {
 	return render.NotFound("issue #%d not found in %s", req.Number, req.Repo).
-		WithFix("gh issue list -R " + req.Repo.String())
+		WithFix(ListFix)
 }
 
 // onlyNested reports whether every GraphQL error points below the issue

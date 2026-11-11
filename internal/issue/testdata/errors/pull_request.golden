@@ -1,2 +1,2 @@
-error: #15 in Trum-ok/gh-dojo is a pull request, not an issue
-fix: gh pr view 15 -R Trum-ok/gh-dojo
+error: #15 in Trum-ok/gh-dojo is a pull request; gh dojo works with issues only
+fix: gh dojo list

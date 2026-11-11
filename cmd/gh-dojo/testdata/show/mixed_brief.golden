@@ -5,5 +5,5 @@ closed (completed) 2026-11-12 · board status unknown (GitHub withheld some of t
 no open blockers (1 closed) · blocking none · comments: 0
 note: GitHub withheld part of this issue from the token; the rest is accurate
 --- stderr
-error: #15 in Trum-ok/gh-dojo is a pull request, not an issue
-fix: gh pr view 15 -R Trum-ok/gh-dojo
+error: #15 in Trum-ok/gh-dojo is a pull request; gh dojo works with issues only
+fix: gh dojo list

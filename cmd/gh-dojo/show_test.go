@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -230,11 +229,11 @@ func TestShowError(t *testing.T) {
 	dojo := issue.Repo{Owner: "Trum-ok", Name: "gh-dojo"}
 	missing := func(n int) issue.Result {
 		return issue.Result{Number: n, Cause: issue.CauseMissing,
-			Err: render.NotFound("issue #%d not found in Trum-ok/gh-dojo", n).WithFix("gh issue list -R Trum-ok/gh-dojo")}
+			Err: render.NotFound("issue #%d not found in Trum-ok/gh-dojo", n).WithFix(issue.ListFix)}
 	}
 	pr := func(n int) issue.Result {
 		return issue.Result{Number: n, Cause: issue.CausePullRequest,
-			Err: render.NotFound("#%d in Trum-ok/gh-dojo is a pull request, not an issue", n).WithFix(fmt.Sprintf("gh pr view %d -R Trum-ok/gh-dojo", n))}
+			Err: render.NotFound("#%d in Trum-ok/gh-dojo is a pull request; gh dojo works with issues only", n).WithFix(issue.ListFix)}
 	}
 	other := issue.Result{Number: 77, Err: render.NotFound("something else about #77")}
 	if err := showError(dojo, nil, nil, nil); err != nil {
