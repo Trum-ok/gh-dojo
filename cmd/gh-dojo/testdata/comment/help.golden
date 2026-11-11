@@ -1,0 +1,23 @@
+code: 0
+--- stdout
+Comment on an issue without changing its status.
+
+The text comes from the second argument or from --body-file (a file, or - for
+stdin), exactly one of them; empty text is an error. Use --body-file - for
+long or multi-line text.
+
+A repeat is safe: the comment carries a hidden marker, and when the latest
+gh-dojo comment on the issue already has the same text it is not posted again.
+
+Usage:
+  gh dojo comment <N> [text] [flags]
+
+Examples:
+  gh dojo comment 42 "Reproduced on main; the redirect drops the query string"
+  gh dojo comment 42 --body-file notes.md
+  echo "Waiting for the API team" | gh dojo comment 42 --body-file -
+
+Flags:
+      --body-file file   read the text from file; - reads stdin
+  -h, --help             help for comment
+--- stderr

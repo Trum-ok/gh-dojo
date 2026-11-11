@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: new needs a title, like: gh dojo new "Fix login redirect"
+fix: gh dojo new --help

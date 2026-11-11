@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: --body-file testdata/nope.md: no such file
+fix: gh dojo new --help

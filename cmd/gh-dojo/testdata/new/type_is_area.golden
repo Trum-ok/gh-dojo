@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: --type "area:cli" is an area label; pass --area cli instead
+fix: gh dojo new --help

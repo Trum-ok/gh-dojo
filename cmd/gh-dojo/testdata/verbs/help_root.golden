@@ -15,8 +15,10 @@ Process verbs (from .github/dojo.toml):
   wait        Work is stuck: waiting for another issue or an outside decision
 
 Additional Commands:
+  comment     Comment on an issue without changing its status
   help        Help about any command
   list        See what is on the board: one line per open issue, grouped by status
+  new         Create an issue with labels, on the board, in the initial status
   show        Read issues before working on them: board status, blockers, history, description, comments
 
 Flags:

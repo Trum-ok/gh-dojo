@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: give the text either as an argument or with --body-file, not both
+fix: gh dojo comment --help

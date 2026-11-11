@@ -1,0 +1,25 @@
+{
+  "comment": "Hand-crafted: addComment on issue #3 with multi-line text read from stdin; payload shape from the GraphQL schema.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "AddComment",
+      "query": "mutation AddComment($subject: ID!, $body: String!) {\n  addComment(input: {subjectId: $subject, body: $body}) {\n    commentEdge { node { id } }\n  }\n}",
+      "variables": {
+        "subject": "I_kwDOVq9iIs8AAAABeZKr9A",
+        "body": "Line one\nLine two\n\n<!-- gh-dojo:comment:4ff052e5 -->"
+      },
+      "response": {
+        "data": {
+          "addComment": {
+            "commentEdge": {
+              "node": {
+                "id": "IC_kwDOVq9iIs7NEW0001"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

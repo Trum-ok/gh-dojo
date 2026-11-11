@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: the comment text is empty
+fix: gh dojo comment --help

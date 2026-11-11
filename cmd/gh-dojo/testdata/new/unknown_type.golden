@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: unknown type "chore": no such label in Trum-ok/gh-dojo
+allowed: accessibility, bug, documentation, dogfood, duplicate, enhancement, good first issue, help wanted, invalid, question, wontfix

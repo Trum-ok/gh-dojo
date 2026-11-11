@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: new takes one title, got 2 arguments; quote the title
+fix: gh dojo new --help

@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: give the body either with --body or with --body-file, not both
+fix: gh dojo new --help

@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: unknown area "cli": Trum-ok/gh-dojo has no labels starting with "area:"
+fix: gh label create "area:cli" -R Trum-ok/gh-dojo

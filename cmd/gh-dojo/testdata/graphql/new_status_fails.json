@@ -1,0 +1,182 @@
+{
+  "comment": "Hand-crafted: #15 is created, then the status write gets HTTP 502 with a text body. Shapes: the read is new_context.json (recorded) cut to issues #13-#14, with labels area:board and area:cli added; mutation payloads follow the GraphQL schema (createIssue.issue, updateProjectV2ItemFieldValue.projectV2Item, addProjectV2ItemById.item, addLabelsToLabelable); mutations are never sent to GitHub.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "NewIssueContext",
+      "query": "query NewIssueContext($owner: String!, $repo: String!, $status: String!) {\n  repository(owner: $owner, name: $repo) {\n    id\n    labels(first: 100, orderBy: {field: NAME, direction: ASC}) {\n      totalCount\n      pageInfo { hasNextPage endCursor }\n      nodes { id name }\n    }\n    issues(last: 20, orderBy: {field: CREATED_AT, direction: ASC}) {\n      nodes {\n        id\n        number\n        body\n        viewerDidAuthor\n        labels(first: 50) { nodes { name } }\n        projectItems(first: 20) {\n          nodes {\n            id\n            project { id }\n            fieldValueByName(name: $status) { ... on ProjectV2ItemFieldSingleSelectValue { name } }\n          }\n        }\n      }\n    }\n  }\n}",
+      "variables": {
+        "owner": "Trum-ok",
+        "repo": "gh-dojo",
+        "status": "Status"
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "id": "R_kgDOVq9iIg",
+            "labels": {
+              "totalCount": 13,
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": "MTE"
+              },
+              "nodes": [
+                {
+                  "id": "LA_kwDOVq9iIs8AAAADCYId8Q",
+                  "name": "accessibility"
+                },
+                {
+                  "id": "LA_kwDOVq9iIs8AAAADCaREAb",
+                  "name": "area:board"
+                },
+                {
+                  "id": "LA_kwDOVq9iIs8AAAADCaREAc",
+                  "name": "area:cli"
+                },
+                {
+                  "id": "LA_kwDOVq9iIs8AAAADCYId4A",
+                  "name": "bug"
+                },
+                {
+                  "id": "LA_kwDOVq9iIs8AAAADCYIeBw",
+                  "name": "documentation"
+                },
+                {
+                  "id": "LA_kwDOVq9iIs8AAAADCYLjtg",
+                  "name": "dogfood"
+                },
+                {
+                  "id": "LA_kwDOVq9iIs8AAAADCYIeHQ",
+                  "name": "duplicate"
+                },
+                {
+                  "id": "LA_kwDOVq9iIs8AAAADCYIeOA",
+                  "name": "enhancement"
+                },
+                {
+                  "id": "LA_kwDOVq9iIs8AAAADCYIeYg",
+                  "name": "good first issue"
+                },
+                {
+                  "id": "LA_kwDOVq9iIs8AAAADCYIeTA",
+                  "name": "help wanted"
+                },
+                {
+                  "id": "LA_kwDOVq9iIs8AAAADCYIecw",
+                  "name": "invalid"
+                },
+                {
+                  "id": "LA_kwDOVq9iIs8AAAADCYIehg",
+                  "name": "question"
+                },
+                {
+                  "id": "LA_kwDOVq9iIs8AAAADCYIeog",
+                  "name": "wontfix"
+                }
+              ]
+            },
+            "issues": {
+              "nodes": [
+                {
+                  "id": "I_kwDOVq9iIs8AAAABeZMbcQ",
+                  "number": 13,
+                  "body": "## Зачем\ngh-dojo ведёт собственную разработку через себя.\n\n## Что сделать\n- Привести статусы доски gh-dojo (проект №5) к ожиданиям пресета `kanban`.\n- Написать `.github/dojo.toml` для репозитория: доска, поля, пресет и переопределения; тексты комментариев — на языке проекта.\n- Завести метку `dogfood` для неудобств, замеченных по ходу работы, если её ещё нет.\n\n## Готово, когда\n- Конфиг загружается и проходит сверку с доской без ошибок.\n\nСпека: `docs/spec.md`: «Этапы → Самохостинг».\n",
+                  "viewerDidAuthor": true,
+                  "labels": {
+                    "nodes": []
+                  },
+                  "projectItems": {
+                    "nodes": [
+                      {
+                        "id": "PVTI_lAHOBFGd5c4BrMYFzhH6Ltk",
+                        "project": {
+                          "id": "PVT_kwHOBFGd5c4BrMYF"
+                        },
+                        "fieldValueByName": {
+                          "name": "Backlog"
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "id": "I_kwDOVq9iIs8AAAABeZMk6g",
+                  "number": 14,
+                  "body": "## Зачем\nРубеж v0.0: все задачи gh-dojo лежат на его собственной доске, агенты работают с ней только через `gh dojo`.\n\n## Что сделать\n- Написать вручную `.claude/skills/gh-dojo/SKILL.md`: глаголы проекта, когда их применять, коды выхода, правило «неудобство → задача с меткой `dogfood`» (с v0.2 skill генерирует `agent install`).\n- В `CLAUDE.md` указать, что задачи ведутся только через `gh dojo`, а не через `gh issue` и `gh project`.\n- Проверить, что все открытые задачи на доске и `gh dojo list` их показывает.\n- Пройти цикл одной реальной задачи: `new` → `start` → `ready`/`done` → `show`.\n\n## Готово, когда\n- Рубеж выполнен; найденные неудобства заведены с меткой `dogfood`.\n\nСпека: `docs/spec.md`: «Этапы → v0.0, Самохостинг», «Интеграция с агентами».\n",
+                  "viewerDidAuthor": true,
+                  "labels": {
+                    "nodes": []
+                  },
+                  "projectItems": {
+                    "nodes": [
+                      {
+                        "id": "PVTI_lAHOBFGd5c4BrMYFzhH6L4Q",
+                        "project": {
+                          "id": "PVT_kwHOBFGd5c4BrMYF"
+                        },
+                        "fieldValueByName": {
+                          "name": "Backlog"
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "CreateIssue",
+      "query": "mutation CreateIssue($repo: ID!, $title: String!, $body: String!, $labels: [ID!], $projects: [ID!]) {\n  createIssue(input: {repositoryId: $repo, title: $title, body: $body, labelIds: $labels, projectV2Ids: $projects}) {\n    issue {\n      id\n      number\n      projectItems(first: 20) { nodes { id project { id } } }\n    }\n  }\n}",
+      "variables": {
+        "repo": "R_kgDOVq9iIg",
+        "title": "Fix login redirect",
+        "body": "The redirect drops the query string.\n\n<!-- gh-dojo:new:b33d93a0 -->",
+        "labels": [
+          "LA_kwDOVq9iIs8AAAADCYId4A",
+          "LA_kwDOVq9iIs8AAAADCaREAc"
+        ],
+        "projects": [
+          "PVT_kwHOBFGd5c4BrMYF"
+        ]
+      },
+      "response": {
+        "data": {
+          "createIssue": {
+            "issue": {
+              "id": "I_kwDOVq9iIs8AAAABfNEW15",
+              "number": 15,
+              "projectItems": {
+                "nodes": [
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFzhNEW15",
+                    "project": {
+                      "id": "PVT_kwHOBFGd5c4BrMYF"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "SetStatus",
+      "query": "mutation SetStatus($project: ID!, $item: ID!, $field: ID!, $option: String!) {\n  updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field, value: {singleSelectOptionId: $option}}) {\n    projectV2Item { id }\n  }\n}",
+      "variables": {
+        "project": "PVT_kwHOBFGd5c4BrMYF",
+        "item": "PVTI_lAHOBFGd5c4BrMYFzhNEW15",
+        "field": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+        "option": "f75ad846"
+      },
+      "status": 502,
+      "response": "Bad Gateway",
+      "headers": {
+        "Content-Type": "text/plain"
+      }
+    }
+  ]
+}

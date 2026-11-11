@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: no comment text: pass it as the second argument or with --body-file (- reads stdin)
+fix: gh dojo comment --help

@@ -1,0 +1,37 @@
+code: 0
+--- stdout
+Create an issue, label it, add it to the board and set its initial status
+(statuses.initial) in one command.
+
+Labels: --type takes one of labels.types, or any repo label outside the areas
+when labels.types is empty; --area X adds the label <labels.area_prefix>X;
+--label adds any existing label. An unknown one fails before anything is
+created, listing the allowed values.
+
+The body comes from --body or --body-file (a file, or - for stdin).
+
+A repeat is safe: the body ends with a hidden marker of the title and body,
+and a run that finds it among the repo's 20 newest issues finishes that issue
+(labels, board, status) instead of creating another. If a run fails after
+creating the issue, it exits with code 5: run the same command again.
+
+This project:
+  --type    any repo label not starting with area:
+  --area X  adds the label area:X
+  status    Backlog
+
+Usage:
+  gh dojo new <title> [flags]
+
+Examples:
+  gh dojo new "Fix login redirect" --type bug --area cli
+  gh dojo new "Support org boards" --label enhancement --body-file - < notes.md
+
+Flags:
+      --area name        area name: adds the label <area_prefix><name>; repeatable
+      --body string      issue body (markdown)
+      --body-file file   read the body from file; - reads stdin
+  -h, --help             help for new
+      --label label      any existing repo label; repeatable
+      --type string      issue type: a label from labels.types
+--- stderr

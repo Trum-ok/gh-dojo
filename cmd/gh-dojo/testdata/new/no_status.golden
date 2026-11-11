@@ -1,0 +1,4 @@
+code: 0
+--- stdout
+#15 "Write the README" created, on the board with no status (statuses.initial is not set)
+--- stderr

@@ -1,0 +1,25 @@
+{
+  "comment": "Hand-crafted: addComment on issue #3 (card_3.json); payload shape from the GraphQL schema, never sent to GitHub.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "AddComment",
+      "query": "mutation AddComment($subject: ID!, $body: String!) {\n  addComment(input: {subjectId: $subject, body: $body}) {\n    commentEdge { node { id } }\n  }\n}",
+      "variables": {
+        "subject": "I_kwDOVq9iIs8AAAABeZKr9A",
+        "body": "Reproduced on main.\n\n<!-- gh-dojo:comment:cd834e33 -->"
+      },
+      "response": {
+        "data": {
+          "addComment": {
+            "commentEdge": {
+              "node": {
+                "id": "IC_kwDOVq9iIs7NEW0001"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

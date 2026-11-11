@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: comment takes an issue number and one text argument, got 4 arguments; quote the text
+fix: gh dojo comment --help
