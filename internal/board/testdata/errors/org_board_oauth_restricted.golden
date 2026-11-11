@@ -1,0 +1,2 @@
+error: GitHub denied access: the organization restricts OAuth apps and has not approved GitHub CLI
+fix: ask an organization owner to approve GitHub CLI, or set GH_TOKEN to a personal access token with the project scope

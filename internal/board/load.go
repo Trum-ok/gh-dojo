@@ -83,7 +83,11 @@ func (l *Loader) Fetch(ctx context.Context, ref Ref) (*Schema, error) {
 	err := l.Client.Query(ctx, schemaQuery, map[string]any{"owner": ref.Owner, "number": ref.Number}, &resp)
 	if err != nil {
 		if render.FromError(err).Code == render.ExitNotFound {
-			return nil, notFound(ref, err)
+			ownerType := ""
+			if resp.RepositoryOwner != nil {
+				ownerType = resp.RepositoryOwner.Typename
+			}
+			return nil, notFound(ref, ownerType, err)
 		}
 		return nil, err
 	}
@@ -92,7 +96,7 @@ func (l *Loader) Fetch(ctx context.Context, ref Ref) (*Schema, error) {
 		return nil, render.NotFound("GitHub user or organization %q not found", ref.Owner)
 	}
 	if o.ProjectV2 == nil {
-		return nil, notFound(ref, nil)
+		return nil, notFound(ref, o.Typename, nil)
 	}
 	s := o.ProjectV2.schema(o.Typename, o.Login, ref.Number)
 	s.FetchedAt = l.now().UTC()
@@ -138,8 +142,16 @@ func (l *Loader) Resolve(ctx context.Context, ref Ref, fn func(*Schema) error) (
 	return s, fn(s)
 }
 
-func notFound(ref Ref, cause error) error {
-	e := render.NotFound("board %s not found", ref).
+// notFound reports a missing board. GitHub answers the same for an
+// organization's private project the token has no access to, which is
+// common, so for organizations the error says so; gh project list shows
+// the projects the token can see.
+func notFound(ref Ref, ownerType string, cause error) error {
+	what := "board %s not found"
+	if ownerType == OwnerOrganization {
+		what = "board %s not found, or the token has no access to it"
+	}
+	e := render.NotFound(what, ref).
 		WithFix("gh project list --owner " + ref.Owner)
 	if cause != nil {
 		e = e.WithCause(cause)

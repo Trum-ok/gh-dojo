@@ -119,7 +119,7 @@ func ReadItems(ctx context.Context, q graph.Querier, s *Schema, statusField stri
 	})
 	if err != nil {
 		if errors.Is(err, graph.ErrParentNotFound) || render.FromError(err).Code == render.ExitNotFound {
-			return nil, notFound(s.Ref(), err)
+			return nil, notFound(s.Ref(), s.OwnerType, err)
 		}
 		return nil, err
 	}

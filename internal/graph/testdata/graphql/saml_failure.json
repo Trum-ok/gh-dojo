@@ -1,0 +1,25 @@
+{
+  "comment": "Hand-crafted: an organization enforces SAML SSO the token is not authorized for. GitHub answers 200 with FORBIDDEN, extensions.saml_failure and the field null; message as GitHub words it.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "Viewer",
+      "query": "query Viewer { viewer { login } }",
+      "response": {
+        "data": null,
+        "errors": [
+          {
+            "type": "FORBIDDEN",
+            "path": [
+              "viewer"
+            ],
+            "extensions": {
+              "saml_failure": true
+            },
+            "message": "Resource protected by organization SAML enforcement. You must grant your Personal Access token access to this organization."
+          }
+        ]
+      }
+    }
+  ]
+}

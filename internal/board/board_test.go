@@ -277,6 +277,31 @@ func TestBoardNotFound(t *testing.T) {
 	assertError(t, err, render.ExitNotFound, "errors/board_not_found")
 }
 
+// TestOrgBoardNotFound: GitHub answers the same for an organization's
+// project that does not exist and one the token cannot see, so the error
+// says both.
+func TestOrgBoardNotFound(t *testing.T) {
+	l, _, _ := newLoader(t, fixture("org_board_not_found"))
+	_, err := l.Load(context.Background(), board.Ref{Owner: "github", Number: 1})
+	assertError(t, err, render.ExitNotFound, "errors/org_board_not_found")
+}
+
+// TestOrgBoardAccessDenied: an organization that blocks the token (SAML
+// SSO, OAuth app restrictions, a fine-grained token without access to its
+// projects) is exit code 4 with a fix, and nothing is cached.
+func TestOrgBoardAccessDenied(t *testing.T) {
+	for _, name := range []string{"org_board_saml", "org_board_oauth_restricted", "org_board_forbidden"} {
+		t.Run(name, func(t *testing.T) {
+			l, _, _ := newLoader(t, fixture(name))
+			_, err := l.Load(context.Background(), board.Ref{Owner: "acme", Number: 3})
+			assertError(t, err, render.ExitNetwork, "errors/"+name)
+			if entries, _ := os.ReadDir(l.Dir); len(entries) != 0 {
+				t.Errorf("an error was cached: %v", entries)
+			}
+		})
+	}
+}
+
 func TestOwnerNotFound(t *testing.T) {
 	l, _, _ := newLoader(t, fixture("owner_not_found"))
 	_, err := l.Load(context.Background(), board.Ref{Owner: "no-such-user-xyz-123987", Number: 1})

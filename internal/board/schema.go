@@ -15,7 +15,8 @@ import (
 )
 
 // Ref identifies a board: owner login (user or organization) and project
-// number, as in https://github.com/users/<owner>/projects/<number>.
+// number, as in https://github.com/users/<owner>/projects/<number> or
+// https://github.com/orgs/<owner>/projects/<number>.
 type Ref struct {
 	Owner  string
 	Number int

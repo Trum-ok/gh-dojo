@@ -204,8 +204,11 @@ func isSecondaryRateLimit(e *api.HTTPError) bool {
 // starting from render's mapping and tightening it for GraphQL.
 func (c *Client) mapError(err error, mutation bool) error {
 	e := c.describe(err, mutation)
-	if e.Fix == render.AuthFix {
+	switch e.Fix {
+	case render.AuthFix:
 		e.Fix = c.authFix()
+	case SSOFix:
+		e.Fix = c.ssoFix()
 	}
 	e.What = c.scrub(e.What)
 	e.Fix = c.scrub(e.Fix)
@@ -281,6 +284,16 @@ func describeGraphQL(err *api.GraphQLError) *render.Error {
 	if item, ok := has("INSUFFICIENT_SCOPES"); ok {
 		return render.Network("GitHub token is missing a required scope%s", scopesHint(item.Message)).WithFix(render.AuthFix)
 	}
+	for _, item := range err.Errors {
+		if samlFailure(item) {
+			return render.Network("GitHub denied access: the organization enforces SAML single sign-on and the token is not authorized for it").
+				WithFix(SSOFix)
+		}
+		if strings.Contains(strings.ToLower(item.Message), "oauth app access restrictions") {
+			return render.Network("GitHub denied access: the organization restricts OAuth apps and has not approved GitHub CLI").
+				WithFix(OAuthRestrictedFix)
+		}
+	}
 	if _, ok := has("FORBIDDEN"); ok {
 		return render.Network("GitHub denied access; the token may lack the project scope or access to the owner").WithFix(render.AuthFix)
 	}
@@ -288,6 +301,27 @@ func describeGraphQL(err *api.GraphQLError) *render.Error {
 		return render.NotFound("GitHub API: not found")
 	}
 	return render.New(render.ExitUsage, "GitHub API rejected the request")
+}
+
+// SSOFix is the fix when an organization's SAML single sign-on blocks gh's
+// token: refreshing it opens GitHub's authorization page, where the token
+// is authorized for the organization's SSO too. A token from the
+// environment gets another fix (see Client.ssoFix).
+const SSOFix = "gh auth refresh -s project, and authorize the organization's SSO on the page it opens"
+
+// OAuthRestrictedFix is the fix when an organization's OAuth app access
+// restrictions block gh's token; personal access tokens are not subject to
+// them.
+const OAuthRestrictedFix = "ask an organization owner to approve GitHub CLI, or set GH_TOKEN to a personal access token with the project scope"
+
+// samlFailure reports the error GitHub returns for an organization's
+// resource when the token is not authorized for its SAML single sign-on:
+// extensions.saml_failure, with a message about "SAML enforcement".
+func samlFailure(item api.GraphQLErrorItem) bool {
+	if v, ok := item.Extensions["saml_failure"].(bool); ok && v {
+		return true
+	}
+	return strings.Contains(strings.ToLower(item.Message), "saml enforcement")
 }
 
 // ErrUnknownOutcome is in the chain of a Mutate error whose outcome is
@@ -345,6 +379,16 @@ func (c *Client) authFix() string {
 		return "set " + c.tokenSource + " to a token with the project scope"
 	}
 	return render.AuthFix
+}
+
+// ssoFix is the fix for a token an organization's SAML SSO blocks. A token
+// from the environment is authorized on GitHub's token settings page.
+func (c *Client) ssoFix() string {
+	switch c.tokenSource {
+	case "GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN":
+		return "authorize " + c.tokenSource + " for the organization's SSO (Configure SSO in GitHub's token settings)"
+	}
+	return SSOFix
 }
 
 // IsStaleID reports whether GitHub rejected an ID gh-dojo sent: a node ID

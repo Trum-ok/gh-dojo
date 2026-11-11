@@ -1,0 +1,39 @@
+{
+  "comment": "Hand-crafted: reading the board of organization acme, which restricts OAuth apps and has not approved GitHub CLI. GitHub answers 200 with FORBIDDEN and projectV2 null; the shape follows org_board_not_found.json (recorded), the message GitHub's OAuth App access restrictions error.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "BoardSchema",
+      "query": "query BoardSchema($owner: String!, $number: Int!) {\n  repositoryOwner(login: $owner) {\n    __typename\n    login\n    ... on User { projectV2(number: $number) { ...board } }\n    ... on Organization { projectV2(number: $number) { ...board } }\n  }\n}\n\nfragment board on ProjectV2 {\n  id\n  title\n  url\n  closed\n  fields(first: 100) {\n    nodes {\n      ... on ProjectV2FieldCommon { id name dataType }\n      ... on ProjectV2SingleSelectField { options { id name } }\n      ... on ProjectV2IterationField {\n        configuration {\n          iterations { id title startDate duration }\n          completedIterations { id title startDate duration }\n        }\n      }\n    }\n  }\n}",
+      "variables": {
+        "owner": "acme",
+        "number": 3
+      },
+      "response": {
+        "data": {
+          "repositoryOwner": {
+            "__typename": "Organization",
+            "login": "acme",
+            "projectV2": null
+          }
+        },
+        "errors": [
+          {
+            "type": "FORBIDDEN",
+            "path": [
+              "repositoryOwner",
+              "projectV2"
+            ],
+            "locations": [
+              {
+                "line": 6,
+                "column": 27
+              }
+            ],
+            "message": "Although you appear to have the correct authorization credentials, the `acme` organization has enabled OAuth App access restrictions, meaning that data access to third-parties is limited. For more information on these restrictions, including how to enable this app, visit https://docs.github.com/articles/restricting-access-to-your-organization-s-data/"
+          }
+        ]
+      }
+    }
+  ]
+}

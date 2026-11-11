@@ -1,0 +1,2 @@
+error: GitHub denied access: the organization enforces SAML single sign-on and the token is not authorized for it
+fix: gh auth refresh -s project, and authorize the organization's SSO on the page it opens

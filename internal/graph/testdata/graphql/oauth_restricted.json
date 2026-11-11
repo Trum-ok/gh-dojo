@@ -1,0 +1,22 @@
+{
+  "comment": "Hand-crafted: an organization restricts OAuth apps and has not approved GitHub CLI. GitHub answers 200 with FORBIDDEN and the field null; message as GitHub words it.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "Viewer",
+      "query": "query Viewer { viewer { login } }",
+      "response": {
+        "data": null,
+        "errors": [
+          {
+            "type": "FORBIDDEN",
+            "path": [
+              "viewer"
+            ],
+            "message": "Although you appear to have the correct authorization credentials, the `acme` organization has enabled OAuth App access restrictions, meaning that data access to third-parties is limited. For more information on these restrictions, including how to enable this app, visit https://docs.github.com/articles/restricting-access-to-your-organization-s-data/"
+          }
+        ]
+      }
+    }
+  ]
+}

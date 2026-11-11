@@ -1,0 +1,2 @@
+error: board github/1 not found, or the token has no access to it
+fix: gh project list --owner github

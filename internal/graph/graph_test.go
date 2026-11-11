@@ -231,6 +231,8 @@ func TestErrors(t *testing.T) {
 		{"bad_credentials", render.ExitNetwork},
 		{"token_echo", render.ExitUsage},
 		{"graphql_timeout", render.ExitNetwork},
+		{"saml_failure", render.ExitNetwork},
+		{"oauth_restricted", render.ExitNetwork},
 	}
 	for _, tt := range tests {
 		t.Run(tt.fixture, func(t *testing.T) {
@@ -272,6 +274,25 @@ func TestEnvTokenFix(t *testing.T) {
 		if fix, want := render.FromError(err).Fix, "set GH_TOKEN to a token with the project scope"; fix != want {
 			t.Errorf("%s: fix = %q, want %q", name, fix, want)
 		}
+	}
+}
+
+// TestSSOFix: gh's own token is authorized for an organization's SAML SSO
+// by refreshing it; a token from the environment on GitHub's token page.
+func TestSSOFix(t *testing.T) {
+	srv := graphtest.New(t, fixture("saml_failure"))
+	err := srv.Client().Query(context.Background(), viewerQuery, nil, nil)
+	if fix := render.FromError(err).Fix; fix != graph.SSOFix {
+		t.Errorf("fix = %q, want %q", fix, graph.SSOFix)
+	}
+
+	t.Setenv("GH_TOKEN", graphtest.FakeToken)
+	srv = graphtest.New(t, fixture("saml_failure"))
+	c := graph.New(graph.Options{Host: "github.com", Transport: srv, Sleep: func(context.Context, time.Duration) error { return nil }})
+	err = c.Query(context.Background(), viewerQuery, nil, nil)
+	want := "authorize GH_TOKEN for the organization's SSO (Configure SSO in GitHub's token settings)"
+	if fix := render.FromError(err).Fix; fix != want {
+		t.Errorf("GH_TOKEN: fix = %q, want %q", fix, want)
 	}
 }
 
