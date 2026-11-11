@@ -1,0 +1,4 @@
+code: 3
+--- stdout
+--- stderr
+error: issue #7 not found in acme/shop

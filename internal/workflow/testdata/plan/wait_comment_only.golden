@@ -1,0 +1,5 @@
+dry run: wait #42 "Fix login redirect"
+  status: In progress → Waiting
+  comment: "needs a design decision"
+confirm: #42 In progress → Waiting, comment left
+post: "needs a design decision\n\n<!-- gh-dojo:wait:1bdbe1d5 -->"

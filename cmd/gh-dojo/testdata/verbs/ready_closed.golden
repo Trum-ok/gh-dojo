@@ -1,0 +1,5 @@
+code: 2
+--- stdout
+--- stderr
+error: #42 is closed; ready works only on open issues
+this is a process rule: ask the user what to do with #42

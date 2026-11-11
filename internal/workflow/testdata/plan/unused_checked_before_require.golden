@@ -1,0 +1,4 @@
+code: 1
+error: note does not use --by
+allowed: --comment
+fix: gh dojo note 42 --comment "<text>"

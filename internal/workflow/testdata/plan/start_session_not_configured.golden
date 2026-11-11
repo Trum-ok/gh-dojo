@@ -1,0 +1,5 @@
+dry run: start #42 "Fix login redirect"
+  status: Backlog → In progress
+  comment: "on it"
+confirm: #42 Backlog → In progress, comment left
+post: "on it\n\n<!-- gh-dojo:start:34d2bf11 -->"

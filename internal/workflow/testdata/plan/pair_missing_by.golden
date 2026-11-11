@@ -1,0 +1,3 @@
+code: 1
+error: pair needs --by
+fix: gh dojo pair 42 --comment "<text>" --by "<#N or name>"

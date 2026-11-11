@@ -1,0 +1,6 @@
+code: 0
+--- stdout
+dry run: start #42 "Fix login redirect"
+  status: Backlog → In progress
+  comment: "Started. Session: claude://s/abc"
+--- stderr

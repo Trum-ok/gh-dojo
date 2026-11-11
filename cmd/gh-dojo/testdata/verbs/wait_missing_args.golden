@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: wait needs at least one of --by or --comment
+fix: gh dojo wait 42 --by "<#N or name>"

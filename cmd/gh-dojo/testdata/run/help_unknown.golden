@@ -1,3 +1,2 @@
-error: unknown command "bogus"
-allowed: board, boom, denied, one
-fix: gh dojo --help
+error: unknown command "bogus"; verbs are unavailable: no .github/dojo.toml in this directory or its parents up to the repository root
+fix: create .github/dojo.toml in the repository root, example: https://github.com/Trum-ok/gh-dojo#configuration

@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: park does not use --comment; it takes no arguments besides the issue number
+fix: gh dojo park 42

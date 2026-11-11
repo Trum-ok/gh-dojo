@@ -1,0 +1,5 @@
+code: 0
+--- stdout
+#42 Backlog → In progress, comment left
+--- stderr
+warning: no agent session: DOJO_SESSION is not set, so the comment has no session link

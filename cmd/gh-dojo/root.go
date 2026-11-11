@@ -26,8 +26,9 @@ import (
 // from the config, uses registerAll with a func() ([]*cobra.Command, error).
 //
 // A constructor error stops gh dojo before any command runs and is printed
-// like a command error: return render errors (a broken dojo.toml is a
-// render.Usage error, code 1). Two commands with the same name or alias,
+// like a command error: return render errors. Do not fail on a missing or
+// broken dojo.toml there, or --help breaks too: verbs.go explains how config
+// errors are shown instead. Two commands with the same name or alias,
 // such as a config verb named like a built-in command, are an error too.
 //
 // Commands return errors built with internal/render (render.Usage,
@@ -66,17 +67,25 @@ func buildRoot(ctors []constructor) (*cobra.Command, error) {
 		Use:   "gh-dojo",
 		Short: "Process verbs for GitHub Projects, built for AI agents",
 		Long: "gh dojo moves issues through a GitHub Projects board with process verbs\n" +
-			"defined in .github/dojo.toml, so agents never deal with field or option IDs.",
+			"defined in .github/dojo.toml, so agents never deal with field or option IDs." +
+			configNote(),
 		Version:                    version,
 		Annotations:                map[string]string{cobra.CommandDisplayNameAnnotation: "gh dojo"},
 		SilenceUsage:               true,
 		SilenceErrors:              true,
 		CompletionOptions:          cobra.CompletionOptions{DisableDefaultCmd: true},
-		Args:                       unknownCommand,
+		Args:                       rootArgs,
 		SuggestionsMinimumDistance: 2,
 		RunE:                       func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
 	}
 	root.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
+		// `gh dojo start 42 --dry-run` without a loadable config fails on the
+		// verb's flag before rootArgs sees "start".
+		if args := cmd.Flags().Args(); !cmd.HasParent() && len(args) > 0 {
+			if err := rootArgs(cmd, args); err != nil {
+				return err
+			}
+		}
 		return render.Usage("%s", err).WithFix(cmd.CommandPath() + " --help")
 	})
 	// Added explicitly: cobra adds its help command only to a root that
@@ -105,6 +114,9 @@ func buildRoot(ctors []constructor) (*cobra.Command, error) {
 				}
 				taken[name] = true
 			}
+			if c.GroupID == verbsGroup.ID && !root.ContainsGroup(c.GroupID) {
+				root.AddGroup(verbsGroup)
+			}
 			root.AddCommand(c)
 		}
 	}
@@ -124,6 +136,9 @@ func newHelpCmd() *cobra.Command {
 				return err
 			}
 			if len(rest) > 0 {
+				if !cmd.HasParent() {
+					return rootArgs(cmd, rest) // may name a verb of a broken config
+				}
 				return unknownCommand(cmd, rest)
 			}
 			cmd.InitDefaultHelpFlag()
@@ -131,6 +146,18 @@ func newHelpCmd() *cobra.Command {
 			return cmd.Help()
 		},
 	}
+}
+
+// rootArgs rejects an unknown command name. A name that is not close to a
+// built-in command may be a verb, so when the config cannot be loaded the
+// error is the config's (see verbs.go).
+func rootArgs(cmd *cobra.Command, args []string) error {
+	if len(args) > 0 && len(cmd.SuggestionsFor(args[0])) == 0 {
+		if err := verbsUnavailable(args[0]); err != nil {
+			return err
+		}
+	}
+	return unknownCommand(cmd, args)
 }
 
 // unknownCommand rejects arguments to a command that only groups others,

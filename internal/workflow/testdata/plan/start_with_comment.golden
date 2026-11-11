@@ -1,0 +1,5 @@
+dry run: start #42 "Fix login redirect"
+  status: Waiting → In progress
+  comment: "Started. Session: claude://s/abc\n\npicking it up again"
+confirm: #42 Waiting → In progress, comment left
+post: "Started. Session: claude://s/abc\n\npicking it up again\n\n<!-- gh-dojo:start:eb0aaafa -->"

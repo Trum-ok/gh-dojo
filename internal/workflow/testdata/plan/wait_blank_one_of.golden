@@ -1,0 +1,3 @@
+code: 1
+error: wait needs at least one of --by or --comment (blank values do not count)
+fix: gh dojo wait 42 --by "<#N or name>"

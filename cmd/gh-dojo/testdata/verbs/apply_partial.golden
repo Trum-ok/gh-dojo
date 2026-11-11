@@ -1,0 +1,5 @@
+code: 5
+--- stdout
+--- stderr
+warning: no agent session: DOJO_SESSION is not set, so the comment has no session link
+error: #42 status set, comment not posted

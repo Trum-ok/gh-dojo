@@ -1,0 +1,4 @@
+code: 0
+--- stdout
+gh dojo version dev
+--- stderr

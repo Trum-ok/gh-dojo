@@ -1,0 +1,4 @@
+code: 1
+--- stdout
+--- stderr
+error: verbs cannot reach GitHub yet: not implemented in this build

@@ -1,0 +1,4 @@
+code: 2
+error: done cannot move #42 from Waiting
+allowed: Ready, In progress
+fix: gh dojo start 42

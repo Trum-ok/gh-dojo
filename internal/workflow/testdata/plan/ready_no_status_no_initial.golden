@@ -1,0 +1,4 @@
+code: 2
+error: ready cannot move #42: it has no status
+this is a process rule: ask the user how to proceed
+allowed: In progress, Waiting

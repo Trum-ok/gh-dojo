@@ -1,0 +1,4 @@
+code: 2
+error: ready cannot move #42 from Backlog: it has no status, which counts as Backlog
+allowed: In progress, Waiting
+fix: gh dojo start 42

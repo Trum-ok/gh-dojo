@@ -1,0 +1,5 @@
+dry run: wait #42 "Fix login redirect"
+  status: In progress → Waiting
+  comment: "Waiting for #12."
+confirm: #42 In progress → Waiting, comment left
+post: "Waiting for #12.\n\n<!-- gh-dojo:wait:9314cd4a -->"

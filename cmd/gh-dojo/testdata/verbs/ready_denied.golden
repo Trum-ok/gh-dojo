@@ -1,0 +1,6 @@
+code: 2
+--- stdout
+--- stderr
+error: ready cannot move #42 from Backlog
+allowed: In progress, Waiting
+fix: gh dojo start 42

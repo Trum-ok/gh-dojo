@@ -1,0 +1,5 @@
+dry run: note #42
+  add to the board
+  comment: "hi"
+confirm: #42 added to the board, comment left
+post: "hi\n\n<!-- gh-dojo:note:99e47bfd -->"

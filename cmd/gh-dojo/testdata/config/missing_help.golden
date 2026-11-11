@@ -1,0 +1,16 @@
+code: 0
+--- stdout
+gh dojo moves issues through a GitHub Projects board with process verbs
+defined in .github/dojo.toml, so agents never deal with field or option IDs.
+
+No process verbs: .github/dojo.toml could not be loaded.
+  error: no .github/dojo.toml in this directory or its parents up to the repository root
+  fix: create .github/dojo.toml in the repository root, example: https://github.com/Trum-ok/gh-dojo#configuration
+
+Usage:
+  gh dojo [flags]
+
+Flags:
+  -h, --help      help for gh dojo
+  -v, --version   version for gh dojo
+--- stderr

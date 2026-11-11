@@ -1,0 +1,4 @@
+code: 2
+error: start cannot move #42 from Done
+allowed: Backlog, Waiting, Ready
+fix: gh dojo park 42

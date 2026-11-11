@@ -1,0 +1,7 @@
+code: 0
+--- stdout
+dry run: start #42 "Fix login redirect"
+  add to the board
+  status: no status → In progress
+  comment: "Started. Session: claude://s/abc\n\non it"
+--- stderr

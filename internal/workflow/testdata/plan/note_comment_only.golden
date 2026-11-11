@@ -1,0 +1,4 @@
+dry run: note #42 "Fix login redirect"
+  comment: "Line one\nline two"
+confirm: #42 comment left
+post: "Line one\nline two\n\n<!-- gh-dojo:note:429fa93d -->"

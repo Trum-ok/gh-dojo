@@ -1,0 +1,5 @@
+dry run: start #42 "Fix login redirect"
+  status: Backlog → In progress
+  comment: "Started. Session: claude://s/xyz"
+confirm: #42 Backlog → In progress, comment left
+post: "Started. Session: claude://s/xyz\n\n<!-- gh-dojo:start:098a8c8e -->"

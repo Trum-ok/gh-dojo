@@ -1,0 +1,25 @@
+code: 0
+--- stdout
+gh dojo moves issues through a GitHub Projects board with process verbs
+defined in .github/dojo.toml, so agents never deal with field or option IDs.
+
+Usage:
+  gh dojo [flags]
+  gh dojo [command]
+
+Process verbs (from .github/dojo.toml):
+  done        The change is released
+  park        Put the issue back
+  ready       The work is done, verified and committed, but not released yet
+  start       You begin working on the issue
+  wait        Work is stuck: waiting for another issue or an outside decision
+
+Additional Commands:
+  help        Help about any command
+
+Flags:
+  -h, --help      help for gh dojo
+  -v, --version   version for gh dojo
+
+Use "gh dojo [command] --help" for more information about a command.
+--- stderr

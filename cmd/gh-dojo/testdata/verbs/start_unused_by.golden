@@ -1,0 +1,6 @@
+code: 1
+--- stdout
+--- stderr
+error: start does not use --by
+allowed: --comment
+fix: gh dojo start 42

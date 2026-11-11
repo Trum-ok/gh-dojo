@@ -1,0 +1,3 @@
+code: 1
+error: note needs --comment (blank values do not count)
+fix: gh dojo note 42 --comment "<text>"
