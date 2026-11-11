@@ -1,0 +1,1 @@
+error: .github/dojo.toml:11: verbs.done.confirm: wrong type: got boolean, want string

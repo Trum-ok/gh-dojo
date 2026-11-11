@@ -17,6 +17,7 @@ preset = "kanban"
 [board]
 owner = "acme"
 project = 3
+assignee = "alice"
 
 [session]
 env = ["DOJO_TEST_SESSION", "DOJO_TEST_SESSION_2"]
@@ -42,6 +43,30 @@ to = "In progress"
 from = ["Backlog"]
 require = ["comment", "by"]
 comment = "Pairing with {by}: {comment}"
+
+# The spec's drop, as is: --comment is posted as the comment.
+[verbs.drop]
+when = "The issue is not needed or a duplicate"
+close = "not_planned"
+require = ["comment"]
+confirm = "user"
+
+[verbs.review]
+when = "A pull request waits for review"
+to = "Ready"
+from = ["In progress"]
+labels = ["+in-review", "-blocked"]
+assign = true
+
+[verbs.take]
+when = "Take the issue yourself"
+assign = "@me"
+
+[verbs.revive]
+when = "A closed issue is needed after all"
+to = "Backlog"
+reopen = true
+comment = "Revived."
 `
 
 func testEngine(t *testing.T) (*Engine, *config.Config) {
@@ -71,6 +96,10 @@ func show(p *Plan, err error) string {
 		fmt.Fprintf(&b, "warning: %s\n", w)
 	}
 	fmt.Fprintf(&b, "%s\nconfirm: %s\n", p.DryRun(), p.Confirm())
+	if err := p.Unconfirmed(); err != nil {
+		e := render.FromError(err)
+		fmt.Fprintf(&b, "unconfirmed: code %d\n%s\n", e.Code, e.Text())
+	}
 	for _, op := range p.Ops {
 		if c, ok := op.(AddComment); ok {
 			fmt.Fprintf(&b, "post: %q\n", c.Text())
@@ -121,15 +150,53 @@ func TestPlan(t *testing.T) {
 			code: render.ExitDenied},
 		{name: "start_closed_in_target", verb: "start", issue: Issue{Number: 42, Closed: true, OnBoard: true, Status: "In progress"},
 			code: render.ExitDenied},
-		{name: "done_closed_by_pr", verb: "done", issue: Issue{Number: 42, Closed: true, OnBoard: true, Status: "Ready"},
-			args: Args{Comment: "released in v1.2", HasComment: true}, hasOps: 2},
+		{name: "done_closed_by_pr", verb: "done", issue: Issue{Number: 42, Closed: true, StateReason: "completed",
+			OnBoard: true, Status: "Ready"}, args: Args{Comment: "released in v1.2", HasComment: true}, hasOps: 2},
+		{name: "done_closes", verb: "done", issue: onBoard("Ready"), hasOps: 2},
 		{name: "done_closed_already_done", verb: "done", noOps: true,
 			issue: Issue{Number: 42, Closed: true, OnBoard: true, Status: "Done"}},
 		{name: "done_closed_not_on_board", verb: "done", issue: Issue{Number: 42, Closed: true}, code: render.ExitDenied},
 		{name: "done_closed_wrong_from", verb: "done", issue: Issue{Number: 42, Closed: true, OnBoard: true, Status: "Waiting"},
 			code: render.ExitDenied},
+		// done closes the issue, so it runs on a closed one even when Done is not final.
 		{name: "done_closed_no_final", verb: "done", issue: Issue{Number: 42, Closed: true, OnBoard: true, Status: "Ready"},
-			code: render.ExitDenied, setup: func(e *Engine) { e.Final = nil }},
+			hasOps: 1, setup: func(e *Engine) { e.Final = nil }},
+		{name: "park_closed_no_final", verb: "park", issue: Issue{Number: 42, Closed: true, OnBoard: true, Status: "Ready"},
+			code: render.ExitDenied},
+		// drop: confirm = "user", close = "not_planned", require = ["comment"].
+		{name: "drop_without_yes", verb: "drop", issue: onBoard("In progress"),
+			args: Args{Comment: "duplicate of #7", HasComment: true}, hasOps: 2},
+		{name: "drop_with_yes", verb: "drop", issue: onBoard("In progress"),
+			args: Args{Comment: "duplicate of #7", HasComment: true, Yes: true}, hasOps: 2},
+		{name: "drop_missing_comment", verb: "drop", issue: onBoard("In progress"), args: Args{Yes: true},
+			code: render.ExitUsage},
+		{name: "drop_not_on_board", verb: "drop", issue: Issue{Number: 42},
+			args: Args{Comment: "not needed", HasComment: true, Yes: true}, hasOps: 3},
+		// A repeat finds the issue closed and the comment posted: nothing to
+		// do, so no go-ahead is needed either.
+		{name: "drop_repeat", verb: "drop", noOps: true, args: Args{Comment: "not needed", HasComment: true},
+			issue: Issue{Number: 42, Closed: true, StateReason: "not_planned", OnBoard: true, Status: "Backlog",
+				Comments: []Comment{posted("drop", "not needed")}}},
+		{name: "drop_closed_as_completed", verb: "drop", hasOps: 1, args: Args{Comment: "not needed", HasComment: true, Yes: true},
+			issue: Issue{Number: 42, Closed: true, StateReason: "completed", OnBoard: true, Status: "Done"}},
+		{name: "start_yes", verb: "start", issue: onBoard("Backlog"), args: Args{Yes: true}, code: render.ExitUsage},
+		// review: labels = ["+in-review", "-blocked"], assign = true (board.assignee alice).
+		{name: "review_all", verb: "review", hasOps: 4, issue: Issue{Number: 42, Title: "Fix login redirect",
+			OnBoard: true, Status: "In progress", Labels: []string{"bug", "blocked"}, Assignees: []string{"bob"}}},
+		{name: "review_some_in_place", verb: "review", hasOps: 2, issue: Issue{Number: 42, OnBoard: true,
+			Status: "In progress", Labels: []string{"In-Review", "blocked"}, Assignees: []string{"Alice"}}},
+		{name: "review_repeat", verb: "review", noOps: true, issue: Issue{Number: 42, OnBoard: true,
+			Status: "Ready", Labels: []string{"in-review"}, Assignees: []string{"bob", "alice"}}},
+		{name: "take_me", verb: "take", hasOps: 1, issue: Issue{Number: 42, OnBoard: true, Status: "Backlog", Viewer: "carol"}},
+		{name: "take_me_repeat", verb: "take", noOps: true,
+			issue: Issue{Number: 42, OnBoard: true, Status: "Backlog", Viewer: "carol", Assignees: []string{"carol"}}},
+		{name: "take_me_unknown_viewer", verb: "take", issue: onBoard("Backlog"), code: render.ExitUsage},
+		// revive: reopen = true, to = "Backlog".
+		{name: "revive_closed", verb: "revive", hasOps: 3,
+			issue: Issue{Number: 42, Closed: true, StateReason: "not_planned", OnBoard: true, Status: "Done"}},
+		{name: "revive_closed_archived", verb: "revive", hasOps: 4,
+			issue: Issue{Number: 42, Closed: true, OnBoard: true, Archived: true, Status: "Done"}},
+		{name: "revive_open", verb: "revive", hasOps: 1, issue: onBoard("Backlog")},
 		{name: "note_closed", verb: "note", issue: Issue{Number: 42, Closed: true, OnBoard: true, Status: "Done"},
 			args: Args{Comment: "x", HasComment: true}, code: render.ExitDenied},
 		{name: "start_already_in_target", verb: "start", issue: onBoard("In progress"), hasOps: 1},
@@ -226,7 +293,7 @@ func TestPlan(t *testing.T) {
 			issue: Issue{Number: 42, OnBoard: true, Archived: true, Status: "Ready"}},
 		{name: "start_repeat_archived_comment", verb: "start", hasOps: 1,
 			issue: Issue{Number: 42, OnBoard: true, Archived: true, Status: "In progress"}},
-		{name: "done_archived", verb: "done", hasOps: 1,
+		{name: "done_archived", verb: "done", hasOps: 2,
 			issue: Issue{Number: 42, OnBoard: true, Archived: true, Status: "Ready"}},
 		{name: "note_archived", verb: "note", hasOps: 1, args: Args{Comment: "hi", HasComment: true},
 			issue: Issue{Number: 42, OnBoard: true, Archived: true, Status: "Ready"}},
@@ -321,6 +388,7 @@ func TestExample(t *testing.T) {
 		"start": "gh dojo start 7",
 		"wait":  `gh dojo wait 7 --by "<#N or name>"`,
 		"pair":  `gh dojo pair 7 --comment "<text>" --by "<#N or name>"`,
+		"drop":  `gh dojo drop 7 --comment "<text>"`,
 	} {
 		v, _ := c.Verb(verb)
 		if got := Example(v, 7); got != want {

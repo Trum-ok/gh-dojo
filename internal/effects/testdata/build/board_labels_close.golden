@@ -1,0 +1,19 @@
+mutation Verb($project: ID!, $issue: ID!, $addLabels: [ID!]!, $body: String!, $reason: IssueClosedStateReason!) {
+  board: addProjectV2ItemById(input: {projectId: $project, contentId: $issue}) { item { id } }
+  addLabels: addLabelsToLabelable(input: {labelableId: $issue, labelIds: $addLabels}) { clientMutationId }
+  comment: addComment(input: {subjectId: $issue, body: $body}) { commentEdge { node { id } } }
+  close: closeIssue(input: {issueId: $issue, stateReason: $reason}) { issue { id } }
+}
+--- vars
+{
+  "addLabels": [
+    "LA_1",
+    "LA_2"
+  ],
+  "body": "Started.\n\n<!-- gh-dojo:start:995a443b -->",
+  "issue": "I_1",
+  "project": "PVT_1",
+  "reason": "NOT_PLANNED"
+}
+--- steps
+board, addLabels, comment, close

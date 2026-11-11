@@ -18,21 +18,33 @@ type Plan struct {
 	Issue  Issue  // the state the plan was built from; Issue.Status is "" when not on the board
 	Target string // the verb's target status; "" when it leaves the status alone
 
-	// Ops are the operations to apply, in this order: AddToBoard or
-	// Unarchive, SetStatus, AddComment, each at most once. Empty when there
-	// is nothing to do.
+	// Ops are the operations to apply, in this order, each at most once:
+	// AddToBoard or Unarchive, Reopen, SetStatus, AddLabels, RemoveLabels,
+	// Assign, AddComment, Close. Empty when there is nothing to do.
 	Ops []Op
 
 	StatusUnchanged bool // the issue is already in Target; no SetStatus
 	CommentPresent  bool // the same comment is the latest gh-dojo comment already; no AddComment
+	// InPlace are the verb's effects found already in place, as the ops
+	// that would have applied them: Reopen, AddLabels, RemoveLabels,
+	// Assign, and Close with the reason the issue was closed with ("" when
+	// unknown). They are never applied; they give the "already" wording of
+	// the dry run and the confirmation line.
+	InPlace []Op
+
+	// NeedsYes is set for a verb with confirm = "user" run without --yes
+	// when the plan has something to apply; see Unconfirmed.
+	NeedsYes bool
 
 	// Warnings are for stderr, one line each, such as a missing agent
 	// session. They never stop the verb.
 	Warnings []string
 }
 
-// Op is one operation of a plan: AddToBoard, Unarchive, SetStatus or
-// AddComment.
+// Op is one operation of a plan: AddToBoard, Unarchive, Reopen, SetStatus,
+// AddLabels, RemoveLabels, Assign, AddComment or Close. Each kind has its
+// own type, its own field in the mutation (see package effects) and its
+// own words in the dry run, the confirmation line and a partial report.
 type Op interface {
 	// Describe is the op's line in a dry run.
 	Describe() string
@@ -50,9 +62,27 @@ type AddToBoard struct{}
 // AddToBoard, which it replaces for an issue already on the board.
 type Unarchive struct{}
 
+// Reopen reopens a closed issue, before its status is set.
+type Reopen struct{}
+
 // SetStatus sets the status field. From is the status read, "" for none.
 type SetStatus struct {
 	From, To string
+}
+
+// AddLabels adds the labels Names to the issue.
+type AddLabels struct {
+	Names []string
+}
+
+// RemoveLabels removes the labels Names from the issue.
+type RemoveLabels struct {
+	Names []string
+}
+
+// Assign adds Login to the issue's assignees; the others stay.
+type Assign struct {
+	Login string
 }
 
 // AddComment posts a comment. Post Text, which ends with the marker.
@@ -61,20 +91,57 @@ type AddComment struct {
 	Marker string // see Marker
 }
 
-func (AddToBoard) Describe() string  { return "add to the board" }
-func (AddToBoard) Effect() string    { return "added to the board" }
-func (AddToBoard) op()               {}
-func (Unarchive) Describe() string   { return "unarchive on the board" }
-func (Unarchive) Effect() string     { return "unarchived" }
-func (Unarchive) op()                {}
-func (s SetStatus) Describe() string { return "status: " + render.Transition(s.From, s.To) }
-func (s SetStatus) Effect() string   { return render.Transition(s.From, s.To) }
-func (SetStatus) op()                {}
+// Close closes the issue with Reason, a config close reason
+// (config.CloseCompleted, ...). It comes last, after the comment that
+// explains it.
+type Close struct {
+	Reason string
+}
+
+func (AddToBoard) Describe() string     { return "add to the board" }
+func (AddToBoard) Effect() string       { return "added to the board" }
+func (AddToBoard) op()                  {}
+func (Unarchive) Describe() string      { return "unarchive on the board" }
+func (Unarchive) Effect() string        { return "unarchived" }
+func (Unarchive) op()                   {}
+func (Reopen) Describe() string         { return "reopen" }
+func (Reopen) Effect() string           { return "reopened" }
+func (Reopen) op()                      {}
+func (s SetStatus) Describe() string    { return "status: " + render.Transition(s.From, s.To) }
+func (s SetStatus) Effect() string      { return render.Transition(s.From, s.To) }
+func (SetStatus) op()                   {}
+func (l AddLabels) Describe() string    { return "labels: " + strings.Join(l.signs(), " ") }
+func (l AddLabels) Effect() string      { return "labels " + strings.Join(l.signs(), " ") }
+func (AddLabels) op()                   {}
+func (l RemoveLabels) Describe() string { return "labels: " + strings.Join(l.signs(), " ") }
+func (l RemoveLabels) Effect() string   { return "labels " + strings.Join(l.signs(), " ") }
+func (RemoveLabels) op()                {}
+func (a Assign) Describe() string       { return "assign: " + a.Login }
+func (a Assign) Effect() string         { return "assigned " + a.Login }
+func (Assign) op()                      {}
 func (c AddComment) Describe() string {
 	return "comment: " + strconv.Quote(c.Body)
 }
 func (AddComment) Effect() string { return "comment left" }
 func (AddComment) op()            {}
+func (c Close) Describe() string  { return "close: as " + ReasonText(c.Reason) }
+func (c Close) Effect() string    { return "closed as " + ReasonText(c.Reason) }
+func (Close) op()                 {}
+
+func (l AddLabels) signs() []string    { return signed("+", l.Names) }
+func (l RemoveLabels) signs() []string { return signed("-", l.Names) }
+
+func signed(sign string, names []string) []string {
+	out := make([]string, len(names))
+	for i, n := range names {
+		out[i] = sign + n
+	}
+	return out
+}
+
+// ReasonText is a close reason as output says it: "completed", "not
+// planned", "duplicate".
+func ReasonText(reason string) string { return strings.ReplaceAll(reason, "_", " ") }
 
 // Text is the comment body to post: Body, a blank line and Marker.
 func (c AddComment) Text() string { return c.Body + "\n\n" + c.Marker }
@@ -97,29 +164,62 @@ func (commentSkipped) op()              {}
 // Empty reports whether the plan has nothing to apply.
 func (p *Plan) Empty() bool { return len(p.Ops) == 0 }
 
-// lines returns one entry per effect, through pick, in a fixed order: board,
-// status, comment. Effects already in place are included. The status change
-// of an issue not on the board reads "not on the board → In progress"; with
-// short set, that line alone stands for adding the issue to the board.
-// Unarchiving is a board effect too, but always has its own line.
-func (p *Plan) lines(pick func(Op) string, short bool) []string {
-	var board, unarchive, status, comment []string
+// Unconfirmed refuses a plan that needs the user's go-ahead (NeedsYes)
+// with exit code 2, naming what the verb would do; nil otherwise. A dry
+// run shows the plan instead.
+//
+//	drop needs the user's go-ahead for #42 (would be: comment left, closed as not planned)
+//	this is the user's decision: ask the user, and re-run with --yes only if they agree
+func (p *Plan) Unconfirmed() error {
+	if !p.NeedsYes {
+		return nil
+	}
+	return render.Denied("%s needs the user's go-ahead for #%d (would be: %s)\n"+
+		"this is the user's decision: ask the user, and re-run with --yes only if they agree",
+		p.Verb, p.Issue.Number, strings.Join(p.lines(false), ", "))
+}
+
+// lines returns one entry per effect, in a fixed order: board, reopen,
+// status, labels, assignee, comment, close. dry picks the dry-run wording
+// (Describe), otherwise the confirmation wording (Effect). Effects already
+// in place are included. The status change of an issue not on the board
+// reads "not on the board → In progress"; in the confirmation that line
+// alone stands for adding the issue to the board. Unarchiving is a board
+// effect too, but always has its own line. Labels added and removed share
+// one line.
+func (p *Plan) lines(dry bool) []string {
+	pick := Op.Effect
+	if dry {
+		pick = Op.Describe
+	}
+	var board, unarchive, reopen, status, assign, comment, closing []string
+	var labels, labelsInPlace []string // +name and -name
 	for _, op := range p.Ops {
 		switch op := op.(type) {
 		case AddToBoard:
 			board = append(board, pick(op))
 		case Unarchive:
 			unarchive = append(unarchive, pick(op))
+		case Reopen:
+			reopen = append(reopen, pick(op))
 		case SetStatus:
 			if !p.Issue.OnBoard {
 				op.From = notOnBoard
 			}
 			status = append(status, pick(op))
+		case AddLabels:
+			labels = append(labels, op.signs()...)
+		case RemoveLabels:
+			labels = append(labels, op.signs()...)
+		case Assign:
+			assign = append(assign, pick(op))
 		case AddComment:
 			comment = append(comment, pick(op))
+		case Close:
+			closing = append(closing, pick(op))
 		}
 	}
-	if short && len(status) > 0 {
+	if !dry && len(status) > 0 {
 		board = nil
 	}
 	if p.StatusUnchanged {
@@ -128,12 +228,56 @@ func (p *Plan) lines(pick func(Op) string, short bool) []string {
 	if p.CommentPresent {
 		comment = append(comment, pick(commentSkipped{}))
 	}
+	// key prefixes an in-place effect in the dry run: "close: already closed".
+	key := func(name, text string) string {
+		if dry {
+			return name + ": " + text
+		}
+		return text
+	}
+	for _, op := range p.InPlace {
+		switch op := op.(type) {
+		case Reopen:
+			reopen = append(reopen, key("reopen", "already open"))
+		case AddLabels:
+			labelsInPlace = append(labelsInPlace, op.signs()...)
+		case RemoveLabels:
+			labelsInPlace = append(labelsInPlace, op.signs()...)
+		case Assign:
+			assign = append(assign, key("assign", op.Login+" already assigned"))
+		case Close:
+			text := "already closed"
+			if op.Reason != "" {
+				text += " as " + ReasonText(op.Reason)
+			}
+			closing = append(closing, key("close", text))
+		}
+	}
+	var label []string
+	switch {
+	case len(labels) > 0 && len(labelsInPlace) > 0 && dry:
+		label = []string{"labels: " + strings.Join(labels, " ") +
+			" (" + strings.Join(labelsInPlace, " ") + " already in place)"}
+	case len(labels) > 0 && dry:
+		label = []string{"labels: " + strings.Join(labels, " ")}
+	case len(labels) > 0:
+		label = []string{"labels " + strings.Join(labels, " ")}
+	case len(labelsInPlace) > 0 && dry:
+		label = []string{"labels: " + strings.Join(labelsInPlace, " ") + " already in place"}
+	case len(labelsInPlace) > 0:
+		label = []string{"labels unchanged"}
+	}
 	board = append(board, unarchive...)
-	return append(append(board, status...), comment...)
+	var out []string
+	for _, group := range [][]string{board, reopen, status, label, assign, comment, closing} {
+		out = append(out, group...)
+	}
+	return out
 }
 
 // DryRun renders the plan for --dry-run: a header, then one indented line
-// per effect, including those already in place.
+// per effect, including those already in place, and a last line when the
+// verb needs --yes.
 //
 //	dry run: start #42 "Fix login redirect"
 //	  status: Backlog → In progress
@@ -141,9 +285,12 @@ func (p *Plan) lines(pick func(Op) string, short bool) []string {
 func (p *Plan) DryRun() string {
 	var b strings.Builder
 	b.WriteString(render.Confirm(fmt.Sprintf("dry run: %s #%d", p.Verb, p.Issue.Number), p.Issue.Title))
-	lines := p.lines(Op.Describe, false)
+	lines := p.lines(true)
 	if len(lines) == 0 {
 		lines = []string{noChanges}
+	}
+	if p.NeedsYes {
+		lines = append(lines, "needs --yes: this is the user's decision, ask the user first")
 	}
 	for _, l := range lines {
 		b.WriteString("\n  " + l)
@@ -156,8 +303,10 @@ func (p *Plan) DryRun() string {
 //	#42 Backlog → In progress, comment left
 //	#42 not on the board → In progress, comment left
 //	#42 In progress (unchanged), comment already present
+//	#42 Ready → Done, comment left, closed as completed
+//	#42 comment already present, already closed as not planned
 func (p *Plan) Confirm() string {
-	effects := p.lines(Op.Effect, true)
+	effects := p.lines(false)
 	if len(effects) == 0 {
 		effects = []string{noChanges}
 	}

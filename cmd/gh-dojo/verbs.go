@@ -71,12 +71,14 @@ var getenv = os.Getenv
 // schema ID, also dropping what Apply confirmed in case the re-read lags
 // behind it; after a partial failure the agent re-runs the command.
 type Backend interface {
-	// ReadIssue returns the state of issue n in the default repo, filled as
-	// workflow.Issue documents (comments with viewerDidAuthor), with a
-	// render error on failure (render.NotFound for a missing issue). The
-	// default repo comes from the app wiring: board.repos[0], or the git
-	// remote of the current directory.
-	ReadIssue(ctx context.Context, n int) (workflow.Issue, error)
+	// ReadIssue returns the state of issue n in the default repo for verb
+	// v, filled as workflow.Issue documents (comments with viewerDidAuthor,
+	// labels, assignees, and the viewer when v assigns @me), with a render
+	// error on failure (render.NotFound for a missing issue; a config error
+	// for a label of v missing in the repo or an assignee who cannot be
+	// assigned). The default repo comes from the app wiring:
+	// board.repos[0], or the git remote of the current directory.
+	ReadIssue(ctx context.Context, v config.Verb, n int) (workflow.Issue, error)
 	// Apply applies every op of a non-empty plan, finding the issue's node
 	// IDs in p.Issue.Ref. It returns the ops GitHub confirmed, also with an
 	// error: the rest of p.Ops did not take effect, or their outcome is
@@ -127,12 +129,16 @@ func newVerbCmd(cfg *config.Config, v config.Verb) *cobra.Command {
 	f.StringVar(&args.Comment, config.ArgComment, "", "text for {comment} in the comment")
 	f.StringVar(&args.By, config.ArgBy, "", "value for {by} in the comment: an issue number (12 or #12) or free text")
 	f.BoolVar(&dryRun, "dry-run", false, "print the plan without changing anything")
+	f.BoolVar(&args.Yes, "yes", false, "the user agreed: run a verb that is the user's decision")
 	// Flags the comment template does not use stay registered but hidden, so
 	// passing one gets workflow's precise error instead of "unknown flag".
 	for _, arg := range config.Args() {
 		if !v.Uses(arg) {
 			_ = f.MarkHidden(arg)
 		}
+	}
+	if !v.Confirm {
+		_ = f.MarkHidden("yes")
 	}
 	return cmd
 }
@@ -158,6 +164,9 @@ func runVerb(cmd *cobra.Command, cfg *config.Config, v config.Verb, n int, args 
 	if dryRun {
 		fmt.Fprintln(cmd.OutOrStdout(), plan.DryRun())
 		return nil
+	}
+	if err := plan.Unconfirmed(); err != nil {
+		return err
 	}
 	run := &verbRun{first: plan, stderr: cmd.ErrOrStderr()}
 	if err := run.apply(ctx, be, plan); err != nil {
@@ -212,7 +221,8 @@ func (r *verbRun) apply(ctx context.Context, be Backend, p *workflow.Plan) error
 
 // applied is the plan of what this command did, for the confirmation
 // line: the first plan's starting state with the confirmed ops. After a
-// retry, a status or comment the re-read found in place counts as such.
+// retry, an effect the re-read found in place counts as such, unless this
+// command applied it.
 func (r *verbRun) applied() *workflow.Plan {
 	shown := *r.first
 	shown.Ops = r.done
@@ -221,6 +231,12 @@ func (r *verbRun) applied() *workflow.Plan {
 			r.fresh.StatusUnchanged && !hasKind(r.done, workflow.SetStatus{})
 		shown.CommentPresent = r.first.CommentPresent ||
 			r.fresh.CommentPresent && !hasKind(r.done, workflow.AddComment{})
+		shown.InPlace = slices.Clone(r.first.InPlace)
+		for _, op := range r.fresh.InPlace {
+			if !hasKind(r.done, op) && !hasKind(shown.InPlace, op) {
+				shown.InPlace = append(shown.InPlace, op)
+			}
+		}
 	}
 	return &shown
 }
@@ -283,7 +299,7 @@ func hasKind(ops []workflow.Op, op workflow.Op) bool {
 
 // readPlan reads issue n and plans verb v on it.
 func readPlan(ctx context.Context, be Backend, e *workflow.Engine, v config.Verb, n int, args workflow.Args) (*workflow.Plan, error) {
-	is, err := be.ReadIssue(ctx, n)
+	is, err := be.ReadIssue(ctx, v, n)
 	if err != nil {
 		return nil, err
 	}
@@ -373,8 +389,34 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 	if len(optional) > 0 {
 		line("Optional", "%s", strings.Join(optional, ", "))
 	}
+	if v.Confirm {
+		line("Confirm", "the user's decision: ask the user first; runs only with --yes")
+	}
 
 	line("Board", "adds the issue if it is not there")
+	if v.Reopen {
+		line("Reopen", "reopens a closed issue")
+	}
+	if len(v.AddLabels)+len(v.RemoveLabels) > 0 {
+		var signs []string
+		for _, l := range v.AddLabels {
+			signs = append(signs, "+"+l)
+		}
+		for _, l := range v.RemoveLabels {
+			signs = append(signs, "-"+l)
+		}
+		line("Labels", "%s (+ adds, - removes)", strings.Join(signs, " "))
+	}
+	switch v.Assign {
+	case "":
+	case config.Me:
+		line("Assign", "you (the authenticated user); other assignees stay")
+	default:
+		line("Assign", "%s; other assignees stay", v.Assign)
+	}
+	if v.Close != "" {
+		line("Close", "closes the issue as %s; an issue already closed stays as it is", workflow.ReasonText(v.Close))
+	}
 	if v.Comment != "" {
 		line("Comment", "posted unless it renders empty or is already the latest gh-dojo comment:")
 		// The template as it will read in the issue, indented below the
@@ -406,11 +448,13 @@ func configNote() string {
 
 // processHelp is the lifecycle section of the root help: the statuses each
 // verb moves an issue from and to, in config order, then the initial,
-// final and resolved statuses. It is empty when the config cannot be loaded (see
-// configNote).
+// final and resolved statuses. A verb that closes or reopens the issue, or
+// asks the user first, says so after its target. It is empty when the
+// config cannot be loaded (see configNote).
 //
 //	Lifecycle (from → to):
 //	  start       Backlog, Waiting, Ready → In progress
+//	  done        Ready, In progress → Done; closes as completed
 //	  Initial:    Backlog (new issues; also an issue with no status or not on the board)
 //	  Final:      Done (gh dojo list hides it unless --all)
 //	  Resolved:   Ready, Done (a blocker in these no longer blocks)
@@ -434,6 +478,19 @@ func processHelp() string {
 		}
 		if v.To != "" {
 			to = v.To
+		}
+		var also []string
+		switch {
+		case v.Reopen:
+			also = append(also, "reopens")
+		case v.Close != "":
+			also = append(also, "closes as "+workflow.ReasonText(v.Close))
+		}
+		if v.Confirm {
+			also = append(also, "asks the user first (--yes)")
+		}
+		if len(also) > 0 {
+			to += "; " + strings.Join(also, ", ")
 		}
 		line(v.Name, "%s → %s", from, to)
 	}

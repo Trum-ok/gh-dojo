@@ -1,5 +1,6 @@
 dry run: done #42
   status: Ready → Done
   comment: "released in v1.2"
-confirm: #42 Ready → Done, comment left
+  close: already closed as completed
+confirm: #42 Ready → Done, comment left, already closed as completed
 post: "released in v1.2\n\n<!-- gh-dojo:done:c539fa4f -->"

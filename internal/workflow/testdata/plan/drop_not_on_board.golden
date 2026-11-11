@@ -1,0 +1,6 @@
+dry run: drop #42
+  add to the board
+  comment: "not needed"
+  close: as not planned
+confirm: #42 added to the board, comment left, closed as not planned
+post: "not needed\n\n<!-- gh-dojo:drop:f121cf67 -->"

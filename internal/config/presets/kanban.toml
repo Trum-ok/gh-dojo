@@ -2,7 +2,7 @@
 #
 # Board statuses: Backlog, In progress, Waiting, Ready, Done.
 #   Ready = done, verified and committed, but not released yet.
-#   Done  = shipped.
+#   Done  = shipped: done also closes the issue as completed.
 
 version = 1
 
@@ -47,4 +47,5 @@ comment = "{comment}"
 when = "The change is released"
 to = "Done"
 from = ["Ready", "In progress"]
+close = "completed"
 comment = "{comment}"

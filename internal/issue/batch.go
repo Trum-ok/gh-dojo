@@ -53,6 +53,9 @@ func ReadAll(ctx context.Context, q graph.Querier, req Request, numbers []int) (
 	if req.Repo.Owner == "" || req.Repo.Name == "" {
 		return nil, render.Internal("issue.ReadAll: no repository")
 	}
+	if !req.Lookup.Empty() && len(numbers) > 1 {
+		return nil, render.Internal("issue.ReadAll: a lookup needs a single issue")
+	}
 	if len(numbers) == 1 {
 		return readEach(ctx, q, req, numbers)
 	}

@@ -1,0 +1,21 @@
+mutation Verb($issue: ID!, $addLabels: [ID!]!, $removeLabels: [ID!]!, $assignees: [ID!]!) {
+  addLabels: addLabelsToLabelable(input: {labelableId: $issue, labelIds: $addLabels}) { clientMutationId }
+  removeLabels: removeLabelsFromLabelable(input: {labelableId: $issue, labelIds: $removeLabels}) { clientMutationId }
+  assign: addAssigneesToAssignable(input: {assignableId: $issue, assigneeIds: $assignees}) { clientMutationId }
+}
+--- vars
+{
+  "addLabels": [
+    "LA_1",
+    "LA_2"
+  ],
+  "assignees": [
+    "U_1"
+  ],
+  "issue": "I_1",
+  "removeLabels": [
+    "LA_3"
+  ]
+}
+--- steps
+addLabels, removeLabels, assign

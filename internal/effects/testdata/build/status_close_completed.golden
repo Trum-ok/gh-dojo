@@ -1,0 +1,15 @@
+mutation Verb($project: ID!, $item: ID!, $field: ID!, $option: String!, $issue: ID!, $reason: IssueClosedStateReason!) {
+  status: updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field, value: {singleSelectOptionId: $option}}) { projectV2Item { id } }
+  close: closeIssue(input: {issueId: $issue, stateReason: $reason}) { issue { id } }
+}
+--- vars
+{
+  "field": "PVTSSF_1",
+  "issue": "I_1",
+  "item": "PVTI_1",
+  "option": "47fc9ee4",
+  "project": "PVT_1",
+  "reason": "COMPLETED"
+}
+--- steps
+status, close

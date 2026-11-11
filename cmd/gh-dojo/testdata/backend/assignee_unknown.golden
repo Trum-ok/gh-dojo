@@ -1,0 +1,6 @@
+code: 1
+--- stdout
+--- stderr
+error: .github/dojo.toml: verbs.give.assign: octo-nobody cannot be assigned issues in Trum-ok/gh-dojo
+allowed: Trum-ok
+fix: check the login, or give octo-nobody access to Trum-ok/gh-dojo

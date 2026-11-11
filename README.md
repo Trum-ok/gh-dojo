@@ -229,8 +229,9 @@ gh dojo describe
 
 Prints the project's process in a few lines per verb, short enough for an
 agent's context: when to use each verb, the arguments it needs or takes, what
-it checks and does along the way (the comment it posts, whether it runs on
-closed issues), then the lifecycle (from → to), the initial, final and
+it checks and does along the way (the comment it posts, labels, assignee,
+closing or reopening, whether it runs on closed issues or needs the user's
+go-ahead), then the lifecycle (from → to), the initial, final and
 resolved statuses, and the exit codes. It reads only the config, never the
 network; a missing or broken config is printed as an error (exit code 1).
 
@@ -268,27 +269,44 @@ or the network, else 1.
 ### Process verbs
 
 ```sh
-gh dojo <verb> <N> [--comment TEXT] [--by N|TEXT] [--dry-run]
+gh dojo <verb> <N> [--comment TEXT] [--by N|TEXT] [--yes] [--dry-run]
 ```
 
 Verbs come from [`[verbs]`](#verbs) in the config, so each project has its
 own; the [kanban preset](#kanban-preset) defines `start`, `wait`, `ready` and
 `done`. `gh dojo --help` lists them with their `when` line and, under
 Lifecycle, the statuses each one moves an issue from and to, with the
-initial, final and resolved statuses; `gh dojo <verb> --help` shows the
-allowed starting statuses, the target status, the required arguments and the
-comment template; [`gh dojo describe`](#describe) sums up all of them.
+initial, final and resolved statuses, and which verbs close or reopen the
+issue or ask the user first; `gh dojo <verb> --help` shows the allowed
+starting statuses, the target status, the required arguments, the other
+effects and the comment template; [`gh dojo describe`](#describe) sums up all
+of them.
 
 A verb takes one issue number and, in one command:
 
-1. checks that the issue is open, that its status is one of the verb's `from`
-   statuses (no status, or not on the board, counts as
+1. checks that the issue is open (a verb that moves it to a final status,
+   closes it or reopens it also runs on a closed one), that its status is one
+   of the verb's `from` statuses (no status, or not on the board, counts as
    [`statuses.initial`](#statuses)), and that the required arguments are
    given;
 2. adds the issue to the board if it is not there;
-3. sets the status to the verb's `to`; an issue already there keeps it;
-4. posts the rendered [comment template](#comment-templates), unless it renders
-   empty or is already the latest gh-dojo comment on the issue.
+3. reopens it (`reopen`), sets the status to the verb's `to`, adds and removes
+   `labels`, adds the `assign` user, posts the rendered
+   [comment template](#comment-templates) and closes it (`close`). Each
+   effect already in place is skipped: a status already set, labels already
+   there or gone, a user already assigned, a comment that is already the
+   latest gh-dojo comment, an issue already closed (whatever its reason) or
+   open.
+
+Everything is written in one GraphQL mutation (two when the issue is not on
+the board yet: the status needs the new board item). Label and user IDs are
+read with the issue, so a verb on an issue on the board costs one read and
+one write.
+
+A verb with `confirm = "user"` is the user's decision: without `--yes` it
+exits with code 2 and asks you to ask the user; re-run it with `--yes` only
+once they agree. A repeat with nothing left to do needs no `--yes`. Other
+verbs reject `--yes`.
 
 `--comment` and `--by` fill `{comment}` and `{by}` in the template; a verb
 whose template does not use one of them rejects that flag. `--by` takes an issue number (`12` or
@@ -300,6 +318,13 @@ $ gh dojo wait 42 --by 17 --dry-run
 dry run: wait #42 "Fix login redirect"
   status: In progress → Waiting
   comment: "Waiting for #17."
+
+$ gh dojo drop 42 --comment "Duplicate of #17."
+error: drop needs the user's go-ahead for #42 (would be: comment left, closed as not planned)
+this is the user's decision: ask the user, and re-run with --yes only if they agree
+
+$ gh dojo drop 42 --comment "Duplicate of #17." --yes
+#42 comment left, closed as not planned
 ```
 
 ### Output and exit codes
@@ -327,9 +352,16 @@ this is a process rule: ask the user how to proceed
 | 5    | Partially applied           | Re-run the same command; it finishes the rest                |
 
 `gh dojo --help` prints this table too. Retries are safe for every command:
-verbs keep a status that is already set and skip a comment that is already
-the latest gh-dojo comment, `comment` skips its own repeated text, and `new`
-resumes the issue it created.
+verbs skip every effect already in place (a status already set, a comment
+that is already the latest gh-dojo comment, an issue already closed, ...),
+`comment` skips its own repeated text, and `new` resumes the issue it
+created. A partial write (code 5) names what was done and what was not:
+
+```console
+$ gh dojo review 42
+error: #42 In progress → In review, labels +in-review, comment left; not assigned: GitHub denied access; gh auth refresh -s project, then re-run the same command
+fix: gh auth refresh -s project
+```
 
 ## Configuration
 
@@ -349,6 +381,7 @@ preset = "kanban"            # optional; verbs and defaults to build on
 owner = "acme"
 project = 3
 repos = ["acme/shop"]        # the first one is the default repo
+assignee = "@me"             # who `assign = true` assigns
 
 [fields]                     # logical name = field name on the board
 status = "Status"            # required (the kanban preset sets "Status")
@@ -381,6 +414,23 @@ Waiting for {by}.
 
 {comment}"""
 
+[verbs.review]
+when = "A pull request is open and waits for review"
+to = "In review"
+labels = ["+in-review", "-blocked"]       # + adds a label, - removes it
+assign = true                # board.assignee; or "@me", or a login
+
+[verbs.drop]
+when = "The issue is not needed or a duplicate"
+close = "not_planned"        # completed, not_planned or duplicate
+require = ["comment"]        # without a template, --comment is the comment
+confirm = "user"             # runs only with --yes, after asking the user
+
+[verbs.revive]
+when = "A closed issue is needed after all"
+to = "Backlog"
+reopen = true
+
 [verbs.done]
 disabled = true              # drop a verb that the preset defines
 ```
@@ -399,9 +449,7 @@ disabled = true              # drop a verb that the preset defines
 | `owner`   | yes      | User or organization login that owns the project; which one is detected       |
 | `project` | yes      | Project number from its URL, 1 or greater                                     |
 | `repos`   | no       | `owner/name` list; the first is the default repo for issue numbers and `new`. Empty: the current repo (`GH_REPO`, else the git remote) |
-
-`assignee` (for the assign effect) comes in v0.1; until then it is rejected
-with "not supported in this version".
+| `assignee` | no      | Who a verb with `assign = true` assigns: `"@me"` (the authenticated user) or a login |
 
 ### fields
 
@@ -451,16 +499,40 @@ Each `[verbs.<name>]` table becomes `gh dojo <name>`.
 | `require`        | Arguments that must all be given: `comment`, `by`                                                |
 | `require_one_of` | Arguments of which at least one must be given                                                    |
 | `comment`        | [Comment template](#comment-templates)                                                           |
+| `labels`         | Labels to add (`"+name"`) and remove (`"-name"`): `["+in-review", "-blocked"]`                   |
+| `assign`         | Who to add to the assignees: `true` (`board.assignee`), `"@me"`, a login; `false` turns a preset's off |
+| `close`          | Close the issue with this reason: `completed`, `not_planned` or `duplicate`                      |
+| `reopen`         | `true` reopens a closed issue                                                                    |
+| `confirm`        | `"user"`: the verb is the user's decision and runs only with `--yes`                            |
 | `disabled`       | `true` removes a verb the preset defines; it stands alone in its table                           |
 
-A verb needs `to` or `comment`. Every argument in `require` and
-`require_one_of` must appear in the verb's comment template. Verb names are
+A verb needs at least one effect: `to`, `comment`, `labels`, `assign`,
+`close` or `reopen`. Every argument in `require` and `require_one_of` must
+appear in the verb's comment template; a verb that requires `comment` and
+has no template posts the `--comment` text as is. Verb names are
 lowercase letters, digits and dashes and cannot shadow built-in or planned
 commands (`show`, `list`, `new`, `comment`, `describe`, `init`, `doctor`,
 `help`, `block`, `unblock`, `agent`, `next`, `release`). Keys from the design
-that are not implemented yet (`blockers`, `confirm`, `iteration`, `field`,
-`assign`, `labels`, `close`, `reopen`, `batch`, `pre`, `post`) are rejected
-with "not supported in this version".
+that are not implemented yet (`blockers`, `iteration`, `field`, `batch`,
+`pre`, `post`) are rejected with "not supported in this version".
+
+Effects:
+
+- **labels**: every entry starts with `+` or `-`; a name may not be both
+  added and removed. Names must match the repository's labels exactly, case
+  included: a missing one fails before anything is written, with the
+  repository's labels as the allowed values (create it with `gh label
+  create`). Labels the issue already has (or lacks) are skipped.
+- **assign**: adds one user and keeps the other assignees. `"@me"` is the
+  authenticated user; a login must be able to be assigned issues in the
+  repository, or the verb fails before writing, listing who can be.
+- **close** / **reopen**: a verb sets at most one of them. An issue already
+  closed is not closed again, even with another reason; the line says
+  `already closed as completed`. `duplicate` marks the issue a duplicate
+  without linking the original: name it in the comment. A verb that closes
+  or reopens runs on closed issues.
+- **confirm**: `confirm = "user"` is a signal, not a lock: an agent could add
+  `--yes` itself, so tell agents (in a skill or AGENTS.md) to ask first.
 
 ### Comment templates
 
@@ -515,6 +587,9 @@ The board's status field must have these options (other options are fine):
 | `ready` | Ready       | In progress, Waiting     |                       | `--comment`                      |
 | `done`  | Done        | Ready, In progress       |                       | `--comment`                      |
 
+`done` also closes the issue as completed: Done means released. An issue a
+pull request already closed stays closed; `done` still moves it to Done.
+
 The preset also sets `fields.status = "Status"`, `statuses.initial =
 "Backlog"`, `statuses.final = ["Done"]`, `statuses.resolved = ["Ready",
 "Done"]` (a blocker in Ready is done, so it no longer blocks, though its
@@ -531,8 +606,8 @@ repository's own [`.github/dojo.toml`](.github/dojo.toml) does that.
   gh-dojo's own issues live on its board and are handled only through
   `gh dojo`.
 - **v0.1 — first public release.** `describe`, `init`, `doctor`, `block` and
-  `unblock`, more verb effects (blockers, iteration with sprint fields,
-  assign, close, `confirm`), several issues per verb, a `sprints` preset,
+  `unblock`, more verb effects (labels, assign, close and reopen, `confirm`;
+  blockers, iteration with sprint fields), several issues per verb, a `sprints` preset,
   `--json`, and
   `gh extension install` with prebuilt binaries for macOS, Linux and Windows.
 - **v0.2 — agents and releases.** `agent install` (an agent skill generated

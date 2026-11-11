@@ -1,0 +1,17 @@
+code: 0
+--- stdout
+A closed issue is needed after all
+
+  From:      any status
+  To:        Backlog; an issue already there keeps it, so a repeat is safe
+  Requires:  nothing besides the issue number
+  Board:     adds the issue if it is not there
+  Reopen:    reopens a closed issue
+
+Usage:
+  gh dojo revive <N> [flags]
+
+Flags:
+      --dry-run   print the plan without changing anything
+  -h, --help      help for revive
+--- stderr

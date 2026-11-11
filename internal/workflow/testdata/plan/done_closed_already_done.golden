@@ -1,3 +1,4 @@
 dry run: done #42
   status: Done (unchanged)
-confirm: #42 Done (unchanged)
+  close: already closed
+confirm: #42 Done (unchanged), already closed

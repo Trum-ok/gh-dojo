@@ -1,0 +1,6 @@
+code: 1
+--- stdout
+--- stderr
+error: .github/dojo.toml: verbs.tag.labels: no label "enhancment" in Trum-ok/gh-dojo
+allowed: bug, dogfood, documentation, enhancement
+fix: gh label create "enhancment" -R Trum-ok/gh-dojo, or fix verbs.tag.labels

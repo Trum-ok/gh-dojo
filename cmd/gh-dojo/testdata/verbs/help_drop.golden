@@ -1,0 +1,22 @@
+code: 0
+--- stdout
+задача не нужна или дубль
+
+  From:      any status
+  To:        the status is not changed
+  Requires:  --comment
+  Confirm:   the user's decision: ask the user first; runs only with --yes
+  Board:     adds the issue if it is not there
+  Close:     closes the issue as not planned; an issue already closed stays as it is
+  Comment:   posted unless it renders empty or is already the latest gh-dojo comment:
+               {comment}
+
+Usage:
+  gh dojo drop <N> [flags]
+
+Flags:
+      --comment string   text for {comment} in the comment
+      --dry-run          print the plan without changing anything
+  -h, --help             help for drop
+      --yes              the user agreed: run a verb that is the user's decision
+--- stderr

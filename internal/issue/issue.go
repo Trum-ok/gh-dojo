@@ -88,6 +88,9 @@ type Request struct {
 	// Comments is how many of the latest comments to read: 0 means
 	// DefaultComments; more than MaxComments reads MaxComments.
 	Comments int
+	// Lookup is read in the same request; its result is Card.Found. Only
+	// Read and ReadAll of a single number support it.
+	Lookup Lookup
 }
 
 // Card is an issue with everything gh-dojo shows and checks.
@@ -155,6 +158,9 @@ type Card struct {
 	// project or blocker the token cannot see; the rest is accurate. Item is
 	// then nil if the board item was among the hidden parts.
 	Incomplete bool
+
+	// Found is what Request.Lookup found; nil without a Lookup.
+	Found *Found
 }
 
 // Closed reports whether the issue is closed.
@@ -357,9 +363,13 @@ func Read(ctx context.Context, q graph.Querier, req Request) (*Card, error) {
 		"owner": req.Repo.Owner, "repo": req.Repo.Name, "number": req.Number,
 		"comments": n, "status": req.StatusField,
 	}
+	query, extra := lookupQuery(req.Lookup)
+	for k, v := range extra {
+		vars[k] = v
+	}
 
 	var resp cardResponse
-	err := q.Query(ctx, cardQuery, vars, &resp)
+	err := q.Query(ctx, query, vars, &resp)
 	var node *issueJSON
 	if resp.Repository != nil {
 		node = resp.Repository.IssueOrPullRequest
@@ -385,6 +395,9 @@ func Read(ctx context.Context, q graph.Querier, req Request) (*Card, error) {
 	}
 	c := node.card(req, hidden)
 	c.Incomplete = len(hidden) > 0
+	if !req.Lookup.Empty() {
+		c.Found = req.Lookup.found(resp.Repository, resp.Viewer)
+	}
 	return c, nil
 }
 

@@ -1,0 +1,5 @@
+dry run: review #42 "Fix login redirect"
+  status: In progress → Ready
+  labels: +in-review -blocked
+  assign: alice
+confirm: #42 In progress → Ready, labels +in-review -blocked, assigned alice

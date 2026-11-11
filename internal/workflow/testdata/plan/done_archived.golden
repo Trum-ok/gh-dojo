@@ -1,3 +1,4 @@
 dry run: done #42
   status: Ready → Done
-confirm: #42 Ready → Done
+  close: as completed
+confirm: #42 Ready → Done, closed as completed

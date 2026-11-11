@@ -1,0 +1,1 @@
+error: .github/dojo.toml:12: verbs.go.labels: wrong type: got string, want array

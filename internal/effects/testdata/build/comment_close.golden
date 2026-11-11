@@ -1,0 +1,12 @@
+mutation Verb($issue: ID!, $body: String!, $reason: IssueClosedStateReason!) {
+  comment: addComment(input: {subjectId: $issue, body: $body}) { commentEdge { node { id } } }
+  close: closeIssue(input: {issueId: $issue, stateReason: $reason}) { issue { id } }
+}
+--- vars
+{
+  "body": "Started.\n\n<!-- gh-dojo:start:995a443b -->",
+  "issue": "I_1",
+  "reason": "NOT_PLANNED"
+}
+--- steps
+comment, close

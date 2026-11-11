@@ -18,10 +18,17 @@ var (
 	unarchive = workflow.Unarchive{}
 	status    = workflow.SetStatus{From: "Backlog", To: "In progress"}
 	comment   = workflow.AddComment{Body: "Started.", Marker: workflow.Marker("start", "Started.")}
+	reopen    = workflow.Reopen{}
+	addLabels = workflow.AddLabels{Names: []string{"in-review", "Needs QA"}}
+	rmLabels  = workflow.RemoveLabels{Names: []string{"blocked"}}
+	assign    = workflow.Assign{Login: "Trum-ok"}
+	closing   = workflow.Close{Reason: "not_planned"}
 )
 
 var ids = effects.IDs{
 	Project: "PVT_1", Issue: "I_1", Item: "PVTI_1", StatusField: "PVTSSF_1", StatusOption: "47fc9ee4",
+	Labels: map[string]string{"in-review": "LA_1", "needs qa": "LA_2", "blocked": "LA_3"},
+	Users:  map[string]string{"trum-ok": "U_1"},
 }
 
 func TestBuild(t *testing.T) {
@@ -38,6 +45,13 @@ func TestBuild(t *testing.T) {
 		{"board", []workflow.Op{toBoard}, notOnBoard},
 		{"board_comment", []workflow.Op{toBoard, comment}, notOnBoard},
 		{"unarchive_status_comment", []workflow.Op{unarchive, status, comment}, ids},
+		{"comment_close", []workflow.Op{comment, workflow.Close{Reason: "not_planned"}}, ids},
+		{"status_close_completed", []workflow.Op{status, workflow.Close{Reason: "completed"}}, ids},
+		{"close_duplicate", []workflow.Op{workflow.Close{Reason: "duplicate"}}, ids},
+		{"reopen_status", []workflow.Op{reopen, status}, ids},
+		{"labels_assign", []workflow.Op{addLabels, rmLabels, assign}, ids},
+		{"all", []workflow.Op{unarchive, reopen, status, addLabels, rmLabels, assign, comment}, ids},
+		{"board_labels_close", []workflow.Op{toBoard, addLabels, comment, closing}, notOnBoard},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -68,7 +82,11 @@ func TestBuild(t *testing.T) {
 // TestBuildDeclaresWhatItUses checks every declared variable is used and
 // every used one declared: GitHub rejects a document otherwise.
 func TestBuildDeclaresWhatItUses(t *testing.T) {
-	for _, ops := range [][]workflow.Op{{status, comment}, {status}, {comment}, {toBoard}, {toBoard, comment}, {unarchive, status}} {
+	for _, ops := range [][]workflow.Op{
+		{status, comment}, {status}, {comment}, {toBoard}, {toBoard, comment}, {unarchive, status},
+		{closing}, {reopen}, {addLabels}, {rmLabels}, {assign}, {reopen, status, addLabels, rmLabels, assign, comment},
+		{comment, closing},
+	} {
 		m, err := effects.Build(ops, ids)
 		if err != nil {
 			t.Fatal(err)
@@ -110,6 +128,11 @@ func TestBuildErrors(t *testing.T) {
 		"no_option":    {[]workflow.Op{status}, noOption},
 		"twice":        {[]workflow.Op{comment, comment}, ids},
 		"unarchive":    {[]workflow.Op{unarchive}, noItem},
+		"label_id":     {[]workflow.Op{workflow.AddLabels{Names: []string{"nope"}}}, ids},
+		"remove_id":    {[]workflow.Op{workflow.RemoveLabels{Names: []string{"nope"}}}, ids},
+		"user_id":      {[]workflow.Op{workflow.Assign{Login: "nobody"}}, ids},
+		"no_labels":    {[]workflow.Op{workflow.AddLabels{}}, ids},
+		"close_twice":  {[]workflow.Op{closing, closing}, ids},
 	} {
 		if _, err := effects.Build(tt.ops, tt.ids); err == nil {
 			t.Errorf("%s: want an error", name)
@@ -129,6 +152,10 @@ func TestBatches(t *testing.T) {
 		{[]workflow.Op{toBoard, comment}, [][]workflow.Op{{toBoard, comment}}},
 		{[]workflow.Op{toBoard}, [][]workflow.Op{{toBoard}}},
 		{[]workflow.Op{unarchive, status, comment}, [][]workflow.Op{{unarchive, status, comment}}},
+		{[]workflow.Op{toBoard, reopen, status, addLabels, comment, closing},
+			[][]workflow.Op{{toBoard}, {reopen, status, addLabels, comment, closing}}},
+		{[]workflow.Op{toBoard, addLabels, assign, comment, closing},
+			[][]workflow.Op{{toBoard, addLabels, assign, comment, closing}}},
 	}
 	for _, tt := range tests {
 		if got := effects.Batches(tt.ops); !reflect.DeepEqual(got, tt.want) {
@@ -195,8 +222,12 @@ func TestItemID(t *testing.T) {
 }
 
 func TestMissed(t *testing.T) {
-	got := []string{effects.Missed(toBoard), effects.Missed(unarchive), effects.Missed(status), effects.Missed(comment)}
-	want := []string{"not added to the board", "not unarchived", "status not changed", "comment not posted"}
+	var got []string
+	for _, op := range []workflow.Op{toBoard, unarchive, reopen, status, addLabels, rmLabels, assign, comment, closing} {
+		got = append(got, effects.Missed(op))
+	}
+	want := []string{"not added to the board", "not unarchived", "not reopened", "status not changed",
+		"labels not added", "labels not removed", "not assigned", "comment not posted", "not closed"}
 	if !slices.Equal(got, want) {
 		t.Errorf("Missed = %q, want %q", got, want)
 	}

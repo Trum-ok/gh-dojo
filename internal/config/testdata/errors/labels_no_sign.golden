@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.go.labels: "in-review" must start with + to add the label or - to remove it
+fix: labels = ["+in-review"] adds it, labels = ["-in-review"] removes it

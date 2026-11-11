@@ -1,0 +1,1 @@
+error: .github/dojo.toml: verbs.go.labels: "- blocked": the label name " blocked" has leading or trailing spaces

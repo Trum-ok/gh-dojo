@@ -21,7 +21,7 @@ Lifecycle (from → to):
   start       Backlog, Waiting, Ready → In progress
   wait        In progress → Waiting
   ready       In progress, Waiting → Ready
-  done        Ready, In progress → Done
+  done        Ready, In progress → Done; closes as completed
   Initial:    Backlog (new issues; also an issue with no status or not on the board)
   Final:      Done (gh dojo list hides it unless --all)
   Resolved:   Ready, Done (a blocker in these no longer blocks)

@@ -1,7 +1,7 @@
 file: .github/dojo.toml
 version: 1
 preset: ""
-board: owner=acme project=7 repos=[]
+board: owner=acme project=7 repos=[] assignee=""
 fields.status: "Status"
 statuses: initial="" final=[] resolved=[]
 labels: types=[] area_prefix=""

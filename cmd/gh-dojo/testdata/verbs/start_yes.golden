@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: start does not take --yes: it needs no confirmation
+fix: gh dojo start 42

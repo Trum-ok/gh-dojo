@@ -1,0 +1,5 @@
+dry run: drop #42
+  comment: "not needed"
+  close: already closed as completed
+confirm: #42 comment left, already closed as completed
+post: "not needed\n\n<!-- gh-dojo:drop:f121cf67 -->"

@@ -21,7 +21,7 @@ and a comment already posted is skipped.
 Lifecycle (from → to):
   start       Backlog, Waiting, Ready → In progress
   wait        In progress → Waiting
-  done        Ready, In progress → Done
+  done        Ready, In progress → Done; closes as completed
   note        any status → status unchanged
   park        any status → Backlog
   Initial:    Backlog (new issues; also an issue with no status or not on the board)

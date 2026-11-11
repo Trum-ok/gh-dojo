@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.done.close: unknown reason "done"
+allowed: completed, not_planned, duplicate

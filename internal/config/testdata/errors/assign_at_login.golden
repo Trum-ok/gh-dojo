@@ -1,0 +1,1 @@
+error: .github/dojo.toml: verbs.start.assign: "@alice": write the login without @, or "@me" for the authenticated user

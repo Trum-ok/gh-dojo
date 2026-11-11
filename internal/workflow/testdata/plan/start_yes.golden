@@ -1,0 +1,3 @@
+code: 1
+error: start does not take --yes: it needs no confirmation
+fix: gh dojo start 42

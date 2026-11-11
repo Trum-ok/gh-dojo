@@ -24,13 +24,9 @@ package issue
 // stateReason(enableDuplicate: true) reports DUPLICATE instead of
 // NOT_PLANNED. Status changes come from the timeline across all projects;
 // the reader keeps those of the configured board.
-const cardQuery = `query IssueCard($owner: String!, $repo: String!, $number: Int!, $comments: Int!, $status: String!) {
-  repository(owner: $owner, name: $repo) {
-    issueOrPullRequest(number: $number) ` + cardSelection + `
-  }
-}
-
-` + cardFragments
+//
+// A Lookup adds fields to it (see lookupQuery).
+const cardQuery = cardHead + cardRepo + "\n  }\n}\n\n" + cardFragments
 
 // cardSelection is what a card reads of an issueOrPullRequest: cardQuery
 // selects it in place and batchQuery (ReadAll) as "fragment card", so both
@@ -117,9 +113,8 @@ fragment field on ProjectV2FieldCommon { id name dataType }`
 const historyWindow = 20
 
 type cardResponse struct {
-	Repository *struct {
-		IssueOrPullRequest *issueJSON `json:"issueOrPullRequest"`
-	} `json:"repository"`
+	Repository *repoJSON `json:"repository"`
+	Viewer     *User     `json:"viewer"` // read for Lookup.Viewer only
 }
 
 type login struct {

@@ -85,7 +85,7 @@ type fakeBackend struct {
 	applied  []*workflow.Plan
 }
 
-func (f *fakeBackend) ReadIssue(_ context.Context, n int) (workflow.Issue, error) {
+func (f *fakeBackend) ReadIssue(_ context.Context, _ config.Verb, n int) (workflow.Issue, error) {
 	f.reads++
 	is, ok := f.issues[n]
 	if !ok {
@@ -161,6 +161,8 @@ func TestVerbs(t *testing.T) {
 		{"start_not_on_board", []string{"start", "42"}, map[int]workflow.Issue{42: {Number: 42}}, "abc", render.ExitOK, 1, 1},
 		{"two_args", []string{"start", "1", "2"}, nil, "", render.ExitUsage, 0, 0},
 		{"unknown_flag", []string{"start", "42", "--nope"}, nil, "", render.ExitUsage, 0, 0},
+		{"start_yes", []string{"start", "42", "--yes"}, issue42("Backlog"), "", render.ExitUsage, 0, 0},
+		{"done_open", []string{"done", "42"}, issue42("Ready"), "", render.ExitOK, 1, 1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

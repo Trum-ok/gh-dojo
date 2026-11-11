@@ -1,0 +1,7 @@
+code: 0
+--- stdout
+dry run: drop #3 "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)"
+  comment: "Duplicate of #2."
+  close: as not planned
+  needs --yes: this is the user's decision, ask the user first
+--- stderr

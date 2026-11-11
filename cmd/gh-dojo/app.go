@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"strings"
 	"sync"
 
 	"github.com/cli/go-gh/v2/pkg/repository"
@@ -144,6 +145,23 @@ func (a *App) Card(ctx context.Context, n, comments int) (*issue.Card, error) {
 // the request Card sends). A missing issue or a pull request number fails
 // only its own issue.Result; see issue.ReadAll.
 func (a *App) Cards(ctx context.Context, ns []int, comments int) ([]issue.Result, error) {
+	return a.cards(ctx, ns, comments, issue.Lookup{})
+}
+
+// LookupCard reads issue n like Card, with what lookup names (labels, an
+// assignable user, the viewer) in the same request: card.Found.
+func (a *App) LookupCard(ctx context.Context, n int, lookup issue.Lookup) (*issue.Card, error) {
+	res, err := a.cards(ctx, []int{n}, 0, lookup)
+	if err != nil {
+		return nil, err
+	}
+	if res[0].Err != nil {
+		return nil, res[0].Err
+	}
+	return res[0].Card, nil
+}
+
+func (a *App) cards(ctx context.Context, ns []int, comments int, lookup issue.Lookup) ([]issue.Result, error) {
 	repo, err := a.Repo()
 	if err != nil {
 		return nil, err
@@ -156,7 +174,7 @@ func (a *App) Cards(ctx context.Context, ns []int, comments int) ([]issue.Result
 	if err != nil {
 		return nil, err
 	}
-	req := issue.Request{Repo: repo, Board: s, StatusField: cfg.StatusField(), Comments: comments}
+	req := issue.Request{Repo: repo, Board: s, StatusField: cfg.StatusField(), Comments: comments, Lookup: lookup}
 	if f, err := s.Field(req.StatusField); err == nil { // Schema checked it
 		req.StatusFieldID = f.ID
 	}
@@ -174,13 +192,22 @@ func (a *App) Cards(ctx context.Context, ns []int, comments int) ([]issue.Result
 // (card.Archived()) is OnBoard.
 func workflowIssue(c *issue.Card) workflow.Issue {
 	is := workflow.Issue{
-		Number:   c.Number,
-		Title:    c.Title,
-		Closed:   c.Closed(),
-		OnBoard:  c.OnBoard(),
-		Status:   c.Status(),
-		Archived: c.Archived(),
-		Ref:      c,
+		Number:    c.Number,
+		Title:     c.Title,
+		Closed:    c.Closed(),
+		OnBoard:   c.OnBoard(),
+		Status:    c.Status(),
+		Archived:  c.Archived(),
+		Labels:    c.Labels.Nodes,
+		Assignees: c.Assignees.Nodes,
+		Ref:       c,
+	}
+	if c.Closed() && c.StateReason != "REOPENED" {
+		// COMPLETED, NOT_PLANNED, DUPLICATE: the config's close reasons.
+		is.StateReason = strings.ToLower(c.StateReason)
+	}
+	if c.Found != nil && c.Found.Viewer != nil {
+		is.Viewer = c.Found.Viewer.Login
 	}
 	for _, cm := range c.Comments.Nodes {
 		is.Comments = append(is.Comments, workflow.Comment{Body: cm.Body, ViewerDidAuthor: cm.ViewerDidAuthor})

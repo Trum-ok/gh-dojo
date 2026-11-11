@@ -1,0 +1,4 @@
+dry run: done #42 "Fix login redirect"
+  status: Ready → Done
+  close: as completed
+confirm: #42 Ready → Done, closed as completed

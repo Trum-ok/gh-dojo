@@ -2,7 +2,8 @@
 // without touching the network.
 //
 // The flow of a verb is: CheckArgs (no network, run before reading the
-// issue), then Engine.Plan with the issue state a reader fetched, then an
+// issue), then Engine.Plan with the issue state a reader fetched, then
+// Plan.Unconfirmed (a verb with confirm = "user" without --yes), then an
 // executor applies the Plan and prints Plan.Confirm. Plan.DryRun shows the
 // plan instead of applying it.
 //
@@ -26,6 +27,19 @@ type Issue struct {
 	Number int
 	Title  string // shown in the dry run only
 	Closed bool
+	// StateReason is why a closed issue was closed, as a config close
+	// reason (config.CloseCompleted, ...); "" when open or unknown.
+	StateReason string
+
+	// Labels and Assignees are the issue's label names and assignee
+	// logins, for the labels and assign effects. They may be windows of
+	// the full lists (20 labels and 10 assignees in a card): see
+	// planLabels for what a label beyond the window does.
+	Labels    []string
+	Assignees []string
+	// Viewer is the login of the authenticated user, which assign = "@me"
+	// (config.Me) stands for; the reader fills it for such a verb.
+	Viewer string
 
 	// OnBoard reports whether the issue is an item of the configured
 	// project. Status is the item's status option name, "" when the item has
@@ -66,6 +80,8 @@ type Args struct {
 	HasComment bool // --comment was given, even if blank
 	By         string
 	HasBy      bool // --by was given, even if blank
+	// Yes is --yes: the user agreed to a verb with confirm = "user".
+	Yes bool
 }
 
 func (a Args) given(arg string) bool {
@@ -126,7 +142,10 @@ func NormalizeBy(s string) string {
 // before reading the issue. Errors have exit code 1:
 //
 //   - --comment or --by given while the verb's comment template does not use it;
+//   - --yes given to a verb without confirm = "user";
 //   - an argument of require, or all of require_one_of, missing or blank.
+//
+// A missing --yes is not an argument error: Plan sets Plan.NeedsYes.
 func CheckArgs(v config.Verb, number int, a Args) error {
 	var accepted []string
 	for _, arg := range config.Args() {
@@ -144,6 +163,9 @@ func CheckArgs(v config.Verb, number int, a Args) error {
 		}
 		return render.Usage("%s does not use %s", v.Name, flag(arg)).
 			WithAllowed(accepted...).WithFix(Example(v, number))
+	}
+	if a.Yes && !v.Confirm {
+		return render.Usage("%s does not take --yes: it needs no confirmation", v.Name).WithFix(Example(v, number))
 	}
 
 	var missing []string
@@ -217,18 +239,25 @@ func join(items []string, conj string) string {
 //
 //  1. CheckArgs (exit code 1);
 //  2. a closed issue is refused (exit code 2), unless the verb's target
-//     status is final (Engine.Final);
+//     status is final (Engine.Final), or the verb closes or reopens it;
 //  3. an issue already in the target status gets no status change, and the
 //     from check is skipped, so a repeat is safe;
 //  4. otherwise the current status must be in from (exit code 2). An issue
 //     not on the board or without a status counts as Engine.Initial.
 //
-// The plan adds the issue to the board when it is not there, sets the
-// target status, and posts the rendered comment unless it renders empty or
-// the same comment is already the verb's latest (see AlreadyPosted). An
+// The plan adds the issue to the board when it is not there, reopens it,
+// sets the target status, adds and removes labels, assigns, posts the
+// rendered comment unless it renders empty or the same comment is already
+// the verb's latest (see AlreadyPosted), and closes it. Each effect
+// already in place is left out of Ops (StatusUnchanged, CommentPresent,
+// InPlace): a closed issue is not closed again, whatever its reason. An
 // archived item is unarchived only when the verb moves it to a status that
 // is not final: the issue is live again. A repeat that changes nothing, a
 // comment alone, or a move to a final status leaves it archived.
+//
+// A verb with confirm = "user" run without --yes gets NeedsYes when the
+// plan is not empty: a repeat with nothing left to do needs no go-ahead.
+// Call Plan.Unconfirmed before applying.
 func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 	if err := CheckArgs(v, is.Number, a); err != nil {
 		return nil, err
@@ -255,11 +284,35 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 	case is.Archived && moves && !slices.Contains(e.Final, v.To):
 		p.Ops = append(p.Ops, Unarchive{})
 	}
+	if v.Reopen {
+		if is.Closed {
+			p.Ops = append(p.Ops, Reopen{})
+		} else {
+			p.InPlace = append(p.InPlace, Reopen{})
+		}
+	}
 	if v.To != "" {
 		if atTarget {
 			p.StatusUnchanged = true
 		} else {
 			p.Ops = append(p.Ops, SetStatus{From: is.Status, To: v.To})
+		}
+	}
+	p.planLabels(v)
+	if v.Assign != "" {
+		login := v.Assign
+		if login == config.Me {
+			if login = is.Viewer; login == "" {
+				return nil, render.Internal("%s assigns %s, but the authenticated user was not read", v.Name, config.Me)
+			}
+		}
+		switch {
+		case slices.ContainsFunc(is.Assignees, func(s string) bool { return strings.EqualFold(s, login) }):
+			p.InPlace = append(p.InPlace, Assign{Login: login})
+		default:
+			// Not among the assignees read: assign, even if the list was
+			// truncated; assigning someone twice changes nothing.
+			p.Ops = append(p.Ops, Assign{Login: login})
 		}
 	}
 
@@ -292,7 +345,53 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 				join(e.Session.Env, "or")))
 		}
 	}
+	if v.Close != "" {
+		if is.Closed {
+			p.InPlace = append(p.InPlace, Close{Reason: is.StateReason})
+		} else {
+			p.Ops = append(p.Ops, Close{Reason: v.Close})
+		}
+	}
+	p.NeedsYes = v.Confirm && !a.Yes && !p.Empty()
 	return p, nil
+}
+
+// planLabels adds the label ops of v: labels to add that the issue lacks,
+// labels to remove that it has. The rest are in place. Names compare
+// without case, as GitHub's do. When the issue has more labels than were
+// read, a label to add that was not seen is added (adding it twice
+// changes nothing), and one to remove that was not seen counts as absent.
+func (p *Plan) planLabels(v config.Verb) {
+	has := func(name string) bool {
+		return slices.ContainsFunc(p.Issue.Labels, func(l string) bool { return strings.EqualFold(l, name) })
+	}
+	var add, addInPlace, remove, removeInPlace []string
+	for _, name := range v.AddLabels {
+		if has(name) {
+			addInPlace = append(addInPlace, name)
+		} else {
+			add = append(add, name)
+		}
+	}
+	for _, name := range v.RemoveLabels {
+		if has(name) {
+			remove = append(remove, name)
+		} else {
+			removeInPlace = append(removeInPlace, name)
+		}
+	}
+	if len(add) > 0 {
+		p.Ops = append(p.Ops, AddLabels{Names: add})
+	}
+	if len(remove) > 0 {
+		p.Ops = append(p.Ops, RemoveLabels{Names: remove})
+	}
+	if len(addInPlace) > 0 {
+		p.InPlace = append(p.InPlace, AddLabels{Names: addInPlace})
+	}
+	if len(removeInPlace) > 0 {
+		p.InPlace = append(p.InPlace, RemoveLabels{Names: removeInPlace})
+	}
 }
 
 // checkFrom refuses an issue whose status is not in v.From.
@@ -325,7 +424,7 @@ func (e *Engine) checkFrom(v config.Verb, is Issue) error {
 }
 
 // runsOnClosed reports whether v may run on a closed issue: its target
-// status is final.
+// status is final, or it closes (a repeat is safe) or reopens the issue.
 func (e *Engine) runsOnClosed(v config.Verb) bool {
-	return v.To != "" && slices.Contains(e.Final, v.To)
+	return v.To != "" && slices.Contains(e.Final, v.To) || v.Close != "" || v.Reopen
 }

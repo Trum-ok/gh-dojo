@@ -1,0 +1,3 @@
+code: 1
+error: internal error (not your arguments): take assigns @me, but the authenticated user was not read
+fix: re-run the command; if it repeats, report it to the user

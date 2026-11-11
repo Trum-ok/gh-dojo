@@ -1,0 +1,5 @@
+dry run: review #42
+  status: In progress → Ready
+  labels: -blocked (+in-review already in place)
+  assign: alice already assigned
+confirm: #42 In progress → Ready, labels -blocked, alice already assigned

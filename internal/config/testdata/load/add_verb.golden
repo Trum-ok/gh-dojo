@@ -1,7 +1,7 @@
 file: .github/dojo.toml
 version: 1
 preset: "kanban"
-board: owner=Trum-ok project=1 repos=[]
+board: owner=Trum-ok project=1 repos=[] assignee=""
 fields.status: "Status"
 statuses: initial="Backlog" final=["Done"] resolved=["Ready" "Done"]
 labels: types=[] area_prefix="area:"
@@ -30,6 +30,7 @@ verb done
   from: ["Ready" "In progress"]
   require: [] require_one_of: []
   comment: "{comment}"
+  labels: add=[] remove=[] assign: "" close: "completed" reopen: false confirm: false
 verb review
   when: A pull request is open and waits for review
   to: "In review"

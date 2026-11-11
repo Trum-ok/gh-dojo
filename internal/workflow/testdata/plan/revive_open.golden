@@ -1,0 +1,6 @@
+dry run: revive #42 "Fix login redirect"
+  reopen: already open
+  status: Backlog (unchanged)
+  comment: "Revived."
+confirm: #42 already open, Backlog (unchanged), comment left
+post: "Revived.\n\n<!-- gh-dojo:revive:d68c895c -->"

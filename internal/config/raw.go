@@ -29,9 +29,10 @@ type rawFile struct {
 }
 
 type rawBoard struct {
-	Owner   *string   `toml:"owner"`
-	Project *int      `toml:"project"`
-	Repos   *[]string `toml:"repos"`
+	Owner    *string   `toml:"owner"`
+	Project  *int      `toml:"project"`
+	Repos    *[]string `toml:"repos"`
+	Assignee *string   `toml:"assignee"`
 }
 
 type rawStatuses struct {
@@ -51,13 +52,39 @@ type rawSession struct {
 }
 
 type rawVerb struct {
-	When         *string   `toml:"when"`
-	To           *string   `toml:"to"`
-	From         *[]string `toml:"from"`
-	Require      *[]string `toml:"require"`
-	RequireOneOf *[]string `toml:"require_one_of"`
-	Comment      *string   `toml:"comment"`
-	Disabled     *bool     `toml:"disabled"`
+	When         *string    `toml:"when"`
+	To           *string    `toml:"to"`
+	From         *[]string  `toml:"from"`
+	Require      *[]string  `toml:"require"`
+	RequireOneOf *[]string  `toml:"require_one_of"`
+	Comment      *string    `toml:"comment"`
+	Labels       *[]string  `toml:"labels"`
+	Assign       *rawAssign `toml:"assign"`
+	Close        *string    `toml:"close"`
+	Reopen       *bool      `toml:"reopen"`
+	Confirm      *string    `toml:"confirm"`
+	Disabled     *bool      `toml:"disabled"`
+}
+
+// rawAssign is the value of a verb's assign key: true (board.assignee),
+// false (nobody, to turn off a preset's assign) or a login ("@me" or a
+// user).
+type rawAssign struct {
+	Bool *bool
+	User *string
+}
+
+// UnmarshalTOML accepts a boolean or a string.
+func (a *rawAssign) UnmarshalTOML(v any) error {
+	switch v := v.(type) {
+	case bool:
+		a.Bool = &v
+	case string:
+		a.User = &v
+	default:
+		return fmt.Errorf("wrong type: got %s, want string or boolean", typeName(fmt.Sprintf("%T", v)))
+	}
+	return nil
 }
 
 // setKeys lists the keys of v that are set, other than disabled.
@@ -69,7 +96,8 @@ func (v *rawVerb) setKeys() []string {
 	}{
 		{"when", v.When != nil}, {"to", v.To != nil}, {"from", v.From != nil},
 		{"require", v.Require != nil}, {"require_one_of", v.RequireOneOf != nil},
-		{"comment", v.Comment != nil},
+		{"comment", v.Comment != nil}, {"labels", v.Labels != nil}, {"assign", v.Assign != nil},
+		{"close", v.Close != nil}, {"reopen", v.Reopen != nil}, {"confirm", v.Confirm != nil},
 	} {
 		if k.set {
 			keys = append(keys, k.name)
@@ -82,24 +110,22 @@ func (v *rawVerb) setKeys() []string {
 var (
 	topKeys      = []string{"version", "preset", "board", "fields", "statuses", "labels", "session", "verbs"}
 	presetKeys   = []string{"version", "fields", "statuses", "labels", "session", "verbs"}
-	boardKeys    = []string{"owner", "project", "repos"}
+	boardKeys    = []string{"owner", "project", "repos", "assignee"}
 	statusesKeys = []string{"initial", "final", "resolved"}
 	labelsKeys   = []string{"types", "area_prefix"}
 	sessionKeys  = []string{"env", "link"}
-	verbKeys     = []string{"when", "to", "from", "require", "require_one_of", "comment", "disabled"}
+	verbKeys     = []string{
+		"when", "to", "from", "require", "require_one_of", "comment",
+		"labels", "assign", "close", "reopen", "confirm", "disabled",
+	}
 
 	// unsupportedVerbKeys are verb keys from the spec that this version
 	// recognizes but does not implement yet.
-	unsupportedVerbKeys = []string{
-		"blockers", "confirm", "iteration", "field", "assign", "labels",
-		"close", "reopen", "batch", "pre", "post",
-	}
+	unsupportedVerbKeys = []string{"blockers", "iteration", "field", "batch", "pre", "post"}
 
 	// unsupportedKeys are other keys from the spec that this version
 	// recognizes but does not implement yet, with what they are for.
-	unsupportedKeys = map[string]string{
-		"board.assignee": "the assign effect comes in v0.1",
-	}
+	unsupportedKeys = map[string]string{}
 )
 
 // statusField is the only [fields] entry this version uses; other logical
@@ -226,6 +252,8 @@ func typeName(s string) string {
 		return "integer"
 	case strings.HasPrefix(s, "float"):
 		return "float"
+	case s == "bool":
+		return "boolean"
 	case s == "slice", strings.HasPrefix(s, "[]"):
 		return "array"
 	case s == "map", s == "struct", strings.Contains(s, "."), strings.HasPrefix(s, "map["):
@@ -353,6 +381,11 @@ func mergeVerb(m merger, name string, base, over *rawVerb) *rawVerb {
 		Require:      pick(m, p+"require", base.Require, over.Require),
 		RequireOneOf: pick(m, p+"require_one_of", base.RequireOneOf, over.RequireOneOf),
 		Comment:      pick(m, p+"comment", base.Comment, over.Comment),
+		Labels:       pick(m, p+"labels", base.Labels, over.Labels),
+		Assign:       pick(m, p+"assign", base.Assign, over.Assign),
+		Close:        pick(m, p+"close", base.Close, over.Close),
+		Reopen:       pick(m, p+"reopen", base.Reopen, over.Reopen),
+		Confirm:      pick(m, p+"confirm", base.Confirm, over.Confirm),
 		Disabled:     over.Disabled,
 	}
 }

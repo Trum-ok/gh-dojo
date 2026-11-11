@@ -81,7 +81,28 @@ type Board struct {
 	Owner   string   // user or org login
 	Project int      // project number, 1 or greater
 	Repos   []string // "owner/name"; the first is the default repo; may be empty
+	// Assignee is who a verb with assign = true assigns: Me or a login;
+	// "" when not set.
+	Assignee string
 }
+
+// Me is the assignee that stands for the authenticated user.
+const Me = "@me"
+
+// Close reasons of the close effect, as written in the config.
+const (
+	CloseCompleted  = "completed"
+	CloseNotPlanned = "not_planned"
+	CloseDuplicate  = "duplicate"
+)
+
+// ConfirmUser is the only value of confirm: the verb runs only with --yes.
+const ConfirmUser = "user"
+
+var closeReasons = []string{CloseCompleted, CloseNotPlanned, CloseDuplicate}
+
+// CloseReasons lists the reasons close accepts.
+func CloseReasons() []string { return slices.Clone(closeReasons) }
 
 // Statuses gives meaning to some board statuses. All are optional: without a
 // preset they are empty unless the config sets them.
@@ -113,6 +134,22 @@ type Verb struct {
 	Require      []string // arguments (ArgComment, ArgBy) that must all be given
 	RequireOneOf []string // arguments of which at least one must be given
 	Comment      string   // comment template (see Render); "" posts no comment
+
+	// AddLabels and RemoveLabels are the labels the verb adds ("+name" in
+	// labels) and removes ("-name"), in config order.
+	AddLabels    []string
+	RemoveLabels []string
+	// Assign is who the verb assigns: Me or a login; "" assigns nobody.
+	// assign = true is resolved to board.assignee at load.
+	Assign string
+	// Close is the reason the verb closes the issue with (CloseCompleted,
+	// CloseNotPlanned, CloseDuplicate); "" leaves it open. Reopen reopens
+	// a closed issue. A verb never sets both.
+	Close  string
+	Reopen bool
+	// Confirm says the verb is a decision for the user (confirm = "user"):
+	// it runs only with --yes, which an agent adds after asking.
+	Confirm bool
 }
 
 // Uses reports whether the verb's comment template uses the placeholder

@@ -11,6 +11,7 @@ import (
 var (
 	verbNameRE = regexp.MustCompile(`^[a-z][a-z0-9]*(-[a-z0-9]+)*$`)
 	repoRE     = regexp.MustCompile(`^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$`)
+	loginRE    = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9-]{0,38}$`)
 )
 
 // build validates the merged raw config and fills c. Checks run in file
@@ -74,7 +75,26 @@ func (c *Config) buildBoard(r rawBoard) error {
 		}
 		b.Repos = *r.Repos
 	}
+	if r.Assignee != nil {
+		if err := c.checkAssignee("board.assignee", *r.Assignee); err != nil {
+			return err
+		}
+		b.Assignee = *r.Assignee
+	}
 	c.Board = b
+	return nil
+}
+
+// checkAssignee accepts Me or a GitHub login.
+func (c *Config) checkAssignee(key, s string) error {
+	switch {
+	case s == Me:
+		return nil
+	case strings.HasPrefix(s, "@"):
+		return c.Errorf("%s: %q: write the login without @, or %q for the authenticated user", c.KeyPath(key), s, Me)
+	case !loginRE.MatchString(s):
+		return c.Errorf("%s: %q is not a GitHub login; use a login or %q for the authenticated user", c.KeyPath(key), s, Me)
+	}
 	return nil
 }
 
@@ -160,6 +180,11 @@ func (c *Config) buildVerb(name string, r *rawVerb) (Verb, error) {
 		return Verb{}, err
 	}
 	v := Verb{Name: name, When: strings.TrimSpace(deref(r.When)), To: deref(r.To), Comment: deref(r.Comment)}
+	if r.Comment == nil && requires(r, ArgComment) {
+		// A verb that requires --comment without a template posts the text
+		// as is: [verbs.drop] with require = ["comment"] needs nothing more.
+		v.Comment = "{" + VarComment + "}"
+	}
 	switch {
 	case v.When == "":
 		return Verb{}, c.Errorf("%s is required: one line saying when to use the verb", c.KeyPath(p+"when"))
@@ -184,8 +209,12 @@ func (c *Config) buildVerb(name string, r *rawVerb) (Verb, error) {
 		}
 		return Verb{}, c.Errorf("%s: unknown placeholder {%s}", c.KeyPath(p+"comment"), bad).WithAllowed(allowed...)
 	}
-	if v.To == "" && v.Comment == "" {
-		return Verb{}, c.Errorf("verbs.%s has no effect: set to or comment", name)
+	if err := c.buildEffects(name, r, &v); err != nil {
+		return Verb{}, err
+	}
+	if v.To == "" && v.Comment == "" && len(v.AddLabels)+len(v.RemoveLabels) == 0 && v.Assign == "" &&
+		v.Close == "" && !v.Reopen {
+		return Verb{}, c.Errorf("verbs.%s has no effect: set to, comment, labels, assign, close or reopen", name)
 	}
 	for _, list := range []struct {
 		key  string
@@ -213,6 +242,79 @@ func (c *Config) buildVerb(name string, r *rawVerb) (Verb, error) {
 		*list.dest = *list.src
 	}
 	return v, nil
+}
+
+// requires reports whether the verb names arg in require or require_one_of.
+func requires(r *rawVerb, arg string) bool {
+	for _, list := range []*[]string{r.Require, r.RequireOneOf} {
+		if list != nil && slices.Contains(*list, arg) {
+			return true
+		}
+	}
+	return false
+}
+
+// buildEffects validates labels, assign, close, reopen and confirm.
+func (c *Config) buildEffects(name string, r *rawVerb, v *Verb) error {
+	p := "verbs." + name + "."
+	if r.Labels != nil {
+		key := c.KeyPath(p + "labels")
+		if err := c.checkList(p+"labels", *r.Labels); err != nil {
+			return err
+		}
+		seen := map[string]string{} // folded name → entry
+		for _, entry := range *r.Labels {
+			label := entry[1:]
+			switch {
+			case entry[0] != '+' && entry[0] != '-':
+				return c.Errorf("%s: %q must start with + to add the label or - to remove it", key, entry).
+					WithFix(fmt.Sprintf(`labels = ["+%s"] adds it, labels = ["-%s"] removes it`, entry, entry))
+			case nameProblem(label) != "":
+				return c.Errorf("%s: %q: the label name %s", key, entry, nameProblem(label))
+			}
+			if prev, ok := seen[strings.ToLower(label)]; ok {
+				return c.Errorf("%s lists %q and %q; keep one", key, prev, entry)
+			}
+			seen[strings.ToLower(label)] = entry
+			if entry[0] == '+' {
+				v.AddLabels = append(v.AddLabels, label)
+			} else {
+				v.RemoveLabels = append(v.RemoveLabels, label)
+			}
+		}
+	}
+	if a := r.Assign; a != nil {
+		key := c.KeyPath(p + "assign")
+		switch {
+		case a.Bool != nil && *a.Bool && c.Board.Assignee == "":
+			return c.Errorf("%s = true assigns board.assignee, which is not set", key).
+				WithFix(fmt.Sprintf(`add assignee = %q under [board] in %s, or set assign = %q`, Me, c.Display, Me))
+		case a.Bool != nil && *a.Bool:
+			v.Assign = c.Board.Assignee
+		case a.User != nil:
+			if err := c.checkAssignee(p+"assign", *a.User); err != nil {
+				return err
+			}
+			v.Assign = *a.User
+		}
+	}
+	if r.Close != nil {
+		if !slices.Contains(closeReasons, *r.Close) {
+			return c.Errorf("%s: unknown reason %q", c.KeyPath(p+"close"), *r.Close).WithAllowed(closeReasons...)
+		}
+		v.Close = *r.Close
+	}
+	v.Reopen = deref(r.Reopen)
+	if v.Close != "" && v.Reopen {
+		return c.Errorf("verbs.%s sets both close and reopen; keep one", name)
+	}
+	if r.Confirm != nil {
+		if *r.Confirm != ConfirmUser {
+			return c.Errorf("%s: unknown value %q", c.KeyPath(p+"confirm"), *r.Confirm).WithAllowed(ConfirmUser)
+		}
+		v.Confirm = true
+	}
+	return nil
 }
 
 // checkRepoVerbs checks the verb names of the repo config, including disabled

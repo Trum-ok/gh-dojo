@@ -1,0 +1,1 @@
+error: .github/dojo.toml:11: verbs.start.assign: wrong type: got integer, want string or boolean

@@ -1,0 +1,22 @@
+code: 0
+--- stdout
+A pull request waits for review
+
+  From:      In progress, Ready
+  To:        In review; an issue already there keeps it, so a repeat is safe
+  Requires:  nothing besides the issue number
+  Optional:  --comment
+  Board:     adds the issue if it is not there
+  Labels:    +enhancement -dogfood (+ adds, - removes)
+  Assign:    you (the authenticated user); other assignees stay
+  Comment:   posted unless it renders empty or is already the latest gh-dojo comment:
+               {comment}
+
+Usage:
+  gh dojo review <N> [flags]
+
+Flags:
+      --comment string   text for {comment} in the comment
+      --dry-run          print the plan without changing anything
+  -h, --help             help for review
+--- stderr

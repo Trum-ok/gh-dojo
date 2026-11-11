@@ -1,7 +1,7 @@
 file: .github/dojo.toml
 version: 1
 preset: "kanban"
-board: owner=Trum-ok project=1 repos=[]
+board: owner=Trum-ok project=1 repos=[] assignee=""
 fields.status: "Status"
 statuses: initial="Backlog" final=["Done"] resolved=["Ready" "Done"]
 labels: types=[] area_prefix="area:"

@@ -1,0 +1,80 @@
+file: .github/dojo.toml
+version: 1
+preset: "kanban"
+board: owner=Trum-ok project=1 repos=[] assignee="alice"
+fields.status: "Status"
+statuses: initial="Backlog" final=["Done"] resolved=["Ready" "Done"]
+labels: types=[] area_prefix="area:"
+session: env=[] link="{id}"
+verb start
+  when: You begin working on the issue
+  to: "In progress"
+  from: ["Backlog" "Waiting" "Ready"]
+  require: [] require_one_of: []
+  comment: "Started. Session: {session}\n\n{comment}"
+verb wait
+  when: Work is stuck: waiting for another issue or an outside decision
+  to: "Waiting"
+  from: ["In progress"]
+  require: [] require_one_of: ["by" "comment"]
+  comment: "Waiting for {by}.\n\n{comment}"
+verb ready
+  when: The work is done, verified and committed, but not released yet
+  to: "Ready"
+  from: ["In progress" "Waiting"]
+  require: [] require_one_of: []
+  comment: "{comment}"
+verb done
+  when: The change is released
+  to: "Done"
+  from: ["Ready" "In progress"]
+  require: [] require_one_of: []
+  comment: "{comment}"
+  labels: add=[] remove=[] assign: "" close: "duplicate" reopen: false confirm: false
+verb review
+  when: A pull request is open and waits for review
+  to: "In review"
+  from: []
+  require: [] require_one_of: []
+  comment: ""
+  labels: add=["in-review"] remove=["blocked"] assign: "alice" close: "" reopen: false confirm: false
+verb take
+  when: Take the issue yourself
+  to: ""
+  from: []
+  require: [] require_one_of: []
+  comment: ""
+  labels: add=[] remove=[] assign: "@me" close: "" reopen: false confirm: false
+verb drop
+  when: The issue is not needed
+  to: ""
+  from: []
+  require: ["comment"] require_one_of: []
+  comment: "{comment}"
+  labels: add=[] remove=[] assign: "" close: "not_planned" reopen: false confirm: true
+verb revive
+  when: A closed issue is needed after all
+  to: "Backlog"
+  from: []
+  require: [] require_one_of: []
+  comment: ""
+  labels: add=[] remove=[] assign: "" close: "" reopen: true confirm: false
+status refs:
+  "Backlog"    statuses.initial (from preset kanban)
+  "Done"       statuses.final (from preset kanban)
+  "Ready"      statuses.resolved (from preset kanban)
+  "Done"       statuses.resolved (from preset kanban)
+  "In progress" verbs.start.to (from preset kanban)
+  "Backlog"    verbs.start.from (from preset kanban)
+  "Waiting"    verbs.start.from (from preset kanban)
+  "Ready"      verbs.start.from (from preset kanban)
+  "Waiting"    verbs.wait.to (from preset kanban)
+  "In progress" verbs.wait.from (from preset kanban)
+  "Ready"      verbs.ready.to (from preset kanban)
+  "In progress" verbs.ready.from (from preset kanban)
+  "Waiting"    verbs.ready.from (from preset kanban)
+  "Done"       verbs.done.to (from preset kanban)
+  "Ready"      verbs.done.from (from preset kanban)
+  "In progress" verbs.done.from (from preset kanban)
+  "In review"  verbs.review.to
+  "Backlog"    verbs.revive.to

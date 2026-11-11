@@ -1,0 +1,7 @@
+dry run: revive #42
+  unarchive on the board
+  reopen
+  status: Done → Backlog
+  comment: "Revived."
+confirm: #42 unarchived, reopened, Done → Backlog, comment left
+post: "Revived.\n\n<!-- gh-dojo:revive:d68c895c -->"

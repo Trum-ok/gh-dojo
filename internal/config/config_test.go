@@ -13,9 +13,9 @@ import (
 )
 
 // specExample is the example from docs/spec.md without the keys this
-// version does not support (board.assignee, fields.sprint, blockers,
-// iteration, batch, close, confirm); TestSpecExampleUnsupported puts some of
-// them back.
+// version does not support (fields.sprint, blockers, iteration, batch);
+// TestSpecExampleUnsupported puts them back. Its drop verb is the spec's,
+// as is: no comment template, so --comment is posted as is.
 const specExample = `
 version = 1
 preset = "kanban"            # base, overrides follow
@@ -24,6 +24,7 @@ preset = "kanban"            # base, overrides follow
 owner = "acme"               # user or org is detected
 project = 3
 repos = ["acme/shop"]
+assignee = "@me"
 
 [fields]
 status = "Status"
@@ -52,8 +53,9 @@ to = "Done"
 
 [verbs.drop]
 when = "задача не нужна или дубль"
+close = "not_planned"
 require = ["comment"]
-comment = "Не нужна: {comment}"
+confirm = "user"
 `
 
 const presetOnly = `
@@ -96,7 +98,7 @@ func dump(c *Config) string {
 	w("file: %s", c.Display)
 	w("version: %d", c.Version)
 	w("preset: %q", c.Preset)
-	w("board: owner=%s project=%d repos=%v", c.Board.Owner, c.Board.Project, c.Board.Repos)
+	w("board: owner=%s project=%d repos=%v assignee=%q", c.Board.Owner, c.Board.Project, c.Board.Repos, c.Board.Assignee)
 	for _, name := range c.FieldNames() {
 		w("fields.%s: %q", name, c.Fields[name])
 	}
@@ -110,6 +112,10 @@ func dump(c *Config) string {
 		w("  from: %q", v.From)
 		w("  require: %q require_one_of: %q", v.Require, v.RequireOneOf)
 		w("  comment: %q", v.Comment)
+		if len(v.AddLabels)+len(v.RemoveLabels) > 0 || v.Assign != "" || v.Close != "" || v.Reopen || v.Confirm {
+			w("  labels: add=%q remove=%q assign: %q close: %q reopen: %v confirm: %v",
+				v.AddLabels, v.RemoveLabels, v.Assign, v.Close, v.Reopen, v.Confirm)
+		}
 	}
 	w("status refs:")
 	for _, r := range c.StatusRefs() {
@@ -131,6 +137,32 @@ when = "Take the issue"
 comment = "Taken in {session}"
 [verbs.done]
 from = ["Ready"]
+`},
+		{"effects", strings.Replace(presetOnly, "project = 1\n", "project = 1\nassignee = \"alice\"\n", 1) + `
+[verbs.review]
+when = "A pull request is open and waits for review"
+to = "In review"
+labels = ["+in-review", "-blocked"]
+assign = true
+
+[verbs.take]
+when = "Take the issue yourself"
+assign = "@me"
+
+[verbs.drop]
+when = "The issue is not needed"
+close = "not_planned"
+require = ["comment"]
+confirm = "user"
+
+[verbs.revive]
+when = "A closed issue is needed after all"
+to = "Backlog"
+reopen = true
+
+[verbs.done]
+close = "duplicate"
+assign = false
 `},
 		{"add_verb", presetOnly + `
 [verbs.review]
@@ -193,7 +225,6 @@ func TestLoadErrors(t *testing.T) {
 		{"unknown_verb_key", presetOnly + "[verbs.start]\nwhen_ = \"x\"\n"},
 		{"unsupported_key", presetOnly + "[verbs.done]\nbatch = true\n"},
 		{"unsupported_hook", presetOnly + "[verbs.start.pre]\ncmd = \"./check\"\n"},
-		{"unsupported_assignee", "preset = \"kanban\"\n" + board + "assignee = \"@me\"\n"},
 		{"unsupported_field", presetOnly + "sprint = \"Sprint\"\n"},
 		{"unsupported_field_first", presetOnly + "sprint = \"Sprint\"\n[verbs.start]\nwhen_ = \"x\"\n"},
 		{"field_wrong_case", strings.Replace(presetOnly, `status = "Status"`, `Status = "Status"`, 1)},
@@ -220,7 +251,22 @@ func TestLoadErrors(t *testing.T) {
 		{"repos_type", "preset = \"kanban\"\n" + board + "repos = \"acme/shop\"\n"},
 		{"verb_not_table", presetOnly + "[verbs]\nstart = \"x\"\n"},
 		{"no_effect", presetOnly + "[verbs.go]\nwhen = \"x\"\n"},
-		{"require_unused", presetOnly + "[verbs.go]\nwhen = \"x\"\nto = \"Doing\"\nrequire = [\"comment\"]\n"},
+		{"require_unused", presetOnly + "[verbs.go]\nwhen = \"x\"\nto = \"Doing\"\nrequire = [\"by\"]\n"},
+		{"labels_no_sign", presetOnly + "[verbs.go]\nwhen = \"x\"\nlabels = [\"in-review\"]\n"},
+		{"labels_add_and_remove", presetOnly + "[verbs.go]\nwhen = \"x\"\nlabels = [\"+bug\", \"-Bug\"]\n"},
+		{"labels_blank_name", presetOnly + "[verbs.go]\nwhen = \"x\"\nlabels = [\"+\"]\n"},
+		{"labels_spaces", presetOnly + "[verbs.go]\nwhen = \"x\"\nlabels = [\"- blocked\"]\n"},
+		{"labels_not_list", presetOnly + "[verbs.go]\nwhen = \"x\"\nlabels = \"+bug\"\n"},
+		{"assign_true_without_board", presetOnly + "[verbs.start]\nassign = true\n"},
+		{"assign_at_login", presetOnly + "[verbs.start]\nassign = \"@alice\"\n"},
+		{"assign_bad_login", presetOnly + "[verbs.start]\nassign = \"alice smith\"\n"},
+		{"assign_wrong_type", presetOnly + "[verbs.start]\nassign = 1\n"},
+		{"board_assignee_bad", "preset = \"kanban\"\n" + board + "assignee = \"me@x\"\n"},
+		{"board_assignee_at", "preset = \"kanban\"\n" + board + "assignee = \"@Me\"\n"},
+		{"close_bad_reason", presetOnly + "[verbs.done]\nclose = \"done\"\n"},
+		{"close_and_reopen", presetOnly + "[verbs.done]\nreopen = true\n"},
+		{"confirm_bad", presetOnly + "[verbs.done]\nconfirm = \"yes\"\n"},
+		{"confirm_not_string", presetOnly + "[verbs.done]\nconfirm = true\n"},
 		{"require_one_of_unused", presetOnly + "[verbs.wait]\ncomment = \"Waiting for {by}.\"\n"},
 		{"require_duplicate", presetOnly + "[verbs.go]\nwhen = \"x\"\ncomment = \"{comment}\"\nrequire = [\"comment\", \"comment\"]\n"},
 		{"require_overlap", presetOnly + "[verbs.wait]\nrequire = [\"comment\"]\n"},
@@ -434,7 +480,6 @@ func TestSessionResolve(t *testing.T) {
 // are rejected, not silently accepted.
 func TestSpecExampleUnsupported(t *testing.T) {
 	tests := []struct{ after, add, want string }{
-		{`repos = ["acme/shop"]` + "\n", `assignee = "@me"` + "\n", "board.assignee is not supported in this version"},
 		{`status = "Status"` + "\n", `sprint = "Sprint"` + "\n", "fields.sprint is not supported in this version"},
 		{"[verbs.done]\n", "batch = true\n", "verbs.done.batch is not supported in this version"},
 		{"[verbs.wait]\n", "blockers = \"add\"\n", "verbs.wait.blockers is not supported in this version"},

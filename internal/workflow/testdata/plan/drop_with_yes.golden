@@ -1,0 +1,5 @@
+dry run: drop #42 "Fix login redirect"
+  comment: "duplicate of #7"
+  close: as not planned
+confirm: #42 comment left, closed as not planned
+post: "duplicate of #7\n\n<!-- gh-dojo:drop:551be565 -->"

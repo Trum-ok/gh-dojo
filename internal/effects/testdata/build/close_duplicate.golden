@@ -1,0 +1,10 @@
+mutation Verb($issue: ID!, $reason: IssueClosedStateReason!) {
+  close: closeIssue(input: {issueId: $issue, stateReason: $reason}) { issue { id } }
+}
+--- vars
+{
+  "issue": "I_1",
+  "reason": "DUPLICATE"
+}
+--- steps
+close

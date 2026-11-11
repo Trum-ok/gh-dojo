@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.done.confirm: unknown value "yes"
+allowed: user

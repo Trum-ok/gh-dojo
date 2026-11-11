@@ -1,0 +1,30 @@
+mutation Verb($project: ID!, $item: ID!, $issue: ID!, $field: ID!, $option: String!, $addLabels: [ID!]!, $removeLabels: [ID!]!, $assignees: [ID!]!, $body: String!) {
+  unarchive: unarchiveProjectV2Item(input: {projectId: $project, itemId: $item}) { item { id } }
+  reopen: reopenIssue(input: {issueId: $issue}) { issue { id } }
+  status: updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field, value: {singleSelectOptionId: $option}}) { projectV2Item { id } }
+  addLabels: addLabelsToLabelable(input: {labelableId: $issue, labelIds: $addLabels}) { clientMutationId }
+  removeLabels: removeLabelsFromLabelable(input: {labelableId: $issue, labelIds: $removeLabels}) { clientMutationId }
+  assign: addAssigneesToAssignable(input: {assignableId: $issue, assigneeIds: $assignees}) { clientMutationId }
+  comment: addComment(input: {subjectId: $issue, body: $body}) { commentEdge { node { id } } }
+}
+--- vars
+{
+  "addLabels": [
+    "LA_1",
+    "LA_2"
+  ],
+  "assignees": [
+    "U_1"
+  ],
+  "body": "Started.\n\n<!-- gh-dojo:start:995a443b -->",
+  "field": "PVTSSF_1",
+  "issue": "I_1",
+  "item": "PVTI_1",
+  "option": "47fc9ee4",
+  "project": "PVT_1",
+  "removeLabels": [
+    "LA_3"
+  ]
+}
+--- steps
+unarchive, reopen, status, addLabels, removeLabels, assign, comment

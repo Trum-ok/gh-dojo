@@ -1,2 +1,2 @@
 error: .github/dojo.toml: unknown key board.ownr
-allowed: owner, project, repos
+allowed: owner, project, repos, assignee

@@ -1,3 +1,4 @@
-code: 2
-error: #42 is closed; done works only on open issues
-this is a process rule: ask the user what to do with #42
+dry run: done #42
+  status: Ready → Done
+  close: already closed
+confirm: #42 Ready → Done, already closed

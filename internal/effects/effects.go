@@ -33,10 +33,15 @@ const OperationName = "Verb"
 // Aliases of the mutation fields, one per kind of op. They key the response
 // data and the paths of GraphQL errors.
 const (
-	AliasBoard     = "board"
-	AliasUnarchive = "unarchive"
-	AliasStatus    = "status"
-	AliasComment   = "comment"
+	AliasBoard        = "board"
+	AliasUnarchive    = "unarchive"
+	AliasReopen       = "reopen"
+	AliasStatus       = "status"
+	AliasAddLabels    = "addLabels"
+	AliasRemoveLabels = "removeLabels"
+	AliasAssign       = "assign"
+	AliasComment      = "comment"
+	AliasClose        = "close"
 )
 
 // IDs are the node IDs the ops need. Never print them.
@@ -50,6 +55,11 @@ type IDs struct {
 	// the option to set; SetStatus needs both.
 	StatusField  string
 	StatusOption string
+	// Labels maps label names to label node IDs, Users logins to user node
+	// IDs; AddLabels, RemoveLabels and Assign look their names up here,
+	// ignoring case.
+	Labels map[string]string
+	Users  map[string]string
 }
 
 // Mutation is one GraphQL mutation document with its variables.
@@ -87,19 +97,30 @@ func Batches(ops []workflow.Op) [][]workflow.Op {
 // with the IDs it needs. A SetStatus without ids.Item is an error: add the
 // issue to the board first (see Batches).
 //
-//	mutation Verb($project: ID!, $item: ID!, $field: ID!, $option: String!, $issue: ID!, $body: String!) {
+//	mutation Verb($project: ID!, $item: ID!, $field: ID!, $option: String!, $issue: ID!, $body: String!, $reason: IssueClosedStateReason!) {
 //	  status: updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field, value: {singleSelectOptionId: $option}}) { projectV2Item { id } }
 //	  comment: addComment(input: {subjectId: $issue, body: $body}) { commentEdge { node { id } } }
+//	  close: closeIssue(input: {issueId: $issue, stateReason: $reason}) { issue { id } }
 //	}
+//
+// A label or user missing from ids is an error: the reader looks them up
+// with the card (see issue.Lookup).
 func Build(ops []workflow.Op, ids IDs) (*Mutation, error) {
 	if len(ops) == 0 {
 		return nil, fmt.Errorf("effects: no ops to build a mutation from")
 	}
 	m := &Mutation{Vars: map[string]any{}}
 	var decls, fields []string
-	declare := func(name, typ string, value string) error {
-		if value == "" {
-			return fmt.Errorf("effects: no value for $%s", name)
+	declare := func(name, typ string, value any) error {
+		switch v := value.(type) {
+		case string:
+			if v == "" {
+				return fmt.Errorf("effects: no value for $%s", name)
+			}
+		case []string:
+			if len(v) == 0 {
+				return fmt.Errorf("effects: no value for $%s", name)
+			}
 		}
 		if _, ok := m.Vars[name]; ok {
 			return nil
@@ -131,10 +152,37 @@ func Build(ops []workflow.Op, ids IDs) (*Mutation, error) {
 				declare("field", "ID!", ids.StatusField), declare("option", "String!", ids.StatusOption))
 			field = "updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field, " +
 				"value: {singleSelectOptionId: $option}}) { projectV2Item { id } }"
+		case workflow.Reopen:
+			alias = AliasReopen
+			err = declare("issue", "ID!", ids.Issue)
+			field = "reopenIssue(input: {issueId: $issue}) { issue { id } }"
+		case workflow.AddLabels:
+			alias = AliasAddLabels
+			var labels []string
+			labels, err = lookupAll("label", ids.Labels, op.Names)
+			err = firstErr(err, declare("issue", "ID!", ids.Issue), declare("addLabels", "[ID!]!", labels))
+			field = "addLabelsToLabelable(input: {labelableId: $issue, labelIds: $addLabels}) { clientMutationId }"
+		case workflow.RemoveLabels:
+			alias = AliasRemoveLabels
+			var labels []string
+			labels, err = lookupAll("label", ids.Labels, op.Names)
+			err = firstErr(err, declare("issue", "ID!", ids.Issue), declare("removeLabels", "[ID!]!", labels))
+			field = "removeLabelsFromLabelable(input: {labelableId: $issue, labelIds: $removeLabels}) { clientMutationId }"
+		case workflow.Assign:
+			alias = AliasAssign
+			var users []string
+			users, err = lookupAll("user", ids.Users, []string{op.Login})
+			err = firstErr(err, declare("issue", "ID!", ids.Issue), declare("assignees", "[ID!]!", users))
+			field = "addAssigneesToAssignable(input: {assignableId: $issue, assigneeIds: $assignees}) { clientMutationId }"
 		case workflow.AddComment:
 			alias = AliasComment
 			err = firstErr(declare("issue", "ID!", ids.Issue), declare("body", "String!", op.Text()))
 			field = "addComment(input: {subjectId: $issue, body: $body}) { commentEdge { node { id } } }"
+		case workflow.Close:
+			alias = AliasClose
+			err = firstErr(declare("issue", "ID!", ids.Issue),
+				declare("reason", "IssueClosedStateReason!", strings.ToUpper(op.Reason)))
+			field = "closeIssue(input: {issueId: $issue, stateReason: $reason}) { issue { id } }"
 		default:
 			return nil, fmt.Errorf("effects: unknown op %T", op)
 		}
@@ -150,6 +198,26 @@ func Build(ops []workflow.Op, ids IDs) (*Mutation, error) {
 	m.Query = "mutation " + OperationName + "(" + strings.Join(decls, ", ") + ") {\n" +
 		strings.Join(fields, "\n") + "\n}"
 	return m, nil
+}
+
+// lookupAll returns the IDs of names in ids, ignoring case.
+func lookupAll(kind string, ids map[string]string, names []string) ([]string, error) {
+	out := make([]string, 0, len(names))
+	for _, name := range names {
+		id := ids[name]
+		if id == "" {
+			for k, v := range ids {
+				if strings.EqualFold(k, name) {
+					id = v
+				}
+			}
+		}
+		if id == "" {
+			return nil, fmt.Errorf("effects: no ID for %s %q", kind, name)
+		}
+		out = append(out, id)
+	}
+	return out, nil
 }
 
 func firstErr(errs ...error) error {
@@ -200,18 +268,29 @@ func isNull(v json.RawMessage) bool {
 }
 
 // Missed says that op did not take effect, for a partial report:
-// "not added to the board", "not unarchived", "status not changed",
-// "comment not posted".
+// "not added to the board", "not unarchived", "not reopened", "status not
+// changed", "labels not added", "labels not removed", "not assigned",
+// "comment not posted", "not closed".
 func Missed(op workflow.Op) string {
 	switch op.(type) {
 	case workflow.AddToBoard:
 		return "not added to the board"
 	case workflow.Unarchive:
 		return "not unarchived"
+	case workflow.Reopen:
+		return "not reopened"
 	case workflow.SetStatus:
 		return "status not changed"
+	case workflow.AddLabels:
+		return "labels not added"
+	case workflow.RemoveLabels:
+		return "labels not removed"
+	case workflow.Assign:
+		return "not assigned"
 	case workflow.AddComment:
 		return "comment not posted"
+	case workflow.Close:
+		return "not closed"
 	}
 	return op.Describe() + " not done"
 }
