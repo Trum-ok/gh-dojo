@@ -52,6 +52,13 @@ The plan is separate from its execution: the workflow engine returns the
 operations without touching the network, which is what `--dry-run`, the
 tests and finishing a partially applied command rely on.
 
+A command prints its result through `emit` (`cmd/gh-dojo/output.go`): it
+builds one typed result and passes the function that prints it as text, so
+the text and `--json` come from the same data. JSON fields are snake_case,
+lists never `null`, no node IDs; a new field is fine, a renamed or removed
+one needs a new `schema_version` (README, "JSON output", lists the schemas).
+Each command has JSON golden files under `cmd/gh-dojo/testdata/json/`.
+
 ## Golden files
 
 Command output, errors and help are compared with `testdata/**/*.golden`

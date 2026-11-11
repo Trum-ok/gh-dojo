@@ -280,6 +280,8 @@ closing or reopening, blocked-by links, whether it checks blockers, runs on
 closed issues or needs the user's go-ahead), then the lifecycle (from → to), the initial, final and
 resolved statuses, and the exit codes. It reads only the config, never the
 network; a missing or broken config is printed as an error (exit code 1).
+`gh dojo describe --json` gives the same as data (see
+[JSON output](#json-output)), and every command takes `--json`.
 
 ### doctor
 
@@ -463,6 +465,7 @@ A successful write prints one line per issue: what was, what is now and what
 was done along the way (`#42 Backlog → In progress, comment left`), so there
 is no need to re-read the issue. Warnings go to stderr. An error is a few
 lines on stderr: what is wrong, the allowed values and a command to fix it.
+`--json` prints the result as data instead (see [JSON output](#json-output)).
 
 ```console
 $ gh dojo ready 42
@@ -493,6 +496,95 @@ $ gh dojo review 42
 error: #42 labels +in-review, assigned octocat, comment left; status not changed: GitHub token is missing a required scope (project); gh auth refresh -s project, then re-run the same command
 fix: gh auth refresh -s project
 ```
+
+### JSON output
+
+Every command takes `--json`, `--jq <expression>` (`-q`) and
+`--template <template>` (`-t`), as gh does: `--jq` filters the JSON with jq
+syntax, printing strings and numbers raw, and `--template` formats it with a
+Go template (gh's functions included). Both imply `--json`, cannot be
+combined, and are checked before the command runs, so a typo never follows a
+write. An expression that fails only on the data (iterating `null`, say) is
+an error (exit code 1) after the command ran, as in gh: a write it follows
+is done, and a re-run is safe. JSON is one compact line; indented when
+stdout is a terminal.
+
+```console
+$ gh dojo list --jq '.issues[].number'
+21
+22
+$ gh dojo show 42 --jq '.issues[0].board.status'
+In progress
+$ gh dojo show 42 --jq '.issues[0].blocked_by[] | select(.resolved | not) | .ref'
+#17
+$ gh dojo start 42 --dry-run --jq '.issues[0].planned[].op'
+set_status
+add_comment
+$ gh dojo list --template '{{range .issues}}#{{.number}} {{.status}}{{"\n"}}{{end}}'
+```
+
+**Errors stay text.** As in gh, an error is the usual short block on stderr
+with the usual exit code, and stdout gets JSON only for what the command
+produced: the same data it prints as text. So a command that fails outright
+(bad arguments, not found, a refusal) prints nothing on stdout, while one that
+did part of its work prints that part and still exits with its code: `show`
+with a missing number (3), a partial write (5: the JSON says what was applied,
+the error what was not), a verb on several issues, `doctor` with a problem,
+`init` with a mismatch. One rule for every command keeps a pipe like
+`gh dojo show 42 --jq ...` simple: stdout is JSON or empty, the exit code
+says whether to trust it, and the error an agent reads on stderr is the same
+in both modes. Warnings stay on stderr too.
+
+**Stability.** Every object has `"schema_version": 1` first. Field names are
+snake_case; lists are `[]` when empty, never `null`; times are RFC 3339 in
+UTC, dates `YYYY-MM-DD`. GitHub node IDs never appear. New fields may be
+added; renaming or removing one, or changing its meaning, is a breaking
+change and comes only with a new `schema_version` in a major release.
+
+An error inside a result (an issue that failed, what stopped a partial
+write) is `{"exit_code", "message", "allowed": [...], "fix"}`, the fields of
+the error block.
+
+The schemas, by command:
+
+| Command | Top-level fields |
+|---------|------------------|
+| `show` | `issues`: cards; `failed`: `[{number, error}]` for numbers not shown |
+| card | `number`, `repo`, `url`, `title`, `state` (`open`/`closed`), `state_reason` (`completed`, `not_planned`, `duplicate`, `reopened` or `""`), `author`, `created_at`, `closed_at`, `incomplete` (GitHub withheld part of it); `board`: `{on_board, unknown_reason, status, status_unknown, archived, fields: [{name, value}], fields_truncated}`; `sprint`: `null` without `fields.sprint`, else `{field, iteration: {title, start_date, end_date, duration_days} or null, unknown_reason}`; `milestone`: `{title, due_on}` or `null`; `labels`, `assignees` with `labels_total`, `assignees_total`; `blocked_by`, `blocking`: `[{ref, repo, number, title, state, on_board, status, archived, status_unknown_reason, resolved}]` with `blocked_by_total`, `blocking_total`, `unresolved_blockers`; `history`: `[{at, from, to, actor, automated}]` with `history_truncated`, `history_untracked`; `body`: `{text, cut, length}`; `comments`: `[{author, created_at, text, cut, length}]` with `comments_total` |
+| `list` | `sprint` (the `--sprint` iteration or `null`), `issues`: `[{repo, number, title, state, status, labels, labels_total, assignees, assignees_total}]` in the printed order, cut to `--limit`; `matched` (before `--limit`), `unchecked`, `hidden`, `filtered`, `skipped`: `{draft_issues, pull_requests, unseen}`, `incomplete` |
+| verbs | `verb`, `dry_run`, `issues`: `[{number, title, outcome, planned, applied, in_place, needs_yes, warnings, error}]` in argument order, `summary`: `{total, done, written, failed, not_attempted}` |
+| `new` | `number`, `repo`, `title`, `created` (`false`: resumed), `labels`, `status`, `status_set`, `unarchived`, `blocked_by`, `already_blocked_by`, `error` |
+| `comment` | `number`, `repo`, `posted` (`false`: already the last comment) |
+| `block`, `unblock` | `number`, `repo`, `action`, `changed`, `unchanged`, `missed`, `error` |
+| `describe` | `config`, `preset`, `board`, `repos`, `verbs`: `[{name, when, from, to, requires, requires_one_of, optional, batch, checks, effects}]`, `statuses`: `{initial, final, resolved}`, `exit_codes`: `[{code, meaning, next}]` |
+| `doctor` | `ok`, `checks`: `[{name, result, detail, allowed, fix}]` |
+| `init` | without `--project`: `owner`, `owner_type`, `projects`: `[{number, title, items, closed}]`, `suggested_project`, `command`; with it: `path`, `written`, `board`, `board_title`, `preset`, `repos`, `matches_board`, `problems`: `[{problem, fix}]`, `content` |
+
+`show` cuts descriptions and comments as its text does (`--full`,
+`--comments`); `--brief` leaves out `history`, `body` and `comments`.
+A verb's `outcome` is `planned` (dry run), `applied`, `unchanged` (every
+effect in place), `partial`, `failed`, or `not_attempted` (an error that
+stops every write, such as auth or a rate limit, came first; a re-run tries
+it). In `summary`, `done` counts `applied` and `unchanged` issues (`planned`
+in a dry run), `written` the `applied` ones, as the text's "N of M done (K
+written)". `planned`, `applied` and `in_place`
+are lists of ops: `{"op": ...}` with the fields of its kind:
+
+| `op` | Fields |
+|------|--------|
+| `add_to_board`, `unarchive`, `reopen` | none |
+| `set_status` | `from`, `to` (`""`: no status or not on the board) |
+| `set_iteration` | `from`, `to` (iteration titles, `""` for none), `start_date` |
+| `set_fields` | `fields`: `[{field, from, to}]` |
+| `add_labels`, `remove_labels` | `labels` |
+| `assign` | `login` |
+| `add_blocked_by` | `issue` (`#12` or `owner/name#12`) |
+| `add_comment` | `body` (none in `in_place`: the comment was posted before) |
+| `close` | `reason` (`completed`, `not_planned`, `duplicate`) |
+
+A single-issue verb prints JSON once it has a plan to show (`--dry-run`) or
+wrote something; a refusal before any write leaves stdout empty. A verb on
+several issues always reports every issue, refused or failed ones too.
 
 ## Configuration
 
