@@ -1,0 +1,10 @@
+code: 4
+--- stdout
+ok       version  gh dojo dev
+ok       config   .github/dojo.toml: preset kanban, 4 verbs
+problem  token    github.com as Trum-ok: the token has read:project but not project, so commands that change the board fail
+                  fix: gh auth refresh -s project
+ok       board    Trum-ok/5 "gh-dojo": field Status and 5 statuses match
+ok       repo     Trum-ok/gh-dojo (default): visible, issues enabled
+--- stderr
+error: doctor found 1 problem; fix as shown above, then run gh dojo doctor again

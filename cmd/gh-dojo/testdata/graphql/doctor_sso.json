@@ -1,0 +1,43 @@
+{
+  "comment": "Hand-crafted: the Doctor query of gh dojo doctor. The data shape follows the GraphQL schema (viewer, repository); X-OAuth-Scopes is the header GitHub sends for classic tokens, which recording does not keep. Organization acme enforces SAML SSO the token is not authorized for: repo0 is null with FORBIDDEN and extensions.saml_failure (message and shape as in internal/board/testdata/graphql/org_board_saml.json).",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "Doctor",
+      "query": "query Doctor($owner0: String!, $name0: String!) {\n  viewer { login }\n  repo0: repository(owner: $owner0, name: $name0) { nameWithOwner hasIssuesEnabled }\n}",
+      "variables": {
+        "owner0": "acme",
+        "name0": "shop"
+      },
+      "headers": {
+        "X-OAuth-Scopes": "gist, project, read:org, repo"
+      },
+      "response": {
+        "data": {
+          "viewer": {
+            "login": "Trum-ok"
+          },
+          "repo0": null
+        },
+        "errors": [
+          {
+            "type": "FORBIDDEN",
+            "path": [
+              "repo0"
+            ],
+            "extensions": {
+              "saml_failure": true
+            },
+            "locations": [
+              {
+                "line": 3,
+                "column": 3
+              }
+            ],
+            "message": "Resource protected by organization SAML enforcement. You must grant your OAuth token access to this organization."
+          }
+        ]
+      }
+    }
+  ]
+}

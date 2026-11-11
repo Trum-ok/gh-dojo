@@ -1,0 +1,11 @@
+code: 4
+--- stdout
+ok       version  gh dojo dev
+ok       config   .github/dojo.toml: preset kanban, 4 verbs
+problem  token    github.com as Trum-ok: the token lacks the project scope (has: read:org, repo)
+                  fix: gh auth refresh -s project
+problem  board    GitHub token is missing a required scope (read:project)
+                  fix: gh auth refresh -s project
+ok       repo     Trum-ok/gh-dojo (default): visible, issues enabled
+--- stderr
+error: doctor found 2 problems; fix as shown above, then run gh dojo doctor again

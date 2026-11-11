@@ -45,8 +45,41 @@ func (l *Loader) LoadChecked(ctx context.Context, c *config.Config) (*Schema, er
 // ErrFieldType), so IsStale holds and Loader.Resolve retries on a cached
 // schema.
 func Check(c *config.Config, s *Schema) error {
-	var problems []*render.Error
-	var keys []string
+	problems := Problems(c, s)
+	if len(problems) == 0 {
+		return nil
+	}
+	first := problems[0].Err
+	if n := len(problems) - 1; n > 0 {
+		noun := "problems"
+		if n == 1 {
+			noun = "problem"
+		}
+		var more []string
+		for _, p := range problems[1:] {
+			more = append(more, p.Key)
+		}
+		if len(more) > maxMoreKeys {
+			more = append(more[:maxMoreKeys:maxMoreKeys], "…")
+		}
+		first.What += fmt.Sprintf("\nand %d more %s: %s", n, noun, strings.Join(more, ", "))
+	}
+	return first
+}
+
+// maxMoreKeys is how many keys of further problems Check names.
+const maxMoreKeys = 4
+
+// Problem is a name in the config that the board does not have.
+type Problem struct {
+	Key string        // the key path, e.g. "verbs.start.to"
+	Err *render.Error // as Check reports it, with allowed values and a fix
+}
+
+// Problems lists every name in the config the board does not have, in the
+// order Check looks at them; see Check.
+func Problems(c *config.Config, s *Schema) []Problem {
+	var problems []Problem
 	add := func(key string, err error) {
 		var e *render.Error
 		if !errors.As(err, &e) {
@@ -56,9 +89,8 @@ func Check(c *config.Config, s *Schema) error {
 		if c.KeyPath(key) != key { // set by the preset: override it in the file
 			fix = fmt.Sprintf("set %s in %s to override preset %s", key, c.Display, c.Preset)
 		}
-		problems = append(problems, c.Errorf("%s: %s", c.KeyPath(key), e.What).
-			WithAllowed(e.Allowed...).WithFix(fix).WithCause(err))
-		keys = append(keys, key)
+		problems = append(problems, Problem{key, c.Errorf("%s: %s", c.KeyPath(key), e.What).
+			WithAllowed(e.Allowed...).WithFix(fix).WithCause(err)})
 	}
 
 	var status *Field
@@ -81,27 +113,8 @@ func Check(c *config.Config, s *Schema) error {
 			}
 		}
 	}
-
-	if len(problems) == 0 {
-		return nil
-	}
-	first := problems[0]
-	if n := len(problems) - 1; n > 0 {
-		noun := "problems"
-		if n == 1 {
-			noun = "problem"
-		}
-		more := keys[1:]
-		if len(more) > maxMoreKeys {
-			more = append(more[:maxMoreKeys:maxMoreKeys], "…")
-		}
-		first.What += fmt.Sprintf("\nand %d more %s: %s", n, noun, strings.Join(more, ", "))
-	}
-	return first
+	return problems
 }
-
-// maxMoreKeys is how many keys of further problems Check names.
-const maxMoreKeys = 4
 
 // notSingleSelect is the error for a status field of another type; the
 // allowed values are the board's single-select fields.

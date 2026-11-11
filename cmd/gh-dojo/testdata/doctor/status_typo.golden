@@ -1,0 +1,14 @@
+code: 1
+--- stdout
+ok       version  gh dojo dev
+ok       config   .github/dojo.toml: preset kanban, 4 verbs
+ok       token    github.com as Trum-ok, with the project scope
+problem  board    .github/dojo.toml: verbs.start.to: unknown status "In progres"; did you mean "In progress"?
+                  allowed: Backlog, Ready, In progress, In review, Waiting, Done
+                  fix: edit verbs.start.to in .github/dojo.toml
+problem  board    .github/dojo.toml: verbs.wait.from: unknown status "In Progress"; did you mean "In progress"?
+                  allowed: Backlog, Ready, In progress, In review, Waiting, Done
+                  fix: edit verbs.wait.from in .github/dojo.toml
+ok       repo     Trum-ok/gh-dojo (default): visible, issues enabled
+--- stderr
+error: doctor found 2 problems; fix as shown above, then run gh dojo doctor again

@@ -1,0 +1,28 @@
+{
+  "comment": "Hand-crafted: the Doctor query of gh dojo doctor. The data shape follows the GraphQL schema (viewer, repository); X-OAuth-Scopes is the header GitHub sends for classic tokens, which recording does not keep. A token with read:project but not project.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "Doctor",
+      "query": "query Doctor($owner0: String!, $name0: String!) {\n  viewer { login }\n  repo0: repository(owner: $owner0, name: $name0) { nameWithOwner hasIssuesEnabled }\n}",
+      "variables": {
+        "owner0": "Trum-ok",
+        "name0": "gh-dojo"
+      },
+      "headers": {
+        "X-OAuth-Scopes": "read:org, read:project, repo"
+      },
+      "response": {
+        "data": {
+          "viewer": {
+            "login": "Trum-ok"
+          },
+          "repo0": {
+            "nameWithOwner": "Trum-ok/gh-dojo",
+            "hasIssuesEnabled": true
+          }
+        }
+      }
+    }
+  ]
+}

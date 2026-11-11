@@ -234,6 +234,37 @@ closed issues), then the lifecycle (from → to), the initial, final and
 resolved statuses, and the exit codes. It reads only the config, never the
 network; a missing or broken config is printed as an error (exit code 1).
 
+### doctor
+
+```sh
+gh dojo doctor
+```
+
+Checks the setup and prints one line per check, `ok`, `problem`, or `skip`
+when an earlier problem keeps a check from running; each problem is
+followed by the command that fixes it:
+
+```console
+$ gh dojo doctor
+ok       version  gh dojo v0.1.0
+ok       config   .github/dojo.toml: preset kanban, 4 verbs
+problem  token    github.com as octocat: the token lacks the project scope (has: read:org, repo)
+                  fix: gh auth refresh -s project
+ok       board    octocat/3 "Shop": field Status and 5 statuses match
+ok       repo     octocat/shop (default): visible, issues enabled
+```
+
+It checks that the config loads, that gh is logged in with a token that has
+the `project` scope (a token from `GH_TOKEN` gets "set GH_TOKEN to …" as
+the fix), that the board exists, is open and has every field and status the
+config names (each mismatch on its own line), and that every repository of
+[`board.repos`](#board), or the current one, is visible with issues
+enabled. An organization whose SAML single sign-on or OAuth app
+restrictions block the token gets the same fix as any other command. It
+sends one request, plus one for the board when its schema is not
+cached. The exit code is 0 when every check is ok, 4 when one failed on auth
+or the network, else 1.
+
 ### Process verbs
 
 ```sh

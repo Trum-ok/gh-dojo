@@ -109,7 +109,7 @@ func (c *Client) init() {
 	gql, err := api.NewGraphQLClient(api.ClientOptions{
 		Host:      host,
 		AuthToken: token,
-		Transport: c.opts.Transport,
+		Transport: headerSink{c.opts.Transport}, // for QueryHeaders
 		Timeout:   c.opts.Timeout,
 	})
 	if err != nil {
@@ -374,9 +374,8 @@ func transportReason(err error) string {
 // authFix is the fix for a token GitHub rejects or that lacks a scope.
 // gh auth refresh can't change a token set in the environment.
 func (c *Client) authFix() string {
-	switch c.tokenSource {
-	case "GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN":
-		return "set " + c.tokenSource + " to a token with the project scope"
+	if env := c.tokenEnv(); env != "" {
+		return "set " + env + " to a token with the project scope"
 	}
 	return render.AuthFix
 }
@@ -384,11 +383,20 @@ func (c *Client) authFix() string {
 // ssoFix is the fix for a token an organization's SAML SSO blocks. A token
 // from the environment is authorized on GitHub's token settings page.
 func (c *Client) ssoFix() string {
-	switch c.tokenSource {
-	case "GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN":
-		return "authorize " + c.tokenSource + " for the organization's SSO (Configure SSO in GitHub's token settings)"
+	if env := c.tokenEnv(); env != "" {
+		return "authorize " + env + " for the organization's SSO (Configure SSO in GitHub's token settings)"
 	}
 	return SSOFix
+}
+
+// tokenEnv names the environment variable the token came from, "" when
+// it came from gh (its config or keyring) or Options.AuthToken.
+func (c *Client) tokenEnv() string {
+	switch c.tokenSource {
+	case "GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN":
+		return c.tokenSource
+	}
+	return ""
 }
 
 // IsStaleID reports whether GitHub rejected an ID gh-dojo sent: a node ID

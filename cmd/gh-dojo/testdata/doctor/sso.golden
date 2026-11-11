@@ -1,0 +1,11 @@
+code: 4
+--- stdout
+ok       version  gh dojo dev
+ok       config   .github/dojo.toml: preset kanban, 4 verbs
+ok       token    github.com as Trum-ok, with the project scope
+problem  board    GitHub denied access: the organization enforces SAML single sign-on and the token is not authorized for it
+                  fix: gh auth refresh -s project, and authorize the organization's SSO on the page it opens
+problem  repo     acme/shop (default): GitHub denied access: the organization enforces SAML single sign-on and the token is not authorized for it
+                  fix: gh auth refresh -s project, and authorize the organization's SSO on the page it opens
+--- stderr
+error: doctor found 2 problems; fix as shown above, then run gh dojo doctor again

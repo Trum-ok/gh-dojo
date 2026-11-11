@@ -1,0 +1,13 @@
+code: 1
+--- stdout
+ok       version  gh dojo dev
+ok       config   .github/dojo.toml: preset kanban, 4 verbs
+ok       token    github.com as Trum-ok; no scopes listed (a fine-grained or app token): the board check shows its access
+ok       board    Trum-ok/5 "gh-dojo": field Status and 5 statuses match
+ok       repo     Trum-ok/gh-dojo (default): visible, issues enabled
+problem  repo     Trum-ok/no-such-repo is not found or not visible to this token
+                  fix: edit board.repos in .github/dojo.toml
+problem  repo     Trum-ok/wiki has issues disabled
+                  fix: gh repo edit Trum-ok/wiki --enable-issues
+--- stderr
+error: doctor found 2 problems; fix as shown above, then run gh dojo doctor again

@@ -1,0 +1,10 @@
+code: 1
+--- stdout
+ok       version  gh dojo dev
+ok       config   .github/dojo.toml: preset kanban, 4 verbs
+ok       token    github.com as Trum-ok, with the project scope
+problem  board    board Trum-ok/99 not found
+                  fix: gh project list --owner Trum-ok
+ok       repo     Trum-ok/gh-dojo (default): visible, issues enabled
+--- stderr
+error: doctor found 1 problem; fix as shown above, then run gh dojo doctor again

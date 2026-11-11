@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: unknown command "now" for "gh dojo doctor"
+fix: gh dojo doctor --help

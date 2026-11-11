@@ -1,0 +1,5 @@
+ok       sprint   Sprint: today (2026-11-11) is in Sprint 12
+problem  sprint   Sprint has no iteration for today (2026-12-20)
+                  fix: add one in the Sprint field settings: https://github.com/orgs/acme/projects/3/settings
+problem  sprint   field "Status" on board acme/3 is SINGLE_SELECT, not an iteration field
+                  fix: edit fields.sprint in .github/dojo.toml

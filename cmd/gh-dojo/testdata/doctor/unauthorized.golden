@@ -1,0 +1,10 @@
+code: 4
+--- stdout
+ok       version  gh dojo dev
+ok       config   .github/dojo.toml: preset kanban, 4 verbs
+problem  token    GitHub rejected the token (HTTP 401)
+                  fix: gh auth refresh -s project
+skip     board    needs GitHub access (see token)
+skip     repo     needs GitHub access (see token)
+--- stderr
+error: doctor found 1 problem; fix as shown above, then run gh dojo doctor again

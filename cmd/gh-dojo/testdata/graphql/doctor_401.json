@@ -1,0 +1,20 @@
+{
+  "comment": "Hand-crafted: a revoked or invalid token; GitHub answers 401 Bad credentials (shape as in internal/graph/testdata/graphql/bad_credentials.json).",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "Doctor",
+      "query": "query Doctor($owner0: String!, $name0: String!) {\n  viewer { login }\n  repo0: repository(owner: $owner0, name: $name0) { nameWithOwner hasIssuesEnabled }\n}",
+      "variables": {
+        "owner0": "Trum-ok",
+        "name0": "gh-dojo"
+      },
+      "status": 401,
+      "response": {
+        "message": "Bad credentials",
+        "documentation_url": "https://docs.github.com/graphql",
+        "status": "401"
+      }
+    }
+  ]
+}

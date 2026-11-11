@@ -1,0 +1,20 @@
+{
+  "comment": "Hand-crafted: the Viewer answer with the X-OAuth-Scopes header GitHub sends for a classic token; recording keeps no such header.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "Viewer",
+      "query": "query Viewer { viewer { login } }",
+      "headers": {
+        "X-OAuth-Scopes": "repo, read:org, project, gist"
+      },
+      "response": {
+        "data": {
+          "viewer": {
+            "login": "Trum-ok"
+          }
+        }
+      }
+    }
+  ]
+}

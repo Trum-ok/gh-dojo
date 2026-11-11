@@ -1,0 +1,10 @@
+code: 1
+--- stdout
+ok       version  gh dojo dev
+problem  config   no .github/dojo.toml in this directory or its parents up to the repository root
+                  fix: gh dojo init
+ok       token    github.com as Trum-ok, with the project scope
+skip     board    needs a config that loads
+skip     repo     needs a config that loads
+--- stderr
+error: doctor found 1 problem; fix as shown above, then run gh dojo doctor again
