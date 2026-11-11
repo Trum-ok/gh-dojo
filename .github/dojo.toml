@@ -8,7 +8,6 @@ preset = "kanban"
 owner = "Trum-ok"
 project = 5
 repos = ["Trum-ok/gh-dojo"]
-assignee = "@me"
 
 [labels]
 types = ["bug", "enhancement", "documentation", "dogfood"]

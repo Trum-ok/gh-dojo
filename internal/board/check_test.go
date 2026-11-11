@@ -56,8 +56,8 @@ func TestCheckErrors(t *testing.T) {
 		{"new_verb_status", "[verbs.park]\nwhen = \"x\"\nto = \"Parked\"\n"},
 		{"status_field_case", "[fields]\nstatus = \"status\"\n"},
 		{"status_field_type", "[fields]\nstatus = \"Estimate\"\n"},
-		{"unknown_field", "[fields]\nsprint = \"Sprint\"\n"},
-		{"several", "[fields]\nsprint = \"Sprint\"\n[statuses]\nfinal = [\"Shipped\"]\n[verbs.start]\nto = \"In progres\"\n"},
+		{"unknown_field", "[fields]\nstatus = \"Stage\"\n"},
+		{"several", "[statuses]\nfinal = [\"Shipped\"]\n[verbs.start]\nto = \"In progres\"\n[verbs.wait]\nto = \"Parked\"\n"},
 		{"two", "[verbs.start]\nto = \"In progres\"\nfrom = [\"Todo\"]\n"},
 	}
 	for _, tt := range tests {

@@ -13,7 +13,9 @@ import (
 )
 
 // specExample is the example from docs/spec.md without the keys this
-// version does not support (blockers, iteration, batch, close, confirm).
+// version does not support (board.assignee, fields.sprint, blockers,
+// iteration, batch, close, confirm); TestSpecExampleUnsupported puts some of
+// them back.
 const specExample = `
 version = 1
 preset = "kanban"            # base, overrides follow
@@ -22,11 +24,9 @@ preset = "kanban"            # base, overrides follow
 owner = "acme"               # user or org is detected
 project = 3
 repos = ["acme/shop"]
-assignee = "@me"
 
 [fields]
 status = "Status"
-sprint = "Sprint"
 
 [session]
 env = ["CLAUDE_CODE_HOST_SESSION_ID"]
@@ -96,7 +96,7 @@ func dump(c *Config) string {
 	w("file: %s", c.Display)
 	w("version: %d", c.Version)
 	w("preset: %q", c.Preset)
-	w("board: owner=%s project=%d repos=%v assignee=%q", c.Board.Owner, c.Board.Project, c.Board.Repos, c.Board.Assignee)
+	w("board: owner=%s project=%d repos=%v", c.Board.Owner, c.Board.Project, c.Board.Repos)
 	for _, name := range c.FieldNames() {
 		w("fields.%s: %q", name, c.Fields[name])
 	}
@@ -192,15 +192,18 @@ func TestLoadErrors(t *testing.T) {
 		{"unknown_verb_key", presetOnly + "[verbs.start]\nwhen_ = \"x\"\n"},
 		{"unsupported_key", presetOnly + "[verbs.done]\nbatch = true\n"},
 		{"unsupported_hook", presetOnly + "[verbs.start.pre]\ncmd = \"./check\"\n"},
+		{"unsupported_assignee", "preset = \"kanban\"\n" + board + "assignee = \"@me\"\n"},
+		{"unsupported_field", presetOnly + "sprint = \"Sprint\"\n"},
+		{"unsupported_field_first", presetOnly + "sprint = \"Sprint\"\n[verbs.start]\nwhen_ = \"x\"\n"},
 		{"bad_version", "version = 2\npreset = \"kanban\"\n" + board},
 		{"unknown_preset", "preset = \"scrum\"\n" + board},
 		{"missing_owner", "preset = \"kanban\"\n[board]\nproject = 3\n"},
 		{"missing_project", "preset = \"kanban\"\n[board]\nowner = \"acme\"\n"},
 		{"bad_project", "preset = \"kanban\"\n[board]\nowner = \"acme\"\nproject = 0\n"},
 		{"bad_repo", "preset = \"kanban\"\n" + board + "repos = [\"shop\"]\n"},
-		{"missing_fields_status", board + "[fields]\nsprint = \"Sprint\"\n"},
+		{"missing_fields_status", board + "[fields]\n"},
 		{"empty_fields_status", "preset = \"kanban\"\n" + board + "[fields]\nstatus = \"\"\n"},
-		{"empty_field", presetOnly + "sprint = \" \"\n"},
+		{"empty_field", strings.Replace(presetOnly, `"Status"`, `" "`, 1)},
 		{"verb_without_when", board + "[fields]\nstatus = \"Status\"\n[verbs.go]\nto = \"Doing\"\n"},
 		{"verb_multiline_when", presetOnly + "[verbs.go]\nwhen = \"\"\"\nline one\nline two\"\"\"\n"},
 		{"verb_name_collision", presetOnly + "[verbs.list]\nwhen = \"x\"\n"},
@@ -225,7 +228,7 @@ func TestLoadErrors(t *testing.T) {
 		{"initial_spaces", presetOnly + "[statuses]\ninitial = \" Backlog\"\n"},
 		{"final_duplicate", presetOnly + "[statuses]\nfinal = [\"Done\", \"Done\"]\n"},
 		{"final_blank", presetOnly + "[statuses]\nfinal = [\"  \"]\n"},
-		{"field_spaces", presetOnly + "sprint = \"Sprint \"\n"},
+		{"field_spaces", strings.Replace(presetOnly, `"Status"`, `"Status "`, 1)},
 		{"env_spaces", presetOnly + "[session]\nenv = [\" X\"]\n"},
 		{"env_duplicate", presetOnly + "[session]\nenv = [\"X\", \"X\"]\n"},
 		{"to_spaces", presetOnly + "[verbs.start]\nto = \"In progress \"\n"},
@@ -236,7 +239,7 @@ func TestLoadErrors(t *testing.T) {
 		{"types_duplicate", presetOnly + "[labels]\ntypes = [\"bug\", \"bug\"]\n"},
 		{"old_type_prefix", presetOnly + "[labels]\ntype_prefix = \"\"\n"},
 		{"verbs_not_table", "verbs = 1\n" + presetOnly},
-		{"field_not_string", presetOnly + "sprint = 2\n"},
+		{"field_not_string", strings.Replace(presetOnly, `"Status"`, `2`, 1)},
 		{"unknown_session_key", presetOnly + "[session]\nenvs = [\"X\"]\n"},
 	}
 	for _, tt := range tests {
@@ -418,6 +421,27 @@ func TestSessionResolve(t *testing.T) {
 	t.Setenv("CLAUDE_CODE_HOST_SESSION_ID", "s1")
 	if got, ok := c.Session.Resolve(nil); !ok || got != "claude://claude.ai/epitaxy/s1" {
 		t.Errorf("Resolve(nil) = %q, %v", got, ok)
+	}
+}
+
+// TestSpecExampleUnsupported checks that the keys stripped from specExample
+// are rejected, not silently accepted.
+func TestSpecExampleUnsupported(t *testing.T) {
+	tests := []struct{ after, add, want string }{
+		{`repos = ["acme/shop"]` + "\n", `assignee = "@me"` + "\n", "board.assignee is not supported in this version"},
+		{`status = "Status"` + "\n", `sprint = "Sprint"` + "\n", "fields.sprint is not supported in this version"},
+		{"[verbs.done]\n", "batch = true\n", "verbs.done.batch is not supported in this version"},
+		{"[verbs.wait]\n", "blockers = \"add\"\n", "verbs.wait.blockers is not supported in this version"},
+	}
+	for _, tt := range tests {
+		if !strings.Contains(specExample, tt.after) {
+			t.Fatalf("specExample has no %q", tt.after)
+		}
+		content := strings.Replace(specExample, tt.after, tt.after+tt.add, 1)
+		_, err := Load(writeConfig(t, content))
+		if err == nil || !strings.Contains(err.Error(), tt.want) {
+			t.Errorf("with %q: got %v, want %q", tt.add, err, tt.want)
+		}
 	}
 }
 

@@ -1,4 +1,4 @@
-error: .github/dojo.toml: fields.sprint: unknown field "Sprint" on board Trum-ok/5
-and 2 more problems: statuses.final, verbs.start.to
-allowed: Status, Priority, Size, Estimate, Start date, Target date
-fix: edit fields.sprint in .github/dojo.toml
+error: .github/dojo.toml: statuses.final: unknown status "Shipped"
+and 2 more problems: verbs.start.to, verbs.wait.to
+allowed: Backlog, Ready, In progress, In review, Waiting, Done
+fix: edit statuses.final in .github/dojo.toml

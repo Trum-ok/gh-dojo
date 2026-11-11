@@ -53,7 +53,7 @@ func (c *Config) build(r *rawFile) error {
 }
 
 func (c *Config) buildBoard(r rawBoard) error {
-	b := Board{Owner: strings.TrimSpace(deref(r.Owner)), Assignee: deref(r.Assignee)}
+	b := Board{Owner: strings.TrimSpace(deref(r.Owner))}
 	if b.Owner == "" {
 		return c.Errorf("board.owner is required: the user or org login that owns the project")
 	}

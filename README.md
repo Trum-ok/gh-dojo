@@ -239,7 +239,6 @@ repos = ["acme/shop"]        # the first one is the default repo
 
 [fields]                     # logical name = field name on the board
 status = "Status"            # required (the kanban preset sets "Status")
-sprint = "Sprint"
 
 [statuses]
 initial = "Backlog"          # set by `new` and assumed for issues not on the board yet
@@ -281,18 +280,21 @@ disabled = true              # drop a verb that the preset defines
 
 ### board
 
-| Key        | Required | Meaning                                                                       |
-|------------|----------|-------------------------------------------------------------------------------|
-| `owner`    | yes      | User or organization login that owns the project                              |
-| `project`  | yes      | Project number from its URL, 1 or greater                                     |
-| `repos`    | no       | `owner/name` list; the first is the default repo for issue numbers and `new`. Empty: the current repo (`GH_REPO`, else the git remote) |
-| `assignee` | no       | Accepted, but not used yet                                                    |
+| Key       | Required | Meaning                                                                       |
+|-----------|----------|-------------------------------------------------------------------------------|
+| `owner`   | yes      | User or organization login that owns the project                              |
+| `project` | yes      | Project number from its URL, 1 or greater                                     |
+| `repos`   | no       | `owner/name` list; the first is the default repo for issue numbers and `new`. Empty: the current repo (`GH_REPO`, else the git remote) |
+
+`assignee` (for the assign effect) comes in v0.1; until then it is rejected
+with "not supported in this version".
 
 ### fields
 
-Logical name = field name on the board. `status` is required and must be a
-single-select field. Other entries (such as `sprint`) are checked against the
-board but not used by any command yet.
+Logical name = field name on the board. `status` is the only entry in this
+version: it is required and must be a single-select field. Other logical
+fields (such as `sprint`, for iteration effects) come in v0.1; until then
+they are rejected with "not supported in this version".
 
 ### statuses
 
@@ -361,10 +363,9 @@ your project's language; the CLI itself speaks English.
 ### Checked against the board
 
 Every command that talks to GitHub first checks the config against the
-board: each `fields` entry must name a board field, the status field must be
-single-select, and every status the config names (`statuses.initial`,
-`statuses.final`, each verb's `to` and `from`) must be one of its options. A
-typo is an error with the board's statuses and a suggestion, not a silent
+board: `fields.status` must name a single-select board field, and every
+status the config names (`statuses.initial`, `statuses.final`, each verb's
+`to` and `from`) must be one of its options. A typo is an error with the board's statuses and a suggestion, not a silent
 skip. The board schema is cached for an hour in `~/.cache/gh-dojo` (or
 `$XDG_CACHE_HOME/gh-dojo`; override with `GH_DOJO_CACHE_DIR`); a mismatch
 re-reads the board before it is reported, so a status just added on the
@@ -411,8 +412,9 @@ repository's own [`.github/dojo.toml`](.github/dojo.toml) does that.
   gh-dojo's own issues live on its board and are handled only through
   `gh dojo`.
 - **v0.1 — first public release.** `describe`, `init`, `doctor`, `block` and
-  `unblock`, more verb effects (blockers, iteration, close, `confirm`),
-  several issues per verb, a `sprints` preset, `--json`, and
+  `unblock`, more verb effects (blockers, iteration with sprint fields,
+  assign, close, `confirm`), several issues per verb, a `sprints` preset,
+  `--json`, and
   `gh extension install` with prebuilt binaries for macOS, Linux and Windows.
 - **v0.2 — agents and releases.** `agent install` (an agent skill generated
   from the config), `next`, `release`, several repositories.

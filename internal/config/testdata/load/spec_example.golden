@@ -1,9 +1,8 @@
 file: .github/dojo.toml
 version: 1
 preset: "kanban"
-board: owner=acme project=3 repos=[acme/shop] assignee="@me"
+board: owner=acme project=3 repos=[acme/shop]
 fields.status: "Status"
-fields.sprint: "Sprint"
 statuses: initial="Backlog" final=["Done"]
 labels: types=[] area_prefix="area:"
 session: env=["CLAUDE_CODE_HOST_SESSION_ID"] link="claude://claude.ai/epitaxy/{id}"

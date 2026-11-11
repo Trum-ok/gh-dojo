@@ -1,0 +1,2 @@
+error: .github/dojo.toml: fields.sprint is not supported in this version (sprint fields and iteration effects come in v0.1)
+fix: remove fields.sprint from .github/dojo.toml

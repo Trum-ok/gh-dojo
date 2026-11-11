@@ -1,1 +1,1 @@
-error: .github/dojo.toml: fields.sprint "Sprint " has leading or trailing spaces
+error: .github/dojo.toml: fields.status "Status " has leading or trailing spaces

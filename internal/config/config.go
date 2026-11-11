@@ -67,7 +67,7 @@ type Config struct {
 	Preset  string // preset name, or "" when the config sets none
 
 	Board    Board
-	Fields   map[string]string // logical name → board field name; "status" is always set
+	Fields   map[string]string // logical name → board field name; only "status" in this version
 	Statuses Statuses
 	Labels   Labels
 	Session  Session
@@ -78,10 +78,9 @@ type Config struct {
 
 // Board says where the issues live.
 type Board struct {
-	Owner    string   // user or org login
-	Project  int      // project number, 1 or greater
-	Repos    []string // "owner/name"; the first is the default repo; may be empty
-	Assignee string   // optional, e.g. "@me"
+	Owner   string   // user or org login
+	Project int      // project number, 1 or greater
+	Repos   []string // "owner/name"; the first is the default repo; may be empty
 }
 
 // Statuses gives meaning to some board statuses. Both are optional: without a

@@ -1,1 +1,1 @@
-error: .github/dojo.toml:10: fields.sprint: wrong type: got integer, want string
+error: .github/dojo.toml:9: fields.status: wrong type: got integer, want string

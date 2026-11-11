@@ -29,10 +29,9 @@ type rawFile struct {
 }
 
 type rawBoard struct {
-	Owner    *string   `toml:"owner"`
-	Project  *int      `toml:"project"`
-	Repos    *[]string `toml:"repos"`
-	Assignee *string   `toml:"assignee"`
+	Owner   *string   `toml:"owner"`
+	Project *int      `toml:"project"`
+	Repos   *[]string `toml:"repos"`
 }
 
 type rawStatuses struct {
@@ -82,7 +81,7 @@ func (v *rawVerb) setKeys() []string {
 var (
 	topKeys      = []string{"version", "preset", "board", "fields", "statuses", "labels", "session", "verbs"}
 	presetKeys   = []string{"version", "fields", "statuses", "labels", "session", "verbs"}
-	boardKeys    = []string{"owner", "project", "repos", "assignee"}
+	boardKeys    = []string{"owner", "project", "repos"}
 	statusesKeys = []string{"initial", "final"}
 	labelsKeys   = []string{"types", "area_prefix"}
 	sessionKeys  = []string{"env", "link"}
@@ -94,7 +93,27 @@ var (
 		"blockers", "confirm", "iteration", "field", "assign", "labels",
 		"close", "reopen", "batch", "pre", "post",
 	}
+
+	// unsupportedKeys are other keys from the spec that this version
+	// recognizes but does not implement yet, with what they are for.
+	unsupportedKeys = map[string]string{
+		"board.assignee": "the assign effect comes in v0.1",
+	}
 )
+
+// statusField is the only [fields] entry this version uses; other logical
+// fields (sprint, ...) are rejected until the effects that use them exist.
+const (
+	statusField     = "status"
+	fieldsLaterNote = "sprint fields and iteration effects come in v0.1"
+)
+
+// unsupported is the error for a key this version recognizes but does not
+// implement; note says what the key is for and when it comes.
+func unsupported(display, path, note string) error {
+	return render.Usage("%s: %s is not supported in this version (%s)", display, path, note).
+		WithFix(fmt.Sprintf("remove %s from %s", path, display))
+}
 
 // parseRaw decodes data and rejects unknown and unsupported keys.
 func parseRaw(data []byte, display string, preset bool) (*rawFile, error) {
@@ -112,9 +131,16 @@ func parseRaw(data []byte, display string, preset bool) (*rawFile, error) {
 			return nil, render.Usage("%s: %s: wrong type: got %s, want table", display, k, strings.ToLower(t))
 		}
 	}
+	undecoded := map[string]bool{}
 	for _, key := range md.Undecoded() {
-		if err := undecodedError(display, key); err != nil {
-			return nil, err
+		undecoded[key.String()] = true
+	}
+	for _, key := range md.Keys() { // file order: the first problem wins
+		switch {
+		case len(key) == 2 && key[0] == "fields" && key[1] != statusField:
+			return nil, unsupported(display, key.String(), fieldsLaterNote)
+		case undecoded[key.String()]:
+			return nil, undecodedError(display, key)
 		}
 	}
 	if preset {
@@ -208,6 +234,9 @@ func undecodedError(display string, key toml.Key) error {
 		allowed = verbKeys
 	case len(key) >= 2:
 		path = strings.Join(key[:2], ".")
+		if note, ok := unsupportedKeys[path]; ok {
+			return unsupported(display, path, note)
+		}
 		switch key[0] {
 		case "board":
 			allowed = boardKeys
