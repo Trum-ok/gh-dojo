@@ -8,13 +8,29 @@ Requires Go (the version in `go.mod`) and `gh`.
 make build    # ./gh-dojo, stamped with git describe
 make test     # go test ./...
 make vet      # go vet ./...
+make dist     # release binaries for all platforms into dist/
 make install  # build and install as the gh dojo extension (see README)
 ```
 
 CI (`.github/workflows/ci.yml`) runs on pushes to `main` and on pull
-requests: `gofmt -l .` must print nothing, then `go mod tidy -diff`,
-`go vet ./...`, `go test ./...` and `go build ./...`. Run the same before
-sending a change.
+requests. Once, on Linux: `gofmt -l .` must print nothing, then
+`go mod tidy -diff`, `go vet ./...` (also with `GOOS=windows` and
+`GOOS=darwin`) and the release build. On Ubuntu, macOS and Windows:
+`go test ./...` (with `-race` on Ubuntu) and `go build ./...`. Run the
+checks and `go test -race ./...` before sending a change.
+
+Code and tests must work on all three: build paths with `path/filepath`,
+show them to users with `filepath.ToSlash`, and keep OS error texts out of
+golden files. `.gitattributes` checks every file out with LF line endings,
+Windows included.
+
+## Releases
+
+Pushing a `v*` tag runs `.github/workflows/release.yml`: the tests, then
+`cli/gh-extension-precompile` with `script/build-release.sh`, which builds
+darwin, linux and windows for amd64 and arm64 with the tag stamped into
+`gh dojo --version`, and publishes them as a GitHub release for
+`gh extension install`. A tag with a `-` (`v0.1.0-rc.1`) makes a prerelease.
 
 The interface, help text and documentation are in English. Texts that go
 into issues (verb `when` lines and comment templates) come from the config.

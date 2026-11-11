@@ -35,8 +35,16 @@ gh-dojo. The config format and output may still change before v0.1. See the
 
 ## Install
 
-There are no release builds yet (`gh extension install Trum-ok/gh-dojo`
-comes with v0.1). Install from source; this needs Go (see `go.mod`) and `gh`:
+After the first release, install the prebuilt binary (macOS, Linux and
+Windows; amd64 and arm64) and update it with gh:
+
+```sh
+gh extension install Trum-ok/gh-dojo
+gh extension upgrade dojo
+```
+
+Until then, or to run the latest `main`, install from source; this needs Go
+(see `go.mod`) and `gh`:
 
 ```sh
 git clone https://github.com/Trum-ok/gh-dojo
@@ -50,7 +58,18 @@ gh dojo --version
 from there, so the installed `gh dojo` does not change when you switch
 branches in the working copy. Re-run it to update. A different `gh dojo`
 extension already installed is replaced, and put back if the install fails.
-`gh dojo --version` shows the `git describe` of the installed build.
+`gh dojo --version` shows the release tag, or the `git describe` of a source
+build.
+
+On Windows `make install` is not available. Build in the clone (its directory
+must be named `gh-dojo`) from Git Bash and install it as a local extension;
+gh runs local extensions through Git for Windows' `sh`, and they follow the
+working copy, so rebuild after switching branches:
+
+```sh
+go build -ldflags "-X main.version=$(git describe --always --dirty)" -o gh-dojo.exe ./cmd/gh-dojo
+gh extension install .
+```
 
 gh-dojo uses gh's authentication (or `GH_TOKEN`). Projects need the `project`
 scope: `gh auth refresh -s project`.
