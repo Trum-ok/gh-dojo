@@ -10,7 +10,8 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  # OS-independent checks, run once.
+  checks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -26,8 +27,36 @@ jobs:
       - name: Tidy
         run: go mod tidy -diff
       - name: Vet
-        run: go vet ./...
+        run: |
+          go vet ./...
+          GOOS=windows go vet ./...
+          GOOS=darwin go vet ./...
+      # The same script the release workflow runs, so a broken release build
+      # shows up before a tag is pushed.
+      - name: Release build
+        run: |
+          script/build-release.sh v0.0.0-ci
+          dist/gh-dojo_v0.0.0-ci_linux-amd64 --version | grep -Fx "gh dojo version v0.0.0-ci"
+
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            race: -race
+          - os: macos-latest
+          - os: windows-latest
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
       - name: Test
-        run: go test ./...
+        run: go test ${{ matrix.race }} ./...
       - name: Build
         run: go build ./...

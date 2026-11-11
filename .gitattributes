@@ -1,0 +1,4 @@
+# LF everywhere, Windows checkouts included (GitHub's Windows runners set
+# core.autocrlf=true): golden files, README examples and embedded presets are
+# compared and parsed byte for byte, and the release script runs under bash.
+* text=auto eol=lf
