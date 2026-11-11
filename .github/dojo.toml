@@ -1,0 +1,38 @@
+# Процесс gh-dojo: задачи ведутся только через `gh dojo`.
+# Ready — сделано, проверено и закоммичено в main; Done — вошло в релиз.
+
+version = 1
+preset = "kanban"
+
+[board]
+owner = "Trum-ok"
+project = 5
+repos = ["Trum-ok/gh-dojo"]
+assignee = "@me"
+
+[labels]
+types = ["bug", "enhancement", "documentation", "dogfood"]
+
+[session]
+env = ["CLAUDE_CODE_HOST_SESSION_ID"]
+link = "claude://claude.ai/epitaxy/{id}"
+
+[verbs.start]
+when = "берёшь задачу в работу"
+comment = """
+Взял в работу. Сессия: {session}
+
+{comment}"""
+
+[verbs.wait]
+when = "работа встала: ждём другую задачу или внешнее решение"
+comment = """
+Ждём {by}.
+
+{comment}"""
+
+[verbs.ready]
+when = "сделано, проверено и закоммичено в main"
+
+[verbs.done]
+when = "изменение вошло в релиз"
