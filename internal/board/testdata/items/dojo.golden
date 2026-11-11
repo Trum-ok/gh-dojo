@@ -1,4 +1,6 @@
 viewer: Trum-ok
+status field: PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ
+total: 14
 incomplete: false
 - Trum-ok/gh-dojo#1 OPEN status="Ready" "Каркас: Go-модуль, cobra и установка как расширение gh" labels=[]/0 assignees=[]/0
 - Trum-ok/gh-dojo#2 OPEN status="Ready" "Коды выхода и короткие ошибки (internal/render)" labels=[]/0 assignees=[]/0

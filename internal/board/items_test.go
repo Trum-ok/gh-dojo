@@ -39,8 +39,9 @@ func TestItemsRecorded(t *testing.T) {
 }
 
 // TestItemsPages reads a hand-crafted board of two pages with a draft, a
-// pull request, an item hidden from the token (a FORBIDDEN error on its
-// content), and an issue with more labels and assignees than the windows.
+// pull request, an item whose content the token cannot see, a null item,
+// assignees withheld below one issue's content, an issue repeated on page 2
+// and an issue with more labels and assignees than the windows.
 func TestItemsPages(t *testing.T) {
 	items, srv, err := readItems(t, dojoItemsBoard, fixture("items_two_pages"))
 	if err != nil {
@@ -48,6 +49,11 @@ func TestItemsPages(t *testing.T) {
 	}
 	if n := srv.Requests(); n != 2 {
 		t.Errorf("requests = %d, want 2", n)
+	}
+	// The repeat is dropped, the null item and the hidden content are
+	// hidden items, and only the withheld assignees make it incomplete.
+	if len(items.Items) != 13 || items.TotalCount != 13 || !items.Incomplete {
+		t.Errorf("items %d, total %d, incomplete %v; want 13, 13, true", len(items.Items), items.TotalCount, items.Incomplete)
 	}
 	testutil.Golden(t, "items/two_pages", dumpItems(items))
 }
@@ -62,7 +68,8 @@ func TestItemsBoardNotFound(t *testing.T) {
 
 func dumpItems(items *board.Items) []byte {
 	var b strings.Builder
-	fmt.Fprintf(&b, "viewer: %s\nincomplete: %v\n", items.Viewer, items.Incomplete)
+	fmt.Fprintf(&b, "viewer: %s\nstatus field: %s\ntotal: %d\nincomplete: %v\n",
+		items.Viewer, items.StatusFieldID, items.TotalCount, items.Incomplete)
 	for _, it := range items.Items {
 		if it.Type != board.ContentIssue {
 			fmt.Fprintf(&b, "- %q status=%q\n", it.Type, it.Status)

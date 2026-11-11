@@ -2,4 +2,4 @@ code: 1
 --- stdout
 --- stderr
 error: unknown status "in progres"; did you mean "In progress"?
-allowed: Backlog, Ready, In progress, In review, Waiting, Done
+allowed: Backlog, Ready, In progress, In review, Waiting, Done, none

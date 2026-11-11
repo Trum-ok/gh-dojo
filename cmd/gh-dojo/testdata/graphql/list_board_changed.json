@@ -1,0 +1,138 @@
+{
+  "comment": "Hand-crafted: the gh-dojo board changing between two pages: issue #1 shows up on both and an item was added (totalCount 3, 2 issues read). Query copied from internal/board/testdata/graphql/items_dojo.json.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "BoardItems",
+      "query": "query BoardItems($owner: String!, $number: Int!, $status: String!, $cursor: String) {\n  viewer { login }\n  repositoryOwner(login: $owner) {\n    ... on User { projectV2(number: $number) { ...items } }\n    ... on Organization { projectV2(number: $number) { ...items } }\n  }\n}\n\nfragment items on ProjectV2 {\n  field(name: $status) { ... on ProjectV2SingleSelectField { id } }\n  items(first: 100, after: $cursor) {\n    totalCount\n    pageInfo { hasNextPage endCursor }\n    nodes {\n      status: fieldValueByName(name: $status) {\n        ... on ProjectV2ItemFieldSingleSelectValue { name }\n      }\n      content {\n        __typename\n        ... on Issue {\n          number\n          title\n          state\n          repository { nameWithOwner }\n          labels(first: 100) { totalCount nodes { name } }\n          assignees(first: 10) { totalCount nodes { login } }\n        }\n      }\n    }\n  }\n}",
+      "variables": {
+        "cursor": null,
+        "number": 5,
+        "owner": "Trum-ok",
+        "status": "Status"
+      },
+      "response": {
+        "data": {
+          "viewer": {
+            "login": "Trum-ok"
+          },
+          "repositoryOwner": {
+            "projectV2": {
+              "field": {
+                "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ"
+              },
+              "items": {
+                "totalCount": 2,
+                "pageInfo": {
+                  "hasNextPage": true,
+                  "endCursor": "MQ"
+                },
+                "nodes": [
+                  {
+                    "status": {
+                      "name": "Backlog"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 1,
+                      "title": "First",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "Trum-ok/gh-dojo"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "BoardItems",
+      "query": "query BoardItems($owner: String!, $number: Int!, $status: String!, $cursor: String) {\n  viewer { login }\n  repositoryOwner(login: $owner) {\n    ... on User { projectV2(number: $number) { ...items } }\n    ... on Organization { projectV2(number: $number) { ...items } }\n  }\n}\n\nfragment items on ProjectV2 {\n  field(name: $status) { ... on ProjectV2SingleSelectField { id } }\n  items(first: 100, after: $cursor) {\n    totalCount\n    pageInfo { hasNextPage endCursor }\n    nodes {\n      status: fieldValueByName(name: $status) {\n        ... on ProjectV2ItemFieldSingleSelectValue { name }\n      }\n      content {\n        __typename\n        ... on Issue {\n          number\n          title\n          state\n          repository { nameWithOwner }\n          labels(first: 100) { totalCount nodes { name } }\n          assignees(first: 10) { totalCount nodes { login } }\n        }\n      }\n    }\n  }\n}",
+      "variables": {
+        "cursor": "MQ",
+        "number": 5,
+        "owner": "Trum-ok",
+        "status": "Status"
+      },
+      "response": {
+        "data": {
+          "viewer": {
+            "login": "Trum-ok"
+          },
+          "repositoryOwner": {
+            "projectV2": {
+              "field": {
+                "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ"
+              },
+              "items": {
+                "totalCount": 3,
+                "pageInfo": {
+                  "hasNextPage": false,
+                  "endCursor": "Mg"
+                },
+                "nodes": [
+                  {
+                    "status": {
+                      "name": "Backlog"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 1,
+                      "title": "First",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "Trum-ok/gh-dojo"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "Ready"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 2,
+                      "title": "Second",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "Trum-ok/gh-dojo"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

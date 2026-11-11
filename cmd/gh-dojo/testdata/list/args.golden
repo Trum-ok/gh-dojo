@@ -1,5 +1,4 @@
 code: 1
 --- stdout
 --- stderr
-error: unknown command "42" for "gh dojo list"
-fix: gh dojo list --help
+error: list takes no arguments; to see one issue: gh dojo show 42

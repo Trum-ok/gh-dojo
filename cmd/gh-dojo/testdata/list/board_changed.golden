@@ -1,0 +1,8 @@
+code: 0
+--- stdout
+Backlog (1)
+  #1 First
+Ready (1)
+  #2 Second
+--- stderr
+warning: the board changed while it was read (2 items read, GitHub reports 3); run again for an exact list

@@ -1,0 +1,10 @@
+code: 0
+--- stdout
+In progress (2)
+  #23 Fix login redirect [bug] @Trum-ok @alice
+  acme/shop#7 Cross-repo task @alice
+hidden: 1 closed, use --all
+filtered out: 6 issues not matching --status
+skipped: 1 draft issue, 1 pull request, 2 items the token cannot see (list shows issues only)
+--- stderr
+warning: GitHub withheld parts of some board items from this token; their lines may be incomplete

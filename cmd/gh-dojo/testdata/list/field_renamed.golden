@@ -1,0 +1,6 @@
+code: 1
+--- stdout
+--- stderr
+error: .github/dojo.toml: fields.status (from preset kanban): unknown field "Status" on board Trum-ok/5; did you mean "State"?
+allowed: State, Priority, Size, Estimate, Start date, Target date
+fix: set fields.status in .github/dojo.toml to override preset kanban

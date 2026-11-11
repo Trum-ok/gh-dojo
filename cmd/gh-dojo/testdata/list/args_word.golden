@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: list takes no arguments
+fix: gh dojo list --help

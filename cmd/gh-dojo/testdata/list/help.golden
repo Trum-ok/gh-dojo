@@ -14,6 +14,7 @@ Usage:
 Examples:
   gh dojo list
   gh dojo list --status "In progress" --mine
+  gh dojo list --status none
   gh dojo list --label bug --label area:cli --limit 100
 
 Flags:
@@ -22,5 +23,5 @@ Flags:
       --label stringArray    only issues with this label; repeat to require several
       --limit int            print at most this many issues (default 50)
       --mine                 only issues assigned to you
-      --status stringArray   only issues in this status; repeat for several
+      --status stringArray   only issues in this status ("none": without a status); repeat for several
 --- stderr

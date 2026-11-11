@@ -9,54 +9,91 @@ import (
 	"github.com/Trum-ok/gh-dojo/internal/testutil"
 )
 
-// Board items fixtures, owned by internal/board: the gh-dojo board as
-// recorded (14 open issues, one page) and a hand-crafted board of two
-// pages with every kind of item list handles.
+// Board items fixtures. Owned by internal/board: the gh-dojo board as
+// recorded (14 open issues, one page) and a hand-crafted board of two pages
+// with every kind of item list handles. Hand-crafted here: scenarios only
+// list cares about.
 const (
 	itemsFixture         = "../../internal/board/testdata/graphql/items_dojo.json"
 	itemsTwoPagesFixture = "../../internal/board/testdata/graphql/items_two_pages.json"
+	listLabelsFixture    = "testdata/graphql/list_labels.json"
+	listChangedFixture   = "testdata/graphql/list_board_changed.json"
+	listRenamedFixture   = "testdata/graphql/list_field_renamed.json"
 )
 
 func TestList(t *testing.T) {
 	tests := []struct {
 		name     string
-		fixtures []string
+		fixtures []string // nil: nothing may reach GitHub
+		warm     bool     // read the schema into the cache first (not counted)
 		args     []string
 		code     render.Code
 		requests int
 	}{
 		// The recorded board: schema (cold cache) + one page of items.
-		{"recorded", []string{itemsFixture}, nil, 0, 2},
-		{"recorded_status", []string{itemsFixture}, []string{"--status", "In progress", "--status", "Backlog"}, 0, 2},
-		{"recorded_limit", []string{itemsFixture}, []string{"--limit", "8"}, 0, 2},
+		{name: "recorded", fixtures: []string{boardFixture, itemsFixture}, requests: 2},
+		{name: "recorded_status", fixtures: []string{boardFixture, itemsFixture},
+			args: []string{"--status", "In progress", "--status", "Backlog"}, requests: 2},
+		{name: "recorded_limit", fixtures: []string{boardFixture, itemsFixture}, args: []string{"--limit", "8"}, requests: 2},
 		// The hand-crafted board: schema + two pages of items.
-		{"default", []string{itemsTwoPagesFixture}, nil, 0, 3},
-		{"all", []string{itemsTwoPagesFixture}, []string{"--all"}, 0, 3},
-		{"mine_label", []string{itemsTwoPagesFixture}, []string{"--mine", "--label", "BUG"}, 0, 3},
-		{"labels_and", []string{itemsTwoPagesFixture}, []string{"--label", "bug", "--label", "area:cli"}, 0, 3},
-		{"final_status", []string{itemsTwoPagesFixture}, []string{"--status", "Done"}, 0, 3},
-		{"limit", []string{itemsTwoPagesFixture}, []string{"--limit", "2"}, 0, 3},
-		{"nothing", []string{itemsTwoPagesFixture}, []string{"--status", "Ready"}, 0, 3},
+		{name: "default", fixtures: []string{boardFixture, itemsTwoPagesFixture}, requests: 3},
+		{name: "all", fixtures: []string{boardFixture, itemsTwoPagesFixture}, args: []string{"--all"}, requests: 3},
+		{name: "mine_label", fixtures: []string{boardFixture, itemsTwoPagesFixture},
+			args: []string{"--mine", "--label", "BUG"}, requests: 3},
+		{name: "labels_and", fixtures: []string{boardFixture, itemsTwoPagesFixture},
+			args: []string{"--label", "bug", "--label", "area:cli"}, requests: 3},
+		{name: "final_status", fixtures: []string{boardFixture, itemsTwoPagesFixture},
+			args: []string{"--status", "Done"}, requests: 3},
+		// With --status, final statuses are filtered out: only "closed" is hidden.
+		{name: "status_hidden_closed", fixtures: []string{boardFixture, itemsTwoPagesFixture},
+			args: []string{"--status", "In progress"}, requests: 3},
+		{name: "status_none", fixtures: []string{boardFixture, itemsTwoPagesFixture},
+			args: []string{"--status", "none", "--status", "Waiting"}, requests: 3},
+		{name: "limit", fixtures: []string{boardFixture, itemsTwoPagesFixture}, args: []string{"--limit", "2"}, requests: 3},
+		{name: "nothing", fixtures: []string{boardFixture, itemsTwoPagesFixture}, args: []string{"--status", "Ready"}, requests: 3},
+		// #27 has 102 labels, 100 read: it may have the label, so it is shown
+		// and counted as not fully checked; no typo error either.
+		{name: "label_window", fixtures: []string{boardFixture, itemsTwoPagesFixture},
+			args: []string{"--label", "l102"}, requests: 3},
+		// A cached schema without the status "Icebox" an item has: re-read once.
+		{name: "stale_item_status", fixtures: []string{boardFixture, itemsTwoPagesFixture}, warm: true, requests: 3},
+		// The status field renamed since the schema was cached: the re-read
+		// schema fails the config check (#6).
+		{name: "field_renamed", fixtures: []string{listRenamedFixture}, warm: true, code: render.ExitUsage, requests: 2},
+		{name: "board_changed", fixtures: []string{boardFixture, listChangedFixture}, requests: 3},
+		// --label checks against every issue on the board, closed ones too.
+		{name: "label_typo", fixtures: []string{boardFixture, listLabelsFixture},
+			args: []string{"--label", "bgu"}, code: render.ExitUsage, requests: 2},
+		{name: "label_closed_only", fixtures: []string{boardFixture, listLabelsFixture},
+			args: []string{"--label", "wontfix"}, requests: 2},
 		// Bad flags fail before the items are read.
-		{"unknown_status", nil, []string{"--status", "in progres"}, render.ExitUsage, 1},
-		{"unknown_status_far", nil, []string{"--status", "Blocked"}, render.ExitUsage, 1},
-		{"bad_limit", nil, []string{"--limit", "0"}, render.ExitUsage, 0},
-		{"args", nil, []string{"42"}, render.ExitUsage, 0},
+		{name: "unknown_status", fixtures: []string{boardFixture}, args: []string{"--status", "in progres"}, code: render.ExitUsage, requests: 1},
+		{name: "unknown_status_far", fixtures: []string{boardFixture}, args: []string{"--status", "Blocked"}, code: render.ExitUsage, requests: 1},
+		{name: "bad_limit", args: []string{"--limit", "0"}, code: render.ExitUsage},
+		{name: "args", args: []string{"42"}, code: render.ExitUsage},
+		{name: "args_word", args: []string{"bugs"}, code: render.ExitUsage},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			withConfig(t, dojoConfig)
 			var srv *graphtest.Server
-			if tt.requests > 0 { // else newApp panics: nothing may reach GitHub
-				srv = withApp(t, append([]string{boardFixture}, tt.fixtures...)...)
+			if tt.fixtures != nil {
+				srv = withApp(t, tt.fixtures...)
+			}
+			before := 0
+			if tt.warm {
+				if _, err := newApp().Schema(context.Background()); err != nil {
+					t.Fatal(err)
+				}
+				before = srv.Requests()
 			}
 			code, out := runOut(append([]string{"list"}, tt.args...)...)
 			if code != tt.code {
 				t.Errorf("code = %d, want %d\n%s", code, tt.code, out)
 			}
 			testutil.Golden(t, "list/"+tt.name, out)
-			if srv != nil && srv.Requests() != tt.requests {
-				t.Errorf("requests = %d, want %d", srv.Requests(), tt.requests)
+			if srv != nil && srv.Requests()-before != tt.requests {
+				t.Errorf("requests = %d, want %d", srv.Requests()-before, tt.requests)
 			}
 		})
 	}

@@ -1,0 +1,10 @@
+code: 0
+--- stdout
+No status (1)
+  #21 Triage me [bug]
+Waiting (1)
+  #27 Many labels and assignees [l001, l002, l003, l004, l005, +97 more] @u01 @u02 @u03 @u04 @u05 @u06 @u07 @u08 @u09 @u10 +2 more
+filtered out: 7 issues not matching --status
+skipped: 1 draft issue, 1 pull request, 2 items the token cannot see (list shows issues only)
+--- stderr
+warning: GitHub withheld parts of some board items from this token; their lines may be incomplete

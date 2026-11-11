@@ -1,0 +1,6 @@
+code: 0
+--- stdout
+no issues to show
+hidden: 1 closed or Done, use --all
+filtered out: 2 issues not matching --label
+--- stderr
