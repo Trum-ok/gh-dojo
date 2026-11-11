@@ -1,0 +1,7 @@
+code: 0
+--- stdout
+no issues to show
+filtered out: 9 issues not matching --label
+skipped: 1 draft issue, 1 pull request, 1 item the token cannot see (list shows issues only)
+--- stderr
+warning: GitHub withheld parts of some board items from this token; the list may be incomplete

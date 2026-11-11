@@ -16,6 +16,7 @@ Process verbs (from .github/dojo.toml):
 
 Additional Commands:
   help        Help about any command
+  list        See what is on the board: one line per open issue, grouped by status
   show        Read issues before working on them: board status, blockers, history, description, comments
 
 Flags:

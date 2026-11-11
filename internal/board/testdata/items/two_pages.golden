@@ -1,0 +1,14 @@
+viewer: Trum-ok
+incomplete: true
+- Trum-ok/gh-dojo#21 OPEN status="" "Triage me" labels=[bug]/1 assignees=[]/0
+- "DraftIssue" status="Backlog"
+- Trum-ok/gh-dojo#22 OPEN status="Backlog" "Add --json to list" labels=[enhancement area:cli]/2 assignees=[Trum-ok]/1
+- Trum-ok/gh-dojo#23 OPEN status="In progress" "Fix   login\tredirect" labels=[bug]/1 assignees=[Trum-ok alice]/2
+- acme/shop#7 OPEN status="In progress" "Cross-repo task" labels=[]/0 assignees=[alice]/1
+- "PullRequest" status="In review"
+- Trum-ok/gh-dojo#24 CLOSED status="In progress" "Closed without moving" labels=[bug]/1 assignees=[Trum-ok]/1
+- Trum-ok/gh-dojo#25 CLOSED status="Done" "Shipped" labels=[]/0 assignees=[]/0
+- Trum-ok/gh-dojo#26 OPEN status="Done" "Released, issue still open" labels=[bug]/1 assignees=[Trum-ok]/1
+- Trum-ok/gh-dojo#27 OPEN status="Waiting" "Many labels and assignees" labels=[l01 l02 l03 l04 l05 l06 l07 l08 l09 l10 l11 l12 l13 l14 l15 l16 l17 l18 l19 l20]/22 assignees=[u01 u02 u03 u04 u05 u06 u07 u08 u09 u10]/12
+- Trum-ok/gh-dojo#28 OPEN status="Icebox" "Status the board no longer has" labels=[bug]/1 assignees=[]/0
+- "" status=""

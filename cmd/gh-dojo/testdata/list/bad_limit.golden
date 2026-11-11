@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: invalid --limit 0: want 1 or greater
+fix: gh dojo list --help

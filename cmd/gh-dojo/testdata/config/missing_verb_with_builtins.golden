@@ -2,5 +2,5 @@ code: 1
 --- stdout
 --- stderr
 error: unknown command "start"; verbs unavailable: no .github/dojo.toml found
-allowed: board, boom, denied, one, show
+allowed: board, boom, denied, list, one, show
 fix: gh dojo --help

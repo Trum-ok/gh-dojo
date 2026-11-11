@@ -1,0 +1,16 @@
+viewer: Trum-ok
+incomplete: false
+- Trum-ok/gh-dojo#1 OPEN status="Ready" "Каркас: Go-модуль, cobra и установка как расширение gh" labels=[]/0 assignees=[]/0
+- Trum-ok/gh-dojo#2 OPEN status="Ready" "Коды выхода и короткие ошибки (internal/render)" labels=[]/0 assignees=[]/0
+- Trum-ok/gh-dojo#3 OPEN status="Ready" "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)" labels=[]/0 assignees=[]/0
+- Trum-ok/gh-dojo#4 OPEN status="Ready" "Пресет kanban через embed.FS" labels=[]/0 assignees=[]/0
+- Trum-ok/gh-dojo#5 OPEN status="Ready" "GraphQL-клиент и схема доски с кэшем (internal/graph, internal/board)" labels=[]/0 assignees=[]/0
+- Trum-ok/gh-dojo#6 OPEN status="Ready" "Сверка конфига с доской" labels=[]/0 assignees=[]/0
+- Trum-ok/gh-dojo#7 OPEN status="In progress" "Команда show <N>…" labels=[]/0 assignees=[]/0
+- Trum-ok/gh-dojo#8 OPEN status="In progress" "Команда list" labels=[]/0 assignees=[]/0
+- Trum-ok/gh-dojo#9 OPEN status="In progress" "Команда new: issue + метки + доска + стартовый статус" labels=[]/0 assignees=[]/0
+- Trum-ok/gh-dojo#10 OPEN status="In progress" "Команда comment" labels=[]/0 assignees=[]/0
+- Trum-ok/gh-dojo#11 OPEN status="In progress" "Глаголы из конфига: проверки и план эффектов (internal/workflow)" labels=[]/0 assignees=[]/0
+- Trum-ok/gh-dojo#12 OPEN status="In progress" "Исполнение глагола: эффекты status и comment одной мутацией (internal/effects)" labels=[]/0 assignees=[]/0
+- Trum-ok/gh-dojo#13 OPEN status="Backlog" "Доска и .github/dojo.toml для самого gh-dojo" labels=[]/0 assignees=[]/0
+- Trum-ok/gh-dojo#14 OPEN status="Backlog" "Skill для агентов и переход на gh dojo (рубеж v0.0)" labels=[]/0 assignees=[]/0

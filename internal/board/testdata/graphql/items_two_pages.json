@@ -1,0 +1,444 @@
+{
+  "comment": "Hand-crafted: two pages of the gh-dojo board (user Trum-ok, project 5) with every kind of item list must handle: no status, closed, final, other repo, draft, pull request, label and assignee windows overflowing, a status the board no longer has, and an item the token cannot see (FORBIDDEN on its content, shaped like GitHub's partial-data errors). Query copied from items_dojo.json.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "BoardItems",
+      "query": "query BoardItems($owner: String!, $number: Int!, $status: String!, $cursor: String) {\n  viewer { login }\n  repositoryOwner(login: $owner) {\n    ... on User { projectV2(number: $number) { ...items } }\n    ... on Organization { projectV2(number: $number) { ...items } }\n  }\n}\n\nfragment items on ProjectV2 {\n  items(first: 100, after: $cursor) {\n    totalCount\n    pageInfo { hasNextPage endCursor }\n    nodes {\n      status: fieldValueByName(name: $status) {\n        ... on ProjectV2ItemFieldSingleSelectValue { name }\n      }\n      content {\n        __typename\n        ... on Issue {\n          number\n          title\n          state\n          repository { nameWithOwner }\n          labels(first: 20) { totalCount nodes { name } }\n          assignees(first: 10) { totalCount nodes { login } }\n        }\n      }\n    }\n  }\n}",
+      "variables": {
+        "cursor": null,
+        "number": 5,
+        "owner": "Trum-ok",
+        "status": "Status"
+      },
+      "response": {
+        "data": {
+          "viewer": {
+            "login": "Trum-ok"
+          },
+          "repositoryOwner": {
+            "projectV2": {
+              "items": {
+                "totalCount": 12,
+                "pageInfo": {
+                  "hasNextPage": true,
+                  "endCursor": "Y3Vyc29yOnYyOpMGAA"
+                },
+                "nodes": [
+                  {
+                    "status": null,
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 21,
+                      "title": "Triage me",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "Trum-ok/gh-dojo"
+                      },
+                      "labels": {
+                        "totalCount": 1,
+                        "nodes": [
+                          {
+                            "name": "bug"
+                          }
+                        ]
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "Backlog"
+                    },
+                    "content": {
+                      "__typename": "DraftIssue"
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "Backlog"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 22,
+                      "title": "Add --json to list",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "Trum-ok/gh-dojo"
+                      },
+                      "labels": {
+                        "totalCount": 2,
+                        "nodes": [
+                          {
+                            "name": "enhancement"
+                          },
+                          {
+                            "name": "area:cli"
+                          }
+                        ]
+                      },
+                      "assignees": {
+                        "totalCount": 1,
+                        "nodes": [
+                          {
+                            "login": "Trum-ok"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "In progress"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 23,
+                      "title": "Fix   login\tredirect",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "Trum-ok/gh-dojo"
+                      },
+                      "labels": {
+                        "totalCount": 1,
+                        "nodes": [
+                          {
+                            "name": "bug"
+                          }
+                        ]
+                      },
+                      "assignees": {
+                        "totalCount": 2,
+                        "nodes": [
+                          {
+                            "login": "Trum-ok"
+                          },
+                          {
+                            "login": "alice"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "In progress"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 7,
+                      "title": "Cross-repo task",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "acme/shop"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 1,
+                        "nodes": [
+                          {
+                            "login": "alice"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "In review"
+                    },
+                    "content": {
+                      "__typename": "PullRequest"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "BoardItems",
+      "query": "query BoardItems($owner: String!, $number: Int!, $status: String!, $cursor: String) {\n  viewer { login }\n  repositoryOwner(login: $owner) {\n    ... on User { projectV2(number: $number) { ...items } }\n    ... on Organization { projectV2(number: $number) { ...items } }\n  }\n}\n\nfragment items on ProjectV2 {\n  items(first: 100, after: $cursor) {\n    totalCount\n    pageInfo { hasNextPage endCursor }\n    nodes {\n      status: fieldValueByName(name: $status) {\n        ... on ProjectV2ItemFieldSingleSelectValue { name }\n      }\n      content {\n        __typename\n        ... on Issue {\n          number\n          title\n          state\n          repository { nameWithOwner }\n          labels(first: 20) { totalCount nodes { name } }\n          assignees(first: 10) { totalCount nodes { login } }\n        }\n      }\n    }\n  }\n}",
+      "variables": {
+        "cursor": "Y3Vyc29yOnYyOpMGAA",
+        "number": 5,
+        "owner": "Trum-ok",
+        "status": "Status"
+      },
+      "response": {
+        "data": {
+          "viewer": {
+            "login": "Trum-ok"
+          },
+          "repositoryOwner": {
+            "projectV2": {
+              "items": {
+                "totalCount": 12,
+                "pageInfo": {
+                  "hasNextPage": false,
+                  "endCursor": "Y3Vyc29yOnYyOpMMAA"
+                },
+                "nodes": [
+                  {
+                    "status": {
+                      "name": "In progress"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 24,
+                      "title": "Closed without moving",
+                      "state": "CLOSED",
+                      "repository": {
+                        "nameWithOwner": "Trum-ok/gh-dojo"
+                      },
+                      "labels": {
+                        "totalCount": 1,
+                        "nodes": [
+                          {
+                            "name": "bug"
+                          }
+                        ]
+                      },
+                      "assignees": {
+                        "totalCount": 1,
+                        "nodes": [
+                          {
+                            "login": "Trum-ok"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "Done"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 25,
+                      "title": "Shipped",
+                      "state": "CLOSED",
+                      "repository": {
+                        "nameWithOwner": "Trum-ok/gh-dojo"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "Done"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 26,
+                      "title": "Released, issue still open",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "Trum-ok/gh-dojo"
+                      },
+                      "labels": {
+                        "totalCount": 1,
+                        "nodes": [
+                          {
+                            "name": "bug"
+                          }
+                        ]
+                      },
+                      "assignees": {
+                        "totalCount": 1,
+                        "nodes": [
+                          {
+                            "login": "Trum-ok"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "Waiting"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 27,
+                      "title": "Many labels and assignees",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "Trum-ok/gh-dojo"
+                      },
+                      "labels": {
+                        "totalCount": 22,
+                        "nodes": [
+                          {
+                            "name": "l01"
+                          },
+                          {
+                            "name": "l02"
+                          },
+                          {
+                            "name": "l03"
+                          },
+                          {
+                            "name": "l04"
+                          },
+                          {
+                            "name": "l05"
+                          },
+                          {
+                            "name": "l06"
+                          },
+                          {
+                            "name": "l07"
+                          },
+                          {
+                            "name": "l08"
+                          },
+                          {
+                            "name": "l09"
+                          },
+                          {
+                            "name": "l10"
+                          },
+                          {
+                            "name": "l11"
+                          },
+                          {
+                            "name": "l12"
+                          },
+                          {
+                            "name": "l13"
+                          },
+                          {
+                            "name": "l14"
+                          },
+                          {
+                            "name": "l15"
+                          },
+                          {
+                            "name": "l16"
+                          },
+                          {
+                            "name": "l17"
+                          },
+                          {
+                            "name": "l18"
+                          },
+                          {
+                            "name": "l19"
+                          },
+                          {
+                            "name": "l20"
+                          }
+                        ]
+                      },
+                      "assignees": {
+                        "totalCount": 12,
+                        "nodes": [
+                          {
+                            "login": "u01"
+                          },
+                          {
+                            "login": "u02"
+                          },
+                          {
+                            "login": "u03"
+                          },
+                          {
+                            "login": "u04"
+                          },
+                          {
+                            "login": "u05"
+                          },
+                          {
+                            "login": "u06"
+                          },
+                          {
+                            "login": "u07"
+                          },
+                          {
+                            "login": "u08"
+                          },
+                          {
+                            "login": "u09"
+                          },
+                          {
+                            "login": "u10"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "Icebox"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 28,
+                      "title": "Status the board no longer has",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "Trum-ok/gh-dojo"
+                      },
+                      "labels": {
+                        "totalCount": 1,
+                        "nodes": [
+                          {
+                            "name": "bug"
+                          }
+                        ]
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      }
+                    }
+                  },
+                  {
+                    "status": null,
+                    "content": null
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "errors": [
+          {
+            "type": "FORBIDDEN",
+            "path": [
+              "repositoryOwner",
+              "projectV2",
+              "items",
+              "nodes",
+              5,
+              "content"
+            ],
+            "locations": [
+              {
+                "line": 14,
+                "column": 7
+              }
+            ],
+            "message": "Resource not accessible by integration"
+          }
+        ]
+      }
+    }
+  ]
+}

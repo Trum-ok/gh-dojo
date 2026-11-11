@@ -1,0 +1,26 @@
+code: 0
+--- stdout
+Use it to see what is on the board: one line per open issue, grouped by status
+in board order, issues without a status first.
+
+Closed issues and issues in a final status (statuses.final) are hidden and
+counted; --all shows them, and so does --status naming a final status.
+Filters combine with AND; the issues they leave out are counted. Only
+issues are listed: draft issues and pull requests on the board are counted.
+
+Usage:
+  gh dojo list [flags]
+
+Examples:
+  gh dojo list
+  gh dojo list --status "In progress" --mine
+  gh dojo list --label bug --label area:cli --limit 100
+
+Flags:
+      --all                  also show closed issues and issues in a final status
+  -h, --help                 help for list
+      --label stringArray    only issues with this label; repeat to require several
+      --limit int            print at most this many issues (default 50)
+      --mine                 only issues assigned to you
+      --status stringArray   only issues in this status; repeat for several
+--- stderr

@@ -1,0 +1,42 @@
+{
+  "comment": "Hand-crafted: a project number the owner does not have; error shape from GitHub's NOT_FOUND on projectV2(number:). Query copied from items_dojo.json.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "BoardItems",
+      "query": "query BoardItems($owner: String!, $number: Int!, $status: String!, $cursor: String) {\n  viewer { login }\n  repositoryOwner(login: $owner) {\n    ... on User { projectV2(number: $number) { ...items } }\n    ... on Organization { projectV2(number: $number) { ...items } }\n  }\n}\n\nfragment items on ProjectV2 {\n  items(first: 100, after: $cursor) {\n    totalCount\n    pageInfo { hasNextPage endCursor }\n    nodes {\n      status: fieldValueByName(name: $status) {\n        ... on ProjectV2ItemFieldSingleSelectValue { name }\n      }\n      content {\n        __typename\n        ... on Issue {\n          number\n          title\n          state\n          repository { nameWithOwner }\n          labels(first: 20) { totalCount nodes { name } }\n          assignees(first: 10) { totalCount nodes { login } }\n        }\n      }\n    }\n  }\n}",
+      "variables": {
+        "cursor": null,
+        "number": 99,
+        "owner": "Trum-ok",
+        "status": "Status"
+      },
+      "response": {
+        "data": {
+          "viewer": {
+            "login": "Trum-ok"
+          },
+          "repositoryOwner": {
+            "projectV2": null
+          }
+        },
+        "errors": [
+          {
+            "type": "NOT_FOUND",
+            "path": [
+              "repositoryOwner",
+              "projectV2"
+            ],
+            "locations": [
+              {
+                "line": 4,
+                "column": 21
+              }
+            ],
+            "message": "Could not resolve to a ProjectV2 with the number 99."
+          }
+        ]
+      }
+    }
+  ]
+}
