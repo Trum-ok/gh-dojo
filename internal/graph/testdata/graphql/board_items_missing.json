@@ -1,0 +1,10 @@
+{
+  "comment": "The connection's parent is null: Paginate stops with an empty page.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "BoardItems",
+      "response": {"data": {"user": null}}
+    }
+  ]
+}

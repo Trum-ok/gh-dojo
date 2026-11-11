@@ -1,0 +1,2 @@
+error: unknown field "status" on board Trum-ok/5; did you mean "Status"?
+allowed: Status, Priority, Size, Estimate, Start date, Target date

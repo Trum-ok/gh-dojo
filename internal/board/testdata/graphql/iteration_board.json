@@ -1,0 +1,55 @@
+{
+  "comment": "Organization board with an iteration field. Shape follows the recorded org_board.json plus ProjectV2IterationField.configuration from the GraphQL schema; IDs are made up.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "BoardSchema",
+      "variables": {"owner": "acme", "number": 3},
+      "response": {
+        "data": {
+          "repositoryOwner": {
+            "__typename": "Organization",
+            "login": "acme",
+            "projectV2": {
+              "id": "PVT_kwDOacme0003",
+              "title": "Shop",
+              "url": "https://github.com/orgs/acme/projects/3",
+              "closed": false,
+              "fields": {
+                "nodes": [
+                  {"id": "PVTF_acme_title", "name": "Title", "dataType": "TITLE"},
+                  {
+                    "id": "PVTSSF_acme_status",
+                    "name": "Status",
+                    "dataType": "SINGLE_SELECT",
+                    "options": [
+                      {"id": "f75ad846", "name": "Todo"},
+                      {"id": "47fc9ee4", "name": "In progress"},
+                      {"id": "98236657", "name": "Done"}
+                    ]
+                  },
+                  {
+                    "id": "PVTIF_acme_sprint",
+                    "name": "Sprint",
+                    "dataType": "ITERATION",
+                    "configuration": {
+                      "iterations": [
+                        {"id": "it12", "title": "Sprint 12", "startDate": "2026-11-09", "duration": 14},
+                        {"id": "it13", "title": "Sprint 13", "startDate": "2026-11-23", "duration": 14}
+                      ],
+                      "completedIterations": [
+                        {"id": "it11", "title": "Sprint 11", "startDate": "2026-10-26", "duration": 14},
+                        {"id": "it10", "title": "Sprint 10", "startDate": "2026-10-12", "duration": 14}
+                      ]
+                    }
+                  },
+                  {"id": "PVTF_acme_notes", "name": "Notes", "dataType": "TEXT"}
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

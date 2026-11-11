@@ -1,0 +1,2 @@
+error: unknown field "Sprint" on board Trum-ok/5
+allowed: Status, Priority, Size, Estimate, Start date, Target date

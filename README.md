@@ -151,3 +151,14 @@ Override `when` and `comment` to write them in your project's language.
 make build test vet
 make golden   # rewrite golden files after an intended output change (UPDATE_GOLDEN=1)
 ```
+
+Tests never touch the network: GraphQL responses are replayed from
+`testdata/graphql/*.json` (see `internal/graph/graphtest`). To re-record
+read-only fixtures from the real API with your gh token:
+
+```sh
+GH_DOJO_RECORD=1 go test ./internal/board -run TestUserBoard
+```
+
+The board schema cache lives in `~/.cache/gh-dojo` (override with
+`GH_DOJO_CACHE_DIR`) and expires after an hour.

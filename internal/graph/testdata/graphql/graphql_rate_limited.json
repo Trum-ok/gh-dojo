@@ -1,0 +1,14 @@
+{
+  "comment": "Primary rate limit reported inside a 200 GraphQL response (type RATE_LIMITED).",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "Viewer",
+      "response": {
+        "errors": [
+          {"type": "RATE_LIMITED", "message": "API rate limit exceeded for user ID 72457701."}
+        ]
+      }
+    }
+  ]
+}

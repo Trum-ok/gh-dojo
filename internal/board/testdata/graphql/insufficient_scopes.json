@@ -1,0 +1,20 @@
+{
+  "comment": "Token without the project scope reading a board. GitHub answers 200 with an INSUFFICIENT_SCOPES error and null data; message copied from a real response.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "BoardSchema",
+      "variables": {"owner": "Trum-ok", "number": 5},
+      "response": {
+        "data": {"repositoryOwner": {"__typename": "User", "login": "Trum-ok", "projectV2": null}},
+        "errors": [
+          {
+            "type": "INSUFFICIENT_SCOPES",
+            "locations": [{"line": 5, "column": 19}],
+            "message": "Your token has not been granted the required scopes to execute this query. The 'projectV2' field requires one of the following scopes: ['read:project'], but your token has only been granted the: ['gist', 'read:org', 'repo'] scopes. Please modify your token's scopes at: https://github.com/settings/tokens."
+          }
+        ]
+      }
+    }
+  ]
+}

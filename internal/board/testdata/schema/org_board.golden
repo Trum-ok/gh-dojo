@@ -1,0 +1,38 @@
+board github/4247 Organization "GitHub Public Roadmap" PVT_kwDNJr_NE10 https://github.com/orgs/github/projects/4247 closed=false
+  Title [TITLE] PVTF_lADNJr_NE13Nmlw
+  Assignees [ASSIGNEES] PVTF_lADNJr_NE13Nml0
+  Status [SINGLE_SELECT] PVTSSF_lADNJr_NE13Nml4
+    option "Up Next" f75ad846
+    option "Exploring" bebfd2a1
+    option "Shipped" 7bdf8bc2
+    option "Paused" 0b6e37be
+  Labels [LABELS] PVTF_lADNJr_NE13Nml8
+  Repository [REPOSITORY] PVTF_lADNJr_NE13NmmA
+  Milestone [MILESTONE] PVTF_lADNJr_NE13NmmE
+  Linked pull requests [LINKED_PULL_REQUESTS] PVTF_lADNJr_NE13OAAZC7g
+  Reviewers [REVIEWERS] PVTF_lADNJr_NE13OAAi8dQ
+  Parent issue [PARENT_ISSUE] PVTF_lADNJr_NE13OBX2eAw
+  Sub-issues progress [SUB_ISSUES_PROGRESS] PVTF_lADNJr_NE13OBX2eBA
+  Product Focus Area [SINGLE_SELECT] PVTSSF_lADNJr_NE13OCLgI8w
+    option "⛰ Platform for collaboration at scale" 3d325d0a
+    option "🌱 Secure at every step" a18553e0
+    option "🚀 Accelerate with AI" 4c464873
+  Release Phase [SINGLE_SELECT] PVTSSF_lADNJr_NE13OCOPQHA
+    option "GA" 2daad5d4
+    option "Public Preview" e1e121e4
+  Created [CREATED] PVTF_lADNJr_NE13OEG_BYQ
+  Updated [UPDATED] PVTF_lADNJr_NE13OEG_BZQ
+  Closed [CLOSED] PVTF_lADNJr_NE13OEG_BaA
+  Theme [SINGLE_SELECT] PVTSSF_lADNJr_NE13OFZ49Qw
+    option "People Stay In Flow" dc6f71ab
+    option "Teams Gain Velocity" 25175cf3
+    option "Companies Scale With Intelligence + Trust" 7864ece2
+  Quarter [SINGLE_SELECT] PVTSSF_lADNJr_NE13OFZ4-4Q
+    option "Q3 2025 – Jul-Sep" cbe2b75d
+    option "Q4 2025 – Oct-Dec" 06d3b931
+    option "Q1 2026 – Jan-Mar" bbf75708
+    option "Q2 2026 – Apr-Jun" 3463f1d4
+    option "Q3 2026 – Jul-Sep" 626207a8
+    option "Q4 2026 – Oct-Dec" dd0140ac
+    option "Future" baf825b3
+  Archive [DATE] PVTF_lADNJr_NE13OFqQyVg

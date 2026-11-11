@@ -1,0 +1,33 @@
+board Trum-ok/5 User "gh-dojo" PVT_kwHOBFGd5c4BrMYF https://github.com/users/Trum-ok/projects/5 closed=false
+  Title [TITLE] PVTF_lAHOBFGd5c4BrMYFzhpgKzI
+  Assignees [ASSIGNEES] PVTF_lAHOBFGd5c4BrMYFzhpgKzM
+  Status [SINGLE_SELECT] PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ
+    option "Backlog" f75ad846
+    option "Ready" 61e4505c
+    option "In progress" 47fc9ee4
+    option "In review" df73e18b
+    option "Waiting" f3ad4205
+    option "Done" 98236657
+  Labels [LABELS] PVTF_lAHOBFGd5c4BrMYFzhpgKzU
+  Linked pull requests [LINKED_PULL_REQUESTS] PVTF_lAHOBFGd5c4BrMYFzhpgKzY
+  Milestone [MILESTONE] PVTF_lAHOBFGd5c4BrMYFzhpgKzc
+  Repository [REPOSITORY] PVTF_lAHOBFGd5c4BrMYFzhpgKzg
+  Reviewers [REVIEWERS] PVTF_lAHOBFGd5c4BrMYFzhpgKzo
+  Parent issue [PARENT_ISSUE] PVTF_lAHOBFGd5c4BrMYFzhpgKzs
+  Sub-issues progress [SUB_ISSUES_PROGRESS] PVTF_lAHOBFGd5c4BrMYFzhpgKzw
+  Created [CREATED] PVTF_lAHOBFGd5c4BrMYFzhpgKz0
+  Updated [UPDATED] PVTF_lAHOBFGd5c4BrMYFzhpgKz4
+  Closed [CLOSED] PVTF_lAHOBFGd5c4BrMYFzhpgK0A
+  Priority [SINGLE_SELECT] PVTSSF_lAHOBFGd5c4BrMYFzhpgLFw
+    option "P0" 79628723
+    option "P1" 0a877460
+    option "P2" da944a9c
+  Size [SINGLE_SELECT] PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4
+    option "XS" 6c6483d2
+    option "S" f784b110
+    option "M" 7515a9f1
+    option "L" 817d0097
+    option "XL" db339eb2
+  Estimate [NUMBER] PVTF_lAHOBFGd5c4BrMYFzhpgLF8
+  Start date [DATE] PVTF_lAHOBFGd5c4BrMYFzhpgLGA
+  Target date [DATE] PVTF_lAHOBFGd5c4BrMYFzhpgLGE

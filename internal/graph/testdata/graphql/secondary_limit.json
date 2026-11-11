@@ -1,0 +1,19 @@
+{
+  "comment": "Secondary rate limit: 403 with Retry-After and GitHub's documented message, then success. Shape from https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api#exceeding-the-rate-limit",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "Viewer",
+      "status": 403,
+      "headers": {"Retry-After": "5"},
+      "response": {
+        "documentation_url": "https://docs.github.com/free-pro-team@latest/rest/overview/rate-limits-for-the-rest-api#about-secondary-rate-limits",
+        "message": "You have exceeded a secondary rate limit. Please wait a few minutes before you try again."
+      }
+    },
+    {
+      "operation": "Viewer",
+      "response": {"data": {"viewer": {"login": "Trum-ok"}}}
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "comment": "A mutation fails with 502; the client must not resend it.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "AddComment",
+      "variables": {"subject": "I_kwDOexample", "body": "hello"},
+      "status": 502,
+      "response": {"message": "Server Error"}
+    }
+  ]
+}

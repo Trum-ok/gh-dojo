@@ -1,0 +1,15 @@
+{
+  "comment": "Primary rate limit exhausted: 403 with X-RateLimit-Remaining: 0. Not retried: it resets in up to an hour.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "Viewer",
+      "status": 403,
+      "headers": {"X-RateLimit-Remaining": "0", "X-RateLimit-Reset": "1767225600"},
+      "response": {
+        "documentation_url": "https://docs.github.com/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api",
+        "message": "API rate limit exceeded for user ID 72457701."
+      }
+    }
+  ]
+}

@@ -1,0 +1,97 @@
+{
+  "comment": "Recorded: first two pages (5 items each) of the gh-dojo board items.",
+  "interactions": [
+    {
+      "operation": "BoardItems",
+      "query": "query BoardItems($owner: String!, $number: Int!, $cursor: String) {\n  user(login: $owner) {\n    projectV2(number: $number) {\n      items(first: 5, after: $cursor) {\n        totalCount\n        pageInfo { hasNextPage endCursor }\n        nodes { id type }\n      }\n    }\n  }\n}",
+      "variables": {
+        "cursor": null,
+        "number": 5,
+        "owner": "Trum-ok"
+      },
+      "response": {
+        "data": {
+          "user": {
+            "projectV2": {
+              "items": {
+                "totalCount": 14,
+                "pageInfo": {
+                  "hasNextPage": true,
+                  "endCursor": "Y3Vyc29yOnYyOpKqMDAwMDAwMDAuMs4R-ifi"
+                },
+                "nodes": [
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFzhH6JM0",
+                    "type": "ISSUE"
+                  },
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFzhH6Jbk",
+                    "type": "ISSUE"
+                  },
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFzhH6Jn8",
+                    "type": "ISSUE"
+                  },
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFzhH6J1s",
+                    "type": "ISSUE"
+                  },
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFzhH6J-I",
+                    "type": "ISSUE"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "BoardItems",
+      "query": "query BoardItems($owner: String!, $number: Int!, $cursor: String) {\n  user(login: $owner) {\n    projectV2(number: $number) {\n      items(first: 5, after: $cursor) {\n        totalCount\n        pageInfo { hasNextPage endCursor }\n        nodes { id type }\n      }\n    }\n  }\n}",
+      "variables": {
+        "cursor": "Y3Vyc29yOnYyOpKqMDAwMDAwMDAuMs4R-ifi",
+        "number": 5,
+        "owner": "Trum-ok"
+      },
+      "response": {
+        "data": {
+          "user": {
+            "projectV2": {
+              "items": {
+                "totalCount": 14,
+                "pageInfo": {
+                  "hasNextPage": true,
+                  "endCursor": "Y3Vyc29yOnYyOpKqMDAwMDAwMDAuMc4R-iwt"
+                },
+                "nodes": [
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFzhH6KKs",
+                    "type": "ISSUE"
+                  },
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFzhH6Kaw",
+                    "type": "ISSUE"
+                  },
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFzhH6KoQ",
+                    "type": "ISSUE"
+                  },
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFzhH6K1A",
+                    "type": "ISSUE"
+                  },
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFzhH6LC0",
+                    "type": "ISSUE"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

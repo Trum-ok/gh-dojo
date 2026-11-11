@@ -1,0 +1,117 @@
+package graphtest
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+// fakeTB records failures instead of failing the real test.
+type fakeTB struct {
+	testing.TB
+	errors   []string
+	cleanups []func()
+}
+
+func (f *fakeTB) Helper()           {}
+func (f *fakeTB) Name() string      { return "TestFake" }
+func (f *fakeTB) Failed() bool      { return len(f.errors) > 0 }
+func (f *fakeTB) Cleanup(fn func()) { f.cleanups = append(f.cleanups, fn) }
+func (f *fakeTB) Error(args ...any) { f.errors = append(f.errors, fmt.Sprint(args...)) }
+func (f *fakeTB) Errorf(format string, a ...any) {
+	f.errors = append(f.errors, fmt.Sprintf(format, a...))
+}
+func (f *fakeTB) Fatalf(format string, a ...any) { panic(fmt.Sprintf(format, a...)) }
+func (f *fakeTB) Logf(string, ...any)            {}
+func (f *fakeTB) Log(...any)                     {}
+func (f *fakeTB) Skipf(format string, a ...any)  { panic("skip: " + fmt.Sprintf(format, a...)) }
+func (f *fakeTB) finish() {
+	for _, fn := range f.cleanups {
+		fn()
+	}
+}
+
+func writeFixture(t *testing.T, body string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "f.json")
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+const viewerFixture = `{"interactions": [
+  {"operation": "Viewer", "variables": {"a": 1, "b": "x"}, "query": "query Viewer($a: Int, $b: String) { viewer { login } }",
+   "response": {"data": {"viewer": {"login": "me"}}}}
+]}`
+
+const viewerQuery = "query Viewer($a: Int, $b: String) {\n  viewer {\n    login\n  }\n}"
+
+func TestMatchIgnoresVariableOrderAndQueryWhitespace(t *testing.T) {
+	t.Setenv(recordEnv, "")
+	srv := New(t, writeFixture(t, viewerFixture))
+	var out struct {
+		Viewer struct{ Login string } `json:"viewer"`
+	}
+	if err := srv.Client().Do(context.Background(), viewerQuery, map[string]any{"b": "x", "a": 1}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if out.Viewer.Login != "me" {
+		t.Errorf("login = %q", out.Viewer.Login)
+	}
+}
+
+func TestUnexpectedRequestFails(t *testing.T) {
+	t.Setenv(recordEnv, "")
+	ft := &fakeTB{}
+	srv := New(ft, writeFixture(t, viewerFixture))
+	err := srv.Client().Do(context.Background(), viewerQuery, map[string]any{"a": 2, "b": "x"}, nil)
+	if err == nil {
+		t.Fatal("want error for an unknown request")
+	}
+	ft.finish()
+	if len(ft.errors) != 2 || !strings.Contains(ft.errors[0], `unexpected request Viewer {"a":2,"b":"x"}`) ||
+		!strings.Contains(ft.errors[1], "never requested") {
+		t.Errorf("errors = %q", ft.errors)
+	}
+}
+
+func TestStaleQueryFails(t *testing.T) {
+	t.Setenv(recordEnv, "")
+	ft := &fakeTB{}
+	srv := New(ft, writeFixture(t, viewerFixture))
+	q := "query Viewer($a: Int, $b: String) { viewer { login name } }"
+	if err := srv.Client().Do(context.Background(), q, map[string]any{"a": 1, "b": "x"}, nil); err == nil {
+		t.Fatal("want error for a changed query")
+	}
+	if len(ft.errors) == 0 || !strings.Contains(ft.errors[0], "different query") {
+		t.Errorf("errors = %q", ft.errors)
+	}
+}
+
+func TestRepeatsInOrderThenSticky(t *testing.T) {
+	t.Setenv(recordEnv, "")
+	srv := New(t, writeFixture(t, `{"interactions": [
+  {"operation": "Viewer", "response": {"data": {"viewer": {"login": "first"}}}},
+  {"operation": "Viewer", "response": {"data": {"viewer": {"login": "second"}}}}
+]}`))
+	var got []string
+	for range 3 {
+		var out struct {
+			Viewer struct{ Login string } `json:"viewer"`
+		}
+		if err := srv.Client().Do(context.Background(), viewerQuery, nil, &out); err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, out.Viewer.Login)
+	}
+	if strings.Join(got, ",") != "first,second,second" {
+		t.Errorf("answers = %v", got)
+	}
+	if srv.Requests() != 3 {
+		t.Errorf("requests = %d", srv.Requests())
+	}
+}

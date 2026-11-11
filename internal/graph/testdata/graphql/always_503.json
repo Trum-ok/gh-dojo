@@ -1,0 +1,11 @@
+{
+  "comment": "GitHub keeps answering 503; the single interaction answers every attempt.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "Viewer",
+      "status": 503,
+      "response": {"message": "Service Unavailable"}
+    }
+  ]
+}

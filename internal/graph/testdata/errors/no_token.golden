@@ -1,0 +1,2 @@
+error: not logged in to GitHub (github.com)
+fix: gh auth login -s project

@@ -1,0 +1,2 @@
+error: GitHub token is missing a required scope (read:project)
+fix: gh auth refresh -s project

@@ -1,0 +1,14 @@
+{
+  "comment": "A made-up error whose message contains the (fake) token, to prove the client scrubs it.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "Viewer",
+      "response": {
+        "errors": [
+          {"type": "SOMETHING", "message": "token ghp_graphtestFAKEtoken0000000000000000000 is weird"}
+        ]
+      }
+    }
+  ]
+}

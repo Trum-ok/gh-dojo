@@ -1,0 +1,12 @@
+board acme/3 Organization "Shop" PVT_kwDOacme0003 https://github.com/orgs/acme/projects/3 closed=false
+  Title [TITLE] PVTF_acme_title
+  Status [SINGLE_SELECT] PVTSSF_acme_status
+    option "Todo" f75ad846
+    option "In progress" 47fc9ee4
+    option "Done" 98236657
+  Sprint [ITERATION] PVTIF_acme_sprint
+    iteration "Sprint 12" it12 2026-11-09 +14d completed=false
+    iteration "Sprint 13" it13 2026-11-23 +14d completed=false
+    iteration "Sprint 11" it11 2026-10-26 +14d completed=true
+    iteration "Sprint 10" it10 2026-10-12 +14d completed=true
+  Notes [TEXT] PVTF_acme_notes

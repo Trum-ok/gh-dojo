@@ -1,0 +1,2 @@
+error: unknown status "In progres"; did you mean "In progress"?
+allowed: Backlog, Ready, In progress, In review, Waiting, Done
