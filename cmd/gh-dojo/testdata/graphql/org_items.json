@@ -1,0 +1,347 @@
+{
+  "comment": "Hand-crafted from internal/board/testdata/graphql/items_dojo.json (recorded): board user Trum-ok/5 renamed to organization acme, project 3 (Organization, org-style project, field and item IDs, /orgs/ URL), repository Trum-ok/gh-dojo to acme/shop.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "BoardItems",
+      "query": "query BoardItems($owner: String!, $number: Int!, $status: String!, $cursor: String) {\n  viewer { login }\n  repositoryOwner(login: $owner) {\n    ... on User { projectV2(number: $number) { ...items } }\n    ... on Organization { projectV2(number: $number) { ...items } }\n  }\n}\n\nfragment items on ProjectV2 {\n  field(name: $status) { ... on ProjectV2SingleSelectField { id } }\n  items(first: 100, after: $cursor) {\n    totalCount\n    pageInfo { hasNextPage endCursor }\n    nodes {\n      status: fieldValueByName(name: $status) {\n        ... on ProjectV2ItemFieldSingleSelectValue { name }\n      }\n      content {\n        __typename\n        ... on Issue {\n          number\n          title\n          state\n          repository { nameWithOwner }\n          labels(first: 100) { totalCount nodes { name } }\n          assignees(first: 10) { totalCount nodes { login } }\n        }\n      }\n    }\n  }\n}",
+      "variables": {
+        "cursor": null,
+        "number": 3,
+        "owner": "acme",
+        "status": "Status"
+      },
+      "response": {
+        "data": {
+          "viewer": {
+            "login": "Trum-ok"
+          },
+          "repositoryOwner": {
+            "projectV2": {
+              "field": {
+                "id": "PVTSSF_lADOCbZnTg4AV3xQzhpgKzQ"
+              },
+              "items": {
+                "totalCount": 14,
+                "pageInfo": {
+                  "hasNextPage": false,
+                  "endCursor": "Y3Vyc29yOnYyOpK5MDAwMDAwMDAuMDcxNDI4NTcxNDI4NTcxNM4R-i-E"
+                },
+                "nodes": [
+                  {
+                    "status": {
+                      "name": "Ready"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 1,
+                      "title": "Каркас: Go-модуль, cobra и установка как расширение gh",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "acme/shop"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "Ready"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 2,
+                      "title": "Коды выхода и короткие ошибки (internal/render)",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "acme/shop"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "Ready"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 3,
+                      "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "acme/shop"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "Ready"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 4,
+                      "title": "Пресет kanban через embed.FS",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "acme/shop"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "Ready"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 5,
+                      "title": "GraphQL-клиент и схема доски с кэшем (internal/graph, internal/board)",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "acme/shop"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "Ready"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 6,
+                      "title": "Сверка конфига с доской",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "acme/shop"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "In progress"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 7,
+                      "title": "Команда show <N>…",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "acme/shop"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "In progress"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 8,
+                      "title": "Команда list",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "acme/shop"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "In progress"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 9,
+                      "title": "Команда new: issue + метки + доска + стартовый статус",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "acme/shop"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "In progress"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 10,
+                      "title": "Команда comment",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "acme/shop"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "In progress"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 11,
+                      "title": "Глаголы из конфига: проверки и план эффектов (internal/workflow)",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "acme/shop"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "In progress"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 12,
+                      "title": "Исполнение глагола: эффекты status и comment одной мутацией (internal/effects)",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "acme/shop"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "Backlog"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 13,
+                      "title": "Доска и .github/dojo.toml для самого gh-dojo",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "acme/shop"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "Backlog"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 14,
+                      "title": "Skill для агентов и переход на gh dojo (рубеж v0.0)",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "acme/shop"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

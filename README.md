@@ -72,7 +72,9 @@ gh extension install .
 ```
 
 gh-dojo uses gh's authentication (or `GH_TOKEN`). Projects need the `project`
-scope: `gh auth refresh -s project`.
+scope: `gh auth refresh -s project`. Boards of users and of organizations are
+both supported; for an organization with SAML single sign-on, the token must
+also be authorized for it.
 
 ## Quick start
 
@@ -315,7 +317,7 @@ disabled = true              # drop a verb that the preset defines
 
 | Key       | Required | Meaning                                                                       |
 |-----------|----------|-------------------------------------------------------------------------------|
-| `owner`   | yes      | User or organization login that owns the project                              |
+| `owner`   | yes      | User or organization login that owns the project; which one is detected       |
 | `project` | yes      | Project number from its URL, 1 or greater                                     |
 | `repos`   | no       | `owner/name` list; the first is the default repo for issue numbers and `new`. Empty: the current repo (`GH_REPO`, else the git remote) |
 

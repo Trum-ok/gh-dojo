@@ -1,0 +1,185 @@
+{
+  "comment": "Hand-crafted from internal/board/testdata/graphql/user_board.json (recorded): the same board as an organization's, organization acme, project 3 (Organization, org-style project and field IDs, /orgs/ URL).",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "BoardSchema",
+      "query": "query BoardSchema($owner: String!, $number: Int!) {\n  repositoryOwner(login: $owner) {\n    __typename\n    login\n    ... on User { projectV2(number: $number) { ...board } }\n    ... on Organization { projectV2(number: $number) { ...board } }\n  }\n}\n\nfragment board on ProjectV2 {\n  id\n  title\n  url\n  closed\n  fields(first: 100) {\n    nodes {\n      ... on ProjectV2FieldCommon { id name dataType }\n      ... on ProjectV2SingleSelectField { options { id name } }\n      ... on ProjectV2IterationField {\n        configuration {\n          iterations { id title startDate duration }\n          completedIterations { id title startDate duration }\n        }\n      }\n    }\n  }\n}",
+      "variables": {
+        "number": 3,
+        "owner": "acme"
+      },
+      "repeat": true,
+      "response": {
+        "data": {
+          "repositoryOwner": {
+            "__typename": "Organization",
+            "login": "acme",
+            "projectV2": {
+              "id": "PVT_kwDOCbZnTg4AV3xQ",
+              "title": "gh-dojo",
+              "url": "https://github.com/orgs/acme/projects/3",
+              "closed": false,
+              "fields": {
+                "nodes": [
+                  {
+                    "id": "PVTF_lADOCbZnTg4AV3xQzhpgKzI",
+                    "name": "Title",
+                    "dataType": "TITLE"
+                  },
+                  {
+                    "id": "PVTF_lADOCbZnTg4AV3xQzhpgKzM",
+                    "name": "Assignees",
+                    "dataType": "ASSIGNEES"
+                  },
+                  {
+                    "id": "PVTSSF_lADOCbZnTg4AV3xQzhpgKzQ",
+                    "name": "Status",
+                    "dataType": "SINGLE_SELECT",
+                    "options": [
+                      {
+                        "id": "f75ad846",
+                        "name": "Backlog"
+                      },
+                      {
+                        "id": "61e4505c",
+                        "name": "Ready"
+                      },
+                      {
+                        "id": "47fc9ee4",
+                        "name": "In progress"
+                      },
+                      {
+                        "id": "df73e18b",
+                        "name": "In review"
+                      },
+                      {
+                        "id": "f3ad4205",
+                        "name": "Waiting"
+                      },
+                      {
+                        "id": "98236657",
+                        "name": "Done"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "PVTF_lADOCbZnTg4AV3xQzhpgKzU",
+                    "name": "Labels",
+                    "dataType": "LABELS"
+                  },
+                  {
+                    "id": "PVTF_lADOCbZnTg4AV3xQzhpgKzY",
+                    "name": "Linked pull requests",
+                    "dataType": "LINKED_PULL_REQUESTS"
+                  },
+                  {
+                    "id": "PVTF_lADOCbZnTg4AV3xQzhpgKzc",
+                    "name": "Milestone",
+                    "dataType": "MILESTONE"
+                  },
+                  {
+                    "id": "PVTF_lADOCbZnTg4AV3xQzhpgKzg",
+                    "name": "Repository",
+                    "dataType": "REPOSITORY"
+                  },
+                  {
+                    "id": "PVTF_lADOCbZnTg4AV3xQzhpgKzo",
+                    "name": "Reviewers",
+                    "dataType": "REVIEWERS"
+                  },
+                  {
+                    "id": "PVTF_lADOCbZnTg4AV3xQzhpgKzs",
+                    "name": "Parent issue",
+                    "dataType": "PARENT_ISSUE"
+                  },
+                  {
+                    "id": "PVTF_lADOCbZnTg4AV3xQzhpgKzw",
+                    "name": "Sub-issues progress",
+                    "dataType": "SUB_ISSUES_PROGRESS"
+                  },
+                  {
+                    "id": "PVTF_lADOCbZnTg4AV3xQzhpgKz0",
+                    "name": "Created",
+                    "dataType": "CREATED"
+                  },
+                  {
+                    "id": "PVTF_lADOCbZnTg4AV3xQzhpgKz4",
+                    "name": "Updated",
+                    "dataType": "UPDATED"
+                  },
+                  {
+                    "id": "PVTF_lADOCbZnTg4AV3xQzhpgK0A",
+                    "name": "Closed",
+                    "dataType": "CLOSED"
+                  },
+                  {
+                    "id": "PVTSSF_lADOCbZnTg4AV3xQzhpgLFw",
+                    "name": "Priority",
+                    "dataType": "SINGLE_SELECT",
+                    "options": [
+                      {
+                        "id": "79628723",
+                        "name": "P0"
+                      },
+                      {
+                        "id": "0a877460",
+                        "name": "P1"
+                      },
+                      {
+                        "id": "da944a9c",
+                        "name": "P2"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "PVTSSF_lADOCbZnTg4AV3xQzhpgLF4",
+                    "name": "Size",
+                    "dataType": "SINGLE_SELECT",
+                    "options": [
+                      {
+                        "id": "6c6483d2",
+                        "name": "XS"
+                      },
+                      {
+                        "id": "f784b110",
+                        "name": "S"
+                      },
+                      {
+                        "id": "7515a9f1",
+                        "name": "M"
+                      },
+                      {
+                        "id": "817d0097",
+                        "name": "L"
+                      },
+                      {
+                        "id": "db339eb2",
+                        "name": "XL"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "PVTF_lADOCbZnTg4AV3xQzhpgLF8",
+                    "name": "Estimate",
+                    "dataType": "NUMBER"
+                  },
+                  {
+                    "id": "PVTF_lADOCbZnTg4AV3xQzhpgLGA",
+                    "name": "Start date",
+                    "dataType": "DATE"
+                  },
+                  {
+                    "id": "PVTF_lADOCbZnTg4AV3xQzhpgLGE",
+                    "name": "Target date",
+                    "dataType": "DATE"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+code: 4
+--- stdout
+--- stderr
+error: GitHub denied access; the token may lack the project scope or access to the owner
+fix: gh auth refresh -s project

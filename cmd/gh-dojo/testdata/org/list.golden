@@ -1,0 +1,20 @@
+code: 0
+--- stdout
+Backlog (2)
+  #13 Доска и .github/dojo.toml для самого gh-dojo
+  #14 Skill для агентов и переход на gh dojo (рубеж v0.0)
+Ready (6)
+  #1 Каркас: Go-модуль, cobra и установка как расширение gh
+  #2 Коды выхода и короткие ошибки (internal/render)
+  #3 Конфиг: загрузка и валидация .github/dojo.toml (internal/config)
+  #4 Пресет kanban через embed.FS
+  #5 GraphQL-клиент и схема доски с кэшем (internal/graph, internal/board)
+  #6 Сверка конфига с доской
+In progress (6)
+  #7 Команда show <N>…
+  #8 Команда list
+  #9 Команда new: issue + метки + доска + стартовый статус
+  #10 Команда comment
+  #11 Глаголы из конфига: проверки и план эффектов (internal/workflow)
+  #12 Исполнение глагола: эффекты status и comment одной мутацией (internal/effects)
+--- stderr
