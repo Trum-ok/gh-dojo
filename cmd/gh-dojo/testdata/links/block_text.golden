@@ -1,5 +1,5 @@
 code: 1
 --- stdout
 --- stderr
-error: --by "the API team" is not an issue: pass 12, "#12" or owner/repo#12
+error: --by "the API team" is not an issue: pass 12, "#12", owner/repo#12 or the issue's URL
 fix: gh dojo block --help

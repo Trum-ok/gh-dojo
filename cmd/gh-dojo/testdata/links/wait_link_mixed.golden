@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: wait --by "26, the API team" mixes issues and text: pass only issues, comma-separated, to link them, or only text for the comment
+fix: gh dojo wait --help

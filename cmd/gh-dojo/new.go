@@ -250,7 +250,7 @@ func newNewCmd() (*cobra.Command, error) {
 	f.StringVar(&o.Body, "body", "", "issue body (markdown); one starting with - goes as --body=...")
 	f.StringVar(&bodyFile, bodyFileFlag, "", "read the body from `file`; - reads stdin")
 	f.StringArrayVar(&o.BlockedBy, "blocked-by", nil,
-		"the blocking `issue`: 12, \"#12\" or owner/repo#12; repeatable, or comma-separated")
+		"the blocking `issue`: 12, \"#12\", owner/repo#12 or its URL; repeatable, or comma-separated")
 	return cmd, nil
 }
 
@@ -296,9 +296,10 @@ created, listing the allowed values.
 The body comes from --body or --body-file (a file, or - for stdin). A title
 starting with - goes after --: gh dojo new -- "-v is ignored".
 
---blocked-by marks the new issue blocked by other issues (12, "#12" or
-owner/repo#12; repeatable, or comma-separated). An issue that does not exist
-fails before anything is created (exit code 3).
+--blocked-by marks the new issue blocked by other issues (12, "#12",
+owner/repo#12 or the issue's URL; repeatable, or comma-separated). An issue
+that does not exist, or a pull request, fails before anything is created
+(exit code 3).
 
 A repeat is safe: the body ends with a hidden marker of the title, and a run
 that finds it on one of the repo's 20 newest open issues, written by you,
@@ -464,8 +465,11 @@ func (r *newRun) run(ctx context.Context) error {
 	found := nc.find(marker, s.ID)
 	if found != nil {
 		for _, l := range nc.Links {
-			if l.ID == found.ID {
+			switch {
+			case l.ID == found.ID:
 				return selfBlock(found.Number, "--blocked-by")
+			case l.BlockedBy(found.ID):
+				return cycleError(found.Number, l.Ref.String(repo), "--blocked-by")
 			}
 		}
 		r.resumed = true
@@ -768,7 +772,9 @@ func (r *newRun) confirm() string {
 
 // partial is the exit-code-5 error of a run that stopped after the issue
 // existed: what failed, why, and that re-running finishes it. A cause with
-// its own fix (auth, say) keeps it, followed by the re-run.
+// its own fix (auth, say) keeps it, followed by the re-run. A blocked-by
+// link GitHub refused as a dependency cycle is exit code 1 instead: a
+// re-run would fail the same way.
 func (r *newRun) partial(err error) error {
 	step, cause := "finishing it failed", err
 	var se *newStepError
@@ -781,6 +787,11 @@ func (r *newRun) partial(err error) error {
 	}
 	e := render.FromError(cause)
 	why, _, _ := strings.Cut(e.What, "\n")
+	if graph.IsCycle(cause) {
+		// Re-running cannot help: the links make a cycle through other issues.
+		return render.Usage("#%d %s, but %s\n%s", r.number, what, step, why).
+			WithFix(fmt.Sprintf("gh dojo show %d", r.number)).WithCause(err)
+	}
 	fix := fmt.Sprintf("re-run the same gh dojo new command: it finds #%d and finishes it", r.number)
 	if e.Fix != "" && e.Fix != render.InternalFix {
 		fix = e.Fix + "; then re-run the same gh dojo new command"

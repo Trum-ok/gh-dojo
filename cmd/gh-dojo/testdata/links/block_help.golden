@@ -2,9 +2,11 @@ code: 0
 --- stdout
 Mark issue N blocked by the issues --by names, without changing its status.
 
---by takes 12, "#12" or owner/repo#12; repeat it, or separate numbers with
-commas. A link already there is not an error: the line says "already". An
-issue that does not exist fails before anything is written (exit code 3).
+--by takes 12, "#12", owner/repo#12 or the issue's URL; repeat it, or
+separate them with commas. A link already there is not an error: the line
+says "already". An issue that does not exist, or a pull request, fails
+before anything is written (exit code 3); so does, with exit code 1, a
+blocker that N already blocks: GitHub refuses cycles.
 
 A blocker stops blocking once it is closed or in a resolved status
 (statuses.resolved); a verb with blockers = "warn" or "deny" checks that,
@@ -18,6 +20,6 @@ Examples:
   gh dojo block 42 --by 17,18 --by acme/api#7
 
 Flags:
-      --by issue   the blocking issue: 12, "#12" or owner/repo#12; repeatable, or comma-separated
+      --by issue   the blocking issue: 12, "#12", owner/repo#12 or its URL; repeatable, or comma-separated
   -h, --help       help for block
 --- stderr

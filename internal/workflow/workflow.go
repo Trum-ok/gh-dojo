@@ -107,10 +107,11 @@ type Issue struct {
 	Unresolved     []Blocker
 	UnreadBlockers int
 
-	// ByIssue is the issue --by names, read for a verb with blockers =
-	// "link" when --by is an issue reference; nil otherwise, and then --by
-	// is only text for the comment.
-	ByIssue *ByIssue
+	// ByIssues are the issues --by names, in order, read for a verb with
+	// blockers = "link" when --by is an issue reference or a
+	// comma-separated list of them; empty otherwise, and then --by is only
+	// text for the comment.
+	ByIssues []ByIssue
 
 	// Ref is opaque to this package: the reader may keep the node IDs the
 	// executor needs here. It is never printed.
@@ -144,12 +145,15 @@ type Blocker struct {
 
 func (b Blocker) String() string { return b.Ref + " (" + b.Place + ")" }
 
-// ByIssue is the issue --by names for the blockers = "link" effect.
+// ByIssue is an issue --by names for the blockers = "link" effect.
 type ByIssue struct {
 	Ref string // "#12", or "owner/repo#12" in another repository
 	// Blocks reports that it blocks the issue already: the link is in
 	// place.
 	Blocks bool
+	// PullRequest says the number is a pull request: it is named in the
+	// comment, but only issues can block, so it is not linked (a warning).
+	PullRequest bool
 }
 
 // Comment is an issue comment.
@@ -350,8 +354,9 @@ func join(items []string, conj string) string {
 // none of), reopens it,
 // sets the target status, sets the sprint (see planIteration; a day
 // without an iteration is exit code 1) and the fields of the field effect,
-// adds and removes labels, assigns, marks the issue blocked by
-// Issue.ByIssue (blockers = "link"), posts the
+// adds and removes labels, assigns, marks the issue blocked by each of
+// Issue.ByIssues (blockers = "link"; a pull request among them is only
+// named in the comment, with a warning), posts the
 // rendered comment unless it renders empty or the same comment is already
 // the verb's latest (see AlreadyPosted), and closes it. Each effect
 // already in place is left out of Ops (StatusUnchanged, CommentPresent,
@@ -442,17 +447,26 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 		}
 	}
 
-	if v.Blockers == config.BlockersLink && is.ByIssue != nil {
-		if is.ByIssue.Blocks {
-			p.InPlace = append(p.InPlace, AddBlockedBy{Ref: is.ByIssue.Ref})
-		} else {
-			p.Ops = append(p.Ops, AddBlockedBy{Ref: is.ByIssue.Ref})
+	by := NormalizeBy(a.By)
+	if v.Blockers == config.BlockersLink && len(is.ByIssues) > 0 {
+		refs := make([]string, len(is.ByIssues))
+		for i, b := range is.ByIssues {
+			refs[i] = b.Ref
+			switch {
+			case b.PullRequest:
+				p.Warnings = append(p.Warnings, b.Ref+" is a pull request: not linked")
+			case b.Blocks:
+				p.InPlace = append(p.InPlace, AddBlockedBy{Ref: b.Ref})
+			default:
+				p.Ops = append(p.Ops, AddBlockedBy{Ref: b.Ref})
+			}
 		}
+		by = strings.Join(refs, ", ") // as GitHub links them: "#25, #26"
 	}
 
 	vars := map[string]string{
 		config.VarComment: a.value(config.ArgComment),
-		config.VarBy:      NormalizeBy(a.By),
+		config.VarBy:      by,
 	}
 	noSession := false
 	if v.Uses(config.VarSession) {

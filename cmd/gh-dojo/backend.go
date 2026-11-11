@@ -38,12 +38,11 @@ func (b *githubBackend) ReadIssue(ctx context.Context, v config.Verb, n int, a w
 		if err != nil {
 			return workflow.Issue{}, err
 		}
-		if ref, ok := issue.ParseRef(a.By, repo); ok {
-			if ref.Same(issue.Ref{Repo: repo, Number: n}) {
-				return workflow.Issue{}, selfBlock(n, v.Name+" --by")
-			}
-			lookup.Links = issue.Links{ref}
+		refs, err := byRefs(v, a.By, repo, n)
+		if err != nil {
+			return workflow.Issue{}, err
 		}
+		lookup.Links = issue.Links(refs)
 	}
 	card, err := b.app.LookupCard(ctx, n, lookup)
 	if err != nil {
@@ -74,29 +73,84 @@ func (b *githubBackend) ReadIssue(ctx context.Context, v config.Verb, n int, a w
 		is.Unresolved, is.UnreadBlockers = unresolvedBlockers(card, cfg.Statuses.Resolved)
 	}
 	if len(lookup.Links) > 0 {
-		var links []*issue.Linked
-		if card.Found != nil {
-			links = card.Found.Links
-		}
-		if len(links) != 1 {
-			return workflow.Issue{}, render.Internal("the issue --by names was not read")
-		}
-		l := links[0]
-		if err := issue.LinksError("--by", links, card.Repo); err != nil {
+		if is.ByIssues, err = byIssues(v, card); err != nil {
 			return workflow.Issue{}, err
 		}
-		if l.ID == card.ID {
-			return workflow.Issue{}, selfBlock(n, v.Name+" --by")
-		}
-		is.ByIssue = &workflow.ByIssue{Ref: l.Ref.String(card.Repo), Blocks: l.Blocks(card.ID)}
 	}
 	return is, nil
+}
+
+// byRefs parses --by of a verb with blockers = "link" for issue n: issues
+// to link (see splitRefs), or none for free text, which only fills the
+// comment. Issues and text mixed are exit code 1: linking some and not
+// others would be a guess.
+func byRefs(v config.Verb, by string, def issue.Repo, n int) ([]issue.Ref, error) {
+	refs, text := splitRefs([]string{by}, def)
+	switch {
+	case len(refs) == 0:
+		return nil, nil
+	case len(text) > 0:
+		return nil, render.Usage("%s --by %q mixes issues and text: pass only issues, comma-separated, to link them, "+
+			"or only text for the comment", v.Name, strings.TrimSpace(by)).
+			WithFix("gh dojo " + v.Name + " --help")
+	}
+	for _, r := range refs {
+		if r.Same(issue.Ref{Repo: def, Number: n}) {
+			return nil, selfBlock(n, v.Name+" --by")
+		}
+	}
+	return refs, nil
+}
+
+// byIssues are the issues --by names as read with the card (Lookup.Links):
+// a missing one is exit code 3, one that would close a cycle exit code 1;
+// a pull request is kept, to be named in the comment but not linked.
+func byIssues(v config.Verb, card *issue.Card) ([]workflow.ByIssue, error) {
+	var links []*issue.Linked
+	if card.Found != nil {
+		links = card.Found.Links
+	}
+	if len(links) == 0 {
+		return nil, render.Internal("the issues --by names were not read")
+	}
+	var issues []*issue.Linked // the pull requests are not linked, so not an error
+	for _, l := range links {
+		if !l.PullRequest {
+			issues = append(issues, l)
+		}
+	}
+	if err := issue.LinksError("--by", issues, card.Repo); err != nil {
+		return nil, err
+	}
+	out := make([]workflow.ByIssue, 0, len(links))
+	for _, l := range links {
+		ref := l.Ref.String(card.Repo)
+		switch {
+		case l.PullRequest:
+			out = append(out, workflow.ByIssue{Ref: ref, PullRequest: true})
+			continue
+		case l.ID == card.ID:
+			return nil, selfBlock(card.Number, v.Name+" --by")
+		case l.BlockedBy(card.ID):
+			return nil, cycleError(card.Number, ref, v.Name+" --by")
+		}
+		out = append(out, workflow.ByIssue{Ref: ref, Blocks: l.Blocks(card.ID)})
+	}
+	return out, nil
 }
 
 // selfBlock is the error for an issue named as its own blocker by flag.
 func selfBlock(n int, flag string) error {
 	return render.Usage("%s names #%d itself; an issue cannot block itself", flag, n).
-		WithFix(fmt.Sprintf("pass the number of the issue #%d waits for", n))
+		WithFix(fmt.Sprintf("pass the issues that block #%d, not #%d itself", n, n))
+}
+
+// cycleError is the error for a blocker ref of issue n that n already
+// blocks, named by flag: linking it would close a cycle, which GitHub
+// refuses. Nothing is written; gh dojo show lists n's links both ways.
+func cycleError(n int, ref, flag string) error {
+	return render.Usage("%s %s: #%d already blocks %s, so %s cannot block #%d too (a cycle)", flag, ref, n, ref, ref, n).
+		WithFix(fmt.Sprintf("gh dojo show %d", n))
 }
 
 // unresolvedBlockers returns the card's blockers that still block (see
@@ -117,11 +171,14 @@ func unresolvedBlockers(c *issue.Card, resolved []string) ([]workflow.Blocker, i
 
 // verbLookup is what the effects of v need looked up with the card: the
 // IDs of its labels, and of the user it assigns. A verb that removes
-// labels reads all of the issue's labels, so it can tell one is there.
+// labels reads all of the issue's labels, so it can tell one is there; a
+// verb that checks blockers reads all of its blockers (GitHub allows 50),
+// so a resolved one is not counted as unread.
 func verbLookup(v config.Verb) issue.Lookup {
 	l := issue.Lookup{
-		Labels:    append(slices.Clone(v.AddLabels), v.RemoveLabels...),
-		AllLabels: len(v.RemoveLabels) > 0,
+		Labels:      append(slices.Clone(v.AddLabels), v.RemoveLabels...),
+		AllLabels:   len(v.RemoveLabels) > 0,
+		AllBlockers: v.ChecksBlockers(),
 	}
 	switch v.Assign {
 	case "":
@@ -393,8 +450,11 @@ func (b *githubBackend) ids(ctx context.Context, p *workflow.Plan, card *issue.C
 		return effects.IDs{}, err
 	}
 	if f := card.Found; f != nil {
-		if len(f.Links) == 1 {
-			ids.Blocker = f.Links[0].ID
+		ids.Blockers = map[string]string{}
+		for _, l := range f.Links {
+			if l.ID != "" {
+				ids.Blockers[l.Ref.String(card.Repo)] = l.ID
+			}
 		}
 		ids.Labels = f.Labels
 		ids.Users = map[string]string{}

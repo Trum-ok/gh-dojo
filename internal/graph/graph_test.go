@@ -351,6 +351,28 @@ func TestStaleIDs(t *testing.T) {
 	}
 }
 
+// TestCycle: GitHub refusing a blocked-by link as a dependency cycle is
+// exit code 1 with a message that says so, without GitHub's text.
+func TestCycle(t *testing.T) {
+	srv := graphtest.New(t, fixture("add_blocked_by_cycle"))
+	err := srv.Client().Mutate(context.Background(),
+		"mutation Block($issue: ID!, $link0: ID!) {\n  link0: addBlockedBy(input: {issueId: $issue, blockingIssueId: $link0}) { issue { id } }\n}",
+		map[string]any{"issue": "I_1", "link0": "I_2"}, nil)
+	assertError(t, err, render.ExitUsage, "errors/add_blocked_by_cycle")
+	if !graph.IsCycle(err) {
+		t.Errorf("IsCycle(%v) = false", err)
+	}
+	for _, err := range []error{
+		nil,
+		errors.New("a cycle"),
+		&api.GraphQLError{Errors: []api.GraphQLErrorItem{{Type: "NOT_FOUND", Message: "Could not resolve to an Issue with the number of 999."}}},
+	} {
+		if graph.IsCycle(err) {
+			t.Errorf("IsCycle(%v) = true", err)
+		}
+	}
+}
+
 func TestNoTokenAsksToLogIn(t *testing.T) {
 	for _, env := range []string{"GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN", "GH_HOST"} {
 		t.Setenv(env, "")

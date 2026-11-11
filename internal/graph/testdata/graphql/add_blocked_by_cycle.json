@@ -1,0 +1,21 @@
+{
+  "comment": "An addBlockedBy that would close a dependency cycle. Not recorded (it is a mutation); the type and message are a best guess at what GitHub reports.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "Block",
+      "query": "mutation Block($issue: ID!, $link0: ID!) {\n  link0: addBlockedBy(input: {issueId: $issue, blockingIssueId: $link0}) { issue { id } }\n}",
+      "response": {
+        "data": {"link0": null},
+        "errors": [
+          {
+            "type": "UNPROCESSABLE",
+            "path": ["link0"],
+            "locations": [{"line": 2, "column": 3}],
+            "message": "Blocking issue I_kwDOVq9iIs8AAAABeb-QYw would create a circular dependency"
+          }
+        ]
+      }
+    }
+  ]
+}

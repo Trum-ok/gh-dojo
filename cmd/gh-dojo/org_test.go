@@ -63,7 +63,7 @@ func TestOrgCommands(t *testing.T) {
 		// Cold cache: the schema, then the card or the items.
 		{"show", []string{orgBoardFixture, orgCard3Fixture}, false, []string{"show", "3"}, 2},
 		{"list", []string{orgBoardFixture, "testdata/graphql/org_items.json"}, false, []string{"list"}, 2},
-		{"start_dry_run", []string{orgBoardFixture, orgCard3Fixture}, true, []string{"start", "3", "--dry-run"}, 1},
+		{"start_dry_run", []string{orgBoardFixture, "testdata/graphql/org_card_3_start.json"}, true, []string{"start", "3", "--dry-run"}, 1},
 		{"start", []string{orgBoardFixture, "testdata/graphql/org_start_ok.json"}, true, []string{"start", "3"}, 2},
 		{"comment", []string{orgBoardFixture, orgCard3Fixture, commentAddFixture}, true,
 			[]string{"comment", "3", "Reproduced on main."}, 2},
@@ -116,7 +116,8 @@ func TestCrossOwner(t *testing.T) {
 			if n := srv.Requests() - before; n != tt.requests {
 				t.Errorf("requests = %d, want %d", n, tt.requests)
 			}
-			if strings.Contains(string(out), "not on the board") {
+			// stderr may name blockers not on the board (start warns).
+			if stdout, _, _ := strings.Cut(string(out), "--- stderr"); strings.Contains(stdout, "not on the board") {
 				t.Errorf("the board's item was not found:\n%s", out)
 			}
 			testutil.Golden(t, "org/"+tt.name, out)

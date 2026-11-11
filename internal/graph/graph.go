@@ -294,6 +294,9 @@ func describeGraphQL(err *api.GraphQLError) *render.Error {
 				WithFix(OAuthRestrictedFix)
 		}
 	}
+	if isCycle(err) {
+		return render.Usage("GitHub refused a blocked-by link: it would make a dependency cycle")
+	}
 	if _, ok := has("FORBIDDEN"); ok {
 		return render.Network("GitHub denied access; the token may lack the project scope or access to the owner").WithFix(render.AuthFix)
 	}
@@ -417,6 +420,24 @@ func IsStaleID(err error) bool {
 			return true
 		case containsAny(msg, "optionid", "option id", "iterationid", "iteration id", "fieldid", "field id") &&
 			containsAny(msg, "invalid", "not found", "does not exist", "doesn't exist", "could not resolve"):
+			return true
+		}
+	}
+	return false
+}
+
+// IsCycle reports whether GitHub refused a blocked-by link (addBlockedBy)
+// because it would make a dependency cycle: the blocking issue is itself
+// blocked by the issue, directly or through others. It is exit code 1, and
+// re-running cannot help.
+func IsCycle(err error) bool {
+	var gqlErr *api.GraphQLError
+	return errors.As(err, &gqlErr) && gqlErr != nil && isCycle(gqlErr)
+}
+
+func isCycle(err *api.GraphQLError) bool {
+	for _, item := range err.Errors {
+		if containsAny(strings.ToLower(item.Message), "cycle", "circular") {
 			return true
 		}
 	}

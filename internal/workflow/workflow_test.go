@@ -152,7 +152,13 @@ func blocked(is Issue, n, unread int) Issue {
 
 // byIssue gives is the issue --by names, as the reader finds it.
 func byIssue(is Issue, ref string, blocks bool) Issue {
-	is.ByIssue = &ByIssue{Ref: ref, Blocks: blocks}
+	is.ByIssues = append(is.ByIssues, ByIssue{Ref: ref, Blocks: blocks})
+	return is
+}
+
+// byPR gives is a pull request --by names.
+func byPR(is Issue, ref string) Issue {
+	is.ByIssues = append(is.ByIssues, ByIssue{Ref: ref, PullRequest: true})
 	return is
 }
 
@@ -387,6 +393,16 @@ func TestPlan(t *testing.T) {
 		{name: "wait_link_repeat", verb: "wait", noOps: true, args: Args{By: "12", HasBy: true},
 			issue: byIssue(Issue{Number: 42, OnBoard: true, Status: "Waiting",
 				Comments: []Comment{posted("wait", "Waiting for #12.")}}, "#12", true)},
+		// --by 25,26: both linked, the comment names both.
+		{name: "wait_links_two", verb: "wait", hasOps: 4, args: Args{By: "25,26", HasBy: true},
+			issue: byIssue(byIssue(onBoard("In progress"), "#25", false), "#26", false)},
+		{name: "wait_links_two_one_in_place", verb: "wait", hasOps: 4, args: Args{By: "25, acme/api#7, 26", HasBy: true},
+			issue: byIssue(byIssue(byIssue(onBoard("In progress"), "#25", false), "acme/api#7", true), "#26", false)},
+		// A pull request is named in the comment, with a warning, not linked.
+		{name: "wait_link_pull_request", verb: "wait", hasOps: 2, args: Args{By: "40", HasBy: true},
+			issue: byPR(onBoard("In progress"), "#40")},
+		{name: "wait_link_issue_and_pull_request", verb: "wait", hasOps: 3, args: Args{By: "40,26", HasBy: true},
+			issue: byIssue(byPR(onBoard("In progress"), "#40"), "#26", false)},
 		// Free text in --by: the reader names no issue, the comment alone.
 		{name: "wait_by_text_no_link", verb: "wait", hasOps: 2, args: Args{By: "the API team", HasBy: true},
 			issue: onBoard("In progress")},

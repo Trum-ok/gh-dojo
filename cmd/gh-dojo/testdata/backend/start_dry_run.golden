@@ -4,3 +4,4 @@ dry run: start #3 "Конфиг: загрузка и валидация .github/
   status: Ready → In progress
   comment: "Started. Session: claude://s/abc"
 --- stderr
+warning: #3 has unresolved blockers: #2 (not on the board), #1 (not on the board)

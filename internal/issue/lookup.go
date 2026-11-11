@@ -23,6 +23,11 @@ type Lookup struct {
 	// issue) instead of the card's 20, for a verb that removes labels: a
 	// label beyond the window would read as absent.
 	AllLabels bool
+	// AllBlockers reads up to 50 of the issue's blockers (GitHub's limit
+	// per issue) instead of the card's 20, for a verb that checks them
+	// (blockers = "warn" or "deny"): a resolved blocker beyond the window
+	// would count as unresolved.
+	AllBlockers bool
 	// Links are issues to read for blocked-by links (see Links), such as
 	// the issue --by names for blockers = "link".
 	Links Links
@@ -30,7 +35,7 @@ type Lookup struct {
 
 // Empty reports whether there is nothing to look up.
 func (l Lookup) Empty() bool {
-	return len(l.Labels) == 0 && l.User == "" && !l.Viewer && !l.AllLabels && len(l.Links) == 0
+	return len(l.Labels) == 0 && l.User == "" && !l.Viewer && !l.AllLabels && !l.AllBlockers && len(l.Links) == 0
 }
 
 // Found is what a Lookup found. Its IDs are for mutations only; never
@@ -60,10 +65,13 @@ type User struct {
 const assignableWindow = 100
 
 // labelsWindow is the labels selection of cardSelection; Lookup.AllLabels
-// widens it to allLabelsWindow.
+// widens it to allLabelsWindow. blockersWindow is its blockers selection;
+// Lookup.AllBlockers widens it to allBlockersWindow.
 const (
-	labelsWindow    = "labels(first: 20)"
-	allLabelsWindow = "labels(first: 100)"
+	labelsWindow      = "labels(first: 20)"
+	allLabelsWindow   = "labels(first: 100)"
+	blockersWindow    = "blockedBy(first: 20)"
+	allBlockersWindow = "blockedBy(first: 50)"
 )
 
 // The parts of cardQuery a Lookup extends.
@@ -83,7 +91,8 @@ func labelAlias(i int) string { return fmt.Sprintf("label%d", i) }
 // the top. It returns the extra variables too. An empty l gives cardQuery
 // itself.
 //
-// AllLabels widens the issue's labels window.
+// AllLabels widens the issue's labels window, AllBlockers its blockers
+// window.
 //
 //	query IssueCard(..., $label0: String!, $user: String!) {
 //	  repository(owner: $owner, name: $repo) {
@@ -120,6 +129,9 @@ func lookupQuery(l Lookup) (string, map[string]any) {
 	card := cardRepo
 	if l.AllLabels {
 		card = strings.Replace(card, labelsWindow, allLabelsWindow, 1)
+	}
+	if l.AllBlockers {
+		card = strings.Replace(card, blockersWindow, allBlockersWindow, 1)
 	}
 	return cardHead + decls.String() + card + repo.String() + "\n  }\n" + top + "}\n\n" + cardFragments, vars
 }

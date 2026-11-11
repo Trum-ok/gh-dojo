@@ -124,7 +124,7 @@ func TestVerbStaleOption(t *testing.T) {
 
 // TestVerbDryRun reads the issue for real and writes nothing.
 func TestVerbDryRun(t *testing.T) {
-	srv, before := withWarmVerbApp(t, verbFixture("card_3"))
+	srv, before := withWarmVerbApp(t, verbFixture("card_3_start"))
 	checkRuns(t, srv, before, runs{[]string{"start", "3", "--dry-run"}, render.ExitOK, 1, "start_dry_run"})
 }
 

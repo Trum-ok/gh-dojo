@@ -384,7 +384,8 @@ func (c *Config) buildBlockers(name string, o *rawOff, v *Verb) error {
 		case b == BlockersLink && !v.Uses(ArgBy):
 			return c.Errorf("%s = %q takes the blocking issue from --by, but %s does not use {%s}",
 				key, b, c.KeyPath(p+"comment"), ArgBy).
-				WithFix(fmt.Sprintf(`add {%s} to %s, e.g. "Waiting for {%s}."`, ArgBy, c.KeyPath(p+"comment"), ArgBy))
+				WithFix(fmt.Sprintf(`add {%s} to %s, e.g. "Waiting for {%s}.", or set %s = false to drop the link`,
+					ArgBy, c.KeyPath(p+"comment"), ArgBy, p+"blockers"))
 		default:
 			v.Blockers = b
 		}

@@ -22,6 +22,7 @@ area_prefix = "area:"
 when = "You begin working on the issue"
 to = "In progress"
 from = ["Backlog", "Waiting", "Ready"]
+blockers = "warn"              # warns about blockers not yet Ready, Done or closed
 comment = """
 Started. Session: {session}
 

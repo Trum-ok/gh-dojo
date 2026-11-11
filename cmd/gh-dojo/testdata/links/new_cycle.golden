@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: --blocked-by #26: #15 already blocks #26, so #26 cannot block #15 too (a cycle)
+fix: gh dojo show 15

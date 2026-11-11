@@ -94,6 +94,31 @@ func TestStaleQueryFails(t *testing.T) {
 	}
 }
 
+// TestSameKeyOtherQuery: two interactions with one operation and the same
+// variables but different queries (a card read with a wider window by
+// another verb) each answer their own query.
+func TestSameKeyOtherQuery(t *testing.T) {
+	t.Setenv(recordEnv, "")
+	wide := "query Viewer($a: Int, $b: String) { viewer { login name } }"
+	srv := New(t, writeFixture(t, `{"interactions": [
+  {"operation": "Viewer", "variables": {"a": 1, "b": "x"}, "query": "query Viewer($a: Int, $b: String) { viewer { login } }",
+   "response": {"data": {"viewer": {"login": "narrow"}}}},
+  {"operation": "Viewer", "variables": {"a": 1, "b": "x"}, "query": "`+wide+`",
+   "response": {"data": {"viewer": {"login": "wide"}}}}
+]}`))
+	for _, tt := range []struct{ query, want string }{{wide, "wide"}, {viewerQuery, "narrow"}} {
+		var out struct {
+			Viewer struct{ Login string } `json:"viewer"`
+		}
+		if err := srv.Client().Query(context.Background(), tt.query, map[string]any{"a": 1, "b": "x"}, &out); err != nil {
+			t.Fatal(err)
+		}
+		if out.Viewer.Login != tt.want {
+			t.Errorf("login = %q, want %q", out.Viewer.Login, tt.want)
+		}
+	}
+}
+
 const twoViewers = `{"interactions": [
   {"operation": "Viewer", "query": "query Viewer($a: Int, $b: String) { viewer { login } }", "response": {"data": {"viewer": {"login": "first"}}}},
   {"operation": "Viewer", "query": "query Viewer($a: Int, $b: String) { viewer { login } }", "REPEAT": true, "response": {"data": {"viewer": {"login": "second"}}}}

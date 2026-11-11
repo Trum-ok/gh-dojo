@@ -2,4 +2,4 @@ code: 1
 --- stdout
 --- stderr
 error: wait --by names #3 itself; an issue cannot block itself
-fix: pass the number of the issue #3 waits for
+fix: pass the issues that block #3, not #3 itself

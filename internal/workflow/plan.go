@@ -19,10 +19,11 @@ type Plan struct {
 	Issue  Issue  // the state the plan was built from; Issue.Status is "" when not on the board
 	Target string // the verb's target status; "" when it leaves the status alone
 
-	// Ops are the operations to apply, in this order, each at most once:
-	// AddToBoard or Unarchive, Reopen, SetStatus, SetIteration, SetFields,
-	// AddLabels, RemoveLabels, Assign, AddBlockedBy, AddComment, Close.
-	// Empty when there is nothing to do.
+	// Ops are the operations to apply, in this order, each at most once
+	// (AddBlockedBy once per blocking issue): AddToBoard or Unarchive,
+	// Reopen, SetStatus, SetIteration, SetFields, AddLabels, RemoveLabels,
+	// Assign, AddBlockedBy, AddComment, Close. Empty when there is nothing
+	// to do.
 	Ops []Op
 
 	StatusUnchanged bool // the issue is already in Target; no SetStatus
@@ -265,14 +266,15 @@ func (p *Plan) Unconfirmed() error {
 // reads "not on the board → In progress"; in the confirmation that line
 // alone stands for adding the issue to the board. Unarchiving is a board
 // effect too, but always has its own line. Labels added and removed share
-// one line.
+// one line; so do the blocked-by links added, and those already in place.
 func (p *Plan) lines(dry bool) []string {
 	pick := Op.Effect
 	if dry {
 		pick = Op.Describe
 	}
 	var board, unarchive, reopen, status, sprint, fields, assign, blocked, comment, closing []string
-	var labels, labelsInPlace []string // +name and -name
+	var blockers, blockersInPlace []string // refs of AddBlockedBy, joined in one line each
+	var labels, labelsInPlace []string     // +name and -name
 	change := FieldChange.effect
 	if dry {
 		change = FieldChange.describe
@@ -301,7 +303,7 @@ func (p *Plan) lines(dry bool) []string {
 		case Assign:
 			assign = append(assign, pick(op))
 		case AddBlockedBy:
-			blocked = append(blocked, pick(op))
+			blockers = append(blockers, op.Ref)
 		case AddComment:
 			comment = append(comment, pick(op))
 		case Close:
@@ -339,11 +341,7 @@ func (p *Plan) lines(dry bool) []string {
 		case Assign:
 			assign = append(assign, key("assign", op.Login+" already assigned"))
 		case AddBlockedBy:
-			if dry {
-				blocked = append(blocked, "blocked by: "+op.Ref+" already linked")
-			} else {
-				blocked = append(blocked, "already blocked by "+op.Ref)
-			}
+			blockersInPlace = append(blockersInPlace, op.Ref)
 		case Close:
 			text := "already closed"
 			if op.Reason != "" {
@@ -365,6 +363,15 @@ func (p *Plan) lines(dry bool) []string {
 		label = []string{"labels: " + strings.Join(labelsInPlace, " ") + " already in place"}
 	case len(labelsInPlace) > 0:
 		label = []string{"labels unchanged"}
+	}
+	if len(blockers) > 0 {
+		blocked = append(blocked, pick(AddBlockedBy{Ref: join(blockers, "and")}))
+	}
+	switch {
+	case len(blockersInPlace) > 0 && dry:
+		blocked = append(blocked, "blocked by: "+join(blockersInPlace, "and")+" already linked")
+	case len(blockersInPlace) > 0:
+		blocked = append(blocked, "already blocked by "+join(blockersInPlace, "and"))
 	}
 	board = append(board, unarchive...)
 	var out []string

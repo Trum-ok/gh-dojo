@@ -29,6 +29,7 @@ var (
 		{Field: "Estimate", To: "3"}, {Field: "Priority", From: "P2", To: "P1"},
 	}}
 	blockedBy = workflow.AddBlockedBy{Ref: "#12"}
+	blocked2  = workflow.AddBlockedBy{Ref: "acme/api#7"}
 )
 
 var ids = effects.IDs{
@@ -40,7 +41,7 @@ var ids = effects.IDs{
 		"Estimate": {ID: "PVTF_est", Value: map[string]any{"number": 3.0}},
 		"Priority": {ID: "PVTSSF_prio", Value: map[string]any{"singleSelectOptionId": "0a877460"}},
 	},
-	Blocker: "I_12",
+	Blockers: map[string]string{"#12": "I_12", "acme/api#7": "I_7"},
 }
 
 func TestBuild(t *testing.T) {
@@ -68,6 +69,7 @@ func TestBuild(t *testing.T) {
 		{"sprint_clear", []workflow.Op{unsprint}, ids},
 		{"status_fields", []workflow.Op{status, setFields, comment}, ids},
 		{"status_blocked_by_comment", []workflow.Op{status, blockedBy, comment}, ids},
+		{"status_blocked_by_two", []workflow.Op{status, blockedBy, blocked2, comment}, ids},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -101,7 +103,7 @@ func TestBuildDeclaresWhatItUses(t *testing.T) {
 	for _, ops := range [][]workflow.Op{
 		{status, comment}, {status}, {comment}, {toBoard}, {toBoard, comment}, {unarchive, status},
 		{closing}, {reopen}, {addLabels}, {rmLabels}, {assign}, {reopen, status, addLabels, rmLabels, assign, comment},
-		{comment, closing}, {sprint}, {unsprint}, {setFields}, {status, sprint, setFields, comment}, {blockedBy}, {status, blockedBy, comment},
+		{comment, closing}, {sprint}, {unsprint}, {setFields}, {status, sprint, setFields, comment}, {blockedBy}, {status, blockedBy, comment}, {blockedBy, blocked2},
 	} {
 		m, err := effects.Build(ops, ids)
 		if err != nil {
@@ -137,7 +139,7 @@ func TestBuildErrors(t *testing.T) {
 	noIteration := ids
 	noIteration.Iteration = ""
 	noBlocker := ids
-	noBlocker.Blocker = ""
+	noBlocker.Blockers = nil
 	for name, tt := range map[string]struct {
 		ops []workflow.Op
 		ids effects.IDs
@@ -226,6 +228,23 @@ func TestOutcome(t *testing.T) {
 		if !reflect.DeepEqual(done, tt.done) || !reflect.DeepEqual(missed, tt.missed) {
 			t.Errorf("%d: done %v, missed %v; want %v, %v", i, done, missed, tt.done, tt.missed)
 		}
+	}
+}
+
+// TestOutcomeBlockedBy: each blocked-by link is its own op, so one GitHub
+// refused is missed alone.
+func TestOutcomeBlockedBy(t *testing.T) {
+	m, err := effects.Build([]workflow.Op{blockedBy, blocked2}, ids)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var d map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(`{"blockedBy0": {"issue": {"id": "I_1"}}, "blockedBy1": null}`), &d); err != nil {
+		t.Fatal(err)
+	}
+	done, missed := m.Outcome(d)
+	if !reflect.DeepEqual(done, []workflow.Op{blockedBy}) || !reflect.DeepEqual(missed, []workflow.Op{blocked2}) {
+		t.Errorf("done %v, missed %v", done, missed)
 	}
 }
 

@@ -338,6 +338,8 @@ func TestLoadErrors(t *testing.T) {
 		{"blockers_true", presetOnly + "[verbs.start]\nblockers = true\n"},
 		{"blockers_number", presetOnly + "[verbs.start]\nblockers = 1\n"},
 		{"blockers_link_without_by", presetOnly + "[verbs.ready]\nblockers = \"link\"\n"},
+		// kanban's wait links --by; a comment without {by} drops what it links.
+		{"blockers_link_comment_override", presetOnly + "[verbs.wait]\ncomment = \"Stuck: {comment}\"\n"},
 		{"require_one_of_unused", presetOnly + "[verbs.wait]\ncomment = \"Waiting for {by}.\"\n"},
 		{"require_duplicate", presetOnly + "[verbs.go]\nwhen = \"x\"\ncomment = \"{comment}\"\nrequire = [\"comment\", \"comment\"]\n"},
 		{"require_overlap", presetOnly + "[verbs.wait]\nrequire = [\"comment\"]\n"},

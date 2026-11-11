@@ -3,9 +3,12 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/Trum-ok/gh-dojo/internal/effects"
+	"github.com/Trum-ok/gh-dojo/internal/graph"
 	"github.com/Trum-ok/gh-dojo/internal/issue"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/spf13/cobra"
@@ -33,9 +36,11 @@ func newLinkCmd(add bool) *cobra.Command {
 	name, short, long := "block", "Mark an issue blocked by other issues, without changing its status",
 		`Mark issue N blocked by the issues --by names, without changing its status.
 
---by takes 12, "#12" or owner/repo#12; repeat it, or separate numbers with
-commas. A link already there is not an error: the line says "already". An
-issue that does not exist fails before anything is written (exit code 3).
+--by takes 12, "#12", owner/repo#12 or the issue's URL; repeat it, or
+separate them with commas. A link already there is not an error: the line
+says "already". An issue that does not exist, or a pull request, fails
+before anything is written (exit code 3); so does, with exit code 1, a
+blocker that N already blocks: GitHub refuses cycles.
 
 A blocker stops blocking once it is closed or in a resolved status
 (statuses.resolved); a verb with blockers = "warn" or "deny" checks that,
@@ -47,9 +52,10 @@ and gh dojo show lists the unresolved blockers first.`
 			`Remove the blocked-by links between issue N and the issues --by names,
 without changing its status.
 
---by takes 12, "#12" or owner/repo#12; repeat it, or separate numbers with
-commas. A link already gone is not an error: the line says "already". An
-issue that does not exist fails before anything is written (exit code 3).`
+--by takes 12, "#12", owner/repo#12 or the issue's URL; repeat it, or
+separate them with commas. A link already gone is not an error: the line
+says "already". An issue that does not exist fails before anything is
+written (exit code 3).`
 		example = `  gh dojo unblock 42 --by 17`
 	}
 	cmd := &cobra.Command{
@@ -68,33 +74,47 @@ issue that does not exist fails before anything is written (exit code 3).`
 			return nil
 		},
 	}
-	cmd.Flags().StringArrayVar(&bys, byFlag, nil, "the blocking `issue`: 12, \"#12\" or owner/repo#12; repeatable, or comma-separated")
+	cmd.Flags().StringArrayVar(&bys, byFlag, nil, "the blocking `issue`: 12, \"#12\", owner/repo#12 or its URL; repeatable, or comma-separated")
 	return cmd
 }
 
-// parseBlockers parses the values of a flag (--by, --blocked-by) naming
-// blocking issues: repeated, or comma-separated. Duplicates are dropped,
-// and n itself (in def) is refused: an issue cannot block itself (n 0
-// skips that check). Errors are exit code 1 with help as the fix.
-func parseBlockers(values []string, flag string, def issue.Repo, n int, help string) ([]issue.Ref, error) {
-	var refs []issue.Ref
+// splitRefs splits flag values naming issues, repeated or comma-separated,
+// into the issue references (see issue.ParseRef), duplicates dropped, and
+// the parts that are not one, trimmed. Empty parts, as in "12,", are
+// skipped.
+func splitRefs(values []string, def issue.Repo) (refs []issue.Ref, text []string) {
 	for _, v := range values {
 		for _, s := range strings.Split(v, ",") {
+			s = strings.TrimSpace(s)
+			if s == "" {
+				continue
+			}
 			ref, ok := issue.ParseRef(s, def)
-			if !ok {
-				return nil, render.Usage("--%s %q is not an issue: pass %s", flag, strings.TrimSpace(s), issue.RefExamples).
-					WithFix(help)
-			}
-			if n > 0 && ref.Same(issue.Ref{Repo: def, Number: n}) {
-				return nil, selfBlock(n, "--"+flag)
-			}
-			dup := false
-			for _, r := range refs {
-				dup = dup || r.Same(ref)
-			}
-			if !dup {
+			switch {
+			case !ok:
+				text = append(text, s)
+			case !slices.ContainsFunc(refs, ref.Same):
 				refs = append(refs, ref)
 			}
+		}
+	}
+	return refs, text
+}
+
+// parseBlockers parses the values of a flag (--by, --blocked-by) naming
+// blocking issues: repeated, or comma-separated (see splitRefs). n itself
+// (in def) is refused: an issue cannot block itself (n 0 skips that
+// check). Errors are exit code 1 with help as the fix; none means no
+// issue was named.
+func parseBlockers(values []string, flag string, def issue.Repo, n int, help string) ([]issue.Ref, error) {
+	refs, text := splitRefs(values, def)
+	if len(text) > 0 {
+		return nil, render.Usage("--%s %q is not an issue: pass %s", flag, text[0], issue.RefExamples).
+			WithFix(help)
+	}
+	for _, ref := range refs {
+		if n > 0 && ref.Same(issue.Ref{Repo: def, Number: n}) {
+			return nil, selfBlock(n, "--"+flag)
 		}
 	}
 	return refs, nil
@@ -107,9 +127,12 @@ func parseBlockers(values []string, flag string, def issue.Repo, n int, help str
 //	#42 no longer blocked by #17, already not blocked by #18
 func runLinks(cmd *cobra.Command, add bool, n int, bys []string) (string, error) {
 	help := cmd.CommandPath() + " --help"
-	if len(bys) == 0 {
-		return "", render.Usage("%s needs --%s with the blocking issue, like: gh dojo %s %d --%s 17",
+	noBy := func() error {
+		return render.Usage("%s needs --%s with the blocking issue, like: gh dojo %s %d --%s 17",
 			cmd.Name(), byFlag, cmd.Name(), n, byFlag).WithFix(help)
+	}
+	if len(bys) == 0 {
+		return "", noBy()
 	}
 	ctx := cmd.Context()
 	a := newApp()
@@ -121,6 +144,9 @@ func runLinks(cmd *cobra.Command, add bool, n int, bys []string) (string, error)
 	if err != nil {
 		return "", err
 	}
+	if len(refs) == 0 {
+		return "", noBy() // --by "" or --by ","
+	}
 	target, links, err := issue.ReadLinks(ctx, a.Client, repo, n, refs, "--"+byFlag)
 	if err != nil {
 		return "", err
@@ -130,10 +156,15 @@ func runLinks(cmd *cobra.Command, add bool, n int, bys []string) (string, error)
 		if l.ID == target.ID {
 			return "", selfBlock(n, "--"+byFlag)
 		}
-		if l.Blocks(target.ID) == add {
+		if target.BlockedBy(l) == add {
 			same = append(same, l)
 		} else {
 			change = append(change, l)
+		}
+	}
+	for _, l := range change {
+		if add && l.BlockedBy(target.ID) {
+			return "", cycleError(n, l.Ref.String(repo), "--"+byFlag)
 		}
 	}
 	line := func(done []*issue.Linked) string { return linksConfirm(add, n, repo, done, same) }
@@ -159,6 +190,13 @@ func runLinks(cmd *cobra.Command, add bool, n int, bys []string) (string, error)
 	case len(missed) == 0 && err != nil:
 		render.Warn(cmd.ErrOrStderr(), "GitHub reported an error after applying every change: %s", reason(err))
 	case len(missed) == 0:
+	case graph.IsCycle(err):
+		// A cycle through other issues: re-running cannot help.
+		what := "GitHub refused to mark #" + strconv.Itoa(n) + " blocked by " + joinRefs(missed, repo) + ": it would make a dependency cycle"
+		if len(done) > 0 {
+			what = line(done) + "; " + what
+		}
+		return "", render.Usage("%s", what).WithFix(fmt.Sprintf("gh dojo show %d", n)).WithCause(err)
 	case len(done) == 0 && err != nil:
 		return "", err // a lost answer says "may have been applied, re-run": a re-run skips what is done
 	case len(done) == 0:

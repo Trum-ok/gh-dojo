@@ -1,0 +1,93 @@
+{
+  "comment": "Hand-crafted for the blocker review fixes from links_unblock.json; mutations are never sent to GitHub. gh dojo block 3 --by 26 where #3 blocks #26: a cycle, exit 1 before any write; gh dojo block 3 --by 40: a pull request, exit 3.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "IssueLinks",
+      "query": "query IssueLinks($owner: String!, $repo: String!, $number: Int!, $link0Owner: String!, $link0Repo: String!, $link0Number: Int!) {\n  repository(owner: $owner, name: $repo) {\n    issueOrPullRequest(number: $number) { __typename ... on Issue { id title blockedBy(first: 50) { nodes { id } } } }\n  }\n  link0: repository(owner: $link0Owner, name: $link0Repo) {\n    issueOrPullRequest(number: $link0Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } } }\n  }\n}",
+      "variables": {
+        "link0Number": 26,
+        "link0Owner": "Trum-ok",
+        "link0Repo": "gh-dojo",
+        "number": 3,
+        "owner": "Trum-ok",
+        "repo": "gh-dojo"
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "issueOrPullRequest": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8AAAABeZKr9A",
+              "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)",
+              "blockedBy": {
+                "nodes": [
+                  {
+                    "id": "I_kwDOVq9iIs8AAAABeZKieQ"
+                  }
+                ]
+              }
+            }
+          },
+          "link0": {
+            "issueOrPullRequest": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8AAAABeb-QYw",
+              "title": "Блокеры: block/unblock, new --blocked-by, проверка blockers, эффект blockers",
+              "state": "OPEN",
+              "blocking": {
+                "nodes": [
+                  {
+                    "id": "I_kwDOVq9iIs8AAAABeb-zgQ"
+                  }
+                ]
+              },
+              "blockedBy": {
+                "nodes": [
+                  {
+                    "id": "I_kwDOVq9iIs8AAAABeZKr9A"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "IssueLinks",
+      "query": "query IssueLinks($owner: String!, $repo: String!, $number: Int!, $link0Owner: String!, $link0Repo: String!, $link0Number: Int!) {\n  repository(owner: $owner, name: $repo) {\n    issueOrPullRequest(number: $number) { __typename ... on Issue { id title blockedBy(first: 50) { nodes { id } } } }\n  }\n  link0: repository(owner: $link0Owner, name: $link0Repo) {\n    issueOrPullRequest(number: $link0Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } } }\n  }\n}",
+      "variables": {
+        "link0Number": 40,
+        "link0Owner": "Trum-ok",
+        "link0Repo": "gh-dojo",
+        "number": 3,
+        "owner": "Trum-ok",
+        "repo": "gh-dojo"
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "issueOrPullRequest": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8AAAABeZKr9A",
+              "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)",
+              "blockedBy": {
+                "nodes": [
+                  {
+                    "id": "I_kwDOVq9iIs8AAAABeZKieQ"
+                  }
+                ]
+              }
+            }
+          },
+          "link0": {
+            "issueOrPullRequest": {
+              "__typename": "PullRequest"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

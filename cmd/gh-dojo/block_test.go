@@ -46,7 +46,8 @@ func TestBlock(t *testing.T) {
 	srv, before := withLinksApp(t, verbFixture("links_block"))
 	checkLinkRuns(t, srv, before,
 		runs{[]string{"block", "3", "--by", "2,26"}, render.ExitOK, 2, "block_ok"},
-		runs{[]string{"block", "#3", "--by", "2", "--by", "#26"}, render.ExitOK, 1, "block_repeat"},
+		// An empty part ("2,") is skipped; an issue URL is a reference.
+		runs{[]string{"block", "#3", "--by", "2,", "--by", "https://github.com/Trum-ok/gh-dojo/issues/26"}, render.ExitOK, 1, "block_repeat"},
 	)
 }
 
@@ -88,6 +89,7 @@ func TestBlockArgs(t *testing.T) {
 		runs{[]string{"block", "3", "--by", "3"}, render.ExitUsage, 0, "block_self"},
 		runs{[]string{"unblock", "3", "--by", "Trum-ok/gh-dojo#3"}, render.ExitUsage, 0, "unblock_self"},
 		runs{[]string{"block", "3", "--by", "the API team"}, render.ExitUsage, 0, "block_text"},
+		runs{[]string{"block", "3", "--by", ","}, render.ExitUsage, 0, "block_no_by"},
 		runs{[]string{"block", "3", "4", "--by", "2"}, render.ExitUsage, 0, "block_two_issues"},
 		runs{[]string{"block", "--help"}, render.ExitOK, 0, "block_help"},
 		runs{[]string{"unblock", "--help"}, render.ExitOK, 0, "unblock_help"},
@@ -211,4 +213,82 @@ func TestNewBlockedByErrors(t *testing.T) {
 		runs{append(slices.Clone(newFixArgs), "--blocked-by", "9999"), render.ExitNotFound, 1, "new_missing"},
 		runs{append(slices.Clone(newFixArgs), "--blocked-by", "soon"), render.ExitUsage, 0, "new_not_issue"},
 	)
+}
+
+// TestUnblockFindsLinkByTarget: whether a link is in place comes from the
+// issue's own blockers, read whole, not from the issues the blocker blocks,
+// which may be more than are read.
+func TestUnblockFindsLinkByTarget(t *testing.T) {
+	srv, before := withLinksApp(t, verbFixture("links_unblock_window"))
+	checkLinkRuns(t, srv, before, runs{[]string{"unblock", "3", "--by", "2"}, render.ExitOK, 2, "unblock_window"})
+}
+
+// TestBlockCycle: a blocker the issue already blocks is refused before any
+// write (exit 1); a pull request is exit 3.
+func TestBlockCycle(t *testing.T) {
+	srv, before := withLinksApp(t, verbFixture("links_cycle"))
+	checkLinkRuns(t, srv, before,
+		runs{[]string{"block", "3", "--by", "26"}, render.ExitUsage, 1, "block_cycle"},
+		runs{[]string{"block", "3", "--by", "40"}, render.ExitNotFound, 1, "block_pull_request"},
+	)
+}
+
+// TestBlockCycleRefused: GitHub refusing a link as a cycle (through other
+// issues) is exit 1, not a partial 5: a re-run would fail the same way.
+func TestBlockCycleRefused(t *testing.T) {
+	srv, before := withLinksApp(t, verbFixture("links_cycle_refused"))
+	checkLinkRuns(t, srv, before,
+		runs{[]string{"block", "3", "--by", "2", "--by", "26"}, render.ExitUsage, 2, "block_cycle_refused"})
+}
+
+// TestVerbBlockersMany: a blockers check reads up to 50 blockers (GitHub's
+// limit), so resolved ones past the card's usual 20 do not count as
+// unresolved: deny lets start run.
+func TestVerbBlockersMany(t *testing.T) {
+	withConfig(t, verbDojoConfig+"\n[verbs.start]\nblockers = \"deny\"\n")
+	withSession(t, "abc")
+	srv := withApp(t, boardFixture, verbFixture("start_many_blockers"))
+	before := warmSchema(t, srv)
+	checkLinkRuns(t, srv, before, runs{[]string{"start", "3", "--dry-run"}, render.ExitOK, 1, "start_many_blockers"})
+}
+
+// TestVerbWaitLinkMany: --by naming several issues links each; one linked
+// already is "already", a pull request is named in the comment with a
+// warning but not linked. Issues and text mixed are exit 1 before any
+// request.
+func TestVerbWaitLinkMany(t *testing.T) {
+	srv, before := withWarmVerbApp(t, verbFixture("wait_link_many"))
+	checkLinkRuns(t, srv, before,
+		runs{[]string{"wait", "3", "--by", "2, https://github.com/Trum-ok/gh-dojo/issues/26, 40,", "--dry-run"},
+			render.ExitOK, 1, "wait_link_many"},
+		runs{[]string{"wait", "3", "--by", "26, the API team"}, render.ExitUsage, 0, "wait_link_mixed"},
+	)
+}
+
+// TestVerbWaitLinkTwo: two issues in --by are two blocked-by links in the
+// verb's one mutation, and the comment names both.
+func TestVerbWaitLinkTwo(t *testing.T) {
+	srv, before := withWarmVerbApp(t, verbFixture("wait_link_two"))
+	checkLinkRuns(t, srv, before, runs{[]string{"wait", "3", "--by", "26,25"}, render.ExitOK, 2, "wait_link_two"})
+}
+
+// TestVerbWaitLinkCycle: a --by issue that #3 already blocks is refused
+// after the read (exit 1); GitHub refusing the link as a cycle after the
+// status and comment applied is exit 1 too, not 5.
+func TestVerbWaitLinkCycle(t *testing.T) {
+	srv, before := withWarmVerbApp(t, verbFixture("wait_link_cycle"), verbFixture("wait_link_cycle_refused"))
+	checkLinkRuns(t, srv, before,
+		runs{[]string{"wait", "3", "--by", "26"}, render.ExitUsage, 1, "wait_link_cycle"},
+		runs{[]string{"wait", "3", "--by", "26"}, render.ExitUsage, 2, "wait_link_cycle_refused"},
+	)
+}
+
+// TestNewBlockedByCycle: the issue an earlier run created already blocks
+// the --blocked-by issue: exit 1 before any write.
+func TestNewBlockedByCycle(t *testing.T) {
+	withConfig(t, dojoConfig)
+	srv := withApp(t, boardFixture, verbFixture("new_blocked_by_cycle"))
+	before := warmSchema(t, srv)
+	checkLinkRuns(t, srv, before,
+		runs{append(slices.Clone(newFixArgs), "--blocked-by", "26"), render.ExitUsage, 1, "new_cycle"})
 }

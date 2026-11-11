@@ -12,6 +12,7 @@ verb start
   from: ["Backlog" "Waiting" "Ready"]
   require: [] require_one_of: []
   comment: "Started. Session: {session}\n\n{comment}"
+  blockers: "warn"
 verb wait
   when: Work is stuck: waiting for another issue or an outside decision
   to: "Waiting"

@@ -1,0 +1,67 @@
+{
+  "comment": "Hand-crafted for the blocker review fixes from links_unblock.json; mutations are never sent to GitHub. gh dojo unblock 3 --by 2 where the issues #2 blocks do not list #3 (as if beyond the 50 read) but #3's blockers list #2: the link is found by #3's blockers and removed.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "IssueLinks",
+      "query": "query IssueLinks($owner: String!, $repo: String!, $number: Int!, $link0Owner: String!, $link0Repo: String!, $link0Number: Int!) {\n  repository(owner: $owner, name: $repo) {\n    issueOrPullRequest(number: $number) { __typename ... on Issue { id title blockedBy(first: 50) { nodes { id } } } }\n  }\n  link0: repository(owner: $link0Owner, name: $link0Repo) {\n    issueOrPullRequest(number: $link0Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } } }\n  }\n}",
+      "variables": {
+        "link0Number": 2,
+        "link0Owner": "Trum-ok",
+        "link0Repo": "gh-dojo",
+        "number": 3,
+        "owner": "Trum-ok",
+        "repo": "gh-dojo"
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "issueOrPullRequest": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8AAAABeZKr9A",
+              "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)",
+              "blockedBy": {
+                "nodes": [
+                  {
+                    "id": "I_kwDOVq9iIs8AAAABeZKieQ"
+                  }
+                ]
+              }
+            }
+          },
+          "link0": {
+            "issueOrPullRequest": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8AAAABeZKieQ",
+              "title": "Коды выхода и короткие ошибки (internal/render)",
+              "state": "OPEN",
+              "blocking": {
+                "nodes": []
+              },
+              "blockedBy": {
+                "nodes": []
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "Unblock",
+      "query": "mutation Unblock($issue: ID!, $link0: ID!) {\n  link0: removeBlockedBy(input: {issueId: $issue, blockingIssueId: $link0}) { issue { id } }\n}",
+      "variables": {
+        "issue": "I_kwDOVq9iIs8AAAABeZKr9A",
+        "link0": "I_kwDOVq9iIs8AAAABeZKieQ"
+      },
+      "response": {
+        "data": {
+          "link0": {
+            "issue": {
+              "id": "I_kwDOVq9iIs8AAAABeZKr9A"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

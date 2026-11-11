@@ -2,3 +2,4 @@ code: 0
 --- stdout
 #3 not on the board → In progress, comment left
 --- stderr
+warning: #3 has unresolved blockers: #2 (not on the board), #1 (not on the board)

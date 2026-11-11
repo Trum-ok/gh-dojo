@@ -1,4 +1,5 @@
 code: 5
 --- stdout
 --- stderr
+warning: #3 has unresolved blockers: #2 (not on the board), #1 (not on the board)
 error: #3 comment left; status not changed: GitHub API unavailable (HTTP 502); re-run the same command

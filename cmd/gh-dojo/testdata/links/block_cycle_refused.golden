@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: #3 blocked by #2; GitHub refused to mark #3 blocked by #26: it would make a dependency cycle
+fix: gh dojo show 3

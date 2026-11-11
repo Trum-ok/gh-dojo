@@ -242,15 +242,19 @@ func (s *Server) RoundTrip(req *http.Request) (*http.Response, error) {
 func (s *Server) match(op, query, vars string) (*Interaction, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	var repeat, used *Interaction
+	var repeat, used, differs *Interaction
 	for _, in := range s.list {
 		anyVars := len(in.Variables) == 0 || string(in.Variables) == "null"
 		if in.Operation != op || !anyVars && canonical(in.Variables) != vars {
 			continue
 		}
 		if normalize(in.Query) != normalize(query) {
-			return nil, fmt.Errorf("%s in %s has a different query than the code sends; re-record (%s=1 go test -run %s) or update the hand-crafted fixture",
-				op, s.files[in.file], recordEnv, s.t.Name())
+			// Another query with the same name and variables, such as a
+			// card read with a wider window by another verb.
+			if differs == nil {
+				differs = in
+			}
+			continue
 		}
 		if in.used == 0 {
 			in.used++
@@ -268,6 +272,9 @@ func (s *Server) match(op, query, vars string) (*Interaction, error) {
 	case used != nil:
 		return nil, fmt.Errorf("request %s %s answered already by %s; add another interaction or \"repeat\": true",
 			op, vars, s.files[used.file])
+	case differs != nil:
+		return nil, fmt.Errorf("%s in %s has a different query than the code sends; re-record (%s=1 go test -run %s) or update the hand-crafted fixture",
+			op, s.files[differs.file], recordEnv, s.t.Name())
 	}
 	return nil, fmt.Errorf("unexpected request %s %s: no fixture in %s", op, vars, strings.Join(s.files, ", "))
 }

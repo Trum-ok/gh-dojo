@@ -18,6 +18,7 @@ import (
 	"github.com/Trum-ok/gh-dojo/internal/board"
 	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/effects"
+	"github.com/Trum-ok/gh-dojo/internal/graph"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/Trum-ok/gh-dojo/internal/workflow"
 	"github.com/spf13/cobra"
@@ -81,9 +82,10 @@ type Backend interface {
 	// board.repos[0], or the git remote of the current directory.
 	//
 	// For a verb with blockers = "warn" or "deny" it fills the unresolved
-	// blockers; for blockers = "link" with --by naming an issue (a), that
-	// issue (workflow.Issue.ByIssue), with exit code 3 when it does not
-	// exist and 1 when it is the issue itself.
+	// blockers; for blockers = "link" with --by naming issues (a), those
+	// issues (workflow.Issue.ByIssues), with exit code 3 when one does not
+	// exist, and 1 when one is the issue itself, would close a cycle, or
+	// --by mixes issues and text.
 	ReadIssue(ctx context.Context, v config.Verb, n int, a workflow.Args) (workflow.Issue, error)
 	// Apply applies every op of a non-empty plan, finding the issue's node
 	// IDs in p.Issue.Ref. It returns the ops GitHub confirmed, also with an
@@ -135,7 +137,7 @@ func newVerbCmd(cfg *config.Config, v config.Verb) *cobra.Command {
 	f.StringVar(&args.Comment, config.ArgComment, "", "text for {comment} in the comment")
 	byUsage := "value for {by} in the comment: an issue number (12 or #12) or free text"
 	if v.Blockers == config.BlockersLink {
-		byUsage = "value for {by} in the comment: an issue (12, #12 or owner/repo#12), also marked as blocking this one, or free text"
+		byUsage = "value for {by} in the comment: issues (12, #12, owner/repo#12 or URLs, comma-separated), also marked as blocking this one, or free text"
 	}
 	f.StringVar(&args.By, config.ArgBy, "", byUsage)
 	f.BoolVar(&dryRun, "dry-run", false, "print the plan without changing anything")
@@ -257,7 +259,9 @@ func (r *verbRun) applied() *workflow.Plan {
 //
 //	#42 comment left; status not changed: GitHub token is missing a required scope (project); gh auth refresh -s project, then re-run the same command
 //
-// The re-run re-reads the issue, so its plan leaves out what is done. cause
+// The re-run re-reads the issue, so its plan leaves out what is done; but
+// a blocked-by link GitHub refused as a dependency cycle is exit code 1,
+// since a re-run would fail the same way. cause
 // is the error of the write that left missed undone: per-field GraphQL
 // errors or ops never sent (errNotSent) mean they did not happen, a lost
 // answer (timeout, 5xx) that they are unconfirmed. err is what stopped the command, and gives the reason.
@@ -265,14 +269,15 @@ func (r *verbRun) partial(missed []workflow.Op, cause, err error) error {
 	if len(r.done) == 0 {
 		return err
 	}
+	if graph.IsCycle(err) {
+		// Re-running cannot help: the link makes a cycle through other issues.
+		return render.Usage("%s; %s: %s", r.applied().Confirm(), missedWords(missed), reason(err)).
+			WithFix(fmt.Sprintf("gh dojo show %d", r.first.Issue.Number)).WithCause(err)
+	}
 	var gqlErr *api.GraphQLError
 	what := "the rest is unconfirmed"
 	if (errors.As(cause, &gqlErr) || errors.Is(cause, errNotSent)) && len(missed) > 0 {
-		words := make([]string, len(missed))
-		for i, op := range missed {
-			words[i] = effects.Missed(op)
-		}
-		what = strings.Join(words, ", ")
+		what = missedWords(missed)
 	}
 	e := render.FromError(err)
 	next := "re-run the same command"
@@ -281,6 +286,15 @@ func (r *verbRun) partial(missed []workflow.Op, cause, err error) error {
 	}
 	return render.Partial("%s; %s: %s; %s", r.applied().Confirm(), what, reason(err), next).
 		WithFix(e.Fix).WithCause(err)
+}
+
+// missedWords says what ops did not take effect: "status not changed, comment not posted".
+func missedWords(missed []workflow.Op) string {
+	words := make([]string, len(missed))
+	for i, op := range missed {
+		words[i] = effects.Missed(op)
+	}
+	return strings.Join(words, ", ")
 }
 
 // reason is the first clause of an error's message, for a partial report.
@@ -479,7 +493,8 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 	case config.BlockersDeny:
 		line("Blockers", "refused (exit code 2) while a blocker is unresolved (%s): ask the user", unresolvedMeaning(cfg))
 	case config.BlockersLink:
-		line("Blockers", "--by naming an issue (12, #12, owner/repo#12) also marks this one blocked by it")
+		line("Blockers", "--by naming issues (12, #12, owner/repo#12 or URLs, comma-separated) also marks this one "+
+			"blocked by them; a pull request is only named in the comment")
 	}
 	if v.Close != "" {
 		line("Close", "closes the issue as %s; an issue already closed stays as it is", workflow.ReasonText(v.Close))

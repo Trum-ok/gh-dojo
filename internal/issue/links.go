@@ -23,17 +23,27 @@ type Ref struct {
 	Number int
 }
 
-// refRE matches "12", "#12" and "owner/name#12".
-var refRE = regexp.MustCompile(`^(?:([A-Za-z0-9][A-Za-z0-9_-]*/[A-Za-z0-9._-]+)#|#)?([1-9][0-9]*)$`)
+// refRE matches "12", "#12" and "owner/name#12"; urlRefRE an issue's URL,
+// "https://github.com/owner/name/issues/12" (any host: GitHub Enterprise
+// Server URLs name issues the same way).
+var (
+	refRE    = regexp.MustCompile(`^(?:([A-Za-z0-9][A-Za-z0-9_-]*/[A-Za-z0-9._-]+)#|#)?([1-9][0-9]*)$`)
+	urlRefRE = regexp.MustCompile(`^https?://[^/\s]+/([A-Za-z0-9][A-Za-z0-9_-]*/[A-Za-z0-9._-]+)/issues/([1-9][0-9]*)/?$`)
+)
 
 // RefExamples shows how to write an issue reference.
-const RefExamples = `12, "#12" or owner/repo#12`
+const RefExamples = `12, "#12", owner/repo#12 or the issue's URL`
 
-// ParseRef parses an issue reference, "12", "#12" or "owner/name#12",
-// ignoring surrounding spaces; a bare number is in def. ok is false for
-// anything else, such as free text.
+// ParseRef parses an issue reference, "12", "#12", "owner/name#12" or the
+// issue's URL ("https://github.com/owner/name/issues/12"), ignoring
+// surrounding spaces; a bare number is in def. ok is false for anything
+// else, such as free text or a pull request's URL.
 func ParseRef(s string, def Repo) (Ref, bool) {
-	m := refRE.FindStringSubmatch(strings.TrimSpace(s))
+	s = strings.TrimSpace(s)
+	m := refRE.FindStringSubmatch(s)
+	if m == nil {
+		m = urlRefRE.FindStringSubmatch(s)
+	}
 	if m == nil {
 		return Ref{}, false
 	}
@@ -68,9 +78,11 @@ func sameRepo(a, b Repo) bool {
 	return strings.EqualFold(a.Owner, b.Owner) && strings.EqualFold(a.Name, b.Name)
 }
 
-// BlockingWindow is how many of a linked issue's blocked issues are read
-// (Linked.Blocks): GitHub allows at most 50 per issue, so the list is
-// whole.
+// BlockingWindow is how many of an issue's links are read each way for
+// a link: the issues a linked issue blocks (Linked.Blocks) and those that
+// block it (Linked.BlockedBy), and the blockers of the issue gh dojo block
+// and unblock change (Target.BlockedBy). GitHub allows at most 50 blockers
+// per issue, so a blockedBy list read with it is whole.
 const BlockingWindow = 50
 
 // Linked is an issue read by its Ref to link it as a blocker.
@@ -85,11 +97,17 @@ type Linked struct {
 	Title       string
 	State       string
 	blocking    []string // node IDs of the issues it blocks
+	blockedBy   []string // node IDs of the issues blocking it
 }
 
 // Blocks reports whether the linked issue blocks the issue with node ID
 // id: the blocked-by link is in place.
 func (l *Linked) Blocks(id string) bool { return id != "" && slices.Contains(l.blocking, id) }
+
+// BlockedBy reports whether the issue with node ID id blocks the linked
+// issue: making the linked issue block it would close a cycle. The list
+// read is whole (see BlockingWindow).
+func (l *Linked) BlockedBy(id string) bool { return id != "" && slices.Contains(l.blockedBy, id) }
 
 // Links are issues read by Ref in the request of another query, each
 // under its own alias at the top of the document, so a command reads its
@@ -99,7 +117,8 @@ func (l *Linked) Blocks(id string) bool { return id != "" && slices.Contains(l.b
 //	query X(..., $link0Owner: String!, $link0Repo: String!, $link0Number: Int!) {
 //	  ...
 //	  link0: repository(owner: $link0Owner, name: $link0Repo) {
-//	    issueOrPullRequest(number: $link0Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } } }
+//	    issueOrPullRequest(number: $link0Number) { __typename ... on Issue { id title state
+//	      blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } } }
 //	  }
 //	}
 type Links []Ref
@@ -128,7 +147,8 @@ func (ls Links) Fields() string {
 		a := linkAlias(i)
 		fmt.Fprintf(&b, "  %s: repository(owner: $%sOwner, name: $%sRepo) {\n"+
 			"    issueOrPullRequest(number: $%sNumber) { __typename ... on Issue { id title state "+
-			"blocking(first: %d) { nodes { id } } } }\n  }\n", a, a, a, a, BlockingWindow)
+			"blocking(first: %d) { nodes { id } } blockedBy(first: %d) { nodes { id } } } }\n  }\n",
+			a, a, a, a, BlockingWindow, BlockingWindow)
 	}
 	return b.String()
 }
@@ -154,15 +174,12 @@ func (ls Links) Decode(data map[string]json.RawMessage) ([]*Linked, error) {
 		}
 		var v *struct {
 			Issue *struct {
-				Typename string `json:"__typename"`
-				ID       string `json:"id"`
-				Title    string `json:"title"`
-				State    string `json:"state"`
-				Blocking struct {
-					Nodes []*struct {
-						ID string `json:"id"`
-					} `json:"nodes"`
-				} `json:"blocking"`
+				Typename  string  `json:"__typename"`
+				ID        string  `json:"id"`
+				Title     string  `json:"title"`
+				State     string  `json:"state"`
+				Blocking  idNodes `json:"blocking"`
+				BlockedBy idNodes `json:"blockedBy"`
 			} `json:"issueOrPullRequest"`
 		}
 		if err := json.Unmarshal(raw, &v); err != nil {
@@ -177,13 +194,26 @@ func (ls Links) Decode(data map[string]json.RawMessage) ([]*Linked, error) {
 			continue
 		}
 		l.ID, l.Title, l.State = v.Issue.ID, v.Issue.Title, v.Issue.State
-		for _, n := range v.Issue.Blocking.Nodes {
-			if n != nil {
-				l.blocking = append(l.blocking, n.ID)
-			}
-		}
+		l.blocking, l.blockedBy = v.Issue.Blocking.ids(), v.Issue.BlockedBy.ids()
 	}
 	return out, nil
+}
+
+// idNodes is a connection read as { nodes { id } }.
+type idNodes struct {
+	Nodes []*struct {
+		ID string `json:"id"`
+	} `json:"nodes"`
+}
+
+func (c idNodes) ids() []string {
+	var out []string
+	for _, n := range c.Nodes {
+		if n != nil && n.ID != "" {
+			out = append(out, n.ID)
+		}
+	}
+	return out
 }
 
 // isLinkPath reports whether a GraphQL error path points at or below a
@@ -217,58 +247,83 @@ func OnlyLinkErrors(err error) bool {
 	return true
 }
 
-// LinksError is the error for linked issues that cannot be blocked by:
-// missing ones (exit code 3, "gh dojo list" as the fix) or pull requests
-// (exit code 3), named by what (such as "--by"); nil when there are none.
-// def is the default repository, for the refs and the message.
+// LinksError is the error for linked issues that cannot be blocked by,
+// with exit code 3: missing ones and pull requests, all named at once by
+// what (such as "--by"); nil when there are none. def is the default
+// repository, for the refs and the message. "gh dojo list" is the fix
+// only when every issue named is in def: it lists def's board, which
+// cannot help with another repository's numbers.
 //
-//	--by #98, #99: no such issue in Trum-ok/gh-dojo, or the token cannot see it
+//	--by #98, #99: no such issue in Trum-ok/gh-dojo, or the token cannot see it; #40: a pull request, not an issue; only issues can block
 func LinksError(what string, links []*Linked, def Repo) error {
 	var missing, prs []string
 	where := " in " + def.String() // all missing ones are in def
+	fix := ListFix
 	for _, l := range links {
-		switch {
-		case l.Missing:
-			missing = append(missing, l.Ref.String(def))
-			if !sameRepo(l.Ref.Repo, def) {
-				where = ""
-			}
-		case l.PullRequest:
+		if !l.Missing && !l.PullRequest {
+			continue
+		}
+		if !sameRepo(l.Ref.Repo, def) {
+			fix = ""
+		}
+		if l.PullRequest {
 			prs = append(prs, l.Ref.String(def))
+			continue
+		}
+		missing = append(missing, l.Ref.String(def))
+		if !sameRepo(l.Ref.Repo, def) {
+			where = ""
 		}
 	}
-	switch {
-	case len(missing) > 0:
-		return render.NotFound("%s %s: no such issue%s, or the token cannot see it",
-			what, strings.Join(missing, ", "), where).WithFix(ListFix)
-	case len(prs) > 0:
-		return render.NotFound("%s %s: a pull request, not an issue; only issues can block", what, strings.Join(prs, ", ")).
-			WithFix(ListFix)
+	var parts []string
+	if len(missing) > 0 {
+		parts = append(parts, fmt.Sprintf("%s: no such issue%s, or the token cannot see it", strings.Join(missing, ", "), where))
 	}
-	return nil
+	switch len(prs) {
+	case 0:
+	case 1:
+		parts = append(parts, prs[0]+": a pull request, not an issue; only issues can block")
+	default:
+		parts = append(parts, strings.Join(prs, ", ")+": pull requests, not issues; only issues can block")
+	}
+	if len(parts) == 0 {
+		return nil
+	}
+	e := render.NotFound("%s %s", what, strings.Join(parts, "; "))
+	if fix != "" {
+		e = e.WithFix(fix)
+	}
+	return e
 }
 
 // Target is the issue gh dojo block and unblock change.
 type Target struct {
-	Repo   Repo
-	Number int
-	ID     string // node ID; never print it
-	Title  string
+	Repo      Repo
+	Number    int
+	ID        string // node ID; never print it
+	Title     string
+	blockedBy []string // node IDs of its blockers, all of them (see BlockingWindow)
 }
+
+// BlockedBy reports whether the linked issue blocks the target: the
+// blocked-by link is in place. The target's blockers are read whole, so
+// unlike Linked.Blocks the answer holds however many issues l blocks.
+func (t *Target) BlockedBy(l *Linked) bool { return l.ID != "" && slices.Contains(t.blockedBy, l.ID) }
 
 // linksHead and linksTarget are the parts of the query ReadLinks sends.
 const (
 	linksHead   = `query IssueLinks($owner: String!, $repo: String!, $number: Int!`
 	linksTarget = `) {
   repository(owner: $owner, name: $repo) {
-    issueOrPullRequest(number: $number) { __typename ... on Issue { id title } }
+    issueOrPullRequest(number: $number) { __typename ... on Issue { id title blockedBy(first: 50) { nodes { id } } } }
   }
 `
 )
 
-// ReadLinks reads issue number of repo and the issues refs name, with
-// whether each already blocks it, in one request: what gh dojo block and
-// unblock need. A missing repository or issue, or a pull request number,
+// ReadLinks reads issue number of repo with its blockers, and the issues
+// refs name (see Links), in one request: what gh dojo block and unblock
+// need. Target.BlockedBy tells whether a link is in place, Linked.BlockedBy
+// whether adding it would close a cycle. A missing repository or issue, or a pull request number,
 // is exit code 3; so are missing or pull request refs (see LinksError,
 // with what naming them). The links come back in the order of refs.
 func ReadLinks(ctx context.Context, q graph.Querier, repo Repo, number int, refs []Ref, what string) (*Target, []*Linked, error) {
@@ -285,9 +340,10 @@ func ReadLinks(ctx context.Context, q graph.Querier, repo Repo, number int, refs
 	var resp struct {
 		Repository *struct {
 			Issue *struct {
-				Typename string `json:"__typename"`
-				ID       string `json:"id"`
-				Title    string `json:"title"`
+				Typename  string  `json:"__typename"`
+				ID        string  `json:"id"`
+				Title     string  `json:"title"`
+				BlockedBy idNodes `json:"blockedBy"`
 			} `json:"issueOrPullRequest"`
 		} `json:"repository"`
 	}
@@ -320,7 +376,8 @@ func ReadLinks(ctx context.Context, q graph.Querier, repo Repo, number int, refs
 	if err := LinksError(what, links, repo); err != nil {
 		return nil, nil, err
 	}
-	t := &Target{Repo: repo, Number: number, ID: resp.Repository.Issue.ID, Title: resp.Repository.Issue.Title}
+	is := resp.Repository.Issue
+	t := &Target{Repo: repo, Number: number, ID: is.ID, Title: is.Title, blockedBy: is.BlockedBy.ids()}
 	return t, links, nil
 }
 

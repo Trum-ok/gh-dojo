@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: #3 In progress → Waiting, comment left; not blocked by #26: GitHub refused a blocked-by link: it would make a dependency cycle
+fix: gh dojo show 3

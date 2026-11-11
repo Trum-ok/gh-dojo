@@ -160,8 +160,9 @@ const (
 	// BlockersDeny: the verb is refused (exit code 2) while the issue has an
 	// unresolved blocker.
 	BlockersDeny = "deny"
-	// BlockersLink: a --by naming an issue (12, #12 or owner/repo#12) also
-	// marks the issue blocked by it; free text stays comment-only.
+	// BlockersLink: a --by naming issues (12, #12, owner/repo#12 or an
+	// issue's URL; comma-separated) also marks the issue blocked by them;
+	// free text stays comment-only, and so does a pull request.
 	BlockersLink = "link"
 )
 

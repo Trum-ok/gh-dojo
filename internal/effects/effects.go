@@ -40,7 +40,6 @@ const (
 	AliasAddLabels    = "addLabels"
 	AliasRemoveLabels = "removeLabels"
 	AliasAssign       = "assign"
-	AliasBlockedBy    = "blockedBy"
 	AliasComment      = "comment"
 	AliasClose        = "close"
 	AliasIteration    = "sprint"
@@ -49,6 +48,10 @@ const (
 // FieldAlias is the alias of the i-th field a SetFields op sets: field0,
 // field1, ...
 func FieldAlias(i int) string { return fmt.Sprintf("field%d", i) }
+
+// BlockedByAlias is the alias of the i-th AddBlockedBy op: blockedBy0,
+// blockedBy1, ...; its variable is blocker0, blocker1, ...
+func BlockedByAlias(i int) string { return fmt.Sprintf("blockedBy%d", i) }
 
 // IDs are the node IDs the ops need. Never print them.
 type IDs struct {
@@ -74,9 +77,9 @@ type IDs struct {
 	// Fields maps the board field names of a SetFields op to their IDs
 	// and the values to write.
 	Fields map[string]FieldInput
-	// Blocker is the node ID of the issue AddBlockedBy links as blocking
-	// the issue.
-	Blocker string
+	// Blockers maps the Ref of each AddBlockedBy op to the node ID of the
+	// issue it links as blocking the issue.
+	Blockers map[string]string
 }
 
 // FieldInput is a board field to set: its node ID and the value, a
@@ -132,8 +135,8 @@ func Batches(ops []workflow.Op) [][]workflow.Op {
 	return [][]workflow.Op{{ops[i]}, rest}
 }
 
-// Build makes one mutation document from ops: at most one op of each kind,
-// with the IDs it needs. A SetStatus without ids.Item is an error: add the
+// Build makes one mutation document from ops: at most one op of each kind
+// (AddBlockedBy one per blocking issue), with the IDs it needs. A SetStatus without ids.Item is an error: add the
 // issue to the board first (see Batches).
 //
 //	mutation Verb($project: ID!, $item: ID!, $field: ID!, $option: String!, $issue: ID!, $body: String!, $reason: IssueClosedStateReason!) {
@@ -168,6 +171,7 @@ func Build(ops []workflow.Op, ids IDs) (*Mutation, error) {
 		decls = append(decls, "$"+name+": "+typ)
 		return nil
 	}
+	blockers := 0 // AddBlockedBy ops so far
 	for n, op := range ops {
 		var (
 			alias, field string
@@ -214,9 +218,15 @@ func Build(ops []workflow.Op, ids IDs) (*Mutation, error) {
 			err = firstErr(err, declare("issue", "ID!", ids.Issue), declare("assignees", "[ID!]!", users))
 			field = "addAssigneesToAssignable(input: {assignableId: $issue, assigneeIds: $assignees}) { clientMutationId }"
 		case workflow.AddBlockedBy:
-			alias = AliasBlockedBy
-			err = firstErr(declare("issue", "ID!", ids.Issue), declare("blocker", "ID!", ids.Blocker))
-			field = BlockedByField(true, "issue", "blocker")
+			alias = BlockedByAlias(blockers)
+			v := fmt.Sprintf("blocker%d", blockers)
+			blockers++
+			id := ids.Blockers[op.Ref]
+			if id == "" {
+				return nil, fmt.Errorf("effects: no ID for blocking issue %s", op.Ref)
+			}
+			err = firstErr(declare("issue", "ID!", ids.Issue), declare(v, "ID!", id))
+			field = BlockedByField(true, "issue", v)
 		case workflow.AddComment:
 			alias = AliasComment
 			err = firstErr(declare("issue", "ID!", ids.Issue), declare("body", "String!", op.Text()))

@@ -3,8 +3,8 @@ package issue
 import "encoding/json"
 
 // cardQuery reads a whole card in one request (principle 6). Windows:
-// labels 20 (100 with Lookup.AllLabels), assignees 10, blockers 20 each way (each with its first 10
-// project items), project items 20 (each with up to 100 field values), the
+// labels 20 (100 with Lookup.AllLabels), assignees 10, blockers 20 each way
+// (blockedBy 50 with Lookup.AllBlockers; each with its first 10 project items), project items 20 (each with up to 100 field values), the
 // last 20 status changes and the last $comments comments; every list of
 // the card keeps its totalCount, so the reader can tell "none" from "not
 // read".

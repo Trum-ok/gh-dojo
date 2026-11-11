@@ -1,0 +1,6 @@
+warning: #40 is a pull request: not linked
+dry run: wait #42 "Fix login redirect"
+  status: In progress → Waiting
+  comment: "Waiting for #40."
+confirm: #42 In progress → Waiting, comment left
+post: "Waiting for #40.\n\n<!-- gh-dojo:wait:0b8b080a -->"

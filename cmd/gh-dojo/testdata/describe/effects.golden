@@ -5,7 +5,7 @@ Run a verb as gh dojo <verb> <N>; --dry-run shows its plan first.
 
 Verbs:
   start       You begin working on the issue
-              optional --comment; comments "Started. Session: {session} {comment}"
+              optional --comment; warns about unresolved blockers; comments "Started. Session: {session} {comment}"
   wait        Work is stuck: waiting for another issue or an outside decision
               needs --by or --comment; --by N also marks it blocked by #N; comments "Waiting for {by}. {comment}"
   ready       The work is done, verified and committed, but not released yet

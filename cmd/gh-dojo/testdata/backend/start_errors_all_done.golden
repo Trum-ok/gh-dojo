@@ -2,4 +2,5 @@ code: 0
 --- stdout
 #3 Ready → In progress, comment left
 --- stderr
+warning: #3 has unresolved blockers: #2 (not on the board), #1 (not on the board)
 warning: GitHub reported an error after applying every change: GitHub API rejected the request

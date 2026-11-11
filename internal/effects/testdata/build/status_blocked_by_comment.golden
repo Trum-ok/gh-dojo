@@ -1,11 +1,11 @@
-mutation Verb($project: ID!, $item: ID!, $field: ID!, $option: String!, $issue: ID!, $blocker: ID!, $body: String!) {
+mutation Verb($project: ID!, $item: ID!, $field: ID!, $option: String!, $issue: ID!, $blocker0: ID!, $body: String!) {
   status: updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field, value: {singleSelectOptionId: $option}}) { projectV2Item { id } }
-  blockedBy: addBlockedBy(input: {issueId: $issue, blockingIssueId: $blocker}) { issue { id } }
+  blockedBy0: addBlockedBy(input: {issueId: $issue, blockingIssueId: $blocker0}) { issue { id } }
   comment: addComment(input: {subjectId: $issue, body: $body}) { commentEdge { node { id } } }
 }
 --- vars
 {
-  "blocker": "I_12",
+  "blocker0": "I_12",
   "body": "Started.\n\n<!-- gh-dojo:start:995a443b -->",
   "field": "PVTSSF_1",
   "issue": "I_1",
@@ -14,4 +14,4 @@ mutation Verb($project: ID!, $item: ID!, $field: ID!, $option: String!, $issue: 
   "project": "PVT_1"
 }
 --- steps
-status, blockedBy, comment
+status, blockedBy0, comment

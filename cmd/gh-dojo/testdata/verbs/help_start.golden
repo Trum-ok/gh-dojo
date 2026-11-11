@@ -7,6 +7,7 @@ You begin working on the issue
   Requires:  nothing besides the issue number
   Optional:  --comment
   Board:     adds the issue if it is not there
+  Blockers:  warns about unresolved blockers (open and not in Ready or Done), then runs
   Comment:   posted unless it renders empty or is already the latest gh-dojo comment:
                Started. Session: {session}
 

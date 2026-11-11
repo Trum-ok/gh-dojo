@@ -1,5 +1,5 @@
 code: 1
 --- stdout
 --- stderr
-error: --blocked-by "soon" is not an issue: pass 12, "#12" or owner/repo#12
+error: --blocked-by "soon" is not an issue: pass 12, "#12", owner/repo#12 or the issue's URL
 fix: gh dojo new --help
