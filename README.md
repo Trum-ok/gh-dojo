@@ -104,7 +104,7 @@ also be authorized for it.
    gh dojo list            # open issues on the board, grouped by status
    gh dojo show 42         # read an issue before working on it
    gh dojo start 42        # Backlog → In progress, with a comment
-   gh dojo wait 42 --by 17 # In progress → Waiting, "Waiting for #17."
+   gh dojo wait 42 --by 17 # In progress → Waiting, blocked by #17, "Waiting for #17."
    gh dojo ready 42        # → Ready: done and committed, not released
    gh dojo done 42         # → Done: released
    ```
@@ -166,7 +166,7 @@ title lists the iterations.
 ### new
 
 ```sh
-gh dojo new <title> [--type T] [--area A]... [--label L]... [--body TEXT | --body-file FILE]
+gh dojo new <title> [--type T] [--area A]... [--label L]... [--blocked-by N]... [--body TEXT | --body-file FILE]
 ```
 
 Creates an issue, labels it, adds it to the board and sets the initial status
@@ -174,8 +174,11 @@ Creates an issue, labels it, adds it to the board and sets the initial status
 [`labels.types`](#labels) (or any repo label outside the areas when that list
 is empty), `--area cli` adds the label `<labels.area_prefix>cli`, `--label`
 adds any existing label. An unknown label fails before anything is created,
-listing the allowed values. `--body-file -` reads the body from stdin. A
-title starting with `-` goes after `--`: `gh dojo new -- "-v is ignored"`.
+listing the allowed values. `--blocked-by 17` marks the new issue blocked by
+#17 (repeatable, or comma-separated; `owner/repo#17` for another
+repository); an issue that does not exist fails before anything is created
+(exit code 3). `--body-file -` reads the body from stdin. A title starting
+with `-` goes after `--`: `gh dojo new -- "-v is ignored"`.
 
 ```console
 $ gh dojo new "Fix login redirect" --type bug --area cli
@@ -184,7 +187,8 @@ $ gh dojo new "Fix login redirect" --type bug --area cli
 
 A repeat is safe: the body ends with a hidden marker of the title, and a run
 that finds it on one of the repository's 20 newest open issues written by
-you finishes that issue (labels, board, status) instead of creating another.
+you finishes that issue (labels, board, status, blocked-by links) instead of
+creating another.
 If a run fails after creating the issue, it exits with code 5: run the same
 command again.
 
@@ -199,6 +203,32 @@ second argument or from `--body-file` (`-` reads stdin), exactly one of them.
 Text starting with `-` goes after `--`: `gh dojo comment 42 -- "-1, still broken"`.
 When the issue's last comment is yours with the same text, it is not posted
 again.
+
+### block, unblock
+
+```sh
+gh dojo block <N> --by <M>...
+gh dojo unblock <N> --by <M>...
+```
+
+Marks issue N blocked by the issues `--by` names, or removes those links,
+without changing its status. `--by` takes `12`, `"#12"` or `owner/repo#12`;
+repeat it or separate numbers with commas. A link already there (`block`) or
+already gone (`unblock`) is not an error, and the line says so. An issue that
+does not exist fails before anything is written (exit code 3); an issue
+cannot block itself (exit code 1). One read and one write:
+
+```console
+$ gh dojo block 42 --by 17,18
+#42 blocked by #18, already blocked by #17
+$ gh dojo unblock 42 --by 17
+#42 no longer blocked by #17
+```
+
+A blocker stops blocking once it is closed or in one of
+[`statuses.resolved`](#statuses); [`blockers = "warn"` or `"deny"`](#verbs)
+makes a verb check that. `wait --by 17` of the kanban preset also adds the
+link (`blockers = "link"`).
 
 ### init
 
@@ -236,8 +266,8 @@ gh dojo describe
 Prints the project's process in a few lines per verb, short enough for an
 agent's context: when to use each verb, the arguments it needs or takes, what
 it checks and does along the way (the comment it posts, labels, assignee,
-closing or reopening, whether it runs on closed issues or needs the user's
-go-ahead), then the lifecycle (from → to), the initial, final and
+closing or reopening, blocked-by links, whether it checks blockers, runs on
+closed issues or needs the user's go-ahead), then the lifecycle (from → to), the initial, final and
 resolved statuses, and the exit codes. It reads only the config, never the
 network; a missing or broken config is printed as an error (exit code 1).
 
@@ -299,21 +329,23 @@ A verb takes one issue number and, in one command:
 1. checks that the issue is open (a verb that moves it to a final status,
    closes it or reopens it also runs on a closed one), that its status is one
    of the verb's `from` statuses (no status, or not on the board, counts as
-   [`statuses.initial`](#statuses)), and that the required arguments are
-   given;
+   [`statuses.initial`](#statuses)), that the required arguments are given,
+   and, with `blockers = "warn"` or `"deny"`, whether the issue has
+   unresolved blockers (a warning on stderr, or exit code 2);
 2. adds the issue to the board if it is not there;
 3. reopens it (`reopen`), sets the status to the verb's `to`, adds and removes
-   `labels`, adds the `assign` user, posts the rendered
+   `labels`, adds the `assign` user, marks it blocked by the `--by` issue
+   (`blockers = "link"`), posts the rendered
    [comment template](#comment-templates) and closes it (`close`). Each
    effect already in place is skipped: a status already set, labels already
-   there or gone, a user already assigned, a comment that is already the
-   latest gh-dojo comment, an issue already closed (whatever its reason) or
-   open.
+   there or gone, a user already assigned, a blocked-by link already there,
+   a comment that is already the latest gh-dojo comment, an issue already
+   closed (whatever its reason) or open.
 
 Everything is written in one GraphQL mutation (two when the issue is not on
-the board yet: the status needs the new board item). Label and user IDs are
-read with the issue, so a verb on an issue on the board costs one read and
-one write.
+the board yet: the status needs the new board item). Label and user IDs, and
+the `--by` issue of `blockers = "link"`, are read with the issue, so a verb
+on an issue on the board costs one read and one write.
 
 The board's built-in workflows run after the verb and may change the status
 it set: "Item closed" moves an issue a verb closed (to Done by default),
@@ -332,13 +364,16 @@ verbs reject `--yes`.
 
 `--comment` and `--by` fill `{comment}` and `{by}` in the template; a verb
 whose template does not use one of them rejects that flag. `--by` takes an issue number (`12` or
-`#12`, rendered `#12`) or free text. `--dry-run` prints the plan without
+`#12`, rendered `#12`) or free text; with `blockers = "link"` an issue
+(`12`, `#12` or `owner/repo#12`) is also marked as blocking this one, while
+free text only goes into the comment. `--dry-run` prints the plan without
 changing anything:
 
 ```console
 $ gh dojo wait 42 --by 17 --dry-run
 dry run: wait #42 "Fix login redirect"
   status: In progress → Waiting
+  blocked by: #17
   comment: "Waiting for #17."
 
 $ gh dojo drop 42 --comment "Duplicate of #17."
@@ -376,8 +411,8 @@ this is a process rule: ask the user how to proceed
 `gh dojo --help` prints this table too. Retries are safe for every command:
 verbs skip every effect already in place (a status already set, a comment
 that is already the latest gh-dojo comment, an issue already closed, ...),
-`comment` skips its own repeated text, and `new` resumes the issue it
-created. A partial write (code 5) names what was done and what was not:
+`comment` skips its own repeated text, `block` and `unblock` skip links
+already as asked, and `new` resumes the issue it created. A partial write (code 5) names what was done and what was not:
 
 ```console
 $ gh dojo review 42
@@ -426,12 +461,14 @@ link = "claude://claude.ai/epitaxy/{id}"
 when = "You begin working on the issue"   # one line; first line of --help
 to = "In progress"           # target status
 from = ["Backlog", "Waiting", "Ready"]    # allowed current statuses; empty = any
+blockers = "warn"            # warn about unresolved blockers; "deny" refuses
 comment = "Started. Session: {session}"   # comment template
 
 [verbs.wait]
 when = "Work is stuck: waiting for another issue or an outside decision"
 to = "Waiting"
 require_one_of = ["by", "comment"]        # --by or --comment must be given
+blockers = "link"            # --by 17 also marks the issue blocked by #17
 comment = """
 Waiting for {by}.
 
@@ -550,6 +587,7 @@ Each `[verbs.<name>]` table becomes `gh dojo <name>`.
 | `confirm`        | `"user"`: the verb is the user's decision and runs only with `--yes`; `false` turns a preset's off |
 | `iteration`      | Set the sprint field: `"current"`, `"by_status_date:<status>"` or `"clear"`; needs `fields.sprint`; `""` turns a preset's off |
 | `field`          | A table of board fields to set: `[verbs.<name>.field]` with `Priority = "P1"`, `Estimate = 3`   |
+| `blockers`       | `"warn"` or `"deny"`: check the issue's unresolved blockers; `"link"`: `--by N` also marks it blocked by #N; `false` turns a preset's off |
 | `disabled`       | `true` removes a verb the preset defines; it stands alone in its table                           |
 
 A verb needs at least one effect: `to`, `comment`, `labels`, `assign`,
@@ -559,8 +597,8 @@ has no template posts the `--comment` text as is. Verb names are
 lowercase letters, digits and dashes and cannot shadow built-in or planned
 commands (`show`, `list`, `new`, `comment`, `describe`, `init`, `doctor`,
 `help`, `block`, `unblock`, `agent`, `next`, `release`). Keys from the design
-that are not implemented yet (`blockers`, `batch`, `pre`, `post`) are
-rejected with "not supported in this version".
+that are not implemented yet (`batch`, `pre`, `post`) are rejected with
+"not supported in this version".
 
 Effects:
 
@@ -604,6 +642,20 @@ Effects:
 - **confirm**: `confirm = "user"` is a signal, not a lock: an agent could add
   `--yes` itself, so tell agents (in a skill or AGENTS.md) to ask first.
   `confirm = false` turns off a preset's.
+- **blockers**: a check or an effect, one of three values.
+  - `"warn"` and `"deny"` look at the issue's unresolved blockers: open, and
+    not in one of [`statuses.resolved`](#statuses); a blocker whose board
+    status could not be read, or that was not read at all (more than 20, or
+    hidden from the token), counts as unresolved. `"warn"` prints them on
+    stderr and runs; `"deny"` refuses with exit code 2, listing them and
+    asking you to ask the user (there is no fix line: don't work around it).
+    Like `from`, the check is skipped for an issue already in the verb's
+    `to`, so a repeat is safe. `--dry-run` warns or refuses the same way.
+  - `"link"` turns `--by` naming an issue (`12`, `#12`, `owner/repo#12`)
+    into a blocked-by link, written in the verb's one mutation; free text
+    stays comment-only. The `--by` issue must exist (exit code 3) and cannot
+    be the issue itself (exit code 1). The verb's comment template must use
+    `{by}`. `blockers = false` turns off a preset's (kanban's `wait` links).
 
 ### Comment templates
 
@@ -663,6 +715,8 @@ The board's status field must have these options (other options are fine):
 `done` also closes the issue as completed: Done means released. An issue a
 pull request already closed stays closed; `done` still moves it to Done.
 To keep issues open in Done, set `close = false` under `[verbs.done]`.
+`wait --by 17` also marks the issue blocked by #17 (`blockers = "link"`);
+`wait --by "the API team"` only comments.
 
 The preset also sets `fields.status = "Status"`, `statuses.initial =
 "Backlog"`, `statuses.final = ["Done"]`, `statuses.resolved = ["Ready",

@@ -388,8 +388,9 @@ func isNull(v json.RawMessage) bool {
 // Missed says that op did not take effect, for a partial report:
 // "not added to the board", "not unarchived", "not reopened", "status not
 // changed", "labels not added", "labels not removed", "not assigned",
-// "not blocked by #12", "comment not posted", "not closed", "sprint not set", "sprint not
-// cleared", "Priority not set" (one field) or "fields not set".
+// "not blocked by #12", "comment not posted", "not closed", "sprint not
+// set", "sprint not cleared", "Priority not set" (one field) or "fields
+// not set".
 func Missed(op workflow.Op) string {
 	switch op := op.(type) {
 	case workflow.AddToBoard:
