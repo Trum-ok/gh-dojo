@@ -1,0 +1,151 @@
+{
+  "comment": "Recorded: the public projects of organization github, one page.",
+  "interactions": [
+    {
+      "operation": "OwnerProjects",
+      "query": "query OwnerProjects($owner: String!, $first: Int!, $cursor: String) {\n  repositoryOwner(login: $owner) {\n    __typename\n    login\n    ... on User { projectsV2(first: $first, after: $cursor, orderBy: {field: NUMBER, direction: ASC}) { ...projects } }\n    ... on Organization { projectsV2(first: $first, after: $cursor, orderBy: {field: NUMBER, direction: ASC}) { ...projects } }\n  }\n}\n\nfragment projects on ProjectV2Connection {\n  totalCount\n  pageInfo { hasNextPage endCursor }\n  nodes { number title closed items { totalCount } }\n}",
+      "variables": {
+        "cursor": null,
+        "first": 100,
+        "owner": "github"
+      },
+      "response": {
+        "data": {
+          "repositoryOwner": {
+            "__typename": "Organization",
+            "login": "github",
+            "projectsV2": {
+              "totalCount": 15,
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": "MTU"
+              },
+              "nodes": [
+                {
+                  "number": 4247,
+                  "title": "GitHub Public Roadmap",
+                  "closed": false,
+                  "items": {
+                    "totalCount": 648
+                  }
+                },
+                {
+                  "number": 9557,
+                  "title": "GitHub Actions VS Code Extension",
+                  "closed": false,
+                  "items": {
+                    "totalCount": 218
+                  }
+                },
+                {
+                  "number": 12106,
+                  "title": "Coding Standards Public Development Board",
+                  "closed": false,
+                  "items": {
+                    "totalCount": 576
+                  }
+                },
+                {
+                  "number": 12731,
+                  "title": "GitHub OSPO OSS Board",
+                  "closed": false,
+                  "items": {
+                    "totalCount": 11
+                  }
+                },
+                {
+                  "number": 16162,
+                  "title": "MLH Fellowship Spring '23 (classic)",
+                  "closed": false,
+                  "items": {
+                    "totalCount": 16
+                  }
+                },
+                {
+                  "number": 16712,
+                  "title": "GHAS + Issue Tracking Integration Development",
+                  "closed": false,
+                  "items": {
+                    "totalCount": 15
+                  }
+                },
+                {
+                  "number": 16737,
+                  "title": "Precise ASTs",
+                  "closed": false,
+                  "items": {
+                    "totalCount": 14
+                  }
+                },
+                {
+                  "number": 17079,
+                  "title": "PR Creation",
+                  "closed": false,
+                  "items": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "number": 17318,
+                  "title": "Feature work planning",
+                  "closed": false,
+                  "items": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "number": 17411,
+                  "title": "Maintainer workflow",
+                  "closed": false,
+                  "items": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "number": 18315,
+                  "title": "Campus Experts + GitHub Docs program",
+                  "closed": false,
+                  "items": {
+                    "totalCount": 64
+                  }
+                },
+                {
+                  "number": 18394,
+                  "title": "Polish tasks",
+                  "closed": false,
+                  "items": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "number": 18966,
+                  "title": "BUGS",
+                  "closed": false,
+                  "items": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "number": 19351,
+                  "title": "PR list view/issue list view.",
+                  "closed": false,
+                  "items": {
+                    "totalCount": 0
+                  }
+                },
+                {
+                  "number": 20381,
+                  "title": "gh-skyline",
+                  "closed": false,
+                  "items": {
+                    "totalCount": 120
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

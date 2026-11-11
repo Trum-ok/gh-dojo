@@ -1,0 +1,19 @@
+{
+  "comment": "Recorded: no such user or organization (repositoryOwner is null, no error).",
+  "interactions": [
+    {
+      "operation": "OwnerProjects",
+      "query": "query OwnerProjects($owner: String!, $first: Int!, $cursor: String) {\n  repositoryOwner(login: $owner) {\n    __typename\n    login\n    ... on User { projectsV2(first: $first, after: $cursor, orderBy: {field: NUMBER, direction: ASC}) { ...projects } }\n    ... on Organization { projectsV2(first: $first, after: $cursor, orderBy: {field: NUMBER, direction: ASC}) { ...projects } }\n  }\n}\n\nfragment projects on ProjectV2Connection {\n  totalCount\n  pageInfo { hasNextPage endCursor }\n  nodes { number title closed items { totalCount } }\n}",
+      "variables": {
+        "cursor": null,
+        "first": 100,
+        "owner": "no-such-user-xyz-123987"
+      },
+      "response": {
+        "data": {
+          "repositoryOwner": null
+        }
+      }
+    }
+  ]
+}
