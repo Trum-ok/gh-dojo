@@ -115,7 +115,7 @@ type Card struct {
 	// Comments are the latest ones, oldest first; TotalCount counts all.
 	Comments graph.Page[Comment]
 	// BlockedBy are the issues blocking this one, Blocking those it blocks,
-	// open and closed alike (see OpenBlockers, UnresolvedBlockers).
+	// open and closed alike (see UnresolvedBlockers).
 	BlockedBy graph.Page[Link]
 	Blocking  graph.Page[Link]
 
@@ -197,21 +197,11 @@ func (c *Card) Status() string {
 	return c.Item.Status
 }
 
-// OpenBlockers returns the open issues among BlockedBy. When
-// BlockedBy.Truncated(), more may exist.
-func (c *Card) OpenBlockers() []Link {
-	var open []Link
-	for _, l := range c.BlockedBy.Nodes {
-		if !l.Closed() {
-			open = append(open, l)
-		}
-	}
-	return open
-}
-
 // UnresolvedBlockers returns the blockers that still block: open, and not
-// in one of the resolved statuses (config statuses.resolved) on the board.
-// When BlockedBy.Truncated(), more may exist.
+// in one of the resolved statuses (config statuses.resolved) on the board,
+// or with a status that could not be read (Link.StatusUnknown). Blocker
+// checks use this, never State alone: an open blocker in a resolved status
+// does not block. When BlockedBy.Truncated(), more may exist.
 func (c *Card) UnresolvedBlockers(resolved []string) []Link {
 	var out []Link
 	for _, l := range c.BlockedBy.Nodes {
@@ -245,10 +235,19 @@ type Link struct {
 	Number int
 	Title  string
 	State  string // StateOpen or StateClosed
+	// OnBoard says the linked issue is an item of Request.Board, archived
+	// or not. False is not "not on the board" when StatusUnknown is set.
+	OnBoard  bool
+	Archived bool
 	// Status is the linked issue's status on Request.Board: "" when it has
-	// none, is not on the board, or the board is not among the first 10
-	// projects of the issue read, or Request.Board is nil.
+	// none, is not on the board, or StatusUnknown.
 	Status string
+	// StatusUnknown says why the linked issue's place on the board could
+	// not be read, as a lowercase phrase for messages ("on 12 projects,
+	// only the first 10 read"); "" when OnBoard and Status are accurate.
+	// The issue may then be on the board in any status: as a blocker it is
+	// unresolved unless closed.
+	StatusUnknown string
 }
 
 // Closed reports whether the linked issue is closed.
@@ -258,7 +257,7 @@ func (l Link) Closed() bool { return l.State == StateClosed }
 // blocks: it is closed, or its board status is one of resolved (config
 // statuses.resolved), its work complete though the issue is still open.
 func (l Link) Resolved(resolved []string) bool {
-	return l.Closed() || l.Status != "" && slices.Contains(resolved, l.Status)
+	return l.Closed() || l.StatusUnknown == "" && l.Status != "" && slices.Contains(resolved, l.Status)
 }
 
 // Ref returns "#N" for an issue in repo, else "owner/name#N".
@@ -443,6 +442,17 @@ func nestedPaths(err error) [][]any {
 	return paths
 }
 
+// below returns the paths of hidden at or below prefix, without prefix.
+func below(hidden [][]any, prefix ...any) [][]any {
+	var out [][]any
+	for _, path := range hidden {
+		if withheld([][]any{path}, prefix...) {
+			out = append(out, path[len(prefix):])
+		}
+	}
+	return out
+}
+
 // withheld reports whether GitHub withheld something at or below prefix.
 func withheld(hidden [][]any, prefix ...any) bool {
 	for _, path := range hidden {
@@ -498,14 +508,17 @@ func (n *issueJSON) card(req Request, hidden [][]any) *Card {
 			Body:            cm.Body,
 		})
 	}
-	c.BlockedBy = links(n.BlockedBy, req)
-	c.Blocking = links(n.Blocking, req)
+	renamed := false // the status field's name now finds another field, or none
+	if req.Board != nil {
+		c.Item, c.BoardUnknownReason, renamed = n.boardItem(req, hidden)
+		c.BoardUnknown = c.BoardUnknownReason != ""
+	}
+	c.BlockedBy = links(n.BlockedBy, req, below(hidden, "blockedBy"), renamed)
+	c.Blocking = links(n.Blocking, req, below(hidden, "blocking"), renamed)
 
 	if req.Board == nil {
 		return c
 	}
-	c.Item, c.BoardUnknownReason = n.boardItem(req, hidden)
-	c.BoardUnknown = c.BoardUnknownReason != ""
 	if req.StatusField != builtinStatus {
 		c.HistoryUntracked = true
 		return c
@@ -553,7 +566,9 @@ func (n *issueJSON) historyTruncated(item *Item) bool {
 
 // boardItem finds the issue's item on req.Board. When there is none it
 // returns why the issue may still be on the board, "" when it is not.
-func (n *issueJSON) boardItem(req Request, hidden [][]any) (*Item, string) {
+// renamed reports that the status field's name (req.StatusField) no
+// longer finds the status field by its ID (see itemJSON.status).
+func (n *issueJSON) boardItem(req Request, hidden [][]any) (item *Item, unknown string, renamed bool) {
 	items := n.ProjectItems
 	unseen := false // an item whose project GitHub withheld
 	for i, it := range items.Nodes {
@@ -564,30 +579,32 @@ func (n *issueJSON) boardItem(req Request, hidden [][]any) (*Item, string) {
 		if it.Project.ID != req.Board.ID {
 			continue
 		}
-		item := &Item{ID: it.ID, Archived: it.IsArchived, CreatedAt: parseTime(it.CreatedAt)}
+		item = &Item{ID: it.ID, Archived: it.IsArchived, CreatedAt: parseTime(it.CreatedAt)}
 		for _, v := range it.FieldValues.Nodes {
 			if val, ok := v.value(); ok {
 				item.Values = append(item.Values, val)
 			}
 		}
 		item.ValuesTruncated = it.FieldValues.TotalCount > len(it.FieldValues.Nodes)
-		item.Status, item.StatusUnknown = it.status(req, item, withheld(hidden, "projectItems", "nodes", i))
-		return item, ""
+		item.Status, item.StatusUnknown, renamed = it.status(req, item, withheld(hidden, "projectItems", "nodes", i))
+		return item, "", renamed
 	}
 	switch {
 	case unseen || items.Nodes == nil && withheld(hidden, "projectItems"):
-		return nil, "GitHub withheld some of the issue's projects from this token"
+		return nil, "GitHub withheld some of the issue's projects from this token", false
 	case items.TotalCount > len(items.Nodes):
-		return nil, fmt.Sprintf("the issue is on %d projects and only the first %d were read", items.TotalCount, len(items.Nodes))
+		return nil, fmt.Sprintf("the issue is on %d projects and only the first %d were read", items.TotalCount, len(items.Nodes)), false
 	}
-	return nil, ""
+	return nil, "", false
 }
 
 // status returns the item's status option name, or unknown when it cannot
 // be read. The value looked up by name counts only if its field is the
 // configured one (by ID); otherwise the field may have been renamed, and
-// its ID is looked up among the values read.
-func (it *itemJSON) status(req Request, item *Item, hidden bool) (status string, unknown bool) {
+// its ID is looked up among the values read. renamed reports that the
+// lookup by name found another field, or nothing while the lookup by ID
+// found the status: the name no longer finds the status field.
+func (it *itemJSON) status(req Request, item *Item, hidden bool) (status string, unknown, renamed bool) {
 	match := func(v Value) bool {
 		if v.Type != board.TypeSingleSelect {
 			return false
@@ -597,52 +614,88 @@ func (it *itemJSON) status(req Request, item *Item, hidden bool) (status string,
 		}
 		return v.Field == req.StatusField
 	}
-	if v, ok := it.Status.value(); ok && match(v) {
-		return v.Text, false
+	v, byName := it.Status.value()
+	if byName && match(v) {
+		return v.Text, false, false
 	}
+	renamed = byName && req.StatusFieldID != "" // the name found another field
 	for _, v := range item.Values {
 		if match(v) {
-			return v.Text, false
+			return v.Text, false, true
 		}
 	}
 	if hidden || item.ValuesTruncated && req.StatusFieldID != "" {
-		return "", true
+		return "", true, renamed
 	}
-	return "", false
+	return "", false, renamed
 }
 
-func links(in conn[*linkJSON], req Request) graph.Page[Link] {
+// links converts linked issues. hidden are the withheld paths below the
+// list (nodes.<i>...); renamed is boardItem's: the status field's name no
+// longer finds the status field.
+func links(in conn[*linkJSON], req Request, hidden [][]any, renamed bool) graph.Page[Link] {
 	out := graph.Page[Link]{TotalCount: in.TotalCount}
-	for _, l := range in.Nodes {
+	for i, l := range in.Nodes {
 		if l == nil {
 			continue // hidden from the token
 		}
-		link := Link{Number: l.Number, Title: l.Title, State: l.State, Status: l.status(req)}
+		link := Link{Number: l.Number, Title: l.Title, State: l.State}
 		if l.Repository != nil {
 			link.Repo, _ = ParseRepo(l.Repository.NameWithOwner)
 		}
+		l.board(req, &link, below(hidden, "nodes", i, "projectItems"), renamed)
 		out.Nodes = append(out.Nodes, link)
 	}
 	return out
 }
 
-// status returns the linked issue's status on req.Board, "" when it has
-// none there or it was not read. As for the card, a value whose field is
+// Reasons a linked issue's status is unknown (Link.StatusUnknown).
+const (
+	linkNoBoard  = "the board was not read"
+	linkWithheld = "GitHub withheld its projects from the token"
+	linkRenamed  = "the board's status field was renamed since it was cached"
+)
+
+// board fills the linked issue's place on req.Board: OnBoard, Archived,
+// Status, or StatusUnknown when it cannot be told. hidden are the withheld
+// paths below its projectItems. As for the card, a value whose field is
 // not the configured status field (by ID, when known) does not count.
-func (l *linkJSON) status(req Request) string {
+func (l *linkJSON) board(req Request, link *Link, hidden [][]any, renamed bool) {
 	if req.Board == nil {
-		return ""
+		link.StatusUnknown = linkNoBoard
+		return
 	}
-	for _, it := range l.ProjectItems.Nodes {
-		if it == nil || it.Project == nil || it.Project.ID != req.Board.ID || it.Status == nil {
+	items := l.ProjectItems
+	unseen := items.Nodes == nil && len(hidden) > 0 // the whole list withheld
+	for j, it := range items.Nodes {
+		if it == nil || it.Project == nil {
+			unseen = true
 			continue
 		}
-		if req.StatusFieldID != "" && (it.Status.Field == nil || it.Status.Field.ID != req.StatusFieldID) {
-			return ""
+		if it.Project.ID != req.Board.ID {
+			continue
 		}
-		return it.Status.Name
+		link.OnBoard, link.Archived = true, it.IsArchived
+		switch st := it.Status; {
+		case st == nil && withheld(hidden, "nodes", j):
+			link.StatusUnknown = linkWithheld
+		case st == nil && renamed:
+			link.StatusUnknown = linkRenamed
+		case st == nil:
+			// on the board without a status
+		case req.StatusFieldID != "" && (st.Field == nil || st.Field.ID != req.StatusFieldID):
+			link.StatusUnknown = linkRenamed
+		default:
+			link.Status = st.Name
+		}
+		return
 	}
-	return ""
+	switch {
+	case unseen:
+		link.StatusUnknown = linkWithheld
+	case items.TotalCount > len(items.Nodes):
+		link.StatusUnknown = fmt.Sprintf("on %d projects, only the first %d read", items.TotalCount, len(items.Nodes))
+	}
 }
 
 func (v *valueJSON) value() (Value, bool) {

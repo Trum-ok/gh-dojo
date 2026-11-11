@@ -6,7 +6,7 @@ board: Ready · Size: S
 milestone: v0.0 — самохостинг
 labels: none
 assignees: none
-blocked by: 2 resolved
+blocked by: none unresolved (2 resolved)
   #6 Сверка конфига с доской (Ready, resolved)
   #4 Пресет kanban через embed.FS (Ready, resolved)
 blocking: 1 open

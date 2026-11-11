@@ -6,11 +6,13 @@ board: Ready · Size: M
 milestone: v0.1 — first public release (due 2026-12-01)
 labels: none
 assignees: none
-blocked by: 3 unresolved, 2 resolved
+blocked by: 5 unresolved, 2 resolved
   #1 Каркас: Go-модуль, cobra и установка как расширение gh (In progress)
-  #9 Записать ответы GraphQL для тестов (no board status)
-  acme/auth#7 Auth library upgrade (no board status)
-  #2 Коды выхода и короткие ошибки (internal/render) (Ready, resolved)
+  #9 Записать ответы GraphQL для тестов (not on the board)
+  acme/auth#7 Auth library upgrade (not on the board)
+  #12 Документация: README и skill (on the board, no status)
+  #10 Общая библиотека для команд (status not read: on 12 projects, only the first 10 read)
+  #2 Коды выхода и короткие ошибки (internal/render) (Ready, archived, resolved)
   #5 GraphQL-клиент и схема доски с кэшем (internal/graph, internal/board) (closed)
 blocking: 1 open, 1 closed
   #11 Глаголы из конфига: проверки и план эффектов (internal/workflow) (Backlog)

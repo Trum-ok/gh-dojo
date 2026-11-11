@@ -6,7 +6,7 @@ board: Ready · Size: M
 milestone: v0.0 — самохостинг
 labels: none
 assignees: none
-blocked by: 2 resolved
+blocked by: none unresolved (2 resolved)
   #2 Коды выхода и короткие ошибки (internal/render) (Ready, resolved)
   #1 Каркас: Go-модуль, cobra и установка как расширение gh (Ready, resolved)
 blocking: 5 open
@@ -46,7 +46,7 @@ board: Ready · Size: M
 milestone: v0.0 — самохостинг
 labels: none
 assignees: none
-blocked by: 3 resolved
+blocked by: none unresolved (3 resolved)
   #3 Конфиг: загрузка и валидация .github/dojo.toml (internal/config) (Ready, resolved)
   #2 Коды выхода и короткие ошибки (internal/render) (Ready, resolved)
   #5 GraphQL-клиент и схема доски с кэшем (internal/graph, internal/board) (Ready, resolved)

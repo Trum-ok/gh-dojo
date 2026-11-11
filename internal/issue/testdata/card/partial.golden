@@ -5,7 +5,7 @@ labels [bug area:cli] (2)
 assignees [Trum-ok] (1)
 milestone none
 blocked by (1):
-  acme/auth#7 CLOSED status="" "Auth library upgrade"
+  acme/auth#7 CLOSED on board=false archived=false status="" unknown="" "Auth library upgrade"
 blocking (0):
 item: board membership unknown: GitHub withheld some of the issue's projects from this token
 history (truncated=true untracked=false):

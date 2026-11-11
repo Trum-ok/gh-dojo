@@ -5,7 +5,7 @@ milestone: none
 labels: bug, area:cli (showing 2 of 23)
 assignees: none
 blocked by: 1 unresolved, 1 resolved, showing 2 of 25
-  acme/auth#7 Very long title Very long title Very long title Very long title Very long title… (no board status)
+  acme/auth#7 Very long title Very long title Very long title Very long title Very long title… (not on the board)
   #2 Closed one (closed)
 blocking: none
 status history (latest changes only; older ones are not read):
@@ -27,11 +27,11 @@ comments (showing 2 of 130, --comments all prints up to 100):
 ### brief
 #42 Fix login redirect
 open (reopened) · no status (archived) · labels: bug, area:cli (showing 2 of 23) · assignees: none
-blocked by 1 unresolved (acme/auth#7) and 1 resolved (showing 2 of 25 blockers) · blocking none · comments: 130
+blocked by 1 unresolved (acme/auth#7); 1 resolved (showing 2 of 25 blockers) · blocking none · comments: 130
 note: GitHub withheld part of this issue from the token; the rest is accurate
 
 ### --comments all, last lines
-comments (showing 100 of 130, older ones: gh issue view 42 -R Trum-ok/gh-dojo --comments):
+comments (showing 100 of 130, older ones are beyond gh dojo's 100-comment limit: gh issue view 42 -R Trum-ok/gh-dojo --comments):
 
 ### board unknown
 board: unknown, may be on it (the issue is on 25 projects and only the first 20 were read)
@@ -40,3 +40,16 @@ status history (latest changes only; older ones are not read):
 ### status unknown, history untracked
 board: status unknown (GitHub did not return it) · more fields not read
 status history: not tracked (GitHub records changes of the built-in Status field only)
+
+### blocker places
+blocked by: 5 unresolved, 1 resolved
+  #3 Withheld (status not read: GitHub withheld its projects from the token)
+  #4 Renamed field (status not read: the board's status field was renamed since it was cached, archived)
+  #5 Archived in progress (In progress, archived)
+  #8 No status (on the board, no status)
+  #9 Elsewhere (not on the board)
+  #6 Archived ready (Ready, archived, resolved)
+#42 Fix login redirect
+open (reopened) · no status (archived) · labels: bug, area:cli (showing 2 of 23) · assignees: none
+blocked by 5 unresolved (#3, #4, #5, #8, #9); 1 resolved · blocking none · comments: 130
+note: GitHub withheld part of this issue from the token; the rest is accurate

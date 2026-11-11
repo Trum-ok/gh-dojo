@@ -259,6 +259,24 @@ func TestCardText(t *testing.T) {
 	untracked.History, untracked.HistoryUntracked = nil, true
 	b.WriteString("\n### status unknown, history untracked\n")
 	header(v.card(&untracked), "board", "status history")
+
+	// Where a blocker stands on the board, when it can be told, and an
+	// unknown status counted as unresolved.
+	places := *c
+	places.BlockedBy = graph.Page[issue.Link]{TotalCount: 6, Nodes: []issue.Link{
+		{Repo: dojo, Number: 3, Title: "Withheld", State: issue.StateOpen, StatusUnknown: "GitHub withheld its projects from the token"},
+		{Repo: dojo, Number: 4, Title: "Renamed field", State: issue.StateOpen, OnBoard: true, Archived: true,
+			StatusUnknown: "the board's status field was renamed since it was cached"},
+		{Repo: dojo, Number: 5, Title: "Archived in progress", State: issue.StateOpen, OnBoard: true, Archived: true, Status: "In progress"},
+		{Repo: dojo, Number: 6, Title: "Archived ready", State: issue.StateOpen, OnBoard: true, Archived: true, Status: "Ready"},
+		{Repo: dojo, Number: 8, Title: "No status", State: issue.StateOpen, OnBoard: true},
+		{Repo: dojo, Number: 9, Title: "Elsewhere", State: issue.StateOpen},
+	}}
+	resolved := v
+	resolved.resolved = []string{"Ready", "Done"}
+	b.WriteString("\n### blocker places\n")
+	header(resolved.card(&places), "blocked by", "  #")
+	b.WriteString(resolved.brief(&places))
 	testutil.Golden(t, "show/card_text", []byte(b.String()))
 }
 

@@ -53,8 +53,8 @@ func TestReadRecorded(t *testing.T) {
 	if !card.OnBoard() || card.ItemID() == "" || card.Status() != "Ready" {
 		t.Errorf("on board %v, item %q, status %q", card.OnBoard(), card.ItemID(), card.Status())
 	}
-	if len(card.OpenBlockers()) != 2 || card.BlockedBy.Truncated() {
-		t.Errorf("open blockers %v", card.OpenBlockers())
+	if len(card.UnresolvedBlockers(nil)) != 2 || card.BlockedBy.Truncated() {
+		t.Errorf("unresolved blockers %v", card.UnresolvedBlockers(nil))
 	}
 }
 
@@ -67,8 +67,8 @@ func TestReadResolvedBlockers(t *testing.T) {
 		t.Fatal(err)
 	}
 	testutil.Golden(t, "card/card_13", dump(card))
-	if len(card.OpenBlockers()) != 2 || len(card.UnresolvedBlockers(nil)) != 2 {
-		t.Errorf("open blockers %v, unresolved without resolved statuses %v", card.OpenBlockers(), card.UnresolvedBlockers(nil))
+	if len(card.UnresolvedBlockers(nil)) != 2 {
+		t.Errorf("unresolved without resolved statuses %v", card.UnresolvedBlockers(nil))
 	}
 	if u := card.UnresolvedBlockers([]string{"Ready", "Done"}); len(u) != 0 {
 		t.Errorf("unresolved blockers %v, want none: both are in Ready", u)
@@ -78,51 +78,131 @@ func TestReadResolvedBlockers(t *testing.T) {
 	}
 }
 
-// TestReadLinkStatus: a linked issue's status is the one on the configured
-// board, matched by the status field's ID when known.
+// TestReadLinkStatus: a linked issue's place on the configured board,
+// its status matched by the status field's ID when known. "Not on the
+// board", "on the board, no status" and "unknown" are told apart.
 func TestReadLinkStatus(t *testing.T) {
 	// item is a project item of a linked issue with a status.
-	item := func(project, field, status string) any {
+	item := func(project, field, status string) map[string]any {
 		return map[string]any{
-			"project": map[string]any{"id": project},
-			"status":  map[string]any{"name": status, "field": map[string]any{"id": field}},
+			"isArchived": false,
+			"project":    map[string]any{"id": project},
+			"status":     map[string]any{"name": status, "field": map[string]any{"id": field}},
 		}
 	}
+	noStatus := map[string]any{"project": map[string]any{"id": dojoBoard.ID}, "status": nil}
+	archived := item(dojoBoard.ID, statusID, "Ready")
+	archived["isArchived"] = true
+	other := item("PVT_other", "F_other", "Done")
 	byName := dojoStatus
 	byName.StatusFieldID = ""
 	noBoard := dojoStatus
 	noBoard.Board = nil
+	type want struct {
+		onBoard, archived bool
+		status, unknown   string
+	}
 	tests := []struct {
 		name  string
 		req   issue.Request
 		items []any
-		want  string
+		total int // projectItems.totalCount; 0 means len(items)
+		edit  func(is map[string]any)
+		want  want
 	}{
-		{"this_board", dojoStatus, []any{item("PVT_other", "F_other", "Done"), item(dojoBoard.ID, statusID, "Ready")}, "Ready"},
-		{"other_board_only", dojoStatus, []any{item("PVT_other", "F_other", "Done")}, ""},
-		{"no_items", dojoStatus, []any{}, ""},
-		{"no_status", dojoStatus, []any{map[string]any{"project": map[string]any{"id": dojoBoard.ID}, "status": nil}}, ""},
-		{"withheld_project", dojoStatus, []any{nil, map[string]any{"project": nil, "status": nil}}, ""},
+		{"this_board", dojoStatus, []any{other, item(dojoBoard.ID, statusID, "Ready")}, 0, nil, want{onBoard: true, status: "Ready"}},
+		{"archived", dojoStatus, []any{archived}, 0, nil, want{onBoard: true, archived: true, status: "Ready"}},
+		{"other_board_only", dojoStatus, []any{other}, 0, nil, want{}},
+		{"no_items", dojoStatus, []any{}, 0, nil, want{}},
+		{"no_status", dojoStatus, []any{noStatus}, 0, nil, want{onBoard: true}},
+		// The board may be among the projects not read.
+		{"more_projects", dojoStatus, []any{other}, 12, nil, want{unknown: "on 12 projects, only the first 1 read"}},
+		{"more_projects_found", dojoStatus, []any{item(dojoBoard.ID, statusID, "Ready")}, 12, nil, want{onBoard: true, status: "Ready"}},
+		{"withheld_project", dojoStatus, []any{nil, map[string]any{"project": nil, "status": nil}}, 0, nil,
+			want{unknown: "GitHub withheld its projects from the token"}},
 		// A field with the status field's old name but another ID: not the status.
-		{"other_field", dojoStatus, []any{item(dojoBoard.ID, "PVTSSF_new", "Urgent")}, ""},
-		{"other_field_by_name", byName, []any{item(dojoBoard.ID, "PVTSSF_new", "Urgent")}, "Urgent"},
-		{"no_board", noBoard, []any{item(dojoBoard.ID, statusID, "Ready")}, ""},
+		{"other_field", dojoStatus, []any{item(dojoBoard.ID, "PVTSSF_new", "Urgent")}, 0, nil,
+			want{onBoard: true, unknown: "the board's status field was renamed since it was cached"}},
+		{"other_field_by_name", byName, []any{item(dojoBoard.ID, "PVTSSF_new", "Urgent")}, 0, nil, want{onBoard: true, status: "Urgent"}},
+		// The card's own item shows the name no longer finds the status
+		// field, so a link's empty lookup by that name is not "no status".
+		{"renamed_no_value", dojoStatus, []any{noStatus}, 0, func(is map[string]any) { renameStatus(is, "Stage") },
+			want{onBoard: true, unknown: "the board's status field was renamed since it was cached"}},
+		{"no_board", noBoard, []any{item(dojoBoard.ID, statusID, "Ready")}, 0, nil, want{unknown: "the board was not read"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			card := readVariant(t, tt.req, func(is map[string]any) {
+				total := tt.total
+				if total == 0 {
+					total = len(tt.items)
+				}
 				for _, dir := range []string{"blockedBy", "blocking"} {
 					for _, l := range is[dir].(map[string]any)["nodes"].([]any) {
-						l.(map[string]any)["projectItems"] = map[string]any{"nodes": tt.items}
+						l.(map[string]any)["projectItems"] = map[string]any{"totalCount": total, "nodes": tt.items}
 					}
+				}
+				if tt.edit != nil {
+					tt.edit(is)
 				}
 			})
 			for _, l := range append(card.BlockedBy.Nodes, card.Blocking.Nodes...) {
-				if l.Status != tt.want {
-					t.Errorf("%s status %q, want %q", l.Ref(dojo), l.Status, tt.want)
+				got := want{l.OnBoard, l.Archived, l.Status, l.StatusUnknown}
+				if got != tt.want {
+					t.Errorf("%s: %+v, want %+v", l.Ref(dojo), got, tt.want)
+				}
+				// Unknown never resolves an open blocker.
+				if tt.want.unknown != "" && !l.Closed() && l.Resolved([]string{"Ready", "Done", "Urgent"}) {
+					t.Errorf("%s with unknown status is resolved", l.Ref(dojo))
 				}
 			}
 		})
+	}
+}
+
+// TestReadLinkWithheldItems: GitHub withheld a linked issue's project
+// items (an error below blockedBy.nodes.N.projectItems); its place on the
+// board is unknown, not "not on the board".
+func TestReadLinkWithheldItems(t *testing.T) {
+	path := variant(t, func(is map[string]any) {
+		for _, l := range is["blockedBy"].(map[string]any)["nodes"].([]any) {
+			l.(map[string]any)["projectItems"] = nil
+		}
+	})
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var f map[string]any
+	if err := json.Unmarshal(data, &f); err != nil {
+		t.Fatal(err)
+	}
+	resp := f["interactions"].([]any)[0].(map[string]any)["response"].(map[string]any)
+	resp["errors"] = []any{map[string]any{
+		"type": "FORBIDDEN", "message": "Resource not accessible by integration",
+		"path": []any{"repository", "issueOrPullRequest", "blockedBy", "nodes", 0, "projectItems"},
+	}}
+	if data, err = json.Marshal(f); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	srv := graphtest.New(t, path)
+	req := dojoStatus
+	req.Number = 3
+	card, err := issue.Read(context.Background(), srv.Client(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !card.Incomplete {
+		t.Error("card not incomplete")
+	}
+	for i, l := range card.BlockedBy.Nodes {
+		wantUnknown := i == 0
+		if (l.StatusUnknown != "") != wantUnknown || l.OnBoard {
+			t.Errorf("%s: on board %v, unknown %q; want unknown %v", l.Ref(dojo), l.OnBoard, l.StatusUnknown, wantUnknown)
+		}
 	}
 }
 
@@ -137,6 +217,9 @@ func TestLinkResolved(t *testing.T) {
 		{issue.Link{State: issue.StateOpen}, false},
 		{issue.Link{State: issue.StateClosed, Status: "In progress"}, true},
 		{issue.Link{State: issue.StateClosed}, true},
+		// Unknown status: unresolved while open.
+		{issue.Link{State: issue.StateOpen, Status: "Ready", StatusUnknown: "on 12 projects, only the first 10 read"}, false},
+		{issue.Link{State: issue.StateClosed, StatusUnknown: "on 12 projects, only the first 10 read"}, true},
 	}
 	for _, tt := range tests {
 		if got := tt.link.Resolved(resolved); got != tt.want {
@@ -547,7 +630,7 @@ func dump(c *issue.Card) []byte {
 	}{{"blocked by", c.BlockedBy.Nodes, c.BlockedBy.TotalCount}, {"blocking", c.Blocking.Nodes, c.Blocking.TotalCount}} {
 		p("%s (%d):", pair.name, pair.n)
 		for _, l := range pair.page {
-			p("  %s %s status=%q %q", l.Ref(c.Repo), l.State, l.Status, l.Title)
+			p("  %s %s on board=%v archived=%v status=%q unknown=%q %q", l.Ref(c.Repo), l.State, l.OnBoard, l.Archived, l.Status, l.StatusUnknown, l.Title)
 		}
 	}
 	switch {

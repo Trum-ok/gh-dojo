@@ -7,9 +7,11 @@ package issue
 // the card keeps its totalCount, so the reader can tell "none" from "not
 // read".
 //
-// A linked issue reads only its status on each of its projects: the reader
-// keeps the one on the configured board (Link.Status), which tells a
-// blocker that is done but still open (kanban: Ready) from one that blocks.
+// A linked issue reads only its status on each of its first 10 projects,
+// and how many projects it is on: the reader keeps the one on the
+// configured board (Link.Status), which tells a blocker that is done but
+// still open (kanban: Ready) from one that blocks, and says when the board
+// may be beyond the 10 read (Link.StatusUnknown).
 //
 // Each project item also reads the value of the field named $status
 // directly (fieldValueByName), so the status is there whatever the size of
@@ -89,7 +91,9 @@ const cardFragments = `fragment link on Issue {
   state
   repository { nameWithOwner }
   projectItems(first: 10) {
+    totalCount
     nodes {
+      isArchived
       project { id }
       status: fieldValueByName(name: $status) {
         ... on ProjectV2ItemFieldSingleSelectValue { name field { ... on ProjectV2FieldCommon { id } } }
@@ -188,7 +192,8 @@ type linkJSON struct {
 		NameWithOwner string `json:"nameWithOwner"`
 	} `json:"repository"`
 	ProjectItems conn[*struct {
-		Project *struct {
+		IsArchived bool `json:"isArchived"`
+		Project    *struct {
 			ID string `json:"id"`
 		} `json:"project"`
 		Status *struct {

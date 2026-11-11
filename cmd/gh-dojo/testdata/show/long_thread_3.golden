@@ -6,7 +6,7 @@ board: Ready · Size: M · Sprint: Sprint 12 · Estimate: 2.5 · Target date: 20
 milestone: none
 labels: bug, area:cli
 assignees: Trum-ok
-blocked by: 1 resolved
+blocked by: none unresolved (1 resolved)
   acme/auth#7 Auth library upgrade (closed)
 blocking: none
 status history (latest changes only; older ones are not read):

@@ -6,14 +6,14 @@ labels [] (0)
 assignees [] (0)
 milestone "v0.0 — самохостинг" due -
 blocked by (2):
-  #2 OPEN status="Ready" "Коды выхода и короткие ошибки (internal/render)"
-  #1 OPEN status="Ready" "Каркас: Go-модуль, cobra и установка как расширение gh"
+  #2 OPEN on board=true archived=false status="Ready" unknown="" "Коды выхода и короткие ошибки (internal/render)"
+  #1 OPEN on board=true archived=false status="Ready" unknown="" "Каркас: Go-модуль, cobra и установка как расширение gh"
 blocking (5):
-  #11 OPEN status="Ready" "Глаголы из конфига: проверки и план эффектов (internal/workflow)"
-  #8 OPEN status="Ready" "Команда list"
-  #7 OPEN status="Ready" "Команда show <N>…"
-  #6 OPEN status="Ready" "Сверка конфига с доской"
-  #4 OPEN status="Ready" "Пресет kanban через embed.FS"
+  #11 OPEN on board=true archived=false status="Ready" unknown="" "Глаголы из конфига: проверки и план эффектов (internal/workflow)"
+  #8 OPEN on board=true archived=false status="Ready" unknown="" "Команда list"
+  #7 OPEN on board=true archived=false status="Ready" unknown="" "Команда show <N>…"
+  #6 OPEN on board=true archived=false status="Ready" unknown="" "Сверка конфига с доской"
+  #4 OPEN on board=true archived=false status="Ready" unknown="" "Пресет kanban через embed.FS"
 item PVTI_lAHOBFGd5c4BrMYFzhH6Jn8 archived=false created 2026-11-11T18:19:12Z status="Ready" unknown=false values truncated=false
   Status [SINGLE_SELECT] "Ready" option=61e4505c iteration= /0 field=PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ
   Size [SINGLE_SELECT] "M" option=7515a9f1 iteration= /0 field=PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4
@@ -31,11 +31,11 @@ labels [] (0)
 assignees [] (0)
 milestone "v0.0 — самохостинг" due -
 blocked by (3):
-  #3 OPEN status="Ready" "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)"
-  #2 OPEN status="Ready" "Коды выхода и короткие ошибки (internal/render)"
-  #5 OPEN status="Ready" "GraphQL-клиент и схема доски с кэшем (internal/graph, internal/board)"
+  #3 OPEN on board=true archived=false status="Ready" unknown="" "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)"
+  #2 OPEN on board=true archived=false status="Ready" unknown="" "Коды выхода и короткие ошибки (internal/render)"
+  #5 OPEN on board=true archived=false status="Ready" unknown="" "GraphQL-клиент и схема доски с кэшем (internal/graph, internal/board)"
 blocking (1):
-  #14 OPEN status="Ready" "Skill для агентов и переход на gh dojo (рубеж v0.0)"
+  #14 OPEN on board=true archived=false status="Ready" unknown="" "Skill для агентов и переход на gh dojo (рубеж v0.0)"
 item PVTI_lAHOBFGd5c4BrMYFzhH6Kaw archived=false created 2026-11-11T18:19:54Z status="Ready" unknown=false values truncated=false
   Status [SINGLE_SELECT] "Ready" option=61e4505c iteration= /0 field=PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ
   Size [SINGLE_SELECT] "M" option=7515a9f1 iteration= /0 field=PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4

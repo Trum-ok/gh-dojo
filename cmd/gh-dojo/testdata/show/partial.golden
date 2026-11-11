@@ -6,7 +6,7 @@ board: unknown, may be on it (GitHub withheld some of the issue's projects from 
 milestone: none
 labels: bug, area:cli
 assignees: Trum-ok
-blocked by: 1 resolved
+blocked by: none unresolved (1 resolved)
   acme/auth#7 Auth library upgrade (closed)
 blocking: none
 status history (latest changes only; older ones are not read):

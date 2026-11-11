@@ -127,12 +127,12 @@ func (v cardView) brief(c *issue.Card) string {
 		}
 		blocked += ")"
 		if resolved > 0 {
-			blocked += fmt.Sprintf(" and %d resolved", resolved)
+			blocked += fmt.Sprintf("; %d resolved", resolved)
 		}
 	case resolved > 0:
-		blocked = fmt.Sprintf("no unresolved blockers (%d resolved)", resolved)
+		blocked = fmt.Sprintf("blocked by none unresolved (%d resolved)", resolved)
 	default:
-		blocked = "no blockers"
+		blocked = "blocked by none"
 	}
 	if note := render.Shown(len(c.BlockedBy.Nodes), c.BlockedBy.TotalCount, ""); note != "" {
 		blocked += " (" + note + " blockers)"
@@ -257,18 +257,20 @@ func (v cardView) writeBlockers(b *strings.Builder, c *issue.Card) {
 		}
 	}
 	var counts []string
-	if len(unresolved) > 0 {
+	switch n := len(done) + len(closed); {
+	case len(unresolved) > 0 && n > 0:
+		counts = append(counts, fmt.Sprintf("%d unresolved, %d resolved", len(unresolved), n))
+	case len(unresolved) > 0:
 		counts = append(counts, fmt.Sprintf("%d unresolved", len(unresolved)))
-	}
-	if n := len(done) + len(closed); n > 0 {
-		counts = append(counts, fmt.Sprintf("%d resolved", n))
+	case n > 0:
+		counts = append(counts, fmt.Sprintf("none unresolved (%d resolved)", n))
 	}
 	writeLinks(b, "blocked by", c.BlockedBy, counts)
 	for _, l := range unresolved {
-		writeLink(b, l, c.Repo, linkStatus(l))
+		writeLink(b, l, c.Repo, linkPlace(l))
 	}
 	for _, l := range done {
-		writeLink(b, l, c.Repo, l.Status+", resolved")
+		writeLink(b, l, c.Repo, linkPlace(l)+", resolved")
 	}
 	for _, l := range closed {
 		writeLink(b, l, c.Repo, "closed")
@@ -295,19 +297,32 @@ func writeBlocking(b *strings.Builder, c *issue.Card) {
 	}
 	writeLinks(b, "blocking", c.Blocking, counts)
 	for _, l := range open {
-		writeLink(b, l, c.Repo, linkStatus(l))
+		writeLink(b, l, c.Repo, linkPlace(l))
 	}
 	for _, l := range closed {
 		writeLink(b, l, c.Repo, "closed")
 	}
 }
 
-// linkStatus is the board status of an open linked issue.
-func linkStatus(l issue.Link) string {
-	if l.Status == "" {
-		return "no board status"
+// linkPlace says where an open linked issue stands on the board: its
+// status, "on the board, no status", "not on the board", or why its status
+// was not read; ", archived" for an archived item.
+func linkPlace(l issue.Link) string {
+	var s string
+	switch {
+	case l.StatusUnknown != "":
+		s = "status not read: " + l.StatusUnknown
+	case !l.OnBoard:
+		return "not on the board"
+	case l.Status == "":
+		s = "on the board, no status"
+	default:
+		s = l.Status
 	}
-	return l.Status
+	if l.Archived {
+		s += ", archived"
+	}
+	return s
 }
 
 // writeLinks writes the header line of linked issues: label, counts, and a
@@ -374,7 +389,7 @@ func (v cardView) writeComments(b *strings.Builder, c *issue.Card) {
 	case v.comments < issue.MaxComments:
 		hint = fmt.Sprintf("--comments all prints up to %d", issue.MaxComments)
 	default:
-		hint = fmt.Sprintf("older ones: gh issue view %d -R %s --comments", c.Number, c.Repo)
+		hint = fmt.Sprintf("older ones are beyond gh dojo's %d-comment limit: gh issue view %d -R %s --comments", issue.MaxComments, c.Number, c.Repo)
 	}
 	if note := render.Shown(len(shown), total, hint); note != "" {
 		fmt.Fprintf(b, "comments (%s):\n", note)

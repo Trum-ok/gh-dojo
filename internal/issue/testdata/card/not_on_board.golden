@@ -5,14 +5,14 @@ labels [] (0)
 assignees [] (0)
 milestone "v0.0 — самохостинг" due -
 blocked by (2):
-  #2 OPEN status="Ready" "Коды выхода и короткие ошибки (internal/render)"
-  #1 OPEN status="Ready" "Каркас: Go-модуль, cobra и установка как расширение gh"
+  #2 OPEN on board=true archived=false status="Ready" unknown="" "Коды выхода и короткие ошибки (internal/render)"
+  #1 OPEN on board=true archived=false status="Ready" unknown="" "Каркас: Go-модуль, cobra и установка как расширение gh"
 blocking (5):
-  #11 OPEN status="Ready" "Глаголы из конфига: проверки и план эффектов (internal/workflow)"
-  #8 OPEN status="Ready" "Команда list"
-  #7 OPEN status="Ready" "Команда show <N>…"
-  #6 OPEN status="Ready" "Сверка конфига с доской"
-  #4 OPEN status="Ready" "Пресет kanban через embed.FS"
+  #11 OPEN on board=true archived=false status="Ready" unknown="" "Глаголы из конфига: проверки и план эффектов (internal/workflow)"
+  #8 OPEN on board=true archived=false status="Ready" unknown="" "Команда list"
+  #7 OPEN on board=true archived=false status="Ready" unknown="" "Команда show <N>…"
+  #6 OPEN on board=true archived=false status="Ready" unknown="" "Сверка конфига с доской"
+  #4 OPEN on board=true archived=false status="Ready" unknown="" "Пресет kanban через embed.FS"
 item: not on the board
 history (truncated=false untracked=false):
 comments 0 of 0:

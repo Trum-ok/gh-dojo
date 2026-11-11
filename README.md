@@ -25,7 +25,9 @@ it into commands:
 - **Safe retries.** Repeating a command never posts a second comment or
   creates a second issue.
 - **Self-describing.** `gh dojo --help` lists this project's verbs and when to
-  use them.
+  use them, the lifecycle (the statuses each verb moves an issue from and to;
+  the initial, final and resolved statuses) and the exit codes with what to do
+  next.
 
 **Status:** v0.0, self-hosting: gh-dojo tracks its own development with
 gh-dojo. The config format and output may still change before v0.1. See the
@@ -70,7 +72,7 @@ scope: `gh auth refresh -s project`.
 3. Use it:
 
    ```sh
-   gh dojo --help          # this project's verbs and when to use them
+   gh dojo --help          # verbs, lifecycle and exit codes of this project
    gh dojo list            # open issues on the board, grouped by status
    gh dojo show 42         # read an issue before working on it
    gh dojo start 42        # Backlog → In progress, with a comment
@@ -96,7 +98,10 @@ status history on the board, the description and the latest comments. Times
 are UTC. A blocker is resolved, no longer blocking, when it is closed or its
 board status is in [`statuses.resolved`](#statuses) (kanban: Ready, Done);
 unresolved blockers are listed first, and `--brief` counts only them as
-blocking.
+blocking. A linked issue is shown with its status, "on the board, no
+status", "not on the board", or "status not read" and why (it is on more
+projects than are read, or GitHub withheld them); a blocker whose status was
+not read counts as unresolved.
 
 Long content is folded, always with a note saying what is hidden: the last 5
 comments are printed (`--comments N` for the last N, `--comments all` for up
@@ -169,9 +174,11 @@ gh dojo <verb> <N> [--comment TEXT] [--by N|TEXT] [--dry-run]
 
 Verbs come from [`[verbs]`](#verbs) in the config, so each project has its
 own; the [kanban preset](#kanban-preset) defines `start`, `wait`, `ready` and
-`done`. `gh dojo --help` lists them with their `when` line, and
-`gh dojo <verb> --help` shows the allowed starting statuses, the target
-status, the required arguments and the comment template.
+`done`. `gh dojo --help` lists them with their `when` line and, under
+Lifecycle, the statuses each one moves an issue from and to, with the
+initial, final and resolved statuses; `gh dojo <verb> --help` shows the
+allowed starting statuses, the target status, the required arguments and the
+comment template.
 
 A verb takes one issue number and, in one command:
 
@@ -211,18 +218,19 @@ this is a process rule: ask the user how to proceed
 
 #### Exit codes
 
-| Code | Meaning                     | What to do                                         |
-|------|-----------------------------|----------------------------------------------------|
-| 0    | Everything applied          | Go on                                              |
-| 1    | Bad arguments or config     | Fix them as the error says                         |
-| 2    | A process check refused     | Don't work around it; ask a human                  |
-| 3    | Issue or board not found    | Check the number                                   |
-| 4    | Network, rate limit or auth | Retry later, or `gh auth refresh -s project`       |
-| 5    | Partially applied           | Re-run the same command; it finishes the rest      |
+| Code | Meaning                     | What to do                                                   |
+|------|-----------------------------|--------------------------------------------------------------|
+| 0    | Everything applied          | Go on                                                        |
+| 1    | Bad arguments or config     | Fix them as the error says                                   |
+| 2    | A process check refused     | Don't work around it; ask a human                            |
+| 3    | Issue or board not found    | Check the number (`gh dojo list`) or `board.owner`/`project` |
+| 4    | Network, rate limit or auth | Retry later, or `gh auth refresh -s project`                 |
+| 5    | Partially applied           | Re-run the same command; it finishes the rest                |
 
-Retries are safe for every command: verbs keep a status that is already set
-and skip a comment that is already the latest gh-dojo comment, `comment`
-skips its own repeated text, and `new` resumes the issue it created.
+`gh dojo --help` prints this table too. Retries are safe for every command:
+verbs keep a status that is already set and skip a comment that is already
+the latest gh-dojo comment, `comment` skips its own repeated text, and `new`
+resumes the issue it created.
 
 ## Configuration
 
@@ -300,7 +308,8 @@ with "not supported in this version".
 Logical name = field name on the board. `status` is the only entry in this
 version: it is required and must be a single-select field. Other logical
 fields (such as `sprint`, for iteration effects) come in v0.1; until then
-they are rejected with "not supported in this version".
+they are rejected with "not supported in this version". The logical name is
+lowercase: `Status = "Status"` is an error suggesting `status`.
 
 ### statuses
 
