@@ -79,12 +79,15 @@ also be authorized for it.
 ## Quick start
 
 1. Make sure the board's status field has the [kanban preset](#kanban-preset)
-   statuses: Backlog, In progress, Waiting, Ready, Done.
+   statuses: Backlog, In progress, Waiting, Ready, Done. To count work in
+   sprints, the [sprints preset](#sprints-preset) uses the same statuses
+   and an iteration field named Sprint.
 2. Create `.github/dojo.toml` in the repository root with [`init`](#init):
 
    ```sh
    gh dojo init                          # lists the owner's projects
    gh dojo init --owner acme --project 3 # writes the config, checks the board
+   gh dojo init --owner acme --project 3 --preset sprints
    ```
 
    or by hand:
@@ -238,7 +241,7 @@ of the kanban preset also adds the link (`blockers = "link"`).
 ### init
 
 ```sh
-gh dojo init [--owner LOGIN] [--project N] [--preset kanban] [--repo OWNER/NAME] [--force] [--dry-run]
+gh dojo init [--owner LOGIN] [--project N] [--preset kanban|sprints] [--repo OWNER/NAME] [--force] [--dry-run]
 ```
 
 Writes `.github/dojo.toml` at the repository root, without questions.
@@ -255,10 +258,12 @@ fix: gh dojo init --owner acme --project 3
 ```
 
 With `--project` it writes the board (`owner`, `project`, and `repos` set
-to `--repo` or the current repository) and the preset, nothing the preset
-already provides, then checks the file against the board. Each status the
-board lacks is listed with its fix: add the status on the board, or override
-the keys that name it, e.g. `[verbs.wait] to = "…"`. The file is kept, and
+to `--repo` or the current repository) and the preset (`kanban` by
+default, or `--preset sprints`), nothing the preset already provides, then
+checks the file against the board. Each status the board lacks is listed
+with its fix: add the status on the board, or override the keys that name
+it, e.g. `[verbs.wait] to = "…"`; so is a missing field, such as the
+iteration field Sprint of the sprints preset. The file is kept, and
 the exit code is 1 until the board and the file match. An existing config is
 not overwritten without `--force`; `--dry-run` prints the file instead.
 
@@ -301,7 +306,8 @@ It checks that the config loads, that gh is logged in with a token that has
 the `project` scope (a token from `GH_TOKEN` gets "set GH_TOKEN to …" as
 the fix), that the board exists, is open and has every field and status the
 config names (each mismatch on its own line), that the sprint field (with
-[`fields.sprint`](#fields)) has an iteration for today, a date in
+[`fields.sprint`](#fields), as in the [sprints preset](#sprints-preset))
+has an iteration for today, a date in
 [`board.timezone`](#board) (shown with the zone; a completed iteration
 covers its days, as for verbs, and a cached schema without one is read
 again first), and that
@@ -323,8 +329,8 @@ gh dojo <verb> <N> [--comment TEXT] [--by N|TEXT] [--yes] [--dry-run]
 ```
 
 Verbs come from [`[verbs]`](#verbs) in the config, so each project has its
-own; the [kanban preset](#kanban-preset) defines `start`, `wait`, `ready` and
-`done`. `gh dojo --help` lists them with their `when` line and, under
+own; the [kanban](#kanban-preset) and [sprints](#sprints-preset) presets
+define `start`, `wait`, `ready` and `done`. `gh dojo --help` lists them with their `when` line and, under
 Lifecycle, the statuses each one moves an issue from and to, with the
 initial, final and resolved statuses, and which verbs close or reopen the
 issue or ask the user first; `gh dojo <verb> --help` shows the allowed
@@ -452,8 +458,8 @@ assignee = "@me"             # who `assign = true` assigns
 timezone = "Europe/Moscow"   # the sprint's "today"; UTC when not set
 
 [fields]                     # logical name = field name on the board
-status = "Status"            # required (the kanban preset sets "Status")
-sprint = "Sprint"            # optional: an iteration field, for iteration
+status = "Status"            # required (the presets set "Status")
+sprint = "Sprint"            # optional: an iteration field, for iteration (the sprints preset sets "Sprint")
 
 [statuses]
 initial = "Backlog"          # set by `new` and assumed for issues not on the board yet
@@ -527,7 +533,7 @@ disabled = true              # drop a verb that the preset defines
 | Key       | Required | Meaning                                                      |
 |-----------|----------|--------------------------------------------------------------|
 | `version` | no       | Config version; `1` is the only one                          |
-| `preset`  | no       | A built-in preset to build on; `kanban` is the only one      |
+| `preset`  | no       | A built-in preset to build on: [`kanban`](#kanban-preset) or [`sprints`](#sprints-preset) |
 
 ### board
 
@@ -715,7 +721,8 @@ board is picked up.
 
 ### Presets
 
-With `preset = "kanban"` the file is applied on top of the preset:
+With `preset = "kanban"` or `preset = "sprints"` the file is applied on top
+of the preset:
 `[fields]`, `[statuses]`, `[labels]` and `[session]` override key by key; a
 verb with a preset's name overrides only the keys it sets; a new name adds a
 verb; `disabled = true` removes a preset verb. Without `preset` every verb is
@@ -759,8 +766,8 @@ source is [`internal/config/presets/kanban.toml`](internal/config/presets/kanban
 Override `when` and `comment` to write them in your project's language; this
 repository's own [`.github/dojo.toml`](.github/dojo.toml) does that.
 
-The preset has no sprints. To count work in sprints on a board with an
-iteration field, add it and an `iteration` effect to the verbs:
+The preset has no sprints: use the [sprints preset](#sprints-preset), or
+add the iteration field and an `iteration` effect to the verbs you want:
 
 ```toml
 preset = "kanban"
@@ -775,6 +782,74 @@ sprint = "Sprint"
 [verbs.done]
 iteration = "by_status_date:Ready"   # the sprint in which the work was finished
 ```
+
+## Sprints preset
+
+The kanban flow with work counted in sprints. The board needs the
+[kanban statuses](#kanban-preset) (Backlog, In progress, Waiting, Ready,
+Done; other options are fine) in its built-in `Status` field, and an
+iteration field named `Sprint` with an iteration for today (GitHub: add a
+field of type Iteration; [`gh dojo doctor`](#doctor) checks today's).
+
+```toml
+preset = "sprints"
+
+[board]
+owner = "acme"
+project = 3
+```
+
+| Verb    | Moves to    | From                     | Needs                 | Sprint                         | Comment                      |
+|---------|-------------|--------------------------|-----------------------|--------------------------------|------------------------------|
+| `start` | In progress | Backlog, Waiting, Ready  |                       | today's                        | session link, `--comment`    |
+| `wait`  | Waiting     | In progress              | `--by` or `--comment` | kept                           | "Waiting for …", `--comment` |
+| `ready` | Ready       | In progress, Waiting     |                       | of the day it entered Ready    | `--comment`                  |
+| `done`  | Done        | Ready, In progress       |                       | of the day it entered Ready    | `--comment`                  |
+
+An issue's sprint is the one it is worked in, and in the end the one in
+which it became Ready: `start` takes it into today's sprint (an issue
+carried over from the last sprint moves to the current one), `wait` leaves
+the sprint alone, and `ready` sets the sprint of the day it entered Ready,
+which is today when `ready` moves it there; a repeat of `ready` keeps that
+sprint instead of moving it to today's. `done` sets it again from the
+status history (`iteration = "by_status_date:Ready"`), so an issue
+released in a later sprint, or moved to Ready on the board by hand, still
+counts in the sprint it was finished in. An issue that goes from In
+progress straight to Done never entered Ready: `done` puts it in today's
+sprint and warns (see [iteration](#verbs)). "Today" is a date in
+[`board.timezone`](#board), UTC by default.
+
+Besides the sprint, one difference from kanban: `start` warns about
+unresolved blockers (`blockers = "warn"`) on stderr and runs, since a
+blocked issue taken into the sprint may not finish in it.
+
+Everything else is kanban's: `done` closes the issue as completed,
+`wait --by 17` marks it blocked by #17, and the statuses, labels and
+comments are the same. The preset sets `fields.sprint = "Sprint"`; its
+source is [`internal/config/presets/sprints.toml`](internal/config/presets/sprints.toml).
+Override on top of it like any preset, for example:
+
+```toml
+preset = "sprints"
+
+[board]
+owner = "acme"
+project = 3
+timezone = "Europe/Moscow"   # the team's "today" for sprints
+
+[fields]
+sprint = "Iteration"         # the board's iteration field has another name
+
+[verbs.start]
+blockers = "deny"            # refuse to start a blocked issue
+
+[verbs.done]
+from = ["Ready"]             # released only after ready
+```
+
+`ready` and `done` read the status history, which GitHub keeps only for a
+board's built-in `Status` field: with another `fields.status`, the config
+is refused until they set `iteration = "current"`.
 
 ## Roadmap
 
