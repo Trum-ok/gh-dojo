@@ -7,8 +7,8 @@ Verbs:
   go          Go
 
 Every verb adds the issue to the board if it is missing and refuses a
-closed issue unless noted. A repeat is safe: a status already set is kept
-and a comment already posted is skipped.
+closed issue unless noted. A repeat is safe: an effect already in place
+(status, comment, labels, assignee, closed or open) is skipped.
 
 Lifecycle (from → to):
   go          any status → Doing

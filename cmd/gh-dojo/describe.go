@@ -7,6 +7,7 @@ import (
 
 	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/render"
+	"github.com/Trum-ok/gh-dojo/internal/workflow"
 	"github.com/spf13/cobra"
 )
 
@@ -68,23 +69,62 @@ type processExitCode struct {
 // verbChecks and verbEffects say, in order, what a verb checks and does
 // beyond its from → to and its arguments, as short phrases joined into its
 // describe line. Each returns "" when the verb does not have the key. A new
-// verb key (blockers, confirm, close, reopen, labels, assign, iteration,
-// batch) gets an entry in one of them.
+// verb key (blockers, iteration, batch) gets an entry in one of them.
 var (
 	verbChecks = []func(cfg *config.Config, v config.Verb) string{
 		func(cfg *config.Config, v config.Verb) string {
-			if v.To != "" && slices.Contains(cfg.Statuses.Final, v.To) {
+			if v.To != "" && slices.Contains(cfg.Statuses.Final, v.To) || v.Close != "" || v.Reopen {
 				return "also on closed issues"
+			}
+			return ""
+		},
+		func(_ *config.Config, v config.Verb) string {
+			if v.Confirm {
+				return "the user's decision: ask first, then --yes"
 			}
 			return ""
 		},
 	}
 	verbEffects = []func(cfg *config.Config, v config.Verb) string{
 		func(_ *config.Config, v config.Verb) string {
+			if v.Reopen {
+				return "reopens"
+			}
+			return ""
+		},
+		func(_ *config.Config, v config.Verb) string {
+			var signs []string
+			for _, l := range v.AddLabels {
+				signs = append(signs, "+"+l)
+			}
+			for _, l := range v.RemoveLabels {
+				signs = append(signs, "-"+l)
+			}
+			if len(signs) == 0 {
+				return ""
+			}
+			return "labels " + strings.Join(signs, " ")
+		},
+		func(_ *config.Config, v config.Verb) string {
+			switch v.Assign {
+			case "":
+				return ""
+			case config.Me:
+				return "assigns you"
+			}
+			return "assigns " + v.Assign
+		},
+		func(_ *config.Config, v config.Verb) string {
 			if v.Comment == "" {
 				return ""
 			}
 			return `comments "` + clipRunes(singleLine(v.Comment), maxTemplateRunes) + `"`
+		},
+		func(_ *config.Config, v config.Verb) string {
+			if v.Close == "" {
+				return ""
+			}
+			return "closes as " + workflow.ReasonText(v.Close)
 		},
 	}
 )
@@ -175,8 +215,8 @@ func (p *process) text() string {
 		}
 		sections = append(sections, b.String(),
 			"Every verb adds the issue to the board if it is missing and refuses a\n"+
-				"closed issue unless noted. A repeat is safe: a status already set is kept\n"+
-				"and a comment already posted is skipped.")
+				"closed issue unless noted. A repeat is safe: an effect already in place\n"+
+				"(status, comment, labels, assignee, closed or open) is skipped.")
 	}
 	// The root help's sections, each starting with a blank line; the
 	// lifecycle is empty without verbs and statuses.

@@ -9,14 +9,14 @@ Verbs:
   wait        Work is stuck: waiting for another issue or an outside decision
               needs --by or --comment; comments "Waiting for {by}. {comment}"
   done        The change is released
-              optional --comment; also on closed issues; comments "{comment}"
+              optional --comment; also on closed issues; comments "{comment}"; closes as completed
   note        Leave a progress note without moving the issue
               needs --comment; comments "Progress: {comment}"
   park        Put the issue back
 
 Every verb adds the issue to the board if it is missing and refuses a
-closed issue unless noted. A repeat is safe: a status already set is kept
-and a comment already posted is skipped.
+closed issue unless noted. A repeat is safe: an effect already in place
+(status, comment, labels, assignee, closed or open) is skipped.
 
 Lifecycle (from → to):
   start       Backlog, Waiting, Ready → In progress
