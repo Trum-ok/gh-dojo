@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.go.require: unknown argument "reason"
+allowed: comment, by

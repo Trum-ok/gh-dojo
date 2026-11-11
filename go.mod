@@ -3,6 +3,7 @@ module github.com/Trum-ok/gh-dojo
 go 1.27
 
 require (
+	github.com/BurntSushi/toml v1.6.0
 	github.com/cli/go-gh/v2 v2.17.0
 	github.com/rivo/uniseg v0.4.7
 	github.com/spf13/cobra v1.10.2

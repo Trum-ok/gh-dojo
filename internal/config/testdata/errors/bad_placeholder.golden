@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.start.comment: unknown placeholder {sesion}
+allowed: {session}, {comment}, {by}

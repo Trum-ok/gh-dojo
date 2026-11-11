@@ -1,0 +1,2 @@
+error: .github/dojo.toml: session.link: unknown placeholder {session}
+allowed: {id}

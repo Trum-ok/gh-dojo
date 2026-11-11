@@ -1,0 +1,1 @@
+error: .github/dojo.toml:5: board.repos: wrong type: got string, want array

@@ -1,0 +1,54 @@
+file: .github/dojo.toml
+version: 1
+preset: "kanban"
+board: owner=acme project=3 repos=[acme/shop] assignee="@me"
+fields.status: "Status"
+fields.sprint: "Sprint"
+statuses: initial="Backlog" final=["Done"]
+labels: type_prefix="" area_prefix="area:"
+session: env=["CLAUDE_CODE_HOST_SESSION_ID"] link="claude://claude.ai/epitaxy/{id}"
+verb start
+  when: берёшь задачу в работу
+  to: "In progress"
+  from: ["Backlog" "Waiting" "Ready"]
+  require: [] require_one_of: []
+  comment: "Сессия: {session}"
+verb wait
+  when: работа встала: ждём задачу или внешнее решение
+  to: "Waiting"
+  from: ["In progress"]
+  require: [] require_one_of: ["by" "comment"]
+  comment: "Waiting for {by}.\n\n{comment}"
+verb ready
+  when: сделано, проверено, закоммичено
+  to: "Ready"
+  from: ["In progress" "Waiting"]
+  require: [] require_one_of: []
+  comment: "{comment}"
+verb done
+  when: выкачено на прод
+  to: "Done"
+  from: ["Ready" "In progress"]
+  require: [] require_one_of: []
+  comment: "{comment}"
+verb drop
+  when: задача не нужна или дубль
+  to: ""
+  from: []
+  require: ["comment"] require_one_of: []
+  comment: ""
+status refs:
+  "Backlog"    statuses.initial (from preset kanban)
+  "Done"       statuses.final (from preset kanban)
+  "In progress" verbs.start.to
+  "Backlog"    verbs.start.from (from preset kanban)
+  "Waiting"    verbs.start.from (from preset kanban)
+  "Ready"      verbs.start.from (from preset kanban)
+  "Waiting"    verbs.wait.to
+  "In progress" verbs.wait.from (from preset kanban)
+  "Ready"      verbs.ready.to
+  "In progress" verbs.ready.from (from preset kanban)
+  "Waiting"    verbs.ready.from (from preset kanban)
+  "Done"       verbs.done.to
+  "Ready"      verbs.done.from (from preset kanban)
+  "In progress" verbs.done.from (from preset kanban)

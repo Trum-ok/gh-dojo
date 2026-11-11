@@ -1,0 +1,2 @@
+error: .github/dojo.toml: unknown key session.envs
+allowed: env, link

@@ -1,0 +1,49 @@
+# kanban: one flow, no sprints.
+#
+# Board statuses: Backlog, In progress, Waiting, Ready, Done.
+#   Ready = done, verified and committed, but not released yet.
+#   Done  = shipped.
+
+version = 1
+
+[fields]
+status = "Status"
+
+[statuses]
+initial = "Backlog"
+final = ["Done"]
+
+[labels]
+type_prefix = ""
+area_prefix = "area:"
+
+[verbs.start]
+when = "You begin working on the issue"
+to = "In progress"
+from = ["Backlog", "Waiting", "Ready"]
+comment = """
+Started. Session: {session}
+
+{comment}"""
+
+[verbs.wait]
+when = "Work is stuck: waiting for another issue or an outside decision"
+to = "Waiting"
+from = ["In progress"]
+require_one_of = ["by", "comment"]
+comment = """
+Waiting for {by}.
+
+{comment}"""
+
+[verbs.ready]
+when = "The work is done, verified and committed, but not released yet"
+to = "Ready"
+from = ["In progress", "Waiting"]
+comment = "{comment}"
+
+[verbs.done]
+when = "The change is released"
+to = "Done"
+from = ["Ready", "In progress"]
+comment = "{comment}"

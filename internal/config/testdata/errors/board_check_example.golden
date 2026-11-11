@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.wait.to (from preset kanban): unknown status "Waiting"
+allowed: Backlog, Done

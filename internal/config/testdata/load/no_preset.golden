@@ -1,0 +1,16 @@
+file: .github/dojo.toml
+version: 1
+preset: ""
+board: owner=acme project=7 repos=[] assignee=""
+fields.status: "Status"
+statuses: initial="" final=[]
+labels: type_prefix="" area_prefix=""
+session: env=[] link="{id}"
+verb go
+  when: Go
+  to: "Doing"
+  from: []
+  require: [] require_one_of: []
+  comment: ""
+status refs:
+  "Doing"      verbs.go.to

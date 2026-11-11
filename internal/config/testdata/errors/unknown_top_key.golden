@@ -1,0 +1,2 @@
+error: .github/dojo.toml: unknown key bord
+allowed: version, preset, board, fields, statuses, labels, session, verbs
