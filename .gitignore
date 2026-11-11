@@ -1,0 +1,8 @@
+# Built binary (make build)
+/gh-dojo
+/gh-dojo.exe
+/gh-dojo.tmp
+/dist/
+
+# IDE
+.idea/
