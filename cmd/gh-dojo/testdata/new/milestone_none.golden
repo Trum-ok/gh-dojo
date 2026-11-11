@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: unknown milestone "v0.1": Trum-ok/gh-dojo has no open milestones
+fix: if it is new, create it: gh api repos/Trum-ok/gh-dojo/milestones -f title="v0.1"

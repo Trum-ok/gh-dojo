@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: new takes one title, got 3 arguments; --type after -- is taken as an argument: put the flags before --
+fix: gh dojo new --help

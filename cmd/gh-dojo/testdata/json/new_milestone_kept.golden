@@ -1,0 +1,27 @@
+code: 0
+--- stdout
+{
+  "schema_version": 1,
+  "number": 15,
+  "repo": "Trum-ok/gh-dojo",
+  "title": "Fix login redirect",
+  "created": false,
+  "labels": [
+    "bug",
+    "area:cli"
+  ],
+  "status": "In progress",
+  "status_set": false,
+  "unarchived": false,
+  "milestone": {
+    "title": "v0.2",
+    "due_on": ""
+  },
+  "milestone_set": false,
+  "blocked_by": [],
+  "already_blocked_by": [],
+  "error": null
+}
+
+--- stderr
+warning: #15 already has milestone "v0.2"; kept it, --milestone "v0.1" not applied (to change it: gh issue edit 15 -R Trum-ok/gh-dojo --milestone "v0.1")

@@ -1,0 +1,6 @@
+code: 1
+--- stdout
+--- stderr
+error: unknown type "chore"
+allowed: bug
+fix: gh dojo new --help

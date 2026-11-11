@@ -39,7 +39,7 @@ type showCard struct {
 
 	Board     showBoard      `json:"board"`
 	Sprint    *sprintJSON    `json:"sprint"` // null without fields.sprint
-	Milestone *showMilestone `json:"milestone"`
+	Milestone *jsonMilestone `json:"milestone"`
 
 	Labels         []string `json:"labels"`
 	LabelsTotal    int      `json:"labels_total"`
@@ -108,7 +108,7 @@ func iterationJSON(it *board.Iteration) *jsonIteration {
 	return out
 }
 
-type showMilestone struct {
+type jsonMilestone struct {
 	Title string `json:"title"`
 	DueOn string `json:"due_on"` // YYYY-MM-DD; "" without a due date
 }
@@ -201,7 +201,7 @@ func (v cardView) cardJSON(c *issue.Card, brief bool) showCard {
 		out.Sprint = &sprintJSON{Field: v.sprintField, Iteration: iterationJSON(it), UnknownReason: unknown}
 	}
 	if m := c.Milestone; m != nil {
-		out.Milestone = &showMilestone{Title: singleLine(m.Title)}
+		out.Milestone = &jsonMilestone{Title: singleLine(m.Title)}
 		if !m.DueOn.IsZero() {
 			out.Milestone.DueOn = cardDay(m.DueOn)
 		}

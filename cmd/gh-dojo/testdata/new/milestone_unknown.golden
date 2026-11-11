@@ -1,0 +1,6 @@
+code: 1
+--- stdout
+--- stderr
+error: unknown milestone "v02": no open milestone in Trum-ok/gh-dojo has that title; did you mean "v0.2"?
+allowed: v0.1, v0.2
+fix: if it is new, create it: gh api repos/Trum-ok/gh-dojo/milestones -f title="v02"

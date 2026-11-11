@@ -29,6 +29,9 @@ const (
 	newDoneFixture    = "testdata/graphql/new_done.json"
 	newNoStatus       = "testdata/graphql/new_no_status.json"
 	newContextAreas   = "testdata/graphql/new_context_areas.json"
+
+	newMilestoneFixture = "testdata/graphql/new_milestone.json"
+	newMilestoneKept    = "testdata/graphql/new_milestone_kept.json"
 )
 
 var newFixArgs = []string{"new", "Fix login redirect", "--type", "bug", "--area", "cli",
@@ -46,6 +49,9 @@ func TestNewContextRecorded(t *testing.T) {
 	}
 	if !slices.ContainsFunc(nc.Labels.Nodes, func(l newLabel) bool { return l.Name == "bug" }) {
 		t.Errorf("labels = %v, want bug among them", nc.Labels.Nodes)
+	}
+	if len(nc.Milestones.Nodes) == 0 || nc.Milestones.Nodes[0].ID == "" || nc.Milestones.Nodes[0].Title == "" {
+		t.Errorf("milestones = %+v, want the open ones", nc.Milestones.Nodes)
 	}
 	if srv.Requests() != 1 {
 		t.Errorf("requests = %d, want 1", srv.Requests())
@@ -308,6 +314,102 @@ func TestNewUnknownLabels(t *testing.T) {
 	}
 }
 
+// TestNewMilestone: --milestone goes into createIssue, with the open
+// milestones read in the context query: no request more than without it.
+// The title matches ignoring case.
+func TestNewMilestone(t *testing.T) {
+	for _, title := range []string{"v0.1", "V0.1"} {
+		t.Run(title, func(t *testing.T) {
+			withConfig(t, dojoConfig)
+			srv := withApp(t, boardFixture, newMilestoneFixture)
+			before := warmSchema(t, srv)
+			code, out := runOut(append(slices.Clone(newFixArgs), "--milestone", title)...)
+			testutil.Golden(t, "new/milestone", out)
+			if code != render.ExitOK {
+				t.Errorf("code = %d", code)
+			}
+			if n := srv.Requests() - before; n != 4 {
+				t.Errorf("requests with a warm schema = %d, want 4 (read, createIssue, addProjectV2ItemById, status)", n)
+			}
+		})
+	}
+}
+
+// TestNewMilestoneResume: a re-run sets the milestone of a found issue
+// that has none, and keeps a different one it has, with a warning.
+func TestNewMilestoneResume(t *testing.T) {
+	tests := []struct {
+		name, fixture string
+		requests      int
+	}{
+		{"milestone_resume", "testdata/graphql/new_milestone_resume.json", 2}, // read, updateIssue
+		{"milestone_kept", newMilestoneKept, 1},                               // read
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			withConfig(t, dojoConfig)
+			srv := withApp(t, boardFixture, tt.fixture)
+			before := warmSchema(t, srv)
+			code, out := runOut(append(slices.Clone(newFixArgs), "--milestone", "v0.1")...)
+			testutil.Golden(t, "new/"+tt.name, out)
+			if code != render.ExitOK {
+				t.Errorf("code = %d", code)
+			}
+			if n := srv.Requests() - before; n != tt.requests {
+				t.Errorf("requests with a warm schema = %d, want %d", n, tt.requests)
+			}
+		})
+	}
+}
+
+// TestNewUnknownMilestone: an unknown milestone fails after the read and
+// before any write, listing the open milestones; these fixtures have no
+// mutation to answer. Past the first 100, all open milestones are read.
+func TestNewUnknownMilestone(t *testing.T) {
+	tests := []struct {
+		name, fixture, milestone string
+	}{
+		{"milestone_unknown", "testdata/graphql/new_milestone_read.json", "v02"},
+		{"milestone_none", "testdata/graphql/new_milestone_none.json", "v0.1"},
+		{"milestone_pages", "testdata/graphql/new_milestone_pages.json", "v1.0"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			withConfig(t, dojoConfig)
+			withApp(t, boardFixture, tt.fixture)
+			code, out := runOut(append(slices.Clone(newFixArgs), "--milestone", tt.milestone)...)
+			testutil.Golden(t, "new/"+tt.name, out)
+			if code != render.ExitUsage {
+				t.Errorf("code = %d, want %d", code, render.ExitUsage)
+			}
+		})
+	}
+}
+
+// TestNewDashTitle: flags go before --, the title after it; a flag after
+// -- is part of the arguments. Both fail before any request here.
+func TestNewDashTitle(t *testing.T) {
+	withConfig(t, dojoConfig+"\n[labels]\ntypes = [\"bug\"]\narea_prefix = \"area:\"\n")
+	tests := []struct {
+		name string
+		args []string
+	}{
+		// --type is parsed: refused as outside labels.types.
+		{"dash_title_flags_before", []string{"new", "--type", "chore", "--", "-v is ignored"}},
+		// --type after -- is two more arguments.
+		{"dash_title_flags_after", []string{"new", "--", "-v is ignored", "--type", "bug"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code, out := runOut(tt.args...)
+			testutil.Golden(t, "new/"+tt.name, out)
+			if code != render.ExitUsage {
+				t.Errorf("code = %d", code)
+			}
+		})
+	}
+}
+
 func TestNewConfiguredTypes(t *testing.T) {
 	typed := dojoConfig + "\n[labels]\ntypes = [\"bug\", \"feature\"]\narea_prefix = \"area:\"\n"
 
@@ -348,6 +450,7 @@ func TestNewUsage(t *testing.T) {
 		{"blank_title", []string{"new", "  "}},
 		{"two_bodies", []string{"new", "Fix login", "--body", "x", "--body-file", "-"}},
 		{"missing_body_file", []string{"new", "Fix login", "--body-file", "testdata/nope.md"}},
+		{"empty_milestone", []string{"new", "Fix login", "--milestone", " "}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

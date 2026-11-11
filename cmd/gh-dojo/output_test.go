@@ -336,6 +336,18 @@ func TestWriteJSON(t *testing.T) {
 		srv = withApp(t, boardFixture, newRerunFixture)
 		checkJSONRuns(t, srv, srv.Requests(), runs{newFixArgs, render.ExitOK, 3, "new_rerun"})
 	})
+	t.Run("new_milestone", func(t *testing.T) {
+		withConfig(t, dojoConfig)
+		srv := withApp(t, boardFixture, newMilestoneFixture)
+		checkJSONRuns(t, srv, warmSchema(t, srv),
+			runs{append(slices.Clone(newFixArgs), "--milestone", "v0.1"), render.ExitOK, 4, "new_milestone"})
+	})
+	t.Run("new_milestone_kept", func(t *testing.T) {
+		withConfig(t, dojoConfig)
+		srv := withApp(t, boardFixture, newMilestoneKept)
+		checkJSONRuns(t, srv, warmSchema(t, srv),
+			runs{append(slices.Clone(newFixArgs), "--milestone", "v0.1"), render.ExitOK, 1, "new_milestone_kept"})
+	})
 	t.Run("block", func(t *testing.T) {
 		srv, before := withLinksApp(t, verbFixture("links_block"))
 		checkJSONRuns(t, srv, before,

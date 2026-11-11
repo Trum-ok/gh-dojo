@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: comment takes an issue number and one text argument, got 3 arguments; --json after -- is taken as an argument: put the flags before --
+fix: gh dojo comment --help

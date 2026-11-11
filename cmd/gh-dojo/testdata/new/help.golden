@@ -8,8 +8,13 @@ when labels.types is empty; --area X adds the label <labels.area_prefix>X;
 --label adds any existing label. An unknown one fails before anything is
 created, listing the allowed values.
 
+--milestone puts the issue in an open milestone of the repo, by title
+(ignoring case). An unknown one fails before anything is created, listing the
+open milestones.
+
 The body comes from --body or --body-file (a file, or - for stdin). A title
-starting with - goes after --: gh dojo new -- "-v is ignored".
+starting with - goes after --, and every flag before the --, since anything
+after it is taken as the title: gh dojo new --type bug -- "-v is ignored".
 
 --blocked-by marks the new issue blocked by other issues (12, "#12",
 owner/repo#12 or the issue's URL; repeatable, or comma-separated). An issue
@@ -18,10 +23,11 @@ that does not exist, or a pull request, fails before anything is created
 
 A repeat is safe: the body ends with a hidden marker of the title, and a run
 that finds it on one of the repo's 20 newest open issues, written by you,
-finishes that issue (labels, board, status, blocked-by links) instead of
-creating another. So filing an open issue again with the same title
-(ignoring case and spacing) resumes it. If a run fails after creating the
-issue, it exits with code 5: run the same command again.
+finishes that issue (labels, milestone, board, status, blocked-by links)
+instead of creating another; a different milestone it already has is kept.
+So filing an open issue again with the same title (ignoring case and
+spacing) resumes it. If a run fails after creating the issue, it exits with
+code 5: run the same command again.
 
 This project:
   --type    any repo label not starting with area:
@@ -34,8 +40,8 @@ Usage:
 Examples:
   gh dojo new "Fix login redirect" --type bug --area cli
   gh dojo new "Support org boards" --label enhancement --body-file - < notes.md
-  gh dojo new "Release v1.2" --blocked-by 17 --blocked-by 18
-  gh dojo new -- "-v is ignored by list"
+  gh dojo new "Release v1.2" --milestone v1.2 --blocked-by 17 --blocked-by 18
+  gh dojo new --type bug -- "-v is ignored by list"
 
 Flags:
       --area name          area name: adds the label <labels.area_prefix><name>; repeatable
@@ -44,6 +50,7 @@ Flags:
       --body-file file     read the body from file; - reads stdin
   -h, --help               help for new
       --label label        any existing repo label; repeatable
+      --milestone title    an open milestone of the repo, by title
       --type string        issue type: any repo label not starting with area:
 
 Global Flags:

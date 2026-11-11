@@ -13,6 +13,8 @@ code: 5
   "status": "",
   "status_set": false,
   "unarchived": false,
+  "milestone": null,
+  "milestone_set": false,
   "blocked_by": [],
   "already_blocked_by": [],
   "error": {

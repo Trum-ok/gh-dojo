@@ -13,6 +13,8 @@ code: 0
   "status": "Backlog",
   "status_set": true,
   "unarchived": false,
+  "milestone": null,
+  "milestone_set": false,
   "blocked_by": [],
   "already_blocked_by": [],
   "error": null

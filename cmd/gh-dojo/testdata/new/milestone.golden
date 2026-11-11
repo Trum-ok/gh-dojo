@@ -1,0 +1,4 @@
+code: 0
+--- stdout
+#15 "Fix login redirect" created, labels bug, area:cli, milestone v0.1, no status → Backlog
+--- stderr

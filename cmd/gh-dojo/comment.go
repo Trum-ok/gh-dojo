@@ -32,8 +32,9 @@ func newCommentCmd() (*cobra.Command, error) {
 
 The text comes from the second argument or from --body-file (a file, or - for
 stdin), exactly one of them; empty text is an error. Use --body-file - for
-long or multi-line text, and put text starting with - after --:
-gh dojo comment 42 -- "-1, still broken".
+long or multi-line text. Text starting with - goes after --, and every flag
+before the --, since anything after it is taken as text:
+gh dojo comment 42 --json -- "-1, still broken".
 
 A repeat is safe: the comment carries a hidden marker, and when the issue's
 last comment is yours with the same text it is not posted again. The same
@@ -41,7 +42,7 @@ text after someone else's comment is posted.`,
 		Example: `  gh dojo comment 42 "Reproduced on main; the redirect drops the query string"
   gh dojo comment 42 --body-file notes.md
   echo "Waiting for the API team" | gh dojo comment 42 --body-file -
-  gh dojo comment 42 -- "-1, still broken"`,
+  gh dojo comment 42 --json -- "-1, still broken"`,
 		Args: commentArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			n, _ := parseIssue(args[0]) // validated by commentArgs
@@ -63,8 +64,8 @@ text after someone else's comment is posted.`,
 // commentArgs accepts an issue number and optional text.
 func commentArgs(cmd *cobra.Command, args []string) error {
 	if len(args) > 2 {
-		return render.Usage("comment takes an issue number and one text argument, got %d arguments; quote the text",
-			len(args)).WithFix(cmd.CommandPath() + " --help")
+		return render.Usage("comment takes an issue number and one text argument, got %d arguments; %s",
+			len(args), extraArgsHint(cmd, args, "quote the text")).WithFix(cmd.CommandPath() + " --help")
 	}
 	return issueArg(cmd, args[:min(len(args), 1)])
 }

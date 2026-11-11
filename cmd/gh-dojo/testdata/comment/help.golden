@@ -4,8 +4,9 @@ Comment on an issue without changing its status.
 
 The text comes from the second argument or from --body-file (a file, or - for
 stdin), exactly one of them; empty text is an error. Use --body-file - for
-long or multi-line text, and put text starting with - after --:
-gh dojo comment 42 -- "-1, still broken".
+long or multi-line text. Text starting with - goes after --, and every flag
+before the --, since anything after it is taken as text:
+gh dojo comment 42 --json -- "-1, still broken".
 
 A repeat is safe: the comment carries a hidden marker, and when the issue's
 last comment is yours with the same text it is not posted again. The same
@@ -18,7 +19,7 @@ Examples:
   gh dojo comment 42 "Reproduced on main; the redirect drops the query string"
   gh dojo comment 42 --body-file notes.md
   echo "Waiting for the API team" | gh dojo comment 42 --body-file -
-  gh dojo comment 42 -- "-1, still broken"
+  gh dojo comment 42 --json -- "-1, still broken"
 
 Flags:
       --body-file file   read the text from file; - reads stdin

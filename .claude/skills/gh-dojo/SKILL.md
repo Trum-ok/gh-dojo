@@ -60,7 +60,8 @@ description: Как вести задачи gh-dojo на его собствен
 
 - `gh dojo new "<заголовок>" --type <bug|enhancement|documentation|dogfood> --body "…"` — issue + метка + доска +
   `Backlog` одной командой. Длинное описание: `--body-file file` или `--body-file -` (stdin). Ещё метки: `--label X`.
-  Заголовок с `-` — после `--`.
+  Milestone: `--milestone "<название>"` (открытый milestone репозитория; неизвестное — код 1 со списком). Заголовок
+  с `-` — после `--`, а все флаги — до `--`: `gh dojo new --type bug -- "-v is ignored"`.
 - `gh dojo comment N "текст"` или `gh dojo comment N --body-file -` — комментарий без смены статуса.
 - `gh dojo block N --by M` — связь «N заблокирована M» без смены статуса; `gh dojo unblock N --by M` — снять её.
   `--by` повторяется или через запятую: `--by 12,13`; другой репозиторий — `--by owner/repo#12`; подходит и ссылка

@@ -87,6 +87,7 @@ func TestCommentUsage(t *testing.T) {
 		{"empty_text", "", []string{"comment", "3", "  "}},
 		{"empty_stdin", "\n\n", []string{"comment", "3", "--body-file", "-"}},
 		{"too_many_args", "", []string{"comment", "3", "Reproduced", "on", "main"}},
+		{"flag_after_dash", "", []string{"comment", "3", "--", "-1, still broken", "--json"}},
 		{"bad_number", "", []string{"comment", "abc", "text"}},
 	}
 	for _, tt := range tests {

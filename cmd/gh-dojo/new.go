@@ -24,10 +24,11 @@ import (
 // initial status.
 //
 // Requests with a warm schema cache: one read (newContextQuery: repo ID,
-// labels, recent issues, and the --blocked-by issues), createIssue (with
-// its labels), addProjectV2ItemById, then the status with the blocked-by
-// links (addBlockedBy, aliased, in the same mutation): four. Without
-// statuses.initial and --blocked-by the last write is skipped.
+// labels, open milestones, recent issues, and the --blocked-by issues),
+// createIssue (with its labels and milestone), addProjectV2ItemById, then
+// the status with the blocked-by links (addBlockedBy, aliased, in the same
+// mutation): four. Without statuses.initial and --blocked-by the last write
+// is skipped.
 //
 // The board item is added explicitly rather than with createIssue's
 // projectV2Ids: GitHub adds those asynchronously, so the createIssue answer
@@ -42,9 +43,10 @@ import (
 // <!-- gh-dojo:new:<hash> --> of the normalized title (newDedupKey), and the
 // read looks for it among the repo's newDedupWindow newest open issues,
 // keeping those the viewer wrote. A match is resumed instead of created
-// again: missing labels are added, the issue is unarchived or put on the
-// board and, if it has no status, given the initial one; blocked-by links
-// it lacks are added. So filing an open
+// again: missing labels are added, the --milestone is set if it has none (a
+// different one stays, with a warning), the issue is unarchived or put on
+// the board and, if it has no status, given the initial one; blocked-by
+// links it lacks are added. So filing an open
 // issue again with the same title within the window resumes it. An issue
 // that dropped out of the window (newDedupWindow newer open issues in the
 // repo, by anyone) or was closed is created again.
@@ -70,9 +72,9 @@ const (
 var newRecheckDelay = time.Second
 
 // newContextQuery reads what new needs before writing: the repo ID, its
-// labels (by name, for the allowed lists) and the newest open issues, to
-// find one a failed run already created. $status is the board's status
-// field name.
+// labels (by name, for the allowed lists), its open milestones (for
+// --milestone) and the newest open issues, to find one a failed run already
+// created. $status is the board's status field name.
 const newContextQuery = `query NewIssueContext($owner: String!, $repo: String!, $status: String!, $window: Int!) {
   repository(owner: $owner, name: $repo) {
     id
@@ -80,6 +82,11 @@ const newContextQuery = `query NewIssueContext($owner: String!, $repo: String!, 
       totalCount
       pageInfo { hasNextPage endCursor }
       nodes { id name }
+    }
+    milestones(first: 100, states: OPEN, orderBy: {field: NUMBER, direction: ASC}) {
+      totalCount
+      pageInfo { hasNextPage endCursor }
+      nodes { id title dueOn }
     }
     issues(last: $window, states: OPEN, orderBy: {field: CREATED_AT, direction: ASC}) {
       nodes {
@@ -89,6 +96,7 @@ const newContextQuery = `query NewIssueContext($owner: String!, $repo: String!, 
         body
         viewerDidAuthor
         labels(first: 50) { nodes { name } }
+        milestone { title dueOn }
         projectItems(first: 20) {
           nodes {
             id
@@ -124,10 +132,23 @@ const newLabelsQuery = `query RepoLabels($owner: String!, $repo: String!, $curso
   }
 }`
 
-// newCreateMutation creates the issue with its labels. It is put on the
-// board by newAddToBoardMutation, not projectV2Ids (see the top of the file).
-const newCreateMutation = `mutation CreateIssue($repo: ID!, $title: String!, $body: String!, $labels: [ID!]) {
-  createIssue(input: {repositoryId: $repo, title: $title, body: $body, labelIds: $labels}) {
+// newMilestonesQuery reads all open milestones; only needed past the first
+// 100.
+const newMilestonesQuery = `query RepoMilestones($owner: String!, $repo: String!, $cursor: String) {
+  repository(owner: $owner, name: $repo) {
+    milestones(first: 100, after: $cursor, states: OPEN, orderBy: {field: NUMBER, direction: ASC}) {
+      totalCount
+      pageInfo { hasNextPage endCursor }
+      nodes { id title dueOn }
+    }
+  }
+}`
+
+// newCreateMutation creates the issue with its labels and milestone ($milestone
+// omitted for none). It is put on the board by newAddToBoardMutation, not
+// projectV2Ids (see the top of the file).
+const newCreateMutation = `mutation CreateIssue($repo: ID!, $title: String!, $body: String!, $labels: [ID!], $milestone: ID) {
+  createIssue(input: {repositoryId: $repo, title: $title, body: $body, labelIds: $labels, milestoneId: $milestone}) {
     issue { id number }
   }
 }`
@@ -135,6 +156,12 @@ const newCreateMutation = `mutation CreateIssue($repo: ID!, $title: String!, $bo
 // newAddLabelsMutation adds labels a resumed issue lacks.
 const newAddLabelsMutation = `mutation AddLabels($issue: ID!, $labels: [ID!]!) {
   addLabelsToLabelable(input: {labelableId: $issue, labelIds: $labels}) { clientMutationId }
+}`
+
+// newSetMilestoneMutation sets the milestone of a resumed issue that has
+// none.
+const newSetMilestoneMutation = `mutation SetMilestone($issue: ID!, $milestone: ID!) {
+  updateIssue(input: {id: $issue, milestoneId: $milestone}) { issue { id } }
 }`
 
 // newUnarchiveMutation restores a resumed issue's archived board item.
@@ -179,6 +206,8 @@ type newOptions struct {
 	Type   string // "" when --type is not given
 	Areas  []string
 	Labels []string
+	// Milestone is the --milestone title, "" when not given.
+	Milestone string
 	// BlockedBy are the --blocked-by values as given; Blockers the issues
 	// they name, parsed before any request.
 	BlockedBy []string
@@ -196,8 +225,8 @@ func newNewCmd() (*cobra.Command, error) {
 		Long:  newHelp(),
 		Example: `  gh dojo new "Fix login redirect" --type bug --area cli
   gh dojo new "Support org boards" --label enhancement --body-file - < notes.md
-  gh dojo new "Release v1.2" --blocked-by 17 --blocked-by 18
-  gh dojo new -- "-v is ignored by list"`,
+  gh dojo new "Release v1.2" --milestone v1.2 --blocked-by 17 --blocked-by 18
+  gh dojo new --type bug -- "-v is ignored by list"`,
 		Args: newArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.Title = strings.Join(strings.Fields(args[0]), " ")
@@ -217,6 +246,11 @@ func newNewCmd() (*cobra.Command, error) {
 				o.Body = body
 			default:
 				o.Body = strings.TrimSpace(o.Body)
+			}
+			if f.Changed("milestone") {
+				if o.Milestone = strings.TrimSpace(o.Milestone); o.Milestone == "" {
+					return render.Usage("--milestone is empty").WithFix(cmd.CommandPath() + " --help")
+				}
 			}
 			cfg, err := loadConfig()
 			if err != nil {
@@ -252,6 +286,7 @@ func newNewCmd() (*cobra.Command, error) {
 	f.StringVar(&o.Type, "type", "", newTypeUsage())
 	f.StringArrayVar(&o.Areas, "area", nil, "area `name`: adds the label <labels.area_prefix><name>; repeatable")
 	f.StringArrayVar(&o.Labels, "label", nil, "any existing repo `label`; repeatable")
+	f.StringVar(&o.Milestone, "milestone", "", "an open milestone of the repo, by `title`")
 	f.StringVar(&o.Body, "body", "", "issue body (markdown); one starting with - goes as --body=...")
 	f.StringVar(&bodyFile, bodyFileFlag, "", "read the body from `file`; - reads stdin")
 	f.StringArrayVar(&o.BlockedBy, "blocked-by", nil,
@@ -281,9 +316,25 @@ func newArgs(cmd *cobra.Command, args []string) error {
 	case len(args) == 0:
 		return render.Usage(`new needs a title, like: gh dojo new "Fix login redirect"`).WithFix(help)
 	case len(args) > 1:
-		return render.Usage("new takes one title, got %d arguments; quote the title", len(args)).WithFix(help)
+		return render.Usage("new takes one title, got %d arguments; %s", len(args),
+			extraArgsHint(cmd, args, "quote the title")).WithFix(help)
 	}
 	return nil
+}
+
+// extraArgsHint is the advice for too many arguments: hint, or, when a flag
+// was put after --, where it is an argument, to put the flags before --.
+func extraArgsHint(cmd *cobra.Command, args []string, hint string) string {
+	at := cmd.ArgsLenAtDash()
+	if at < 0 {
+		return hint
+	}
+	for _, a := range args[at+1:] {
+		if strings.HasPrefix(a, "-") && !strings.ContainsAny(a, " \t") {
+			return fmt.Sprintf("%s after -- is taken as an argument: put the flags before --", a)
+		}
+	}
+	return hint
 }
 
 // newHelp is the long help of new, with this project's labels and initial
@@ -298,8 +349,13 @@ when labels.types is empty; --area X adds the label <labels.area_prefix>X;
 --label adds any existing label. An unknown one fails before anything is
 created, listing the allowed values.
 
+--milestone puts the issue in an open milestone of the repo, by title
+(ignoring case). An unknown one fails before anything is created, listing the
+open milestones.
+
 The body comes from --body or --body-file (a file, or - for stdin). A title
-starting with - goes after --: gh dojo new -- "-v is ignored".
+starting with - goes after --, and every flag before the --, since anything
+after it is taken as the title: gh dojo new --type bug -- "-v is ignored".
 
 --blocked-by marks the new issue blocked by other issues (12, "#12",
 owner/repo#12 or the issue's URL; repeatable, or comma-separated). An issue
@@ -308,10 +364,11 @@ that does not exist, or a pull request, fails before anything is created
 
 A repeat is safe: the body ends with a hidden marker of the title, and a run
 that finds it on one of the repo's 20 newest open issues, written by you,
-finishes that issue (labels, board, status, blocked-by links) instead of
-creating another. So filing an open issue again with the same title
-(ignoring case and spacing) resumes it. If a run fails after creating the
-issue, it exits with code 5: run the same command again.`)
+finishes that issue (labels, milestone, board, status, blocked-by links)
+instead of creating another; a different milestone it already has is kept.
+So filing an open issue again with the same title (ignoring case and
+spacing) resumes it. If a run fails after creating the issue, it exits with
+code 5: run the same command again.`)
 	cfg, err := loadConfig()
 	if err != nil {
 		return b.String()
@@ -385,6 +442,10 @@ type newResult struct {
 	Status     string `json:"status"`
 	StatusSet  bool   `json:"status_set"`
 	Unarchived bool   `json:"unarchived"`
+	// Milestone is the issue's milestone, nil for none; MilestoneSet says
+	// this run set it. A resumed issue keeps a different milestone it had.
+	Milestone    *jsonMilestone `json:"milestone"`
+	MilestoneSet bool           `json:"milestone_set"`
 	// BlockedBy are the blocked-by links added now, AlreadyBlockedBy those
 	// a resumed issue had.
 	BlockedBy        []string `json:"blocked_by"`
@@ -403,6 +464,7 @@ func (r *newRun) result(err error) newResult {
 	return newResult{
 		Number: r.number, Repo: r.repo.String(), Title: singleLine(title), Created: !r.resumed,
 		Labels: orEmpty(r.labels), Status: r.status, StatusSet: r.statusSet, Unarchived: r.unarchived,
+		Milestone: r.milestone.json(), MilestoneSet: r.milestoneSet,
 		BlockedBy: refList(r.linked, r.repo), AlreadyBlockedBy: refList(r.linkedFound, r.repo),
 		Error: errorJSON(err),
 	}
@@ -453,6 +515,10 @@ type newRun struct {
 	statusSet  bool   // the status was set to the initial one now
 	noInitial  bool   // statuses.initial is empty: no status was set
 
+	milestone     *newMilestone // the issue's milestone, nil for none
+	milestoneSet  bool          // set to --milestone now
+	milestoneKept string        // the --milestone not applied: a resumed issue had another
+
 	repo        issue.Repo      // the default repository, for the refs of links
 	linked      []*issue.Linked // blocked-by links added now
 	linkedFound []*issue.Linked // blocked-by links a resumed issue had already
@@ -499,6 +565,12 @@ func (r *newRun) run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	var milestone *newMilestone
+	if r.opts.Milestone != "" {
+		if milestone, err = nc.milestone(ctx, r.Client, repo, r.opts.Milestone); err != nil {
+			return err
+		}
+	}
 	if err := issue.LinksError("--blocked-by", nc.Links, repo); err != nil {
 		return err
 	}
@@ -518,7 +590,7 @@ func (r *newRun) run(ctx context.Context) error {
 			}
 		}
 		r.resumed = true
-	} else if err := r.create(ctx, nc.RepoID, withMarker(r.opts.Body, marker), labels); err != nil {
+	} else if err := r.create(ctx, nc.RepoID, withMarker(r.opts.Body, marker), labels, milestone); err != nil {
 		if r.number != 0 || !errors.Is(err, graph.ErrUnknownOutcome) {
 			return err
 		}
@@ -529,13 +601,27 @@ func (r *newRun) run(ctx context.Context) error {
 		r.warnings = append(r.warnings, fmt.Sprintf("GitHub's answer to creating the issue was lost; found #%d on a re-read", found.Number))
 	}
 	var missing []string // label IDs the found issue lacks
+	setMilestone := false
 	if found != nil {
 		r.number, r.id, r.title = found.Number, found.ID, found.title
 		r.itemID, r.archived, r.status = found.itemID, found.archived, found.status
+		r.milestone = found.milestone
 		for _, l := range labels {
 			if !slices.ContainsFunc(found.labels, func(n string) bool { return strings.EqualFold(n, l.Name) }) {
 				missing = append(missing, l.ID)
 			}
+		}
+		// A milestone the issue already has stays, like its status: someone
+		// may have set it on purpose.
+		switch {
+		case milestone == nil:
+		case found.milestone == nil:
+			setMilestone = true
+		case found.milestone.Title != milestone.Title:
+			r.milestoneKept = milestone.Title
+			r.warnings = append(r.warnings, fmt.Sprintf(
+				"#%d already has milestone %q; kept it, --milestone %q not applied (to change it: gh issue edit %d -R %s --milestone %q)",
+				r.number, found.milestone.Title, milestone.Title, r.number, repo, milestone.Title))
 		}
 	}
 
@@ -544,6 +630,13 @@ func (r *newRun) run(ctx context.Context) error {
 		if err := r.Client.Mutate(ctx, newAddLabelsMutation, vars, nil); err != nil {
 			return &newStepError{"adding labels " + strings.Join(r.labels, ", ") + " failed", err}
 		}
+	}
+	if setMilestone {
+		vars := map[string]any{"issue": r.id, "milestone": milestone.ID}
+		if err := r.Client.Mutate(ctx, newSetMilestoneMutation, vars, nil); err != nil {
+			return &newStepError{"setting milestone " + singleLine(milestone.Title) + " failed", err}
+		}
+		r.milestone, r.milestoneSet = milestone, true
 	}
 	if r.archived {
 		vars := map[string]any{"project": s.ID, "item": r.itemID}
@@ -744,10 +837,10 @@ func (r *newRun) recheck(ctx context.Context, repo issue.Repo, statusField, mark
 	return nc.find(marker, projectID)
 }
 
-// create sends createIssue. On an error with the issue in the payload (a
-// part of the input GitHub refused) the issue exists: r.number is set and
-// the error is returned for a partial result.
-func (r *newRun) create(ctx context.Context, repoID, body string, labels []newLabel) error {
+// create sends createIssue, with milestone unless nil. On an error with the
+// issue in the payload (a part of the input GitHub refused) the issue
+// exists: r.number is set and the error is returned for a partial result.
+func (r *newRun) create(ctx context.Context, repoID, body string, labels []newLabel, milestone *newMilestone) error {
 	ids := make([]string, len(labels))
 	for i, l := range labels {
 		ids[i] = l.ID
@@ -763,6 +856,9 @@ func (r *newRun) create(ctx context.Context, repoID, body string, labels []newLa
 	vars := map[string]any{
 		"repo": repoID, "title": r.opts.Title, "body": body, "labels": ids,
 	}
+	if milestone != nil {
+		vars["milestone"] = milestone.ID
+	}
 	err := r.Client.Mutate(ctx, newCreateMutation, vars, &out)
 	if out.Create == nil || out.Create.Issue == nil || out.Create.Issue.Number == 0 {
 		if err == nil {
@@ -773,16 +869,22 @@ func (r *newRun) create(ctx context.Context, repoID, body string, labels []newLa
 	is := out.Create.Issue
 	r.number, r.id = is.Number, is.ID
 	if err != nil {
-		return &newStepError{"GitHub refused part of the request (labels)", err}
+		part := "labels"
+		if milestone != nil {
+			part = "labels or milestone"
+		}
+		return &newStepError{"GitHub refused part of the request (" + part + ")", err}
 	}
+	r.milestone, r.milestoneSet = milestone, milestone != nil
 	return nil
 }
 
 // confirm is the confirmation line of a finished run:
 //
 //	#57 "Fix login redirect" created, labels bug, area:cli, no status → Backlog
-//	#57 "Fix login redirect" created, no status → Backlog, blocked by #12 and #13
+//	#57 "Fix login redirect" created, milestone v1.2, no status → Backlog, blocked by #12 and #13
 //	#57 "Fix login redirect" already created, labels bug, unarchived, Backlog (unchanged)
+//	#57 "Fix login redirect" already created, milestone v1.1 (kept, not v1.2), Backlog (unchanged)
 func (r *newRun) confirm() string {
 	effects := []string{"created"}
 	if r.resumed {
@@ -790,6 +892,13 @@ func (r *newRun) confirm() string {
 	}
 	if len(r.labels) > 0 {
 		effects = append(effects, "labels "+strings.Join(r.labels, ", "))
+	}
+	if r.milestone != nil {
+		m := "milestone " + singleLine(r.milestone.Title)
+		if r.milestoneKept != "" {
+			m += " (kept, not " + singleLine(r.milestoneKept) + ")"
+		}
+		effects = append(effects, m)
 	}
 	if r.unarchived {
 		effects = append(effects, "unarchived")
@@ -850,6 +959,9 @@ type newContext struct {
 	Labels    graph.Connection[newLabel]
 	Issues    []*newIssueJSON
 	allLabels []newLabel // all repo labels, once read past the first page
+	// Milestones are the repo's open milestones: the first page.
+	Milestones    graph.Connection[newMilestone]
+	allMilestones []newMilestone // all of them, once read past the first page
 	// Links are the --blocked-by issues, in order (see issue.Links).
 	Links []*issue.Linked
 }
@@ -857,6 +969,28 @@ type newContext struct {
 type newLabel struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+}
+
+// newMilestone is a repo milestone; DueOn is RFC 3339, nil without a due
+// date.
+type newMilestone struct {
+	ID    string  `json:"id"`
+	Title string  `json:"title"`
+	DueOn *string `json:"dueOn"`
+}
+
+// json is the milestone in new's JSON result, nil for none.
+func (m *newMilestone) json() *jsonMilestone {
+	if m == nil {
+		return nil
+	}
+	out := &jsonMilestone{Title: singleLine(m.Title)}
+	if m.DueOn != nil {
+		if t, err := time.Parse(time.RFC3339, *m.DueOn); err == nil {
+			out.DueOn = cardDay(t)
+		}
+	}
+	return out
 }
 
 type newItemJSON struct {
@@ -881,6 +1015,7 @@ type newIssueJSON struct {
 			Name string `json:"name"`
 		} `json:"nodes"`
 	} `json:"labels"`
+	Milestone    *newMilestone `json:"milestone"`
 	ProjectItems struct {
 		Nodes []*newItemJSON `json:"nodes"`
 	} `json:"projectItems"`
@@ -891,9 +1026,10 @@ type newIssueJSON struct {
 // not an error.
 func readNewContext(ctx context.Context, q graph.Querier, repo issue.Repo, statusField string, links issue.Links) (*newContext, error) {
 	var r *struct {
-		ID     string                     `json:"id"`
-		Labels graph.Connection[newLabel] `json:"labels"`
-		Issues struct {
+		ID         string                         `json:"id"`
+		Labels     graph.Connection[newLabel]     `json:"labels"`
+		Milestones graph.Connection[newMilestone] `json:"milestones"`
+		Issues     struct {
 			Nodes []*newIssueJSON `json:"nodes"`
 		} `json:"issues"`
 	}
@@ -916,7 +1052,7 @@ func readNewContext(ctx context.Context, q graph.Querier, repo issue.Repo, statu
 	if err != nil {
 		return nil, err
 	}
-	nc := &newContext{RepoID: r.ID, Labels: r.Labels, Issues: r.Issues.Nodes}
+	nc := &newContext{RepoID: r.ID, Labels: r.Labels, Milestones: r.Milestones, Issues: r.Issues.Nodes}
 	if len(links) > 0 {
 		if nc.Links, err = links.Decode(data); err != nil {
 			return nil, render.Internal("cannot decode GitHub's answer").WithCause(err)
@@ -932,6 +1068,7 @@ type foundIssue struct {
 	archived           bool
 	Number             int
 	labels             []string
+	milestone          *newMilestone // nil for none
 }
 
 // find returns the newest open issue the viewer wrote whose body ends with
@@ -942,7 +1079,7 @@ func (nc *newContext) find(marker, projectID string) *foundIssue {
 		if is == nil || !is.ViewerDidAuthor || !strings.HasSuffix(strings.TrimSpace(is.Body), marker) {
 			continue
 		}
-		f := &foundIssue{ID: is.ID, Number: is.Number, title: is.Title}
+		f := &foundIssue{ID: is.ID, Number: is.Number, title: is.Title, milestone: is.Milestone}
 		for _, l := range is.Labels.Nodes {
 			if l != nil {
 				f.labels = append(f.labels, l.Name)
@@ -1097,4 +1234,57 @@ func unknownNewLabel(cfg *config.Config, repo issue.Repo, flag, value, name stri
 
 func hasPrefixFold(s, prefix string) bool {
 	return len(s) >= len(prefix) && strings.EqualFold(s[:len(prefix)], prefix)
+}
+
+// milestone returns the open milestone titled title: the exact title, else
+// one that differs only in case, as gh does. An unknown title is a usage
+// error listing the open milestones, with the closest one suggested.
+func (nc *newContext) milestone(ctx context.Context, q graph.Querier, repo issue.Repo, title string) (*newMilestone, error) {
+	all := nc.Milestones.Nodes
+	if nc.Milestones.PageInfo.HasNextPage {
+		if nc.allMilestones == nil {
+			type resp struct {
+				Repository *struct {
+					Milestones graph.Connection[newMilestone] `json:"milestones"`
+				} `json:"repository"`
+			}
+			vars := map[string]any{"owner": repo.Owner, "repo": repo.Name}
+			page, err := graph.Paginate(ctx, q, newMilestonesQuery, vars, 0, func(r *resp) *graph.Connection[newMilestone] {
+				if r.Repository == nil {
+					return nil
+				}
+				return &r.Repository.Milestones
+			})
+			if err != nil {
+				return nil, err
+			}
+			nc.allMilestones = page.Nodes
+		}
+		all = nc.allMilestones
+	}
+	var fold *newMilestone
+	for i := range all {
+		switch {
+		case all[i].Title == title:
+			return &all[i], nil
+		case fold == nil && strings.EqualFold(all[i].Title, title):
+			fold = &all[i]
+		}
+	}
+	if fold != nil {
+		return fold, nil
+	}
+	create := fmt.Sprintf("if it is new, create it: gh api repos/%s/milestones -f title=%q", repo, title)
+	if len(all) == 0 {
+		return nil, render.Usage("unknown milestone %q: %s has no open milestones", title, repo).WithFix(create)
+	}
+	titles := make([]string, len(all))
+	for i, m := range all {
+		titles[i] = m.Title
+	}
+	msg := fmt.Sprintf("unknown milestone %q: no open milestone in %s has that title", title, repo)
+	if s := board.Suggest(title, titles); s != "" {
+		msg += fmt.Sprintf("; did you mean %q?", s)
+	}
+	return nil, render.Usage("%s", msg).WithAllowed(titles...).WithFix(create)
 }

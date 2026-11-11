@@ -4,7 +4,7 @@
   "interactions": [
     {
       "operation": "NewIssueContext",
-      "query": "query NewIssueContext($owner: String!, $repo: String!, $status: String!, $window: Int!) {\n  repository(owner: $owner, name: $repo) {\n    id\n    labels(first: 100, orderBy: {field: NAME, direction: ASC}) {\n      totalCount\n      pageInfo { hasNextPage endCursor }\n      nodes { id name }\n    }\n    issues(last: $window, states: OPEN, orderBy: {field: CREATED_AT, direction: ASC}) {\n      nodes {\n        id\n        number\n        title\n        body\n        viewerDidAuthor\n        labels(first: 50) { nodes { name } }\n        projectItems(first: 20) {\n          nodes {\n            id\n            isArchived\n            project { id }\n            fieldValueByName(name: $status) { ... on ProjectV2ItemFieldSingleSelectValue { name } }\n          }\n        }\n      }\n    }\n  }\n}",
+      "query": "query NewIssueContext($owner: String!, $repo: String!, $status: String!, $window: Int!) {\n  repository(owner: $owner, name: $repo) {\n    id\n    labels(first: 100, orderBy: {field: NAME, direction: ASC}) {\n      totalCount\n      pageInfo { hasNextPage endCursor }\n      nodes { id name }\n    }\n    milestones(first: 100, states: OPEN, orderBy: {field: NUMBER, direction: ASC}) {\n      totalCount\n      pageInfo { hasNextPage endCursor }\n      nodes { id title dueOn }\n    }\n    issues(last: $window, states: OPEN, orderBy: {field: CREATED_AT, direction: ASC}) {\n      nodes {\n        id\n        number\n        title\n        body\n        viewerDidAuthor\n        labels(first: 50) { nodes { name } }\n        milestone { title dueOn }\n        projectItems(first: 20) {\n          nodes {\n            id\n            isArchived\n            project { id }\n            fieldValueByName(name: $status) { ... on ProjectV2ItemFieldSingleSelectValue { name } }\n          }\n        }\n      }\n    }\n  }\n}",
       "variables": {
         "owner": "Trum-ok",
         "repo": "gh-dojo",
@@ -76,6 +76,25 @@
                 }
               ]
             },
+            "milestones": {
+              "totalCount": 2,
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": "Y3Vyc29yOnYyOpICzgEopNw="
+              },
+              "nodes": [
+                {
+                  "id": "MI_kwDOVq9iIs4BKI_2",
+                  "title": "v0.0 — самохостинг",
+                  "dueOn": null
+                },
+                {
+                  "id": "MI_kwDOVq9iIs4BKKTc",
+                  "title": "v0.1 — первый публичный релиз",
+                  "dueOn": null
+                }
+              ]
+            },
             "issues": {
               "nodes": [
                 {
@@ -86,6 +105,10 @@
                   "viewerDidAuthor": true,
                   "labels": {
                     "nodes": []
+                  },
+                  "milestone": {
+                    "title": "v0.0 — самохостинг",
+                    "dueOn": null
                   },
                   "projectItems": {
                     "nodes": [
@@ -110,6 +133,10 @@
                   "viewerDidAuthor": true,
                   "labels": {
                     "nodes": []
+                  },
+                  "milestone": {
+                    "title": "v0.0 — самохостинг",
+                    "dueOn": null
                   },
                   "projectItems": {
                     "nodes": [
@@ -134,7 +161,7 @@
     },
     {
       "operation": "CreateIssue",
-      "query": "mutation CreateIssue($repo: ID!, $title: String!, $body: String!, $labels: [ID!]) {\n  createIssue(input: {repositoryId: $repo, title: $title, body: $body, labelIds: $labels}) {\n    issue { id number }\n  }\n}",
+      "query": "mutation CreateIssue($repo: ID!, $title: String!, $body: String!, $labels: [ID!], $milestone: ID) {\n  createIssue(input: {repositoryId: $repo, title: $title, body: $body, labelIds: $labels, milestoneId: $milestone}) {\n    issue { id number }\n  }\n}",
       "variables": {
         "repo": "R_kgDOVq9iIg",
         "title": "Fix login redirect",
@@ -152,7 +179,7 @@
     },
     {
       "operation": "NewIssueContext",
-      "query": "query NewIssueContext($owner: String!, $repo: String!, $status: String!, $window: Int!) {\n  repository(owner: $owner, name: $repo) {\n    id\n    labels(first: 100, orderBy: {field: NAME, direction: ASC}) {\n      totalCount\n      pageInfo { hasNextPage endCursor }\n      nodes { id name }\n    }\n    issues(last: $window, states: OPEN, orderBy: {field: CREATED_AT, direction: ASC}) {\n      nodes {\n        id\n        number\n        title\n        body\n        viewerDidAuthor\n        labels(first: 50) { nodes { name } }\n        projectItems(first: 20) {\n          nodes {\n            id\n            isArchived\n            project { id }\n            fieldValueByName(name: $status) { ... on ProjectV2ItemFieldSingleSelectValue { name } }\n          }\n        }\n      }\n    }\n  }\n}",
+      "query": "query NewIssueContext($owner: String!, $repo: String!, $status: String!, $window: Int!) {\n  repository(owner: $owner, name: $repo) {\n    id\n    labels(first: 100, orderBy: {field: NAME, direction: ASC}) {\n      totalCount\n      pageInfo { hasNextPage endCursor }\n      nodes { id name }\n    }\n    milestones(first: 100, states: OPEN, orderBy: {field: NUMBER, direction: ASC}) {\n      totalCount\n      pageInfo { hasNextPage endCursor }\n      nodes { id title dueOn }\n    }\n    issues(last: $window, states: OPEN, orderBy: {field: CREATED_AT, direction: ASC}) {\n      nodes {\n        id\n        number\n        title\n        body\n        viewerDidAuthor\n        labels(first: 50) { nodes { name } }\n        milestone { title dueOn }\n        projectItems(first: 20) {\n          nodes {\n            id\n            isArchived\n            project { id }\n            fieldValueByName(name: $status) { ... on ProjectV2ItemFieldSingleSelectValue { name } }\n          }\n        }\n      }\n    }\n  }\n}",
       "variables": {
         "owner": "Trum-ok",
         "repo": "gh-dojo",
@@ -224,6 +251,25 @@
                 }
               ]
             },
+            "milestones": {
+              "totalCount": 2,
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": "Y3Vyc29yOnYyOpICzgEopNw="
+              },
+              "nodes": [
+                {
+                  "id": "MI_kwDOVq9iIs4BKI_2",
+                  "title": "v0.0 — самохостинг",
+                  "dueOn": null
+                },
+                {
+                  "id": "MI_kwDOVq9iIs4BKKTc",
+                  "title": "v0.1 — первый публичный релиз",
+                  "dueOn": null
+                }
+              ]
+            },
             "issues": {
               "nodes": [
                 {
@@ -234,6 +280,10 @@
                   "viewerDidAuthor": true,
                   "labels": {
                     "nodes": []
+                  },
+                  "milestone": {
+                    "title": "v0.0 — самохостинг",
+                    "dueOn": null
                   },
                   "projectItems": {
                     "nodes": [
@@ -258,6 +308,10 @@
                   "viewerDidAuthor": true,
                   "labels": {
                     "nodes": []
+                  },
+                  "milestone": {
+                    "title": "v0.0 — самохостинг",
+                    "dueOn": null
                   },
                   "projectItems": {
                     "nodes": [

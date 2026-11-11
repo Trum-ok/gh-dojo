@@ -172,7 +172,7 @@ is read again before that is an error.
 ### new
 
 ```sh
-gh dojo new <title> [--type T] [--area A]... [--label L]... [--blocked-by N]... [--body TEXT | --body-file FILE]
+gh dojo new <title> [--type T] [--area A]... [--label L]... [--milestone M] [--blocked-by N]... [--body TEXT | --body-file FILE]
 ```
 
 Creates an issue, labels it, adds it to the board and sets the initial status
@@ -180,11 +180,14 @@ Creates an issue, labels it, adds it to the board and sets the initial status
 [`labels.types`](#labels) (or any repo label outside the areas when that list
 is empty), `--area cli` adds the label `<labels.area_prefix>cli`, `--label`
 adds any existing label. An unknown label fails before anything is created,
-listing the allowed values. `--blocked-by 17` marks the new issue blocked by
+listing the allowed values. `--milestone v1.2` puts the issue in the open
+milestone titled `v1.2` (ignoring case); an unknown one fails the same way,
+listing the open milestones. `--blocked-by 17` marks the new issue blocked by
 #17 (repeatable, or comma-separated; `owner/repo#17` for another
 repository); an issue that does not exist fails before anything is created
 (exit code 3). `--body-file -` reads the body from stdin. A title starting
-with `-` goes after `--`: `gh dojo new -- "-v is ignored"`.
+with `-` goes after `--`, and every flag before the `--`, since anything after
+it is taken as the title: `gh dojo new --type bug -- "-v is ignored"`.
 
 ```console
 $ gh dojo new "Fix login redirect" --type bug --area cli
@@ -193,8 +196,9 @@ $ gh dojo new "Fix login redirect" --type bug --area cli
 
 A repeat is safe: the body ends with a hidden marker of the title, and a run
 that finds it on one of the repository's 20 newest open issues written by
-you finishes that issue (labels, board, status, blocked-by links) instead of
-creating another.
+you finishes that issue (labels, milestone, board, status, blocked-by links)
+instead of creating another; a different milestone it already has is kept,
+with a warning.
 If a run fails after creating the issue, it exits with code 5: run the same
 command again.
 
@@ -206,7 +210,8 @@ gh dojo comment <N> [text] [--body-file FILE]
 
 Comments on an issue without changing its status. The text comes from the
 second argument or from `--body-file` (`-` reads stdin), exactly one of them.
-Text starting with `-` goes after `--`: `gh dojo comment 42 -- "-1, still broken"`.
+Text starting with `-` goes after `--`, and every flag before the `--`:
+`gh dojo comment 42 --json -- "-1, still broken"`.
 When the issue's last comment is yours with the same text, it is not posted
 again.
 
@@ -553,7 +558,7 @@ The schemas, by command:
 | card | `number`, `repo`, `url`, `title`, `state` (`open`/`closed`), `state_reason` (`completed`, `not_planned`, `duplicate`, `reopened` or `""`), `author`, `created_at`, `closed_at`, `incomplete` (GitHub withheld part of it); `board`: `{on_board, unknown_reason, status, status_unknown, archived, fields: [{name, value}], fields_truncated}`; `sprint`: `null` without `fields.sprint`, else `{field, iteration: {title, start_date, end_date, duration_days} or null, unknown_reason}`; `milestone`: `{title, due_on}` or `null`; `labels`, `assignees` with `labels_total`, `assignees_total`; `blocked_by`, `blocking`: `[{ref, repo, number, title, state, on_board, status, archived, status_unknown_reason, resolved}]` with `blocked_by_total`, `blocking_total`, `unresolved_blockers`; `history`: `[{at, from, to, actor, automated}]` with `history_truncated`, `history_untracked`; `body`: `{text, cut, length}`; `comments`: `[{author, created_at, text, cut, length}]` with `comments_total` |
 | `list` | `sprint` (the `--sprint` iteration or `null`), `issues`: `[{repo, number, title, state, status, labels, labels_total, assignees, assignees_total}]` in the printed order, cut to `--limit`; `matched` (before `--limit`), `unchecked`, `hidden`, `filtered`, `skipped`: `{draft_issues, pull_requests, unseen}`, `incomplete` |
 | verbs | `verb`, `dry_run`, `issues`: `[{number, title, outcome, planned, applied, in_place, needs_yes, warnings, error}]` in argument order, `summary`: `{total, done, written, failed, not_attempted}` |
-| `new` | `number`, `repo`, `title`, `created` (`false`: resumed), `labels`, `status`, `status_set`, `unarchived`, `blocked_by`, `already_blocked_by`, `error` |
+| `new` | `number`, `repo`, `title`, `created` (`false`: resumed), `labels`, `status`, `status_set`, `unarchived`, `milestone` (`{title, due_on}` or `null`), `milestone_set`, `blocked_by`, `already_blocked_by`, `error` |
 | `comment` | `number`, `repo`, `posted` (`false`: already the last comment) |
 | `block`, `unblock` | `number`, `repo`, `action`, `changed`, `unchanged`, `missed`, `error` |
 | `describe` | `config`, `preset`, `board`, `repos`, `verbs`: `[{name, when, from, to, requires, requires_one_of, optional, batch, checks, effects}]`, `statuses`: `{initial, final, resolved}`, `exit_codes`: `[{code, meaning, next}]` |
