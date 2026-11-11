@@ -4,15 +4,20 @@ The change is released
 
   From:      Ready, In progress
   To:        Done; an issue already there keeps it, so a repeat is safe
-  Requires:  nothing besides the issue number
+  Requires:  nothing besides the issue numbers
   Optional:  --comment
+  Batch:     several numbers at once: gh dojo done 12 13 14; each issue is applied
+             on its own, a failed one is skipped, and a summary ends the run:
+             "3 of 4 applied; #17: <reason>"; a re-run skips what is done
+             exit code: 0 all done; 5 some applied and a re-run may finish the rest;
+             else the failures' code, 2 first, then 1, 3, 4
   Board:     adds the issue if it is not there
   Close:     closes the issue as completed; an issue already closed stays as it is
   Comment:   posted unless it renders empty or is already the latest gh-dojo comment:
                {comment}
 
 Usage:
-  gh dojo done <N> [flags]
+  gh dojo done <N>... [flags]
 
 Flags:
       --comment string   text for {comment} in the comment

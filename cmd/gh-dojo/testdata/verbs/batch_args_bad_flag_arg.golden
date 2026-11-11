@@ -1,0 +1,6 @@
+code: 1
+--- stdout
+--- stderr
+error: done does not use --by
+allowed: --comment
+fix: gh dojo done 1

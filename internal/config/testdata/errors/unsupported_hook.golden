@@ -1,2 +1,2 @@
 error: .github/dojo.toml: verbs.start.pre is not supported in this version
-allowed: when, to, from, require, require_one_of, comment, labels, assign, close, reopen, confirm, iteration, field, blockers, disabled
+allowed: when, to, from, require, require_one_of, comment, labels, assign, close, reopen, confirm, iteration, field, blockers, batch, disabled

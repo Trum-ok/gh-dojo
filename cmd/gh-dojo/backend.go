@@ -25,36 +25,102 @@ import (
 // effects.Batches). The label and user IDs of the labels and assign
 // effects, and the issue --by names for blockers = "link", come with the
 // card's query (issue.Lookup); only a label to add or a user that does not
-// exist costs one more read, for the error's allowed list.
+// exist costs one more read, for the error's allowed list. ReadIssues
+// sends one query per issue.MaxBatch issues, with the lookups once in
+// each.
 type githubBackend struct {
 	app   *App
 	added map[int]string // issue number → board item added in this run
 }
 
 func (b *githubBackend) ReadIssue(ctx context.Context, v config.Verb, n int, a workflow.Args) (workflow.Issue, error) {
-	lookup := verbLookup(v)
-	if v.Blockers == config.BlockersLink && a.HasBy {
-		repo, err := b.app.Repo()
-		if err != nil {
-			return workflow.Issue{}, err
-		}
-		refs, err := byRefs(v, a.By, repo, n)
-		if err != nil {
-			return workflow.Issue{}, err
-		}
-		lookup.Links = issue.Links(refs)
-	}
-	card, err := b.app.LookupCard(ctx, n, lookup)
+	res, err := b.ReadIssues(ctx, v, []int{n}, a)
 	if err != nil {
 		return workflow.Issue{}, err
 	}
+	return res[0].Issue, res[0].Err
+}
+
+// ReadIssues reads the cards of ns with the lookups of v once per request
+// (see issue.ReadAll): for one number, the request ReadIssue sends.
+func (b *githubBackend) ReadIssues(ctx context.Context, v config.Verb, ns []int, a workflow.Args) ([]IssueRead, error) {
+	lookup := verbLookup(v)
+	var refs []issue.Ref // the issues --by names, for blockers = "link"
+	var repo issue.Repo
+	if v.Blockers == config.BlockersLink && a.HasBy {
+		var err error
+		if repo, err = b.app.Repo(); err != nil {
+			return nil, err
+		}
+		if refs, err = byRefs(v, a.By, repo, 0); err != nil {
+			return nil, err
+		}
+		lookup.Links = issue.Links(refs)
+	}
+	out := make([]IssueRead, len(ns))
+	var read []int
+	for i, n := range ns {
+		out[i].Number = n
+		if slices.ContainsFunc(refs, func(r issue.Ref) bool { return r.Same(issue.Ref{Repo: repo, Number: n}) }) {
+			out[i].Err = selfBlock(n, v.Name+" --by")
+			continue
+		}
+		read = append(read, n)
+	}
+	if len(read) == 0 {
+		return out, nil
+	}
+	results, err := b.app.cards(ctx, read, 0, lookup)
+	if err != nil && len(results) == 0 {
+		return nil, err
+	}
+	byNumber := make(map[int]issue.Result, len(results))
+	for _, r := range results {
+		byNumber[r.Number] = r
+	}
+	for i := range out {
+		r := &out[i]
+		if r.Err != nil {
+			continue
+		}
+		res, ok := byNumber[r.Number]
+		switch {
+		case !ok && err != nil:
+			r.Err = err // not read: a later request failed
+			continue
+		case !ok:
+			r.Err = render.Internal("#%d was not read", r.Number)
+			continue
+		case res.Err != nil:
+			r.Err = res.Err
+			continue
+		}
+		is, failed, err := b.workflowIssue(ctx, v, lookup, res.Card)
+		if err != nil {
+			return nil, err
+		}
+		r.Issue, r.Err = is, failed
+	}
+	return out, nil
+}
+
+// workflowIssue turns a card read with lookup into the state v plans
+// with. failed fails this issue alone: its board place could not be read,
+// a label to remove is spelled another way on it, or an issue --by names
+// is this one or blocked by it. err fails every issue: what v needs is
+// missing for all of them (a label to add, the assignee, a --by issue),
+// or the config or the board schema is wrong.
+func (b *githubBackend) workflowIssue(ctx context.Context, v config.Verb, lookup issue.Lookup, card *issue.Card) (is workflow.Issue, failed, err error) {
 	if err := statusUnknown(card); err != nil {
-		return workflow.Issue{}, err
+		return workflow.Issue{}, err, nil
 	}
 	if err := b.checkFound(ctx, v, lookup, card); err != nil {
-		return workflow.Issue{}, err
+		if lookupMissing(v, lookup, card.Found) {
+			return workflow.Issue{}, nil, err
+		}
+		return workflow.Issue{}, err, nil
 	}
-	is := workflowIssue(card)
+	is = workflowIssue(card)
 	if card.Found != nil {
 		for _, name := range v.RemoveLabels {
 			if card.Found.Labels[name] == "" {
@@ -63,27 +129,39 @@ func (b *githubBackend) ReadIssue(ctx context.Context, v config.Verb, n int, a w
 		}
 	}
 	if err := b.fieldState(ctx, v, card, &is); err != nil {
-		return workflow.Issue{}, err
+		return workflow.Issue{}, nil, err
 	}
 	if v.ChecksBlockers() {
 		cfg, err := b.app.Config()
 		if err != nil {
-			return workflow.Issue{}, err
+			return workflow.Issue{}, nil, err
 		}
 		is.Unresolved, is.UnreadBlockers = unresolvedBlockers(card, cfg.Statuses.Resolved)
 	}
 	if len(lookup.Links) > 0 {
-		if is.ByIssues, err = byIssues(v, card); err != nil {
-			return workflow.Issue{}, err
+		if is.ByIssues, failed, err = byIssues(v, card); failed != nil || err != nil {
+			return workflow.Issue{}, failed, err
 		}
 	}
-	return is, nil
+	return is, nil, nil
+}
+
+// lookupMissing reports whether a lookup of v found nothing for every
+// issue alike: a label to add, the user to assign or the viewer is
+// missing. checkFound refuses the verb then, whatever the issue.
+func lookupMissing(v config.Verb, l issue.Lookup, f *issue.Found) bool {
+	if f == nil {
+		f = &issue.Found{}
+	}
+	return slices.ContainsFunc(v.AddLabels, func(name string) bool { return f.Labels[name] == "" }) ||
+		l.User != "" && f.User == nil || l.Viewer && f.Viewer == nil
 }
 
 // byRefs parses --by of a verb with blockers = "link" for issue n: issues
 // to link (see splitRefs), or none for free text, which only fills the
 // comment. Issues and text mixed are exit code 1: linking some and not
-// others would be a guess.
+// others would be a guess. n is 0 for a batch, which checks each issue
+// against the refs itself.
 func byRefs(v config.Verb, by string, def issue.Repo, n int) ([]issue.Ref, error) {
 	refs, text := splitRefs([]string{by}, def)
 	switch {
@@ -103,15 +181,17 @@ func byRefs(v config.Verb, by string, def issue.Repo, n int) ([]issue.Ref, error
 }
 
 // byIssues are the issues --by names as read with the card (Lookup.Links):
-// a missing one is exit code 3, one that would close a cycle exit code 1;
-// a pull request is kept, to be named in the comment but not linked.
-func byIssues(v config.Verb, card *issue.Card) ([]workflow.ByIssue, error) {
+// a missing one is exit code 3 (err, the same for every issue), one that
+// is the card's issue or would close a cycle exit code 1 (failed, this
+// issue's alone); a pull request is kept, to be named in the comment but
+// not linked.
+func byIssues(v config.Verb, card *issue.Card) (out []workflow.ByIssue, failed, err error) {
 	var links []*issue.Linked
 	if card.Found != nil {
 		links = card.Found.Links
 	}
 	if len(links) == 0 {
-		return nil, render.Internal("the issues --by names were not read")
+		return nil, nil, render.Internal("the issues --by names were not read")
 	}
 	var issues []*issue.Linked // the pull requests are not linked, so not an error
 	for _, l := range links {
@@ -120,9 +200,9 @@ func byIssues(v config.Verb, card *issue.Card) ([]workflow.ByIssue, error) {
 		}
 	}
 	if err := issue.LinksError("--by", issues, card.Repo); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	out := make([]workflow.ByIssue, 0, len(links))
+	out = make([]workflow.ByIssue, 0, len(links))
 	for _, l := range links {
 		ref := l.Ref.String(card.Repo)
 		switch {
@@ -130,13 +210,13 @@ func byIssues(v config.Verb, card *issue.Card) ([]workflow.ByIssue, error) {
 			out = append(out, workflow.ByIssue{Ref: ref, PullRequest: true})
 			continue
 		case l.ID == card.ID:
-			return nil, selfBlock(card.Number, v.Name+" --by")
+			return nil, selfBlock(card.Number, v.Name+" --by"), nil
 		case l.BlockedBy(card.ID):
-			return nil, cycleError(card.Number, ref, v.Name+" --by")
+			return nil, cycleError(card.Number, ref, v.Name+" --by"), nil
 		}
 		out = append(out, workflow.ByIssue{Ref: ref, Blocks: l.Blocks(card.ID)})
 	}
-	return out, nil
+	return out, nil, nil
 }
 
 // selfBlock is the error for an issue named as its own blocker by flag.

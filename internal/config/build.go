@@ -339,6 +339,7 @@ func (c *Config) buildEffects(name string, r *rawVerb, v *Verb) error {
 		}
 	}
 	v.Reopen = deref(r.Reopen)
+	v.Batch = deref(r.Batch)
 	if v.Close != "" && v.Reopen {
 		return c.Errorf("verbs.%s sets both close and reopen; keep one", name)
 	}

@@ -1,0 +1,6 @@
+code: 0
+--- stdout
+#3 Ready → Done, closed as completed
+#7 Ready → Done, closed as completed
+2 of 2 applied
+--- stderr

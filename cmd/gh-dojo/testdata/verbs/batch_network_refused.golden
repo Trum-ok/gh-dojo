@@ -1,0 +1,7 @@
+code: 5
+--- stdout
+#1 Ready → Done, closed as completed
+--- stderr
+error: 1 of 3 applied; #2: GitHub is unavailable (HTTP 502); #3: done cannot move #3 from Backlog
+re-run the same command: it skips the issues done and finishes the rest
+fix: gh auth status

@@ -1,0 +1,6 @@
+code: 1
+--- stdout
+--- stderr
+error: start takes one issue number, got 2; several at once need batch = true in verbs.start
+verbs that take several: done
+fix: run gh dojo start once per issue

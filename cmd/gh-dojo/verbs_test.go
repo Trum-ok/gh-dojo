@@ -80,14 +80,20 @@ func withSession(t *testing.T, id string) {
 
 // fakeBackend serves issues from memory and records what it applies.
 type fakeBackend struct {
-	issues   map[int]workflow.Issue
-	applyErr error
-	reads    int
-	applied  []*workflow.Plan
+	issues    map[int]workflow.Issue
+	applyErr  error
+	applyErrs map[int]error // by issue number, for batches
+	confirmed map[int]int   // with applyErrs: how many ops GitHub confirmed first
+	reads     int           // ReadIssue and ReadIssues calls
+	applied   []*workflow.Plan
 }
 
 func (f *fakeBackend) ReadIssue(_ context.Context, _ config.Verb, n int, _ workflow.Args) (workflow.Issue, error) {
 	f.reads++
+	return f.issue(n)
+}
+
+func (f *fakeBackend) issue(n int) (workflow.Issue, error) {
 	is, ok := f.issues[n]
 	if !ok {
 		return workflow.Issue{}, render.NotFound("issue #%d not found in acme/shop", n)
@@ -95,7 +101,20 @@ func (f *fakeBackend) ReadIssue(_ context.Context, _ config.Verb, n int, _ workf
 	return is, nil
 }
 
+func (f *fakeBackend) ReadIssues(_ context.Context, _ config.Verb, ns []int, _ workflow.Args) ([]IssueRead, error) {
+	f.reads++
+	out := make([]IssueRead, len(ns))
+	for i, n := range ns {
+		out[i].Number = n
+		out[i].Issue, out[i].Err = f.issue(n)
+	}
+	return out, nil
+}
+
 func (f *fakeBackend) Apply(_ context.Context, p *workflow.Plan) ([]workflow.Op, error) {
+	if err := f.applyErrs[p.Issue.Number]; err != nil {
+		return p.Ops[:min(f.confirmed[p.Issue.Number], len(p.Ops))], err
+	}
 	if f.applyErr != nil {
 		return nil, f.applyErr
 	}

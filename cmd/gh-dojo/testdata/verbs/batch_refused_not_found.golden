@@ -1,0 +1,6 @@
+code: 2
+--- stdout
+#1 Done (unchanged), already closed
+--- stderr
+error: 1 of 3 applied; #2: done cannot move #2 from Backlog; #9: issue #9 not found in acme/shop
+this is a process rule: ask the user how to proceed

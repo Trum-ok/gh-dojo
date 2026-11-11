@@ -1,0 +1,2222 @@
+{
+  "comment": "Hand-crafted from internal/issue/testdata/graphql/card_3.json (recorded), its card copied for the other numbers; mutations are never recorded. gh dojo done 101..121: 21 issues done already, read in two requests (20, then 1); nothing is written.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "IssueCards",
+      "query": "query IssueCards($owner: String!, $repo: String!, $comments: Int!, $status: String!, $n0: Int!, $n1: Int!, $n2: Int!, $n3: Int!, $n4: Int!, $n5: Int!, $n6: Int!, $n7: Int!, $n8: Int!, $n9: Int!, $n10: Int!, $n11: Int!, $n12: Int!, $n13: Int!, $n14: Int!, $n15: Int!, $n16: Int!, $n17: Int!, $n18: Int!, $n19: Int!) {\n  repository(owner: $owner, name: $repo) {\n    i0: issueOrPullRequest(number: $n0) { ...card }\n    i1: issueOrPullRequest(number: $n1) { ...card }\n    i2: issueOrPullRequest(number: $n2) { ...card }\n    i3: issueOrPullRequest(number: $n3) { ...card }\n    i4: issueOrPullRequest(number: $n4) { ...card }\n    i5: issueOrPullRequest(number: $n5) { ...card }\n    i6: issueOrPullRequest(number: $n6) { ...card }\n    i7: issueOrPullRequest(number: $n7) { ...card }\n    i8: issueOrPullRequest(number: $n8) { ...card }\n    i9: issueOrPullRequest(number: $n9) { ...card }\n    i10: issueOrPullRequest(number: $n10) { ...card }\n    i11: issueOrPullRequest(number: $n11) { ...card }\n    i12: issueOrPullRequest(number: $n12) { ...card }\n    i13: issueOrPullRequest(number: $n13) { ...card }\n    i14: issueOrPullRequest(number: $n14) { ...card }\n    i15: issueOrPullRequest(number: $n15) { ...card }\n    i16: issueOrPullRequest(number: $n16) { ...card }\n    i17: issueOrPullRequest(number: $n17) { ...card }\n    i18: issueOrPullRequest(number: $n18) { ...card }\n    i19: issueOrPullRequest(number: $n19) { ...card }\n  }\n}\n\nfragment card on IssueOrPullRequest {\n      __typename\n      ... on Issue {\n        id\n        number\n        title\n        state\n        stateReason(enableDuplicate: true)\n        url\n        createdAt\n        closedAt\n        author { login }\n        body\n        milestone { title dueOn }\n        labels(first: 20) { totalCount nodes { name } }\n        assignees(first: 10) { totalCount nodes { login } }\n        comments(last: $comments) {\n          totalCount\n          nodes { id author { login } createdAt viewerDidAuthor body }\n        }\n        blockedBy(first: 20) { totalCount nodes { ...link } }\n        blocking(first: 20) { totalCount nodes { ...link } }\n        projectItems(first: 20) {\n          totalCount\n          nodes {\n            id\n            isArchived\n            createdAt\n            project { id }\n            status: fieldValueByName(name: $status) { ...value }\n            fieldValues(first: 100) { totalCount nodes { ...value } }\n          }\n        }\n        timelineItems(last: 20, itemTypes: [PROJECT_V2_ITEM_STATUS_CHANGED_EVENT]) {\n          totalCount\n          nodes {\n            ... on ProjectV2ItemStatusChangedEvent {\n              createdAt\n              previousStatus\n              status\n              wasAutomated\n              actor { login }\n              project { id }\n            }\n          }\n        }\n      }\n    }\n\nfragment link on Issue {\n  number\n  title\n  state\n  repository { nameWithOwner }\n  projectItems(first: 10) {\n    totalCount\n    nodes {\n      isArchived\n      project { id }\n      status: fieldValueByName(name: $status) {\n        ... on ProjectV2ItemFieldSingleSelectValue { name field { ... on ProjectV2FieldCommon { id } } }\n      }\n    }\n  }\n}\n\nfragment value on ProjectV2ItemFieldValue {\n  __typename\n  ... on ProjectV2ItemFieldSingleSelectValue { name optionId field { ...field } }\n  ... on ProjectV2ItemFieldIterationValue { title iterationId startDate duration field { ...field } }\n  ... on ProjectV2ItemFieldTextValue { text field { ...field } }\n  ... on ProjectV2ItemFieldNumberValue { number field { ...field } }\n  ... on ProjectV2ItemFieldDateValue { date field { ...field } }\n}\n\nfragment field on ProjectV2FieldCommon { id name dataType }",
+      "variables": {
+        "comments": 20,
+        "owner": "Trum-ok",
+        "repo": "gh-dojo",
+        "status": "Status",
+        "n0": 101,
+        "n1": 102,
+        "n2": 103,
+        "n3": 104,
+        "n4": 105,
+        "n5": 106,
+        "n6": 107,
+        "n7": 108,
+        "n8": 109,
+        "n9": 110,
+        "n10": 111,
+        "n11": 112,
+        "n12": 113,
+        "n13": 114,
+        "n14": 115,
+        "n15": 116,
+        "n16": 117,
+        "n17": 118,
+        "n18": 119,
+        "n19": 120
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "i0": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8Batch00101",
+              "number": 101,
+              "title": "Issue 101",
+              "state": "CLOSED",
+              "stateReason": "COMPLETED",
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/101",
+              "createdAt": "2026-11-11T18:19:10Z",
+              "closedAt": "2026-11-11T20:00:00Z",
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body of issue 101.",
+              "milestone": null,
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFBatch00101",
+                    "isArchived": false,
+                    "createdAt": "2026-11-11T18:19:12Z",
+                    "project": {
+                      "id": "PVT_kwHOBFGd5c4BrMYF"
+                    },
+                    "status": {
+                      "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                      "name": "Done",
+                      "optionId": "98236657",
+                      "field": {
+                        "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                        "name": "Status",
+                        "dataType": "SINGLE_SELECT"
+                      }
+                    },
+                    "fieldValues": {
+                      "totalCount": 5,
+                      "nodes": [
+                        {
+                          "__typename": "ProjectV2ItemFieldRepositoryValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldMilestoneValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldTextValue",
+                          "text": "Issue 101",
+                          "field": {
+                            "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzI",
+                            "name": "Title",
+                            "dataType": "TITLE"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "Done",
+                          "optionId": "98236657",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                            "name": "Status",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "M",
+                          "optionId": "7515a9f1",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
+                            "name": "Size",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i1": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8Batch00102",
+              "number": 102,
+              "title": "Issue 102",
+              "state": "CLOSED",
+              "stateReason": "COMPLETED",
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/102",
+              "createdAt": "2026-11-11T18:19:10Z",
+              "closedAt": "2026-11-11T20:00:00Z",
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body of issue 102.",
+              "milestone": null,
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFBatch00102",
+                    "isArchived": false,
+                    "createdAt": "2026-11-11T18:19:12Z",
+                    "project": {
+                      "id": "PVT_kwHOBFGd5c4BrMYF"
+                    },
+                    "status": {
+                      "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                      "name": "Done",
+                      "optionId": "98236657",
+                      "field": {
+                        "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                        "name": "Status",
+                        "dataType": "SINGLE_SELECT"
+                      }
+                    },
+                    "fieldValues": {
+                      "totalCount": 5,
+                      "nodes": [
+                        {
+                          "__typename": "ProjectV2ItemFieldRepositoryValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldMilestoneValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldTextValue",
+                          "text": "Issue 102",
+                          "field": {
+                            "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzI",
+                            "name": "Title",
+                            "dataType": "TITLE"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "Done",
+                          "optionId": "98236657",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                            "name": "Status",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "M",
+                          "optionId": "7515a9f1",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
+                            "name": "Size",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i2": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8Batch00103",
+              "number": 103,
+              "title": "Issue 103",
+              "state": "CLOSED",
+              "stateReason": "COMPLETED",
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/103",
+              "createdAt": "2026-11-11T18:19:10Z",
+              "closedAt": "2026-11-11T20:00:00Z",
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body of issue 103.",
+              "milestone": null,
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFBatch00103",
+                    "isArchived": false,
+                    "createdAt": "2026-11-11T18:19:12Z",
+                    "project": {
+                      "id": "PVT_kwHOBFGd5c4BrMYF"
+                    },
+                    "status": {
+                      "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                      "name": "Done",
+                      "optionId": "98236657",
+                      "field": {
+                        "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                        "name": "Status",
+                        "dataType": "SINGLE_SELECT"
+                      }
+                    },
+                    "fieldValues": {
+                      "totalCount": 5,
+                      "nodes": [
+                        {
+                          "__typename": "ProjectV2ItemFieldRepositoryValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldMilestoneValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldTextValue",
+                          "text": "Issue 103",
+                          "field": {
+                            "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzI",
+                            "name": "Title",
+                            "dataType": "TITLE"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "Done",
+                          "optionId": "98236657",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                            "name": "Status",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "M",
+                          "optionId": "7515a9f1",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
+                            "name": "Size",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i3": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8Batch00104",
+              "number": 104,
+              "title": "Issue 104",
+              "state": "CLOSED",
+              "stateReason": "COMPLETED",
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/104",
+              "createdAt": "2026-11-11T18:19:10Z",
+              "closedAt": "2026-11-11T20:00:00Z",
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body of issue 104.",
+              "milestone": null,
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFBatch00104",
+                    "isArchived": false,
+                    "createdAt": "2026-11-11T18:19:12Z",
+                    "project": {
+                      "id": "PVT_kwHOBFGd5c4BrMYF"
+                    },
+                    "status": {
+                      "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                      "name": "Done",
+                      "optionId": "98236657",
+                      "field": {
+                        "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                        "name": "Status",
+                        "dataType": "SINGLE_SELECT"
+                      }
+                    },
+                    "fieldValues": {
+                      "totalCount": 5,
+                      "nodes": [
+                        {
+                          "__typename": "ProjectV2ItemFieldRepositoryValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldMilestoneValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldTextValue",
+                          "text": "Issue 104",
+                          "field": {
+                            "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzI",
+                            "name": "Title",
+                            "dataType": "TITLE"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "Done",
+                          "optionId": "98236657",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                            "name": "Status",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "M",
+                          "optionId": "7515a9f1",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
+                            "name": "Size",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i4": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8Batch00105",
+              "number": 105,
+              "title": "Issue 105",
+              "state": "CLOSED",
+              "stateReason": "COMPLETED",
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/105",
+              "createdAt": "2026-11-11T18:19:10Z",
+              "closedAt": "2026-11-11T20:00:00Z",
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body of issue 105.",
+              "milestone": null,
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFBatch00105",
+                    "isArchived": false,
+                    "createdAt": "2026-11-11T18:19:12Z",
+                    "project": {
+                      "id": "PVT_kwHOBFGd5c4BrMYF"
+                    },
+                    "status": {
+                      "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                      "name": "Done",
+                      "optionId": "98236657",
+                      "field": {
+                        "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                        "name": "Status",
+                        "dataType": "SINGLE_SELECT"
+                      }
+                    },
+                    "fieldValues": {
+                      "totalCount": 5,
+                      "nodes": [
+                        {
+                          "__typename": "ProjectV2ItemFieldRepositoryValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldMilestoneValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldTextValue",
+                          "text": "Issue 105",
+                          "field": {
+                            "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzI",
+                            "name": "Title",
+                            "dataType": "TITLE"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "Done",
+                          "optionId": "98236657",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                            "name": "Status",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "M",
+                          "optionId": "7515a9f1",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
+                            "name": "Size",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i5": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8Batch00106",
+              "number": 106,
+              "title": "Issue 106",
+              "state": "CLOSED",
+              "stateReason": "COMPLETED",
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/106",
+              "createdAt": "2026-11-11T18:19:10Z",
+              "closedAt": "2026-11-11T20:00:00Z",
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body of issue 106.",
+              "milestone": null,
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFBatch00106",
+                    "isArchived": false,
+                    "createdAt": "2026-11-11T18:19:12Z",
+                    "project": {
+                      "id": "PVT_kwHOBFGd5c4BrMYF"
+                    },
+                    "status": {
+                      "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                      "name": "Done",
+                      "optionId": "98236657",
+                      "field": {
+                        "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                        "name": "Status",
+                        "dataType": "SINGLE_SELECT"
+                      }
+                    },
+                    "fieldValues": {
+                      "totalCount": 5,
+                      "nodes": [
+                        {
+                          "__typename": "ProjectV2ItemFieldRepositoryValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldMilestoneValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldTextValue",
+                          "text": "Issue 106",
+                          "field": {
+                            "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzI",
+                            "name": "Title",
+                            "dataType": "TITLE"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "Done",
+                          "optionId": "98236657",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                            "name": "Status",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "M",
+                          "optionId": "7515a9f1",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
+                            "name": "Size",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i6": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8Batch00107",
+              "number": 107,
+              "title": "Issue 107",
+              "state": "CLOSED",
+              "stateReason": "COMPLETED",
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/107",
+              "createdAt": "2026-11-11T18:19:10Z",
+              "closedAt": "2026-11-11T20:00:00Z",
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body of issue 107.",
+              "milestone": null,
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFBatch00107",
+                    "isArchived": false,
+                    "createdAt": "2026-11-11T18:19:12Z",
+                    "project": {
+                      "id": "PVT_kwHOBFGd5c4BrMYF"
+                    },
+                    "status": {
+                      "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                      "name": "Done",
+                      "optionId": "98236657",
+                      "field": {
+                        "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                        "name": "Status",
+                        "dataType": "SINGLE_SELECT"
+                      }
+                    },
+                    "fieldValues": {
+                      "totalCount": 5,
+                      "nodes": [
+                        {
+                          "__typename": "ProjectV2ItemFieldRepositoryValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldMilestoneValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldTextValue",
+                          "text": "Issue 107",
+                          "field": {
+                            "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzI",
+                            "name": "Title",
+                            "dataType": "TITLE"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "Done",
+                          "optionId": "98236657",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                            "name": "Status",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "M",
+                          "optionId": "7515a9f1",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
+                            "name": "Size",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i7": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8Batch00108",
+              "number": 108,
+              "title": "Issue 108",
+              "state": "CLOSED",
+              "stateReason": "COMPLETED",
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/108",
+              "createdAt": "2026-11-11T18:19:10Z",
+              "closedAt": "2026-11-11T20:00:00Z",
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body of issue 108.",
+              "milestone": null,
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFBatch00108",
+                    "isArchived": false,
+                    "createdAt": "2026-11-11T18:19:12Z",
+                    "project": {
+                      "id": "PVT_kwHOBFGd5c4BrMYF"
+                    },
+                    "status": {
+                      "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                      "name": "Done",
+                      "optionId": "98236657",
+                      "field": {
+                        "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                        "name": "Status",
+                        "dataType": "SINGLE_SELECT"
+                      }
+                    },
+                    "fieldValues": {
+                      "totalCount": 5,
+                      "nodes": [
+                        {
+                          "__typename": "ProjectV2ItemFieldRepositoryValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldMilestoneValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldTextValue",
+                          "text": "Issue 108",
+                          "field": {
+                            "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzI",
+                            "name": "Title",
+                            "dataType": "TITLE"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "Done",
+                          "optionId": "98236657",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                            "name": "Status",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "M",
+                          "optionId": "7515a9f1",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
+                            "name": "Size",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i8": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8Batch00109",
+              "number": 109,
+              "title": "Issue 109",
+              "state": "CLOSED",
+              "stateReason": "COMPLETED",
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/109",
+              "createdAt": "2026-11-11T18:19:10Z",
+              "closedAt": "2026-11-11T20:00:00Z",
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body of issue 109.",
+              "milestone": null,
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFBatch00109",
+                    "isArchived": false,
+                    "createdAt": "2026-11-11T18:19:12Z",
+                    "project": {
+                      "id": "PVT_kwHOBFGd5c4BrMYF"
+                    },
+                    "status": {
+                      "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                      "name": "Done",
+                      "optionId": "98236657",
+                      "field": {
+                        "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                        "name": "Status",
+                        "dataType": "SINGLE_SELECT"
+                      }
+                    },
+                    "fieldValues": {
+                      "totalCount": 5,
+                      "nodes": [
+                        {
+                          "__typename": "ProjectV2ItemFieldRepositoryValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldMilestoneValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldTextValue",
+                          "text": "Issue 109",
+                          "field": {
+                            "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzI",
+                            "name": "Title",
+                            "dataType": "TITLE"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "Done",
+                          "optionId": "98236657",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                            "name": "Status",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "M",
+                          "optionId": "7515a9f1",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
+                            "name": "Size",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i9": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8Batch00110",
+              "number": 110,
+              "title": "Issue 110",
+              "state": "CLOSED",
+              "stateReason": "COMPLETED",
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/110",
+              "createdAt": "2026-11-11T18:19:10Z",
+              "closedAt": "2026-11-11T20:00:00Z",
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body of issue 110.",
+              "milestone": null,
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFBatch00110",
+                    "isArchived": false,
+                    "createdAt": "2026-11-11T18:19:12Z",
+                    "project": {
+                      "id": "PVT_kwHOBFGd5c4BrMYF"
+                    },
+                    "status": {
+                      "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                      "name": "Done",
+                      "optionId": "98236657",
+                      "field": {
+                        "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                        "name": "Status",
+                        "dataType": "SINGLE_SELECT"
+                      }
+                    },
+                    "fieldValues": {
+                      "totalCount": 5,
+                      "nodes": [
+                        {
+                          "__typename": "ProjectV2ItemFieldRepositoryValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldMilestoneValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldTextValue",
+                          "text": "Issue 110",
+                          "field": {
+                            "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzI",
+                            "name": "Title",
+                            "dataType": "TITLE"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "Done",
+                          "optionId": "98236657",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                            "name": "Status",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "M",
+                          "optionId": "7515a9f1",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
+                            "name": "Size",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i10": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8Batch00111",
+              "number": 111,
+              "title": "Issue 111",
+              "state": "CLOSED",
+              "stateReason": "COMPLETED",
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/111",
+              "createdAt": "2026-11-11T18:19:10Z",
+              "closedAt": "2026-11-11T20:00:00Z",
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body of issue 111.",
+              "milestone": null,
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFBatch00111",
+                    "isArchived": false,
+                    "createdAt": "2026-11-11T18:19:12Z",
+                    "project": {
+                      "id": "PVT_kwHOBFGd5c4BrMYF"
+                    },
+                    "status": {
+                      "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                      "name": "Done",
+                      "optionId": "98236657",
+                      "field": {
+                        "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                        "name": "Status",
+                        "dataType": "SINGLE_SELECT"
+                      }
+                    },
+                    "fieldValues": {
+                      "totalCount": 5,
+                      "nodes": [
+                        {
+                          "__typename": "ProjectV2ItemFieldRepositoryValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldMilestoneValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldTextValue",
+                          "text": "Issue 111",
+                          "field": {
+                            "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzI",
+                            "name": "Title",
+                            "dataType": "TITLE"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "Done",
+                          "optionId": "98236657",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                            "name": "Status",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "M",
+                          "optionId": "7515a9f1",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
+                            "name": "Size",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i11": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8Batch00112",
+              "number": 112,
+              "title": "Issue 112",
+              "state": "CLOSED",
+              "stateReason": "COMPLETED",
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/112",
+              "createdAt": "2026-11-11T18:19:10Z",
+              "closedAt": "2026-11-11T20:00:00Z",
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body of issue 112.",
+              "milestone": null,
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFBatch00112",
+                    "isArchived": false,
+                    "createdAt": "2026-11-11T18:19:12Z",
+                    "project": {
+                      "id": "PVT_kwHOBFGd5c4BrMYF"
+                    },
+                    "status": {
+                      "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                      "name": "Done",
+                      "optionId": "98236657",
+                      "field": {
+                        "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                        "name": "Status",
+                        "dataType": "SINGLE_SELECT"
+                      }
+                    },
+                    "fieldValues": {
+                      "totalCount": 5,
+                      "nodes": [
+                        {
+                          "__typename": "ProjectV2ItemFieldRepositoryValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldMilestoneValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldTextValue",
+                          "text": "Issue 112",
+                          "field": {
+                            "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzI",
+                            "name": "Title",
+                            "dataType": "TITLE"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "Done",
+                          "optionId": "98236657",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                            "name": "Status",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "M",
+                          "optionId": "7515a9f1",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
+                            "name": "Size",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i12": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8Batch00113",
+              "number": 113,
+              "title": "Issue 113",
+              "state": "CLOSED",
+              "stateReason": "COMPLETED",
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/113",
+              "createdAt": "2026-11-11T18:19:10Z",
+              "closedAt": "2026-11-11T20:00:00Z",
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body of issue 113.",
+              "milestone": null,
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFBatch00113",
+                    "isArchived": false,
+                    "createdAt": "2026-11-11T18:19:12Z",
+                    "project": {
+                      "id": "PVT_kwHOBFGd5c4BrMYF"
+                    },
+                    "status": {
+                      "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                      "name": "Done",
+                      "optionId": "98236657",
+                      "field": {
+                        "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                        "name": "Status",
+                        "dataType": "SINGLE_SELECT"
+                      }
+                    },
+                    "fieldValues": {
+                      "totalCount": 5,
+                      "nodes": [
+                        {
+                          "__typename": "ProjectV2ItemFieldRepositoryValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldMilestoneValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldTextValue",
+                          "text": "Issue 113",
+                          "field": {
+                            "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzI",
+                            "name": "Title",
+                            "dataType": "TITLE"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "Done",
+                          "optionId": "98236657",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                            "name": "Status",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "M",
+                          "optionId": "7515a9f1",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
+                            "name": "Size",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i13": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8Batch00114",
+              "number": 114,
+              "title": "Issue 114",
+              "state": "CLOSED",
+              "stateReason": "COMPLETED",
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/114",
+              "createdAt": "2026-11-11T18:19:10Z",
+              "closedAt": "2026-11-11T20:00:00Z",
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body of issue 114.",
+              "milestone": null,
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFBatch00114",
+                    "isArchived": false,
+                    "createdAt": "2026-11-11T18:19:12Z",
+                    "project": {
+                      "id": "PVT_kwHOBFGd5c4BrMYF"
+                    },
+                    "status": {
+                      "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                      "name": "Done",
+                      "optionId": "98236657",
+                      "field": {
+                        "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                        "name": "Status",
+                        "dataType": "SINGLE_SELECT"
+                      }
+                    },
+                    "fieldValues": {
+                      "totalCount": 5,
+                      "nodes": [
+                        {
+                          "__typename": "ProjectV2ItemFieldRepositoryValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldMilestoneValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldTextValue",
+                          "text": "Issue 114",
+                          "field": {
+                            "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzI",
+                            "name": "Title",
+                            "dataType": "TITLE"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "Done",
+                          "optionId": "98236657",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                            "name": "Status",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "M",
+                          "optionId": "7515a9f1",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
+                            "name": "Size",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i14": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8Batch00115",
+              "number": 115,
+              "title": "Issue 115",
+              "state": "CLOSED",
+              "stateReason": "COMPLETED",
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/115",
+              "createdAt": "2026-11-11T18:19:10Z",
+              "closedAt": "2026-11-11T20:00:00Z",
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body of issue 115.",
+              "milestone": null,
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFBatch00115",
+                    "isArchived": false,
+                    "createdAt": "2026-11-11T18:19:12Z",
+                    "project": {
+                      "id": "PVT_kwHOBFGd5c4BrMYF"
+                    },
+                    "status": {
+                      "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                      "name": "Done",
+                      "optionId": "98236657",
+                      "field": {
+                        "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                        "name": "Status",
+                        "dataType": "SINGLE_SELECT"
+                      }
+                    },
+                    "fieldValues": {
+                      "totalCount": 5,
+                      "nodes": [
+                        {
+                          "__typename": "ProjectV2ItemFieldRepositoryValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldMilestoneValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldTextValue",
+                          "text": "Issue 115",
+                          "field": {
+                            "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzI",
+                            "name": "Title",
+                            "dataType": "TITLE"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "Done",
+                          "optionId": "98236657",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                            "name": "Status",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "M",
+                          "optionId": "7515a9f1",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
+                            "name": "Size",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i15": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8Batch00116",
+              "number": 116,
+              "title": "Issue 116",
+              "state": "CLOSED",
+              "stateReason": "COMPLETED",
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/116",
+              "createdAt": "2026-11-11T18:19:10Z",
+              "closedAt": "2026-11-11T20:00:00Z",
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body of issue 116.",
+              "milestone": null,
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFBatch00116",
+                    "isArchived": false,
+                    "createdAt": "2026-11-11T18:19:12Z",
+                    "project": {
+                      "id": "PVT_kwHOBFGd5c4BrMYF"
+                    },
+                    "status": {
+                      "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                      "name": "Done",
+                      "optionId": "98236657",
+                      "field": {
+                        "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                        "name": "Status",
+                        "dataType": "SINGLE_SELECT"
+                      }
+                    },
+                    "fieldValues": {
+                      "totalCount": 5,
+                      "nodes": [
+                        {
+                          "__typename": "ProjectV2ItemFieldRepositoryValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldMilestoneValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldTextValue",
+                          "text": "Issue 116",
+                          "field": {
+                            "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzI",
+                            "name": "Title",
+                            "dataType": "TITLE"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "Done",
+                          "optionId": "98236657",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                            "name": "Status",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "M",
+                          "optionId": "7515a9f1",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
+                            "name": "Size",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i16": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8Batch00117",
+              "number": 117,
+              "title": "Issue 117",
+              "state": "CLOSED",
+              "stateReason": "COMPLETED",
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/117",
+              "createdAt": "2026-11-11T18:19:10Z",
+              "closedAt": "2026-11-11T20:00:00Z",
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body of issue 117.",
+              "milestone": null,
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFBatch00117",
+                    "isArchived": false,
+                    "createdAt": "2026-11-11T18:19:12Z",
+                    "project": {
+                      "id": "PVT_kwHOBFGd5c4BrMYF"
+                    },
+                    "status": {
+                      "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                      "name": "Done",
+                      "optionId": "98236657",
+                      "field": {
+                        "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                        "name": "Status",
+                        "dataType": "SINGLE_SELECT"
+                      }
+                    },
+                    "fieldValues": {
+                      "totalCount": 5,
+                      "nodes": [
+                        {
+                          "__typename": "ProjectV2ItemFieldRepositoryValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldMilestoneValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldTextValue",
+                          "text": "Issue 117",
+                          "field": {
+                            "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzI",
+                            "name": "Title",
+                            "dataType": "TITLE"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "Done",
+                          "optionId": "98236657",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                            "name": "Status",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "M",
+                          "optionId": "7515a9f1",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
+                            "name": "Size",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i17": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8Batch00118",
+              "number": 118,
+              "title": "Issue 118",
+              "state": "CLOSED",
+              "stateReason": "COMPLETED",
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/118",
+              "createdAt": "2026-11-11T18:19:10Z",
+              "closedAt": "2026-11-11T20:00:00Z",
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body of issue 118.",
+              "milestone": null,
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFBatch00118",
+                    "isArchived": false,
+                    "createdAt": "2026-11-11T18:19:12Z",
+                    "project": {
+                      "id": "PVT_kwHOBFGd5c4BrMYF"
+                    },
+                    "status": {
+                      "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                      "name": "Done",
+                      "optionId": "98236657",
+                      "field": {
+                        "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                        "name": "Status",
+                        "dataType": "SINGLE_SELECT"
+                      }
+                    },
+                    "fieldValues": {
+                      "totalCount": 5,
+                      "nodes": [
+                        {
+                          "__typename": "ProjectV2ItemFieldRepositoryValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldMilestoneValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldTextValue",
+                          "text": "Issue 118",
+                          "field": {
+                            "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzI",
+                            "name": "Title",
+                            "dataType": "TITLE"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "Done",
+                          "optionId": "98236657",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                            "name": "Status",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "M",
+                          "optionId": "7515a9f1",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
+                            "name": "Size",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i18": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8Batch00119",
+              "number": 119,
+              "title": "Issue 119",
+              "state": "CLOSED",
+              "stateReason": "COMPLETED",
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/119",
+              "createdAt": "2026-11-11T18:19:10Z",
+              "closedAt": "2026-11-11T20:00:00Z",
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body of issue 119.",
+              "milestone": null,
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFBatch00119",
+                    "isArchived": false,
+                    "createdAt": "2026-11-11T18:19:12Z",
+                    "project": {
+                      "id": "PVT_kwHOBFGd5c4BrMYF"
+                    },
+                    "status": {
+                      "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                      "name": "Done",
+                      "optionId": "98236657",
+                      "field": {
+                        "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                        "name": "Status",
+                        "dataType": "SINGLE_SELECT"
+                      }
+                    },
+                    "fieldValues": {
+                      "totalCount": 5,
+                      "nodes": [
+                        {
+                          "__typename": "ProjectV2ItemFieldRepositoryValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldMilestoneValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldTextValue",
+                          "text": "Issue 119",
+                          "field": {
+                            "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzI",
+                            "name": "Title",
+                            "dataType": "TITLE"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "Done",
+                          "optionId": "98236657",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                            "name": "Status",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "M",
+                          "optionId": "7515a9f1",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
+                            "name": "Size",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i19": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8Batch00120",
+              "number": 120,
+              "title": "Issue 120",
+              "state": "CLOSED",
+              "stateReason": "COMPLETED",
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/120",
+              "createdAt": "2026-11-11T18:19:10Z",
+              "closedAt": "2026-11-11T20:00:00Z",
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body of issue 120.",
+              "milestone": null,
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFBatch00120",
+                    "isArchived": false,
+                    "createdAt": "2026-11-11T18:19:12Z",
+                    "project": {
+                      "id": "PVT_kwHOBFGd5c4BrMYF"
+                    },
+                    "status": {
+                      "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                      "name": "Done",
+                      "optionId": "98236657",
+                      "field": {
+                        "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                        "name": "Status",
+                        "dataType": "SINGLE_SELECT"
+                      }
+                    },
+                    "fieldValues": {
+                      "totalCount": 5,
+                      "nodes": [
+                        {
+                          "__typename": "ProjectV2ItemFieldRepositoryValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldMilestoneValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldTextValue",
+                          "text": "Issue 120",
+                          "field": {
+                            "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzI",
+                            "name": "Title",
+                            "dataType": "TITLE"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "Done",
+                          "optionId": "98236657",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                            "name": "Status",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "M",
+                          "optionId": "7515a9f1",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
+                            "name": "Size",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "IssueCards",
+      "query": "query IssueCards($owner: String!, $repo: String!, $comments: Int!, $status: String!, $n0: Int!) {\n  repository(owner: $owner, name: $repo) {\n    i0: issueOrPullRequest(number: $n0) { ...card }\n  }\n}\n\nfragment card on IssueOrPullRequest {\n      __typename\n      ... on Issue {\n        id\n        number\n        title\n        state\n        stateReason(enableDuplicate: true)\n        url\n        createdAt\n        closedAt\n        author { login }\n        body\n        milestone { title dueOn }\n        labels(first: 20) { totalCount nodes { name } }\n        assignees(first: 10) { totalCount nodes { login } }\n        comments(last: $comments) {\n          totalCount\n          nodes { id author { login } createdAt viewerDidAuthor body }\n        }\n        blockedBy(first: 20) { totalCount nodes { ...link } }\n        blocking(first: 20) { totalCount nodes { ...link } }\n        projectItems(first: 20) {\n          totalCount\n          nodes {\n            id\n            isArchived\n            createdAt\n            project { id }\n            status: fieldValueByName(name: $status) { ...value }\n            fieldValues(first: 100) { totalCount nodes { ...value } }\n          }\n        }\n        timelineItems(last: 20, itemTypes: [PROJECT_V2_ITEM_STATUS_CHANGED_EVENT]) {\n          totalCount\n          nodes {\n            ... on ProjectV2ItemStatusChangedEvent {\n              createdAt\n              previousStatus\n              status\n              wasAutomated\n              actor { login }\n              project { id }\n            }\n          }\n        }\n      }\n    }\n\nfragment link on Issue {\n  number\n  title\n  state\n  repository { nameWithOwner }\n  projectItems(first: 10) {\n    totalCount\n    nodes {\n      isArchived\n      project { id }\n      status: fieldValueByName(name: $status) {\n        ... on ProjectV2ItemFieldSingleSelectValue { name field { ... on ProjectV2FieldCommon { id } } }\n      }\n    }\n  }\n}\n\nfragment value on ProjectV2ItemFieldValue {\n  __typename\n  ... on ProjectV2ItemFieldSingleSelectValue { name optionId field { ...field } }\n  ... on ProjectV2ItemFieldIterationValue { title iterationId startDate duration field { ...field } }\n  ... on ProjectV2ItemFieldTextValue { text field { ...field } }\n  ... on ProjectV2ItemFieldNumberValue { number field { ...field } }\n  ... on ProjectV2ItemFieldDateValue { date field { ...field } }\n}\n\nfragment field on ProjectV2FieldCommon { id name dataType }",
+      "variables": {
+        "comments": 20,
+        "owner": "Trum-ok",
+        "repo": "gh-dojo",
+        "status": "Status",
+        "n0": 121
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "i0": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8Batch00121",
+              "number": 121,
+              "title": "Issue 121",
+              "state": "CLOSED",
+              "stateReason": "COMPLETED",
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/121",
+              "createdAt": "2026-11-11T18:19:10Z",
+              "closedAt": "2026-11-11T20:00:00Z",
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body of issue 121.",
+              "milestone": null,
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "id": "PVTI_lAHOBFGd5c4BrMYFBatch00121",
+                    "isArchived": false,
+                    "createdAt": "2026-11-11T18:19:12Z",
+                    "project": {
+                      "id": "PVT_kwHOBFGd5c4BrMYF"
+                    },
+                    "status": {
+                      "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                      "name": "Done",
+                      "optionId": "98236657",
+                      "field": {
+                        "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                        "name": "Status",
+                        "dataType": "SINGLE_SELECT"
+                      }
+                    },
+                    "fieldValues": {
+                      "totalCount": 5,
+                      "nodes": [
+                        {
+                          "__typename": "ProjectV2ItemFieldRepositoryValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldMilestoneValue"
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldTextValue",
+                          "text": "Issue 121",
+                          "field": {
+                            "id": "PVTF_lAHOBFGd5c4BrMYFzhpgKzI",
+                            "name": "Title",
+                            "dataType": "TITLE"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "Done",
+                          "optionId": "98236657",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+                            "name": "Status",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        },
+                        {
+                          "__typename": "ProjectV2ItemFieldSingleSelectValue",
+                          "name": "M",
+                          "optionId": "7515a9f1",
+                          "field": {
+                            "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
+                            "name": "Size",
+                            "dataType": "SINGLE_SELECT"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

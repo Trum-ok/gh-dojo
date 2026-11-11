@@ -148,19 +148,9 @@ func (a *App) Cards(ctx context.Context, ns []int, comments int) ([]issue.Result
 	return a.cards(ctx, ns, comments, issue.Lookup{})
 }
 
-// LookupCard reads issue n like Card, with what lookup names (labels, an
-// assignable user, the viewer) in the same request: card.Found.
-func (a *App) LookupCard(ctx context.Context, n int, lookup issue.Lookup) (*issue.Card, error) {
-	res, err := a.cards(ctx, []int{n}, 0, lookup)
-	if err != nil {
-		return nil, err
-	}
-	if res[0].Err != nil {
-		return nil, res[0].Err
-	}
-	return res[0].Card, nil
-}
-
+// cards reads issues ns like Cards, with what lookup names (labels, an
+// assignable user, the viewer, linked issues) once per request:
+// card.Found.
 func (a *App) cards(ctx context.Context, ns []int, comments int, lookup issue.Lookup) ([]issue.Result, error) {
 	repo, err := a.Repo()
 	if err != nil {

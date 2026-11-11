@@ -13,10 +13,8 @@ import (
 	"github.com/Trum-ok/gh-dojo/internal/testutil"
 )
 
-// specExample is the example from docs/spec.md without the keys this
-// version does not support (batch);
-// TestSpecExampleUnsupported puts them back. Its drop verb is the spec's,
-// as is: no comment template, so --comment is posted as is.
+// specExample is the example from docs/spec.md. Its drop verb is the
+// spec's, as is: no comment template, so --comment is posted as is.
 const specExample = `
 version = 1
 preset = "kanban"            # base, overrides follow
@@ -54,6 +52,7 @@ to = "Ready"
 when = "выкачено на прод"
 to = "Done"
 iteration = "by_status_date:Ready"
+batch = true                 # several issues at once
 
 [verbs.drop]
 when = "задача не нужна или дубль"
@@ -303,7 +302,8 @@ func TestLoadErrors(t *testing.T) {
 		{"unknown_top_key", "preset = \"kanban\"\n" + board + "[bord]\nowner = \"x\"\n"},
 		{"unknown_board_key", "preset = \"kanban\"\n" + board + "ownr = \"x\"\n"},
 		{"unknown_verb_key", presetOnly + "[verbs.start]\nwhen_ = \"x\"\n"},
-		{"unsupported_key", presetOnly + "[verbs.done]\nbatch = true\n"},
+		{"unsupported_key", presetOnly + "[verbs.done]\npost = \"./notify\"\n"},
+		{"batch_not_bool", presetOnly + "[verbs.done]\nbatch = \"yes\"\n"},
 		{"unsupported_hook", presetOnly + "[verbs.start.pre]\ncmd = \"./check\"\n"},
 		{"unsupported_field", presetOnly + "priority = \"Priority\"\n"},
 		{"unsupported_field_first", presetOnly + "priority = \"Priority\"\n[verbs.start]\nwhen_ = \"x\"\n"},
@@ -622,20 +622,20 @@ func TestSessionResolve(t *testing.T) {
 	}
 }
 
-// TestSpecExampleUnsupported checks that the keys stripped from specExample
-// are rejected, not silently accepted.
-func TestSpecExampleUnsupported(t *testing.T) {
-	tests := []struct{ after, add, want string }{
-		{"[verbs.done]\n", "batch = true\n", "verbs.done.batch is not supported in this version"},
-	}
-	for _, tt := range tests {
-		if !strings.Contains(specExample, tt.after) {
-			t.Fatalf("specExample has no %q", tt.after)
+// TestBatch: batch = true is the verb's own key, inherited from the
+// preset (kanban's done) and turned off with false; other verbs take one
+// number.
+func TestBatch(t *testing.T) {
+	c := mustLoad(t, specExample)
+	for _, v := range c.Verbs {
+		if v.Batch != (v.Name == "done") {
+			t.Errorf("%s: Batch = %v", v.Name, v.Batch)
 		}
-		content := strings.Replace(specExample, tt.after, tt.after+tt.add, 1)
-		_, err := Load(writeConfig(t, content))
-		if err == nil || !strings.Contains(err.Error(), tt.want) {
-			t.Errorf("with %q: got %v, want %q", tt.add, err, tt.want)
+	}
+	c = mustLoad(t, presetOnly+"[verbs.done]\nbatch = false\n[verbs.ready]\nbatch = true\n")
+	for _, v := range c.Verbs {
+		if v.Batch != (v.Name == "ready") {
+			t.Errorf("%s: Batch = %v", v.Name, v.Batch)
 		}
 	}
 }

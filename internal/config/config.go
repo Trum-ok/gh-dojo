@@ -219,6 +219,10 @@ type Verb struct {
 	// Confirm says the verb is a decision for the user (confirm = "user"):
 	// it runs only with --yes, which an agent adds after asking.
 	Confirm bool
+	// Batch says the verb takes several issue numbers at once (batch =
+	// true): it runs on each, skipping the ones that fail, and ends with a
+	// summary. Other verbs take exactly one number.
+	Batch bool
 
 	// Iteration is how the verb sets the sprint field: IterationCurrent,
 	// IterationClear, or IterationByStatusDate with IterationStatus the

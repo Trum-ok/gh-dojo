@@ -1,0 +1,6 @@
+code: 0
+--- stdout
+#3 Ready → In review, labels +enhancement -dogfood, assigned Trum-ok, comment left
+#7 In progress → In review, labels +enhancement, assigned Trum-ok, comment left
+2 of 2 applied
+--- stderr

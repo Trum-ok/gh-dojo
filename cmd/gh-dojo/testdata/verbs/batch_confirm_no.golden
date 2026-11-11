@@ -1,0 +1,6 @@
+code: 2
+--- stdout
+#3 already closed as not planned
+--- stderr
+error: 1 of 3 applied; #1, #2: drop needs the user's go-ahead for it (would be: closed as not planned)
+this is the user's decision: ask the user, and re-run with --yes only if they agree

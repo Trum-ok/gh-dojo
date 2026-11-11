@@ -1,0 +1,6 @@
+code: 4
+--- stdout
+#1 Done (unchanged), already closed
+--- stderr
+error: 1 of 2 applied; #2: GitHub is unavailable (HTTP 502)
+fix: gh auth status

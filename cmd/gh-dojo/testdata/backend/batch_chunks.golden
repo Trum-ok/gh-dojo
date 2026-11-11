@@ -1,0 +1,25 @@
+code: 0
+--- stdout
+#101 Done (unchanged), already closed as completed
+#102 Done (unchanged), already closed as completed
+#103 Done (unchanged), already closed as completed
+#104 Done (unchanged), already closed as completed
+#105 Done (unchanged), already closed as completed
+#106 Done (unchanged), already closed as completed
+#107 Done (unchanged), already closed as completed
+#108 Done (unchanged), already closed as completed
+#109 Done (unchanged), already closed as completed
+#110 Done (unchanged), already closed as completed
+#111 Done (unchanged), already closed as completed
+#112 Done (unchanged), already closed as completed
+#113 Done (unchanged), already closed as completed
+#114 Done (unchanged), already closed as completed
+#115 Done (unchanged), already closed as completed
+#116 Done (unchanged), already closed as completed
+#117 Done (unchanged), already closed as completed
+#118 Done (unchanged), already closed as completed
+#119 Done (unchanged), already closed as completed
+#120 Done (unchanged), already closed as completed
+#121 Done (unchanged), already closed as completed
+21 of 21 applied
+--- stderr

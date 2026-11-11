@@ -1,0 +1,5 @@
+code: 3
+--- stdout
+#1 Done (unchanged), already closed
+--- stderr
+error: 1 of 2 applied; #9: issue #9 not found in acme/shop

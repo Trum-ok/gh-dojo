@@ -1,0 +1,11 @@
+code: 0
+--- stdout
+dry run: done #1 "Issue 1"
+  status: Ready → Done
+  comment: "v1.2"
+  close: as completed
+dry run: done #2 "Issue 2"
+  status: Done (unchanged)
+  comment: "v1.2"
+  close: already closed
+--- stderr

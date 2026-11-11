@@ -1,0 +1,14 @@
+code: 2
+--- stdout
+dry run: done #3 "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)"
+  status: Ready → Done
+  close: as completed
+dry run: done #7 "Issue 7"
+  status: In progress → Done
+  close: as completed
+dry run: done #9 "Issue 9"
+  status: Done (unchanged)
+  close: already closed as completed
+--- stderr
+error: dry run: 3 of 4 can be applied; #17: done cannot move #17 from Backlog
+this is a process rule: ask the user how to proceed

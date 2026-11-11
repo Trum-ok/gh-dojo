@@ -3,9 +3,11 @@ package main
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/spf13/cobra"
 )
@@ -148,6 +150,11 @@ func exitCodesHelp() string {
 	b.WriteString("\n\nExit codes:")
 	for _, c := range render.ExitCodes {
 		fmt.Fprintf(&b, "\n  %d  %s: %s", c.Code, c.Meaning, c.Next)
+	}
+	if cfg, err := loadConfig(); err == nil && slices.ContainsFunc(cfg.Verbs, func(v config.Verb) bool { return v.Batch }) {
+		b.WriteString("\n  A verb on several issues (batch) exits 0 when all are done, 5 when some were\n" +
+			"  applied and a re-run may finish the rest, else with the code of the failed\n" +
+			"  ones (2 first, then 1, 3, 4); a summary names each issue not done.")
 	}
 	return b.String()
 }

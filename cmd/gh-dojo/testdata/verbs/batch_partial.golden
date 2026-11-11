@@ -1,0 +1,7 @@
+code: 5
+--- stdout
+#2 Ready → Done, closed as completed
+--- stderr
+error: 1 of 2 applied; #1: Ready → Done, the rest is unconfirmed: GitHub is unavailable (HTTP 502)
+re-run the same command: it skips the issues done and finishes the rest
+fix: gh auth status

@@ -87,6 +87,15 @@ type Backend interface {
 	// exist, and 1 when one is the issue itself, would close a cycle, or
 	// --by mixes issues and text.
 	ReadIssue(ctx context.Context, v config.Verb, n int, a workflow.Args) (workflow.Issue, error)
+	// ReadIssues reads issues ns like ReadIssue, for a verb with batch =
+	// true: one request per issue.MaxBatch issues, with what v looks up
+	// read once in each. It returns one IssueRead per number, in order; an
+	// issue that fails alone (not found, a pull request, its board place
+	// not read, the issue --by names) has its own Err. err fails them all:
+	// a config error of v (a label to add missing in the repo) or a
+	// request that read nothing. A request that fails after earlier ones
+	// read their issues is the Err of each issue it did not read.
+	ReadIssues(ctx context.Context, v config.Verb, ns []int, a workflow.Args) ([]IssueRead, error)
 	// Apply applies every op of a non-empty plan, finding the issue's node
 	// IDs in p.Issue.Ref. It returns the ops GitHub confirmed, also with an
 	// error: the rest of p.Ops did not take effect, or their outcome is
@@ -97,6 +106,14 @@ type Backend interface {
 	// Reset drops the cached board schema after GitHub rejected one of its
 	// IDs, so the next ReadIssue and Apply use a fresh one.
 	Reset() error
+}
+
+// IssueRead is one issue of ReadIssues: its state, or why it cannot be
+// planned.
+type IssueRead struct {
+	Number int
+	Issue  workflow.Issue
+	Err    error
 }
 
 // newBackend returns the backend for cfg: GitHub through one App per run,
@@ -120,17 +137,24 @@ func newVerbCmd(cfg *config.Config, v config.Verb) *cobra.Command {
 		args   workflow.Args
 		dryRun bool
 	)
+	use := v.Name + " <N>"
+	if v.Batch {
+		use = v.Name + " <N>..."
+	}
 	cmd := &cobra.Command{
 		GroupID: verbsGroup.ID,
-		Use:     v.Name + " <N>",
+		Use:     use,
 		Short:   v.When,
 		Long:    verbHelp(cfg, v),
-		Args:    issueArg,
+		Args:    issueArgs(cfg, v),
 		RunE: func(cmd *cobra.Command, posArgs []string) error {
-			n, _ := parseIssue(posArgs[0]) // validated by issueArg
 			args.HasComment = cmd.Flags().Changed(config.ArgComment)
 			args.HasBy = cmd.Flags().Changed(config.ArgBy)
-			return runVerb(cmd, cfg, v, n, args, dryRun)
+			ns := issueNumbers(posArgs) // validated by issueArgs
+			if len(ns) == 1 {
+				return runVerb(cmd, cfg, v, ns[0], args, dryRun)
+			}
+			return runBatch(cmd, cfg, v, ns, args, dryRun)
 		},
 	}
 	f := cmd.Flags()
@@ -274,17 +298,12 @@ func (r *verbRun) partial(missed []workflow.Op, cause, err error) error {
 		return render.Usage("%s; %s: %s", r.applied().Confirm(), missedWords(missed), reason(err)).
 			WithFix(fmt.Sprintf("gh dojo show %d", r.first.Issue.Number)).WithCause(err)
 	}
-	var gqlErr *api.GraphQLError
-	what := "the rest is unconfirmed"
-	if (errors.As(cause, &gqlErr) || errors.Is(cause, errNotSent)) && len(missed) > 0 {
-		what = missedWords(missed)
-	}
 	e := render.FromError(err)
 	next := "re-run the same command"
 	if fix := strings.TrimSpace(e.Fix); fix != "" {
 		next = fix + ", then " + next
 	}
-	return render.Partial("%s; %s: %s; %s", r.applied().Confirm(), what, reason(err), next).
+	return render.Partial("%s; %s: %s; %s", r.applied().Confirm(), missedText(missed, cause), reason(err), next).
 		WithFix(e.Fix).WithCause(err)
 }
 
@@ -295,6 +314,17 @@ func missedWords(missed []workflow.Op) string {
 		words[i] = effects.Missed(op)
 	}
 	return strings.Join(words, ", ")
+}
+
+// missedText says what of missed did not take effect, after a write that
+// failed with cause (see partial): the effects not done, or "the rest is
+// unconfirmed".
+func missedText(missed []workflow.Op, cause error) string {
+	var gqlErr *api.GraphQLError
+	if (errors.As(cause, &gqlErr) || errors.Is(cause, errNotSent)) && len(missed) > 0 {
+		return missedWords(missed)
+	}
+	return "the rest is unconfirmed"
 }
 
 // reason is the first clause of an error's message, for a partial report.
@@ -406,6 +436,57 @@ func issueArg(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// issueArgs accepts the issue numbers of verb v: one, or with batch =
+// true one or more. A number repeated counts once.
+func issueArgs(cfg *config.Config, v config.Verb) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		help := cmd.CommandPath() + " --help"
+		switch {
+		case len(args) == 0 && v.Batch:
+			return render.Usage("%s needs one or more issue numbers, like %s", cmd.Name(), issueExamples).WithFix(help)
+		case len(args) == 0:
+			return render.Usage("%s needs an issue number, like %s", cmd.Name(), issueExamples).WithFix(help)
+		}
+		for _, a := range args {
+			if _, ok := parseIssue(a); !ok {
+				return render.Usage("%q is not an issue number; pass one like %s", a, issueExamples).WithFix(help)
+			}
+		}
+		if n := len(issueNumbers(args)); n > 1 && !v.Batch {
+			return render.Usage("%s takes one issue number, got %d; several at once need batch = true in verbs.%s%s",
+				cmd.Name(), n, v.Name, batchVerbsNote(cfg)).
+				WithFix(fmt.Sprintf("run %s once per issue", cmd.CommandPath()))
+		}
+		return nil
+	}
+}
+
+// batchVerbsNote names the verbs that take several numbers, for the error
+// of a verb that does not.
+func batchVerbsNote(cfg *config.Config) string {
+	var names []string
+	for _, v := range cfg.Verbs {
+		if v.Batch {
+			names = append(names, v.Name)
+		}
+	}
+	if len(names) == 0 {
+		return ""
+	}
+	return "\nverbs that take several: " + strings.Join(names, ", ")
+}
+
+// issueNumbers parses the validated issue arguments, dropping repeats.
+func issueNumbers(args []string) []int {
+	var ns []int
+	for _, a := range args {
+		if n, ok := parseIssue(a); ok && !slices.Contains(ns, n) {
+			ns = append(ns, n)
+		}
+	}
+	return ns
+}
+
 // verbHelp is the long help of a verb: its when line, then what it checks,
 // needs and does.
 func verbHelp(cfg *config.Config, v config.Verb) string {
@@ -451,12 +532,15 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 	}
 	if len(required) > 0 {
 		line("Requires", "%s", strings.Join(required, "; "))
+	} else if v.Batch {
+		line("Requires", "nothing besides the issue numbers")
 	} else {
 		line("Requires", "nothing besides the issue number")
 	}
 	if len(optional) > 0 {
 		line("Optional", "%s", strings.Join(optional, ", "))
 	}
+	batchHelp(v, line)
 	if v.Confirm {
 		line("Confirm", "the user's decision: ask the user first; runs only with --yes")
 	}

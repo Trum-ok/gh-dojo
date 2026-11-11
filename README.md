@@ -326,6 +326,7 @@ or the network, else 1.
 
 ```sh
 gh dojo <verb> <N> [--comment TEXT] [--by N|TEXT] [--yes] [--dry-run]
+gh dojo <verb> <N>... [flags]     # a verb with batch = true, such as kanban's done
 ```
 
 Verbs come from [`[verbs]`](#verbs) in the config, so each project has its
@@ -338,7 +339,8 @@ starting statuses, the target status, the required arguments, the other
 effects and the comment template; [`gh dojo describe`](#describe) sums up all
 of them.
 
-A verb takes one issue number and, in one command:
+A verb takes one issue number (several with [`batch = true`](#several-issues-at-once))
+and, in one command:
 
 1. checks that the issue is open (a verb that moves it to a final status,
    closes it or reopens it also runs on a closed one), that its status is one
@@ -400,6 +402,50 @@ $ gh dojo drop 42 --comment "Duplicate of #17." --yes
 #42 comment left, closed as not planned
 ```
 
+#### Several issues at once
+
+A verb with `batch = true` (kanban's `done`) takes several issue numbers;
+other verbs take exactly one and say which verbs take several. A number given
+twice counts once. The cards are read in one request per 20 issues, with the
+label, user and `--by` lookups once in each; then each issue is checked,
+planned and written on its own, with its own mutation, so a lost answer or a
+refusal touches that issue alone. An issue that fails is skipped and the
+others go on. `--yes` counts for every issue; `--dry-run` prints the plan of
+each. A stale cached board ID is retried once per run: the issue that hit it
+and the ones not written yet are re-read in one request.
+
+Each issue done prints its confirmation line; then a summary. When every
+issue is done (applied, or already in place) it is `3 of 3 applied` on
+stdout; otherwise an error names each issue not done with its reason
+(several issues failing alike share one entry):
+
+```console
+$ gh dojo done 12 13 14 17
+#12 Ready → Done, closed as completed
+#13 In progress → Done, closed as completed
+#14 Done (unchanged), already closed as completed
+error: 3 of 4 applied; #17: done cannot move #17 from Backlog
+this is a process rule: ask the user how to proceed
+```
+
+The exit code says what to do about the issues not done:
+
+| Outcome                                                                        | Code |
+|--------------------------------------------------------------------------------|------|
+| Every issue applied or already in place                                        | 0    |
+| Something was applied, and an issue failed on the network or partway (re-run)  | 5    |
+| Otherwise, an issue was refused by a process check                             | 2    |
+| Otherwise, bad arguments for an issue (`--by` naming the issue itself)         | 1    |
+| Otherwise, an issue was not found                                              | 3    |
+| Otherwise, network failures with nothing applied                               | 4    |
+
+Re-running the same command is safe and touches only what is left: issues
+already done are in place and cost no write. After a code 5 the re-run
+finishes the rest, or ends with the code of what still fails (2 for a
+refusal). Bad arguments or flags, a config error and a label to add that the
+repository does not have fail the whole command, with nothing written
+(code 1).
+
 ### Output and exit codes
 
 A successful write prints one line per issue: what was, what is now and what
@@ -424,7 +470,8 @@ this is a process rule: ask the user how to proceed
 | 4    | Network, rate limit or auth | Retry later, or `gh auth refresh -s project`                 |
 | 5    | Partially applied           | Re-run the same command; it finishes the rest                |
 
-`gh dojo --help` prints this table too. Retries are safe for every command:
+`gh dojo --help` prints this table too. A verb on several issues picks one
+code for the whole run (see [Several issues at once](#several-issues-at-once)). Retries are safe for every command:
 verbs skip every effect already in place (a status already set, a comment
 that is already the latest gh-dojo comment, an issue already closed, ...),
 `comment` skips its own repeated text, `block` and `unblock` skip links
@@ -606,6 +653,7 @@ Each `[verbs.<name>]` table becomes `gh dojo <name>`.
 | `iteration`      | Set the sprint field: `"current"`, `"by_status_date:<status>"` or `"clear"`; needs `fields.sprint`; `""` turns a preset's off |
 | `field`          | A table of board fields to set: `[verbs.<name>.field]` with `Priority = "P1"`, `Estimate = 3`   |
 | `blockers`       | `"warn"` or `"deny"`: check the issue's unresolved blockers; `"link"`: `--by N` also marks it blocked by #N; `false` turns a preset's off |
+| `batch`          | `true`: the verb takes several issue numbers at once ([details](#several-issues-at-once)); `false` turns a preset's off |
 | `disabled`       | `true` removes a verb the preset defines; it stands alone in its table                           |
 
 A verb needs at least one effect: `to`, `comment`, `labels`, `assign`,
@@ -615,7 +663,7 @@ has no template posts the `--comment` text as is. Verb names are
 lowercase letters, digits and dashes and cannot shadow built-in or planned
 commands (`show`, `list`, `new`, `comment`, `describe`, `init`, `doctor`,
 `help`, `block`, `unblock`, `agent`, `next`, `release`). Keys from the design
-that are not implemented yet (`batch`, `pre`, `post`) are rejected with
+that are not implemented yet (`pre`, `post`) are rejected with
 "not supported in this version".
 
 Effects:
@@ -747,7 +795,9 @@ The board's status field must have these options (other options are fine):
 | `ready` | Ready       | In progress, Waiting     |                       | `--comment`                      |
 | `done`  | Done        | Ready, In progress       |                       | `--comment`                      |
 
-`done` also closes the issue as completed: Done means released. An issue a
+`done` also closes the issue as completed: Done means released. It takes
+several issues at once (`batch = true`): `gh dojo done 12 13 14` after a
+release. An issue a
 pull request already closed stays closed; `done` still moves it to Done.
 To keep issues open in Done, set `close = false` under `[verbs.done]`.
 `start` warns on stderr about unresolved blockers, those not yet Ready,
@@ -823,8 +873,8 @@ Besides the sprint, one difference from kanban: `start` warns about
 unresolved blockers (`blockers = "warn"`) on stderr and runs, since a
 blocked issue taken into the sprint may not finish in it.
 
-Everything else is kanban's: `done` closes the issue as completed,
-`wait --by 17` marks it blocked by #17, and the statuses, labels and
+Everything else is kanban's: `done` closes the issue as completed and
+takes several issues at once (`batch = true`), `wait --by 17` marks it blocked by #17, and the statuses, labels and
 comments are the same. The preset sets `fields.sprint = "Sprint"`; its
 source is [`internal/config/presets/sprints.toml`](internal/config/presets/sprints.toml).
 Override on top of it like any preset, for example:

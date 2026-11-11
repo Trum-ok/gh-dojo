@@ -60,6 +60,7 @@ type processVerb struct {
 	Requires      []string `json:"requires,omitempty"`
 	RequiresOneOf []string `json:"requiresOneOf,omitempty"`
 	Optional      []string `json:"optional,omitempty"`
+	Batch         bool     `json:"batch,omitempty"`   // takes several issue numbers
 	Checks        []string `json:"checks,omitempty"`  // beyond from and the arguments
 	Effects       []string `json:"effects,omitempty"` // along the way, beyond the status
 }
@@ -184,7 +185,7 @@ func describeProcess(cfg *config.Config) *process {
 		Statuses: cfg.Statuses,
 	}
 	for _, v := range cfg.Verbs {
-		pv := processVerb{Name: v.Name, When: v.When, From: v.From, To: v.To}
+		pv := processVerb{Name: v.Name, When: v.When, From: v.From, To: v.To, Batch: v.Batch}
 		for _, arg := range config.Args() {
 			switch {
 			case slices.Contains(v.Require, arg):
@@ -283,6 +284,9 @@ func (p *process) text() string {
 // effects, or "" when it has none.
 func (v processVerb) facts() string {
 	var parts []string
+	if v.Batch {
+		parts = append(parts, "several numbers at once ("+v.Name+" 12 13 14)")
+	}
 	if len(v.Requires) > 0 {
 		parts = append(parts, "needs "+strings.Join(v.Requires, " and "))
 	}

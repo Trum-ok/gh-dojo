@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: done needs one or more issue numbers, like 42 or "#42"
+fix: gh dojo done --help
