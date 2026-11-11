@@ -45,4 +45,9 @@ Flags:
   -h, --help               help for new
       --label label        any existing repo label; repeatable
       --type string        issue type: any repo label not starting with area:
+
+Global Flags:
+  -q, --jq expression       filter the JSON with a jq expression (implies --json)
+      --json                print the result as JSON (schema_version 1); errors stay text on stderr
+  -t, --template template   format the JSON with a Go template (implies --json)
 --- stderr

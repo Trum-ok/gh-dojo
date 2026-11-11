@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/Trum-ok/gh-dojo/internal/render"
@@ -48,12 +49,11 @@ text after someone else's comment is posted.`,
 			if err != nil {
 				return err
 			}
-			line, err := runComment(cmd, n, text)
+			res, err := runComment(cmd, n, text)
 			if err != nil {
 				return err
 			}
-			fmt.Fprintln(cmd.OutOrStdout(), line)
-			return nil
+			return emit(cmd, res, res.write)
 		},
 	}
 	cmd.Flags().StringVar(&bodyFile, bodyFileFlag, "", "read the text from `file`; - reads stdin")
@@ -96,29 +96,47 @@ func commentText(cmd *cobra.Command, args []string, bodyFile string) (string, er
 	return text, nil
 }
 
+// commentResult is what comment did, and its JSON.
+type commentResult struct {
+	Number int    `json:"number"`
+	Repo   string `json:"repo"`
+	// Posted is false when the issue's last comment was this one already.
+	Posted bool `json:"posted"`
+}
+
+// write prints the confirmation line: "#42 comment left".
+func (r *commentResult) write(w io.Writer) {
+	effect := "comment already present"
+	if r.Posted {
+		effect = workflow.AddComment{}.Effect()
+	}
+	fmt.Fprintln(w, render.Confirm(fmt.Sprintf("#%d", r.Number), "", effect))
+}
+
 // runComment posts text on issue n unless the issue's last comment is the
-// viewer's with the same text (marker), and returns the confirmation line.
-// Requests: the card (one with a warm schema cache) and addComment.
+// viewer's with the same text (marker). Requests: the card (one with a
+// warm schema cache) and addComment.
 //
 // Unlike a verb's comment (workflow.AlreadyPosted, the latest gh-dojo
 // comment), only the very last comment counts: a plain comment repeated on
 // purpose after others replied is posted.
-func runComment(cmd *cobra.Command, n int, text string) (string, error) {
+func runComment(cmd *cobra.Command, n int, text string) (*commentResult, error) {
 	ctx := cmd.Context()
 	a := newApp()
 	card, err := a.Card(ctx, n, 0)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
+	res := &commentResult{Number: n, Repo: card.Repo.String()}
 	post := workflow.AddComment{Body: text, Marker: workflow.Marker(commentMarkerVerb, text)}
-	subject := fmt.Sprintf("#%d", n)
 	if comments := workflowIssue(card).Comments; len(comments) > 0 &&
 		workflow.AlreadyPosted(comments[len(comments)-1:], post.Marker) {
-		return render.Confirm(subject, "", "comment already present"), nil
+		return res, nil
 	}
 	vars := map[string]any{"subject": card.ID, "body": post.Text()}
 	if err := a.Client.Mutate(ctx, addCommentMutation, vars, nil); err != nil {
-		return "", err // a lost answer says "may have been applied, re-run": the marker makes that safe
+		return nil, err // a lost answer says "may have been applied, re-run": the marker makes that safe
 	}
-	return render.Confirm(subject, "", post.Effect()), nil
+	res.Posted = true
+	return res, nil
 }

@@ -1,0 +1,48 @@
+code: 0
+--- stdout
+{
+  "schema_version": 1,
+  "sprint": null,
+  "issues": [
+    {
+      "repo": "Trum-ok/gh-dojo",
+      "number": 21,
+      "title": "Triage me",
+      "state": "open",
+      "status": "",
+      "labels": [
+        "bug"
+      ],
+      "labels_total": 1,
+      "assignees": [],
+      "assignees_total": 0
+    },
+    {
+      "repo": "Trum-ok/gh-dojo",
+      "number": 22,
+      "title": "Add --json to list",
+      "state": "open",
+      "status": "Backlog",
+      "labels": [
+        "enhancement",
+        "area:cli"
+      ],
+      "labels_total": 2,
+      "assignees": [],
+      "assignees_total": 0
+    }
+  ],
+  "matched": 6,
+  "unchecked": 0,
+  "hidden": 3,
+  "filtered": 0,
+  "skipped": {
+    "draft_issues": 1,
+    "pull_requests": 1,
+    "unseen": 2
+  },
+  "incomplete": true
+}
+
+--- stderr
+warning: GitHub withheld parts of some board items from this token; their lines may be incomplete

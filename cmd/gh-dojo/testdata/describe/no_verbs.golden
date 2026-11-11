@@ -2,6 +2,7 @@ code: 0
 --- stdout
 Process from .github/dojo.toml: board acme/3, issues in the current repository.
 Run a verb as gh dojo <verb> <N>; --dry-run shows its plan first.
+Every command takes --json (schema_version 1), --jq and --template, as gh does.
 
 No verbs: add them under [verbs] in .github/dojo.toml.
 

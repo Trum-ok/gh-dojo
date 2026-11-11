@@ -235,12 +235,17 @@ func newNewCmd() (*cobra.Command, error) {
 					return err // before any request
 				}
 			}
-			line, err := runNew(cmd.Context(), a, cfg, o, cmd.ErrOrStderr())
-			if err != nil {
+			r, err := runNew(cmd.Context(), a, cfg, o, cmd.ErrOrStderr())
+			if r == nil { // nothing created
 				return err
 			}
-			fmt.Fprintln(cmd.OutOrStdout(), line)
-			return nil
+			// A run that stopped after creating the issue prints it as JSON
+			// too; its text is the error.
+			return emitResult(cmd, r.result(err), func(w io.Writer) {
+				if err == nil {
+					fmt.Fprintln(w, r.confirm())
+				}
+			}, err)
 		},
 	}
 	f := cmd.Flags()
@@ -334,8 +339,10 @@ issue, it exits with code 5: run the same command again.`)
 }
 
 // runNew creates the issue described by o, or finishes the one a failed
-// run left, and returns the confirmation line. Warnings go to warn.
-func runNew(ctx context.Context, a *App, cfg *config.Config, o newOptions, warn io.Writer) (string, error) {
+// run left, and returns the run: nil when no issue exists, else with
+// r.partial's error when it stopped after the issue existed. Warnings go
+// to warn.
+func runNew(ctx context.Context, a *App, cfg *config.Config, o newOptions, warn io.Writer) (*newRun, error) {
 	for attempt := 1; ; attempt++ {
 		r := &newRun{App: a, cfg: cfg, opts: o}
 		err := r.run(ctx)
@@ -343,7 +350,7 @@ func runNew(ctx context.Context, a *App, cfg *config.Config, o newOptions, warn 
 			render.Warn(warn, "%s", w)
 		}
 		if err == nil {
-			return r.confirm(), nil
+			return r, nil
 		}
 		stale := r.schemaCached && board.IsStale(err)
 		if r.number == 0 {
@@ -352,14 +359,52 @@ func runNew(ctx context.Context, a *App, cfg *config.Config, o newOptions, warn 
 			if stale && attempt == 1 && a.ResetSchema() == nil {
 				continue
 			}
-			return "", err
+			return nil, err
 		}
 		if stale {
 			// The issue exists; retrying here could miss it in a lagging
 			// read and create another. The re-run reads the board afresh.
 			_ = a.ResetSchema()
 		}
-		return "", r.partial(err)
+		return r, r.partial(err)
+	}
+}
+
+// newResult is new's JSON: the issue created or resumed, and how far the
+// run got.
+type newResult struct {
+	Number int    `json:"number"`
+	Repo   string `json:"repo"`
+	Title  string `json:"title"`
+	// Created is false when an earlier run created the issue and this one
+	// found it by its marker and finished it.
+	Created bool     `json:"created"`
+	Labels  []string `json:"labels"`
+	// Status is the issue's status on the board, "" for none; StatusSet
+	// says this run set it.
+	Status     string `json:"status"`
+	StatusSet  bool   `json:"status_set"`
+	Unarchived bool   `json:"unarchived"`
+	// BlockedBy are the blocked-by links added now, AlreadyBlockedBy those
+	// a resumed issue had.
+	BlockedBy        []string `json:"blocked_by"`
+	AlreadyBlockedBy []string `json:"already_blocked_by"`
+	// Error is what stopped a run after the issue existed (exit code 5,
+	// or 1 for a dependency cycle): re-run the same command.
+	Error *jsonError `json:"error"`
+}
+
+// result is the run as JSON, err what stopped it.
+func (r *newRun) result(err error) newResult {
+	title := r.title
+	if title == "" {
+		title = r.opts.Title
+	}
+	return newResult{
+		Number: r.number, Repo: r.repo.String(), Title: singleLine(title), Created: !r.resumed,
+		Labels: orEmpty(r.labels), Status: r.status, StatusSet: r.statusSet, Unarchived: r.unarchived,
+		BlockedBy: refList(r.linked, r.repo), AlreadyBlockedBy: refList(r.linkedFound, r.repo),
+		Error: errorJSON(err),
 	}
 }
 

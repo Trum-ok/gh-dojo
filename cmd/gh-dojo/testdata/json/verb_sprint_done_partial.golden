@@ -1,0 +1,54 @@
+code: 5
+--- stdout
+{
+  "schema_version": 1,
+  "verb": "done",
+  "dry_run": false,
+  "issues": [
+    {
+      "number": 42,
+      "title": "Fix the checkout total",
+      "outcome": "partial",
+      "planned": [
+        {
+          "op": "set_status",
+          "from": "Ready",
+          "to": "Done"
+        },
+        {
+          "op": "set_iteration",
+          "from": "",
+          "to": "Sprint 11",
+          "start_date": "2026-10-26"
+        }
+      ],
+      "applied": [
+        {
+          "op": "set_status",
+          "from": "Ready",
+          "to": "Done"
+        }
+      ],
+      "in_place": [],
+      "needs_yes": false,
+      "warnings": [],
+      "error": {
+        "exit_code": 5,
+        "message": "#42 Ready → Done; sprint not set: GitHub denied access; gh auth refresh -s project, then re-run the same command",
+        "allowed": [],
+        "fix": "gh auth refresh -s project"
+      }
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "done": 0,
+    "written": 0,
+    "failed": 1,
+    "not_attempted": 0
+  }
+}
+
+--- stderr
+error: #42 Ready → Done; sprint not set: GitHub denied access; gh auth refresh -s project, then re-run the same command
+fix: gh auth refresh -s project

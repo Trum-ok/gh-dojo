@@ -1,0 +1,49 @@
+code: 0
+--- stdout
+{
+  "schema_version": 1,
+  "verb": "done",
+  "dry_run": false,
+  "issues": [
+    {
+      "number": 42,
+      "title": "Fix the checkout total",
+      "outcome": "applied",
+      "planned": [
+        {
+          "op": "set_iteration",
+          "from": "",
+          "to": "Sprint 11",
+          "start_date": "2026-10-26"
+        }
+      ],
+      "applied": [
+        {
+          "op": "set_iteration",
+          "from": "",
+          "to": "Sprint 11",
+          "start_date": "2026-10-26"
+        }
+      ],
+      "in_place": [
+        {
+          "op": "set_status",
+          "from": "Done",
+          "to": "Done"
+        }
+      ],
+      "needs_yes": false,
+      "warnings": [],
+      "error": null
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "done": 1,
+    "written": 1,
+    "failed": 0,
+    "not_attempted": 0
+  }
+}
+
+--- stderr

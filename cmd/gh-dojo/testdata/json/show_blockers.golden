@@ -1,0 +1,192 @@
+code: 0
+--- stdout
+{
+  "schema_version": 1,
+  "issues": [
+    {
+      "number": 3,
+      "repo": "Trum-ok/gh-dojo",
+      "url": "https://github.com/Trum-ok/gh-dojo/issues/3",
+      "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)",
+      "state": "open",
+      "state_reason": "",
+      "author": "Trum-ok",
+      "created_at": "2026-11-11T18:19:10Z",
+      "closed_at": null,
+      "incomplete": false,
+      "board": {
+        "on_board": true,
+        "unknown_reason": "",
+        "status": "Ready",
+        "status_unknown": false,
+        "archived": false,
+        "fields": [
+          {
+            "name": "Size",
+            "value": "M"
+          }
+        ],
+        "fields_truncated": false
+      },
+      "sprint": null,
+      "milestone": {
+        "title": "v0.1 — first public release",
+        "due_on": "2026-12-01"
+      },
+      "labels": [],
+      "labels_total": 0,
+      "assignees": [],
+      "assignees_total": 0,
+      "blocked_by": [
+        {
+          "ref": "#2",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 2,
+          "title": "Коды выхода и короткие ошибки (internal/render)",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": true,
+          "status_unknown_reason": "",
+          "resolved": true
+        },
+        {
+          "ref": "#1",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 1,
+          "title": "Каркас: Go-модуль, cobra и установка как расширение gh",
+          "state": "open",
+          "on_board": true,
+          "status": "In progress",
+          "archived": false,
+          "status_unknown_reason": "",
+          "resolved": false
+        },
+        {
+          "ref": "#5",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 5,
+          "title": "GraphQL-клиент и схема доски с кэшем (internal/graph, internal/board)",
+          "state": "closed",
+          "on_board": true,
+          "status": "Done",
+          "archived": false,
+          "status_unknown_reason": "",
+          "resolved": true
+        },
+        {
+          "ref": "#9",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 9,
+          "title": "Записать ответы GraphQL для тестов",
+          "state": "open",
+          "on_board": false,
+          "status": "",
+          "archived": false,
+          "status_unknown_reason": "",
+          "resolved": false
+        },
+        {
+          "ref": "acme/auth#7",
+          "repo": "acme/auth",
+          "number": 7,
+          "title": "Auth library upgrade",
+          "state": "open",
+          "on_board": false,
+          "status": "",
+          "archived": false,
+          "status_unknown_reason": "",
+          "resolved": false
+        },
+        {
+          "ref": "#12",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 12,
+          "title": "Документация: README и skill",
+          "state": "open",
+          "on_board": true,
+          "status": "",
+          "archived": false,
+          "status_unknown_reason": "",
+          "resolved": false
+        },
+        {
+          "ref": "#10",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 10,
+          "title": "Общая библиотека для команд",
+          "state": "open",
+          "on_board": false,
+          "status": "",
+          "archived": false,
+          "status_unknown_reason": "on 12 projects, only the first 10 read",
+          "resolved": false
+        }
+      ],
+      "blocked_by_total": 7,
+      "unresolved_blockers": 5,
+      "blocking": [
+        {
+          "ref": "#11",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 11,
+          "title": "Глаголы из конфига: проверки и план эффектов (internal/workflow)",
+          "state": "open",
+          "on_board": true,
+          "status": "Backlog",
+          "archived": false,
+          "status_unknown_reason": "",
+          "resolved": false
+        },
+        {
+          "ref": "#8",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 8,
+          "title": "Команда list",
+          "state": "closed",
+          "on_board": true,
+          "status": "Done",
+          "archived": false,
+          "status_unknown_reason": "",
+          "resolved": true
+        }
+      ],
+      "blocking_total": 2,
+      "history": [
+        {
+          "at": "2026-11-11T18:19:14Z",
+          "from": "",
+          "to": "Backlog",
+          "actor": "github-project-automation",
+          "automated": true
+        },
+        {
+          "at": "2026-11-11T18:42:17Z",
+          "from": "Backlog",
+          "to": "In progress",
+          "actor": "Trum-ok",
+          "automated": false
+        },
+        {
+          "at": "2026-11-11T19:02:20Z",
+          "from": "In progress",
+          "to": "Ready",
+          "actor": "Trum-ok",
+          "automated": false
+        }
+      ],
+      "history_truncated": false,
+      "history_untracked": false,
+      "body": {
+        "text": "## Зачем\nПроцесс проекта — данные в конфиге, а не код. Все команды читают конфиг.\n\n## Что сделать\n- Поиск `.github/dojo.toml` вверх от текущей папки.\n- Разбор `version`, `preset`, `[board]` (owner, project, repos, assignee), `[fields]` (`status` обязателен), `[session]` (env, link), `[verbs.*]`.\n- Для глаголов в v0.0: `when`, `to`, `from`, `require`, `require_one_of`, `comment` (шаблон). Остальные ключи из спеки распознаются, но дают понятную ошибку «не поддерживается в этой версии», а не молча игнорируются.\n- Ошибки валидации — код 1, с указанием ключа и допустимых значений.\n- Сверка с доской — отдельная задача.\n\n## Готово, когда\n- Пример конфига из спеки (без неподдерживаемых ключей) загружается.\n- Тесты на отсутствие файла, неизвестный ключ, пустой `fields.status`, глагол без `when`.\n\nСпека: `docs/spec.md`: «Модель и конфиг».",
+        "cut": false,
+        "length": 840
+      },
+      "comments": [],
+      "comments_total": 0
+    }
+  ],
+  "failed": []
+}
+
+--- stderr

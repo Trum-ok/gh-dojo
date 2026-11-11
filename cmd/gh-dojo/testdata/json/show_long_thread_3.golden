@@ -1,0 +1,131 @@
+code: 0
+--- stdout
+{
+  "schema_version": 1,
+  "issues": [
+    {
+      "number": 42,
+      "repo": "Trum-ok/gh-dojo",
+      "url": "https://github.com/Trum-ok/gh-dojo/issues/42",
+      "title": "Fix login redirect",
+      "state": "closed",
+      "state_reason": "completed",
+      "author": "Trum-ok",
+      "created_at": "2026-11-11T18:19:10Z",
+      "closed_at": "2026-11-12T10:00:00Z",
+      "incomplete": false,
+      "board": {
+        "on_board": true,
+        "unknown_reason": "",
+        "status": "Ready",
+        "status_unknown": false,
+        "archived": false,
+        "fields": [
+          {
+            "name": "Size",
+            "value": "M"
+          },
+          {
+            "name": "Sprint",
+            "value": "Sprint 12"
+          },
+          {
+            "name": "Estimate",
+            "value": "2.5"
+          },
+          {
+            "name": "Target date",
+            "value": "2026-11-20"
+          }
+        ],
+        "fields_truncated": false
+      },
+      "sprint": null,
+      "milestone": null,
+      "labels": [
+        "bug",
+        "area:cli"
+      ],
+      "labels_total": 2,
+      "assignees": [
+        "Trum-ok"
+      ],
+      "assignees_total": 1,
+      "blocked_by": [
+        {
+          "ref": "acme/auth#7",
+          "repo": "acme/auth",
+          "number": 7,
+          "title": "Auth library upgrade",
+          "state": "closed",
+          "on_board": false,
+          "status": "",
+          "archived": false,
+          "status_unknown_reason": "",
+          "resolved": true
+        }
+      ],
+      "blocked_by_total": 1,
+      "unresolved_blockers": 0,
+      "blocking": [],
+      "blocking_total": 0,
+      "history": [
+        {
+          "at": "2026-11-11T18:19:14Z",
+          "from": "",
+          "to": "Backlog",
+          "actor": "github-project-automation",
+          "automated": true
+        },
+        {
+          "at": "2026-11-11T18:42:17Z",
+          "from": "Backlog",
+          "to": "In progress",
+          "actor": "Trum-ok",
+          "automated": false
+        },
+        {
+          "at": "2026-11-11T19:02:20Z",
+          "from": "In progress",
+          "to": "Ready",
+          "actor": "Trum-ok",
+          "automated": false
+        }
+      ],
+      "history_truncated": true,
+      "history_untracked": false,
+      "body": {
+        "text": "Login redirects to /home instead of the page the user came from.",
+        "cut": false,
+        "length": 64
+      },
+      "comments": [
+        {
+          "author": "octocat",
+          "created_at": "2026-11-13T18:00:00Z",
+          "text": "",
+          "cut": false,
+          "length": 0
+        },
+        {
+          "author": "octocat",
+          "created_at": "2026-11-13T19:00:00Z",
+          "text": "Log from the staging run:\n001 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)\n002 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)\n003 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)\n004 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)\n005 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)\n006 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)\n007 GET /login?next=/settings -> 302 /home (session cookie set, next dropped) …",
+          "cut": true,
+          "length": 2365
+        },
+        {
+          "author": "Trum-ok",
+          "created_at": "2026-11-13T20:00:00Z",
+          "text": "Done.",
+          "cut": false,
+          "length": 5
+        }
+      ],
+      "comments_total": 45
+    }
+  ],
+  "failed": []
+}
+
+--- stderr

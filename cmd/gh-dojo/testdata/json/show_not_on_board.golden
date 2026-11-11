@@ -1,0 +1,141 @@
+code: 0
+--- stdout
+{
+  "schema_version": 1,
+  "issues": [
+    {
+      "number": 3,
+      "repo": "Trum-ok/gh-dojo",
+      "url": "https://github.com/Trum-ok/gh-dojo/issues/3",
+      "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)",
+      "state": "open",
+      "state_reason": "",
+      "author": "Trum-ok",
+      "created_at": "2026-11-11T18:19:10Z",
+      "closed_at": null,
+      "incomplete": false,
+      "board": {
+        "on_board": false,
+        "unknown_reason": "",
+        "status": "",
+        "status_unknown": false,
+        "archived": false,
+        "fields": [],
+        "fields_truncated": false
+      },
+      "sprint": null,
+      "milestone": {
+        "title": "v0.0 — самохостинг",
+        "due_on": ""
+      },
+      "labels": [],
+      "labels_total": 0,
+      "assignees": [],
+      "assignees_total": 0,
+      "blocked_by": [
+        {
+          "ref": "#2",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 2,
+          "title": "Коды выхода и короткие ошибки (internal/render)",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": false,
+          "status_unknown_reason": "",
+          "resolved": true
+        },
+        {
+          "ref": "#1",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 1,
+          "title": "Каркас: Go-модуль, cobra и установка как расширение gh",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": false,
+          "status_unknown_reason": "",
+          "resolved": true
+        }
+      ],
+      "blocked_by_total": 2,
+      "unresolved_blockers": 0,
+      "blocking": [
+        {
+          "ref": "#11",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 11,
+          "title": "Глаголы из конфига: проверки и план эффектов (internal/workflow)",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": false,
+          "status_unknown_reason": "",
+          "resolved": true
+        },
+        {
+          "ref": "#8",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 8,
+          "title": "Команда list",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": false,
+          "status_unknown_reason": "",
+          "resolved": true
+        },
+        {
+          "ref": "#7",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 7,
+          "title": "Команда show <N>…",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": false,
+          "status_unknown_reason": "",
+          "resolved": true
+        },
+        {
+          "ref": "#6",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 6,
+          "title": "Сверка конфига с доской",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": false,
+          "status_unknown_reason": "",
+          "resolved": true
+        },
+        {
+          "ref": "#4",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 4,
+          "title": "Пресет kanban через embed.FS",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": false,
+          "status_unknown_reason": "",
+          "resolved": true
+        }
+      ],
+      "blocking_total": 5,
+      "history": [],
+      "history_truncated": false,
+      "history_untracked": false,
+      "body": {
+        "text": "## Зачем\nПроцесс проекта — данные в конфиге, а не код. Все команды читают конфиг.\n\n## Что сделать\n- Поиск `.github/dojo.toml` вверх от текущей папки.\n- Разбор `version`, `preset`, `[board]` (owner, project, repos, assignee), `[fields]` (`status` обязателен), `[session]` (env, link), `[verbs.*]`.\n- Для глаголов в v0.0: `when`, `to`, `from`, `require`, `require_one_of`, `comment` (шаблон). Остальные ключи из спеки распознаются, но дают понятную ошибку «не поддерживается в этой версии», а не молча игнорируются.\n- Ошибки валидации — код 1, с указанием ключа и допустимых значений.\n- Сверка с доской — отдельная задача.\n\n## Готово, когда\n- Пример конфига из спеки (без неподдерживаемых ключей) загружается.\n- Тесты на отсутствие файла, неизвестный ключ, пустой `fields.status`, глагол без `when`.\n\nСпека: `docs/spec.md`: «Модель и конфиг».",
+        "cut": false,
+        "length": 840
+      },
+      "comments": [],
+      "comments_total": 0
+    }
+  ],
+  "failed": []
+}
+
+--- stderr

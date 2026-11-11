@@ -1,0 +1,120 @@
+code: 4
+--- stdout
+{
+  "schema_version": 1,
+  "verb": "done",
+  "dry_run": false,
+  "issues": [
+    {
+      "number": 1,
+      "title": "",
+      "outcome": "failed",
+      "planned": [
+        {
+          "op": "set_status",
+          "from": "Ready",
+          "to": "Done"
+        },
+        {
+          "op": "close",
+          "reason": "completed"
+        }
+      ],
+      "applied": [],
+      "in_place": [],
+      "needs_yes": false,
+      "warnings": [],
+      "error": {
+        "exit_code": 4,
+        "message": "GitHub rejected the token (HTTP 401)",
+        "allowed": [],
+        "fix": "gh auth refresh -s project"
+      }
+    },
+    {
+      "number": 2,
+      "title": "",
+      "outcome": "not_attempted",
+      "planned": [
+        {
+          "op": "set_status",
+          "from": "Ready",
+          "to": "Done"
+        },
+        {
+          "op": "close",
+          "reason": "completed"
+        }
+      ],
+      "applied": [],
+      "in_place": [],
+      "needs_yes": false,
+      "warnings": [],
+      "error": {
+        "exit_code": 4,
+        "message": "not attempted: GitHub rejected the token (HTTP 401)",
+        "allowed": [],
+        "fix": "gh auth refresh -s project"
+      }
+    },
+    {
+      "number": 3,
+      "title": "",
+      "outcome": "unchanged",
+      "planned": [],
+      "applied": [],
+      "in_place": [
+        {
+          "op": "set_status",
+          "from": "Done",
+          "to": "Done"
+        },
+        {
+          "op": "close",
+          "reason": "completed"
+        }
+      ],
+      "needs_yes": false,
+      "warnings": [],
+      "error": null
+    },
+    {
+      "number": 4,
+      "title": "",
+      "outcome": "not_attempted",
+      "planned": [
+        {
+          "op": "set_status",
+          "from": "Ready",
+          "to": "Done"
+        },
+        {
+          "op": "close",
+          "reason": "completed"
+        }
+      ],
+      "applied": [],
+      "in_place": [],
+      "needs_yes": false,
+      "warnings": [],
+      "error": {
+        "exit_code": 4,
+        "message": "not attempted: GitHub rejected the token (HTTP 401)",
+        "allowed": [],
+        "fix": "gh auth refresh -s project"
+      }
+    }
+  ],
+  "summary": {
+    "total": 4,
+    "done": 1,
+    "written": 0,
+    "failed": 1,
+    "not_attempted": 2
+  }
+}
+
+--- stderr
+error: 1 of 4 done (0 written); #1: GitHub rejected the token (HTTP 401); #2, #4: not attempted: GitHub rejected the token (HTTP 401)
+re-run the same command to retry #1, #2, #4: it skips the issues done
+fix: gh auth refresh -s project

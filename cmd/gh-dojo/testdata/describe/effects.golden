@@ -2,6 +2,7 @@ code: 0
 --- stdout
 Process from .github/dojo.toml (preset kanban): board Trum-ok/5, issues in Trum-ok/gh-dojo.
 Run a verb as gh dojo <verb> <N>; --dry-run shows its plan first.
+Every command takes --json (schema_version 1), --jq and --template, as gh does.
 
 Verbs:
   start       You begin working on the issue

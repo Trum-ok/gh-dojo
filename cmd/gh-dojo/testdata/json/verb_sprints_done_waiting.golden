@@ -1,0 +1,5 @@
+code: 2
+--- stdout
+--- stderr
+error: done cannot move #43 from Waiting; it starts only from Ready or In progress
+this is a process rule: ask the user how to proceed

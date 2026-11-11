@@ -1,0 +1,91 @@
+code: 0
+--- stdout
+{
+  "schema_version": 1,
+  "issues": [
+    {
+      "number": 13,
+      "repo": "Trum-ok/gh-dojo",
+      "url": "https://github.com/Trum-ok/gh-dojo/issues/13",
+      "title": "Доска и .github/dojo.toml для самого gh-dojo",
+      "state": "open",
+      "state_reason": "",
+      "author": "Trum-ok",
+      "created_at": "2026-11-11T18:20:59Z",
+      "closed_at": null,
+      "incomplete": false,
+      "board": {
+        "on_board": true,
+        "unknown_reason": "",
+        "status": "Ready",
+        "status_unknown": false,
+        "archived": false,
+        "fields": [
+          {
+            "name": "Size",
+            "value": "S"
+          }
+        ],
+        "fields_truncated": false
+      },
+      "sprint": null,
+      "milestone": {
+        "title": "v0.0 — самохостинг",
+        "due_on": ""
+      },
+      "labels": [],
+      "labels_total": 0,
+      "assignees": [],
+      "assignees_total": 0,
+      "blocked_by": [
+        {
+          "ref": "#6",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 6,
+          "title": "Сверка конфига с доской",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": false,
+          "status_unknown_reason": "",
+          "resolved": true
+        },
+        {
+          "ref": "#4",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 4,
+          "title": "Пресет kanban через embed.FS",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": false,
+          "status_unknown_reason": "",
+          "resolved": true
+        }
+      ],
+      "blocked_by_total": 2,
+      "unresolved_blockers": 0,
+      "blocking": [
+        {
+          "ref": "#14",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 14,
+          "title": "Skill для агентов и переход на gh dojo (рубеж v0.0)",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": false,
+          "status_unknown_reason": "",
+          "resolved": true
+        }
+      ],
+      "blocking_total": 1,
+      "history_truncated": false,
+      "history_untracked": false,
+      "comments_total": 2
+    }
+  ],
+  "failed": []
+}
+
+--- stderr

@@ -1,0 +1,54 @@
+code: 0
+--- stdout
+{
+  "schema_version": 1,
+  "verb": "review",
+  "dry_run": false,
+  "issues": [
+    {
+      "number": 3,
+      "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)",
+      "outcome": "unchanged",
+      "planned": [],
+      "applied": [],
+      "in_place": [
+        {
+          "op": "set_status",
+          "from": "In review",
+          "to": "In review"
+        },
+        {
+          "op": "add_labels",
+          "labels": [
+            "enhancement"
+          ]
+        },
+        {
+          "op": "remove_labels",
+          "labels": [
+            "dogfood"
+          ]
+        },
+        {
+          "op": "assign",
+          "login": "Trum-ok"
+        },
+        {
+          "op": "add_comment"
+        }
+      ],
+      "needs_yes": false,
+      "warnings": [],
+      "error": null
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "done": 1,
+    "written": 0,
+    "failed": 0,
+    "not_attempted": 0
+  }
+}
+
+--- stderr

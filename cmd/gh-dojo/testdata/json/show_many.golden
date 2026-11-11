@@ -1,0 +1,244 @@
+code: 3
+--- stdout
+{
+  "schema_version": 1,
+  "issues": [
+    {
+      "number": 3,
+      "repo": "Trum-ok/gh-dojo",
+      "url": "https://github.com/Trum-ok/gh-dojo/issues/3",
+      "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)",
+      "state": "open",
+      "state_reason": "",
+      "author": "Trum-ok",
+      "created_at": "2026-11-11T18:19:10Z",
+      "closed_at": null,
+      "incomplete": false,
+      "board": {
+        "on_board": true,
+        "unknown_reason": "",
+        "status": "Ready",
+        "status_unknown": false,
+        "archived": false,
+        "fields": [
+          {
+            "name": "Size",
+            "value": "M"
+          }
+        ],
+        "fields_truncated": false
+      },
+      "sprint": null,
+      "milestone": {
+        "title": "v0.0 — самохостинг",
+        "due_on": ""
+      },
+      "labels": [],
+      "labels_total": 0,
+      "assignees": [],
+      "assignees_total": 0,
+      "blocked_by": [
+        {
+          "ref": "#2",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 2,
+          "title": "Коды выхода и короткие ошибки (internal/render)",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": false,
+          "status_unknown_reason": "",
+          "resolved": true
+        },
+        {
+          "ref": "#1",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 1,
+          "title": "Каркас: Go-модуль, cobra и установка как расширение gh",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": false,
+          "status_unknown_reason": "",
+          "resolved": true
+        }
+      ],
+      "blocked_by_total": 2,
+      "unresolved_blockers": 0,
+      "blocking": [
+        {
+          "ref": "#11",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 11,
+          "title": "Глаголы из конфига: проверки и план эффектов (internal/workflow)",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": false,
+          "status_unknown_reason": "",
+          "resolved": true
+        },
+        {
+          "ref": "#8",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 8,
+          "title": "Команда list",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": false,
+          "status_unknown_reason": "",
+          "resolved": true
+        },
+        {
+          "ref": "#7",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 7,
+          "title": "Команда show <N>…",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": false,
+          "status_unknown_reason": "",
+          "resolved": true
+        },
+        {
+          "ref": "#6",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 6,
+          "title": "Сверка конфига с доской",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": false,
+          "status_unknown_reason": "",
+          "resolved": true
+        },
+        {
+          "ref": "#4",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 4,
+          "title": "Пресет kanban через embed.FS",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": false,
+          "status_unknown_reason": "",
+          "resolved": true
+        }
+      ],
+      "blocking_total": 5,
+      "history_truncated": false,
+      "history_untracked": false,
+      "comments_total": 0
+    },
+    {
+      "number": 7,
+      "repo": "Trum-ok/gh-dojo",
+      "url": "https://github.com/Trum-ok/gh-dojo/issues/7",
+      "title": "Команда show <N>…",
+      "state": "open",
+      "state_reason": "",
+      "author": "Trum-ok",
+      "created_at": "2026-11-11T18:19:52Z",
+      "closed_at": null,
+      "incomplete": false,
+      "board": {
+        "on_board": true,
+        "unknown_reason": "",
+        "status": "Ready",
+        "status_unknown": false,
+        "archived": false,
+        "fields": [
+          {
+            "name": "Size",
+            "value": "M"
+          }
+        ],
+        "fields_truncated": false
+      },
+      "sprint": null,
+      "milestone": {
+        "title": "v0.0 — самохостинг",
+        "due_on": ""
+      },
+      "labels": [],
+      "labels_total": 0,
+      "assignees": [],
+      "assignees_total": 0,
+      "blocked_by": [
+        {
+          "ref": "#3",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 3,
+          "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": false,
+          "status_unknown_reason": "",
+          "resolved": true
+        },
+        {
+          "ref": "#2",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 2,
+          "title": "Коды выхода и короткие ошибки (internal/render)",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": false,
+          "status_unknown_reason": "",
+          "resolved": true
+        },
+        {
+          "ref": "#5",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 5,
+          "title": "GraphQL-клиент и схема доски с кэшем (internal/graph, internal/board)",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": false,
+          "status_unknown_reason": "",
+          "resolved": true
+        }
+      ],
+      "blocked_by_total": 3,
+      "unresolved_blockers": 0,
+      "blocking": [
+        {
+          "ref": "#14",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 14,
+          "title": "Skill для агентов и переход на gh dojo (рубеж v0.0)",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": false,
+          "status_unknown_reason": "",
+          "resolved": true
+        }
+      ],
+      "blocking_total": 1,
+      "history_truncated": false,
+      "history_untracked": false,
+      "comments_total": 1
+    }
+  ],
+  "failed": [
+    {
+      "number": 9999,
+      "error": {
+        "exit_code": 3,
+        "message": "issue #9999 not found in Trum-ok/gh-dojo",
+        "allowed": [],
+        "fix": "gh dojo list"
+      }
+    }
+  ]
+}
+
+--- stderr
+error: issue #9999 not found in Trum-ok/gh-dojo
+fix: gh dojo list

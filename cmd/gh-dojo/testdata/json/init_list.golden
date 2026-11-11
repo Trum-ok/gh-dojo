@@ -1,0 +1,45 @@
+code: 1
+--- stdout
+{
+  "schema_version": 1,
+  "owner": "Trum-ok",
+  "owner_type": "user",
+  "projects": [
+    {
+      "number": 1,
+      "title": "@Trum-ok's untitled project",
+      "items": 0,
+      "closed": true
+    },
+    {
+      "number": 2,
+      "title": "Emote",
+      "items": 0,
+      "closed": true
+    },
+    {
+      "number": 3,
+      "title": "@Trum-ok's untitled project",
+      "items": 0,
+      "closed": true
+    },
+    {
+      "number": 4,
+      "title": "IT Stupino Fall 2026 Kanban",
+      "items": 0,
+      "closed": false
+    },
+    {
+      "number": 5,
+      "title": "gh-dojo",
+      "items": 36,
+      "closed": false
+    }
+  ],
+  "suggested_project": 5,
+  "command": "gh dojo init --owner Trum-ok --project 5"
+}
+
+--- stderr
+error: choose a project: --project is required (user Trum-ok has 5 projects, listed above)
+fix: gh dojo init --owner Trum-ok --project 5

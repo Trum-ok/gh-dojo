@@ -1,0 +1,70 @@
+code: 0
+--- stdout
+{
+  "schema_version": 1,
+  "verb": "done",
+  "dry_run": false,
+  "issues": [
+    {
+      "number": 2,
+      "title": "",
+      "outcome": "applied",
+      "planned": [
+        {
+          "op": "set_status",
+          "from": "Ready",
+          "to": "Done"
+        },
+        {
+          "op": "close",
+          "reason": "completed"
+        }
+      ],
+      "applied": [
+        {
+          "op": "set_status",
+          "from": "Ready",
+          "to": "Done"
+        },
+        {
+          "op": "close",
+          "reason": "completed"
+        }
+      ],
+      "in_place": [],
+      "needs_yes": false,
+      "warnings": [],
+      "error": null
+    },
+    {
+      "number": 3,
+      "title": "",
+      "outcome": "unchanged",
+      "planned": [],
+      "applied": [],
+      "in_place": [
+        {
+          "op": "set_status",
+          "from": "Done",
+          "to": "Done"
+        },
+        {
+          "op": "close",
+          "reason": "completed"
+        }
+      ],
+      "needs_yes": false,
+      "warnings": [],
+      "error": null
+    }
+  ],
+  "summary": {
+    "total": 2,
+    "done": 2,
+    "written": 1,
+    "failed": 0,
+    "not_attempted": 0
+  }
+}
+
+--- stderr

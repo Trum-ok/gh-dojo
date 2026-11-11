@@ -1,0 +1,45 @@
+code: 0
+--- stdout
+{
+  "schema_version": 1,
+  "ok": true,
+  "checks": [
+    {
+      "name": "version",
+      "result": "ok",
+      "detail": "gh dojo dev",
+      "allowed": [],
+      "fix": ""
+    },
+    {
+      "name": "config",
+      "result": "ok",
+      "detail": ".github/dojo.toml: preset kanban, 4 verbs",
+      "allowed": [],
+      "fix": ""
+    },
+    {
+      "name": "token",
+      "result": "ok",
+      "detail": "github.com as Trum-ok, with the project scope",
+      "allowed": [],
+      "fix": ""
+    },
+    {
+      "name": "board",
+      "result": "ok",
+      "detail": "Trum-ok/5 \"gh-dojo\": field Status and 5 statuses match",
+      "allowed": [],
+      "fix": ""
+    },
+    {
+      "name": "repo",
+      "result": "ok",
+      "detail": "Trum-ok/gh-dojo (default): visible, issues enabled",
+      "allowed": [],
+      "fix": ""
+    }
+  ]
+}
+
+--- stderr

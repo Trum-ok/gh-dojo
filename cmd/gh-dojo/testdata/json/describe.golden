@@ -1,0 +1,281 @@
+code: 0
+--- stdout
+{
+  "schema_version": 1,
+  "config": ".github/dojo.toml",
+  "preset": "kanban",
+  "board": "Trum-ok/5",
+  "repos": [
+    "Trum-ok/gh-dojo"
+  ],
+  "verbs": [
+    {
+      "name": "start",
+      "when": "You begin working on the issue",
+      "from": [
+        "Backlog",
+        "Waiting",
+        "Ready"
+      ],
+      "to": "In progress",
+      "requires": [],
+      "requires_one_of": [],
+      "optional": [
+        "--comment"
+      ],
+      "batch": false,
+      "checks": [
+        "warns about unresolved blockers"
+      ],
+      "effects": [
+        "comments \"Started. Session: {session} {comment}\""
+      ]
+    },
+    {
+      "name": "wait",
+      "when": "Work is stuck: waiting for another issue or an outside decision",
+      "from": [
+        "In progress"
+      ],
+      "to": "Waiting",
+      "requires": [],
+      "requires_one_of": [
+        "--by",
+        "--comment"
+      ],
+      "optional": [],
+      "batch": false,
+      "checks": [],
+      "effects": [
+        "--by N also marks it blocked by #N",
+        "comments \"Waiting for {by}. {comment}\""
+      ]
+    },
+    {
+      "name": "ready",
+      "when": "The work is done, verified and committed, but not released yet",
+      "from": [
+        "In progress",
+        "Waiting"
+      ],
+      "to": "Ready",
+      "requires": [],
+      "requires_one_of": [],
+      "optional": [
+        "--comment"
+      ],
+      "batch": false,
+      "checks": [],
+      "effects": [
+        "comments \"{comment}\""
+      ]
+    },
+    {
+      "name": "done",
+      "when": "The change is released",
+      "from": [
+        "Ready",
+        "In progress"
+      ],
+      "to": "Done",
+      "requires": [],
+      "requires_one_of": [],
+      "optional": [
+        "--comment"
+      ],
+      "batch": true,
+      "checks": [
+        "also on closed issues"
+      ],
+      "effects": [
+        "comments \"{comment}\"",
+        "closes as completed"
+      ]
+    },
+    {
+      "name": "drop",
+      "when": "задача не нужна или дубль",
+      "from": [],
+      "to": "",
+      "requires": [
+        "--comment"
+      ],
+      "requires_one_of": [],
+      "optional": [],
+      "batch": false,
+      "checks": [
+        "also on closed issues",
+        "the user's decision: ask first, then --yes"
+      ],
+      "effects": [
+        "comments \"{comment}\"",
+        "closes as not planned"
+      ]
+    },
+    {
+      "name": "review",
+      "when": "A pull request waits for review",
+      "from": [
+        "In progress",
+        "Ready"
+      ],
+      "to": "In review",
+      "requires": [],
+      "requires_one_of": [],
+      "optional": [
+        "--comment"
+      ],
+      "batch": false,
+      "checks": [],
+      "effects": [
+        "labels +enhancement -dogfood",
+        "assigns you",
+        "comments \"{comment}\""
+      ]
+    },
+    {
+      "name": "revive",
+      "when": "A closed issue is needed after all",
+      "from": [],
+      "to": "Backlog",
+      "requires": [],
+      "requires_one_of": [],
+      "optional": [],
+      "batch": false,
+      "checks": [
+        "also on closed issues"
+      ],
+      "effects": [
+        "reopens"
+      ]
+    },
+    {
+      "name": "tag",
+      "when": "Tag it",
+      "from": [],
+      "to": "",
+      "requires": [],
+      "requires_one_of": [],
+      "optional": [],
+      "batch": false,
+      "checks": [],
+      "effects": [
+        "labels +enhancment"
+      ]
+    },
+    {
+      "name": "give",
+      "when": "Hand it over",
+      "from": [],
+      "to": "",
+      "requires": [],
+      "requires_one_of": [],
+      "optional": [],
+      "batch": false,
+      "checks": [],
+      "effects": [
+        "assigns octo-nobody"
+      ]
+    },
+    {
+      "name": "recase",
+      "when": "Labels, one in another case than the repository's",
+      "from": [],
+      "to": "",
+      "requires": [],
+      "requires_one_of": [],
+      "optional": [],
+      "batch": false,
+      "checks": [],
+      "effects": [
+        "labels +enhancement -Dogfood"
+      ]
+    },
+    {
+      "name": "tagcase",
+      "when": "Tag it, in another case than the repository's",
+      "from": [],
+      "to": "",
+      "requires": [],
+      "requires_one_of": [],
+      "optional": [],
+      "batch": false,
+      "checks": [],
+      "effects": [
+        "labels +Enhancement"
+      ]
+    },
+    {
+      "name": "untag",
+      "when": "Remove a label the repository does not have",
+      "from": [],
+      "to": "",
+      "requires": [],
+      "requires_one_of": [],
+      "optional": [],
+      "batch": false,
+      "checks": [],
+      "effects": [
+        "labels -no-such-label"
+      ]
+    },
+    {
+      "name": "hand",
+      "when": "Hand it to the owner, login in lowercase",
+      "from": [],
+      "to": "",
+      "requires": [],
+      "requires_one_of": [],
+      "optional": [],
+      "batch": false,
+      "checks": [],
+      "effects": [
+        "assigns trum-ok"
+      ]
+    }
+  ],
+  "statuses": {
+    "initial": "Backlog",
+    "final": [
+      "Done"
+    ],
+    "resolved": [
+      "Ready",
+      "Done"
+    ]
+  },
+  "exit_codes": [
+    {
+      "code": 0,
+      "meaning": "everything applied",
+      "next": "go on"
+    },
+    {
+      "code": 1,
+      "meaning": "bad arguments or config",
+      "next": "fix them as the error says"
+    },
+    {
+      "code": 2,
+      "meaning": "a process check refused",
+      "next": "don't work around it; ask the user"
+    },
+    {
+      "code": 3,
+      "meaning": "issue or board not found",
+      "next": "check the number (gh dojo list) or board.owner/project in .github/dojo.toml"
+    },
+    {
+      "code": 4,
+      "meaning": "network, rate limit or auth",
+      "next": "retry later, or gh auth refresh -s project"
+    },
+    {
+      "code": 5,
+      "meaning": "partially applied",
+      "next": "re-run the same command; it finishes the rest"
+    }
+  ]
+}
+
+--- stderr

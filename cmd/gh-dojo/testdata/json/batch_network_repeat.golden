@@ -1,0 +1,81 @@
+code: 0
+--- stdout
+{
+  "schema_version": 1,
+  "verb": "done",
+  "dry_run": false,
+  "issues": [
+    {
+      "number": 3,
+      "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)",
+      "outcome": "unchanged",
+      "planned": [],
+      "applied": [],
+      "in_place": [
+        {
+          "op": "set_status",
+          "from": "Done",
+          "to": "Done"
+        },
+        {
+          "op": "close",
+          "reason": "completed"
+        }
+      ],
+      "needs_yes": false,
+      "warnings": [],
+      "error": null
+    },
+    {
+      "number": 7,
+      "title": "Issue 7",
+      "outcome": "unchanged",
+      "planned": [],
+      "applied": [],
+      "in_place": [
+        {
+          "op": "set_status",
+          "from": "Done",
+          "to": "Done"
+        },
+        {
+          "op": "close",
+          "reason": "completed"
+        }
+      ],
+      "needs_yes": false,
+      "warnings": [],
+      "error": null
+    },
+    {
+      "number": 9,
+      "title": "Issue 9",
+      "outcome": "unchanged",
+      "planned": [],
+      "applied": [],
+      "in_place": [
+        {
+          "op": "set_status",
+          "from": "Done",
+          "to": "Done"
+        },
+        {
+          "op": "close",
+          "reason": "completed"
+        }
+      ],
+      "needs_yes": false,
+      "warnings": [],
+      "error": null
+    }
+  ],
+  "summary": {
+    "total": 3,
+    "done": 3,
+    "written": 0,
+    "failed": 0,
+    "not_attempted": 0
+  }
+}
+
+--- stderr

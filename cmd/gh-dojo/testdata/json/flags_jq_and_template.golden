@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: --jq and --template cannot be combined; use one
+fix: gh dojo list --help

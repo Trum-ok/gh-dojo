@@ -1,0 +1,18 @@
+code: 0
+--- stdout
+{
+  "schema_version": 1,
+  "number": 3,
+  "repo": "Trum-ok/gh-dojo",
+  "action": "unblock",
+  "changed": [
+    "#2"
+  ],
+  "unchanged": [
+    "#26"
+  ],
+  "missed": [],
+  "error": null
+}
+
+--- stderr

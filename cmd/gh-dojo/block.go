@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"slices"
 	"strconv"
 	"strings"
@@ -66,12 +67,11 @@ written (exit code 3).`
 		Args:    issueArg,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			n, _ := parseIssue(args[0]) // validated by issueArg
-			line, err := runLinks(cmd, add, n, bys)
-			if err != nil {
+			res, err := runLinks(cmd, add, n, bys)
+			if res == nil { // nothing done
 				return err
 			}
-			fmt.Fprintln(cmd.OutOrStdout(), line)
-			return nil
+			return emitResult(cmd, res, res.write, err) // err: done in part
 		},
 	}
 	cmd.Flags().StringArrayVar(&bys, byFlag, nil, "the blocking `issue`: 12, \"#12\", owner/repo#12 or its URL; repeatable, or comma-separated")
@@ -121,40 +121,41 @@ func parseBlockers(values []string, flag string, def issue.Repo, n int, help str
 }
 
 // runLinks adds (block) or removes (unblock) the blocked-by links between
-// issue n and the issues bys names, and returns the confirmation line:
+// issue n and the issues bys names, and returns what it did, also with
+// the error of a partial write; its confirmation line reads:
 //
 //	#42 blocked by #17 and acme/api#7, already blocked by #18
 //	#42 no longer blocked by #17, already not blocked by #18
-func runLinks(cmd *cobra.Command, add bool, n int, bys []string) (string, error) {
+func runLinks(cmd *cobra.Command, add bool, n int, bys []string) (*linksResult, error) {
 	help := cmd.CommandPath() + " --help"
 	noBy := func() error {
 		return render.Usage("%s needs --%s with the blocking issue, like: gh dojo %s %d --%s 17",
 			cmd.Name(), byFlag, cmd.Name(), n, byFlag).WithFix(help)
 	}
 	if len(bys) == 0 {
-		return "", noBy()
+		return nil, noBy()
 	}
 	ctx := cmd.Context()
 	a := newApp()
 	repo, err := a.Repo()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	refs, err := parseBlockers(bys, byFlag, repo, n, help)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if len(refs) == 0 {
-		return "", noBy() // --by "" or --by ","
+		return nil, noBy() // --by "" or --by ","
 	}
 	target, links, err := issue.ReadLinks(ctx, a.Client, repo, n, refs, "--"+byFlag)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	var change, same []*issue.Linked
 	for _, l := range links {
 		if l.ID == target.ID {
-			return "", selfBlock(n, "--"+byFlag)
+			return nil, selfBlock(n, "--"+byFlag)
 		}
 		if target.BlockedBy(l) == add {
 			same = append(same, l)
@@ -164,12 +165,19 @@ func runLinks(cmd *cobra.Command, add bool, n int, bys []string) (string, error)
 	}
 	for _, l := range change {
 		if add && l.BlockedBy(target.ID) {
-			return "", cycleError(n, l.Ref.String(repo), "--"+byFlag)
+			return nil, cycleError(n, l.Ref.String(repo), "--"+byFlag)
 		}
 	}
 	line := func(done []*issue.Linked) string { return linksConfirm(add, n, repo, done, same) }
+	result := func(done, missed []*issue.Linked, err error) *linksResult {
+		return &linksResult{
+			Number: n, Repo: repo.String(), Action: cmd.Name(),
+			Changed: refList(done, repo), Unchanged: refList(same, repo), Missed: refList(missed, repo),
+			Error: errorJSON(err), line: line(done), err: err,
+		}
+	}
 	if len(change) == 0 {
-		return line(nil), nil
+		return result(nil, nil, nil), nil
 	}
 
 	vars := map[string]any{"issue": target.ID}
@@ -193,14 +201,16 @@ func runLinks(cmd *cobra.Command, add bool, n int, bys []string) (string, error)
 	case graph.IsCycle(err):
 		// A cycle through other issues: re-running cannot help.
 		what := "GitHub refused to mark #" + strconv.Itoa(n) + " blocked by " + joinRefs(missed, repo) + ": it would make a dependency cycle"
-		if len(done) > 0 {
-			what = line(done) + "; " + what
+		e := render.Usage("%s", what).WithFix(fmt.Sprintf("gh dojo show %d", n)).WithCause(err)
+		if len(done) == 0 {
+			return nil, e
 		}
-		return "", render.Usage("%s", what).WithFix(fmt.Sprintf("gh dojo show %d", n)).WithCause(err)
+		e.What = line(done) + "; " + what
+		return result(done, missed, e), e
 	case len(done) == 0 && err != nil:
-		return "", err // a lost answer says "may have been applied, re-run": a re-run skips what is done
+		return nil, err // a lost answer says "may have been applied, re-run": a re-run skips what is done
 	case len(done) == 0:
-		return "", render.Network("GitHub returned no result for the write").WithFix("re-run the same command")
+		return nil, render.Network("GitHub returned no result for the write").WithFix("re-run the same command")
 	default:
 		what := "not blocked by "
 		if !add {
@@ -213,10 +223,46 @@ func runLinks(cmd *cobra.Command, add bool, n int, bys []string) (string, error)
 		if fix != "" {
 			next = fix + ", then " + next
 		}
-		return "", render.Partial("%s; %s%s: %s; %s", line(done), what, joinRefs(missed, repo), why, next).
+		e := render.Partial("%s; %s%s: %s; %s", line(done), what, joinRefs(missed, repo), why, next).
 			WithFix(fix).WithCause(err)
+		return result(done, missed, e), e
 	}
-	return line(done), nil
+	return result(done, nil, nil), nil
+}
+
+// linksResult is what block or unblock did, and its JSON. A partial write
+// has it too, with the links missed and the error.
+type linksResult struct {
+	Number int    `json:"number"`
+	Repo   string `json:"repo"`
+	Action string `json:"action"` // block or unblock
+	// Changed are the blockers linked (block) or unlinked (unblock) now,
+	// Unchanged those already as asked, Missed those a partial write left
+	// as they were (see error).
+	Changed   []string   `json:"changed"`
+	Unchanged []string   `json:"unchanged"`
+	Missed    []string   `json:"missed"`
+	Error     *jsonError `json:"error"`
+
+	line string // the confirmation line
+	err  error  // what stopped a partial write
+}
+
+// write prints the confirmation line; a partial write prints nothing, its
+// error says what was done.
+func (r *linksResult) write(w io.Writer) {
+	if r.err == nil {
+		fmt.Fprintln(w, r.line)
+	}
+}
+
+// refList is the refs of links, "#12" or "owner/name#12".
+func refList(links []*issue.Linked, repo issue.Repo) []string {
+	out := []string{}
+	for _, l := range links {
+		out = append(out, l.Ref.String(repo))
+	}
+	return out
 }
 
 // linkAlias is the alias of the i-th link field of a mutation, and the

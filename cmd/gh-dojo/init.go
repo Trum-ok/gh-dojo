@@ -153,20 +153,9 @@ func listInitProjects(cmd *cobra.Command, a *App, o initOpts, current string) er
 		return render.NotFound("%s %s has no projects this token can see", kind, ps.Owner).
 			WithFix(fmt.Sprintf("gh project create --owner %s --title <title>", ps.Owner))
 	}
-	width := 0
+	res := initProjects{Owner: ps.Owner, OwnerType: kind, Projects: []initProject{}}
 	for _, p := range ps.Projects {
-		width = max(width, len(strconv.Itoa(p.Number)))
-	}
-	out := cmd.OutOrStdout()
-	for _, p := range ps.Projects {
-		items := fmt.Sprintf("%d items", p.Items)
-		if p.Items == 1 {
-			items = "1 item"
-		}
-		if p.Closed {
-			items += ", closed"
-		}
-		fmt.Fprintf(out, "%*d  %s  (%s)\n", width, p.Number, oneLineText(p.Title), items)
+		res.Projects = append(res.Projects, initProject{Number: p.Number, Title: oneLineText(p.Title), Items: p.Items, Closed: p.Closed})
 	}
 	noun := "projects"
 	if len(ps.Projects) == 1 {
@@ -175,9 +164,51 @@ func listInitProjects(cmd *cobra.Command, a *App, o initOpts, current string) er
 	project := "<number>"
 	if p := pickProject(ps.Projects, current); p != nil {
 		project = strconv.Itoa(p.Number)
+		res.Suggested = &p.Number
 	}
-	return render.Usage("choose a project: --project is required (%s %s has %d %s, listed above)",
-		kind, ps.Owner, len(ps.Projects), noun).WithFix(o.command(ps.Owner, project, ""))
+	res.Command = o.command(ps.Owner, project, "")
+	return emitResult(cmd, res, res.write, render.Usage("choose a project: --project is required (%s %s has %d %s, listed above)",
+		kind, ps.Owner, len(ps.Projects), noun).WithFix(res.Command))
+}
+
+// initProjects is the owner's projects init lists without --project, and
+// its JSON. The command still exits 1: --project is required.
+type initProjects struct {
+	Owner     string        `json:"owner"`
+	OwnerType string        `json:"owner_type"` // user or organization
+	Projects  []initProject `json:"projects"`
+	// Suggested is the project the command names, null when the choice is
+	// not clear; Command writes the config ("<number>" when not clear).
+	Suggested *int   `json:"suggested_project"`
+	Command   string `json:"command"`
+}
+
+type initProject struct {
+	Number int    `json:"number"`
+	Title  string `json:"title"`
+	Items  int    `json:"items"`
+	Closed bool   `json:"closed"`
+}
+
+// write prints one line per project:
+//
+//	4  IT Stupino Fall 2026 Kanban  (0 items)
+//	5  gh-dojo  (36 items)
+func (r initProjects) write(w io.Writer) {
+	width := 0
+	for _, p := range r.Projects {
+		width = max(width, len(strconv.Itoa(p.Number)))
+	}
+	for _, p := range r.Projects {
+		items := fmt.Sprintf("%d items", p.Items)
+		if p.Items == 1 {
+			items = "1 item"
+		}
+		if p.Closed {
+			items += ", closed"
+		}
+		fmt.Fprintf(w, "%*d  %s  (%s)\n", width, p.Number, p.Title, items)
+	}
 }
 
 // pickProject returns the project the fix command should name: the only
@@ -248,7 +279,6 @@ func writeInitConfig(cmd *cobra.Command, a *App, o initOpts, repo string) error 
 		return render.Internal("the generated config does not load").WithCause(err)
 	}
 
-	out := cmd.OutOrStdout()
 	effects := []string{"with preset " + o.preset}
 	if repo != "" {
 		effects = append(effects, "repo "+repo)
@@ -259,27 +289,65 @@ func writeInitConfig(cmd *cobra.Command, a *App, o initOpts, repo string) error 
 	if len(problems) == 0 {
 		effects = append(effects, "matches the board")
 	}
+	res := initWritten{
+		Path: display, Written: !o.dryRun, Board: s.Ref().String(), BoardTitle: oneLineText(s.Title),
+		Preset: o.preset, Repos: []string{}, Matches: len(problems) == 0, Problems: []initProblemJSON{},
+		Content: string(data),
+	}
+	if repo != "" {
+		res.Repos = []string{repo}
+	}
+	for _, p := range problems {
+		res.Problems = append(res.Problems, initProblemJSON{Problem: p.what, Fix: p.fix})
+	}
 	subject := fmt.Sprintf("wrote %s for board %s", display, s.Ref())
+	var text func(io.Writer)
 	if o.dryRun {
-		if _, err := out.Write(data); err != nil {
-			return err
-		}
+		// The file on stdout, so it can be redirected; the line on stderr.
 		subject = fmt.Sprintf("dry run, not written: %s for board %s", display, s.Ref())
-		fmt.Fprintln(cmd.ErrOrStderr(), render.Confirm(subject, s.Title, effects...))
+		text = func(w io.Writer) {
+			_, _ = w.Write(data)
+			fmt.Fprintln(cmd.ErrOrStderr(), render.Confirm(subject, s.Title, effects...))
+		}
 	} else {
 		if err := writeFile(path, data); err != nil {
 			return render.Usage("cannot write %s: %v", display, err).WithCause(err)
 		}
-		fmt.Fprintln(out, render.Confirm(subject, s.Title, effects...))
+		text = func(w io.Writer) { fmt.Fprintln(w, render.Confirm(subject, s.Title, effects...)) }
 	}
+	err = emit(cmd, res, text)
 	if len(problems) == 0 {
-		return nil
+		return err
+	}
+	if err != nil { // the mismatch decides the exit code
+		render.Warn(cmd.ErrOrStderr(), "%s", render.FromError(err).What)
 	}
 	fix := "gh dojo list" // checks the config against the board again
 	if o.dryRun {
 		fix = o.command(o.owner, project, "")
 	}
 	return reportProblems(cmd.ErrOrStderr(), cfg, s, problems, o.dryRun, fix)
+}
+
+// initWritten is the config init wrote, or would write with --dry-run,
+// and its JSON. With problems the command exits 1; the file is kept.
+type initWritten struct {
+	Path       string   `json:"path"`    // relative to the current directory
+	Written    bool     `json:"written"` // false for --dry-run
+	Board      string   `json:"board"`   // owner/number
+	BoardTitle string   `json:"board_title"`
+	Preset     string   `json:"preset"`
+	Repos      []string `json:"repos"` // board.repos; none: the current repository is used
+	// Matches says the config matches the board; else Problems lists what
+	// does not, each with its fix (also on stderr).
+	Matches  bool              `json:"matches_board"`
+	Problems []initProblemJSON `json:"problems"`
+	Content  string            `json:"content"` // the file's text
+}
+
+type initProblemJSON struct {
+	Problem string `json:"problem"`
+	Fix     string `json:"fix"`
 }
 
 // gitRoot returns dir or the nearest parent that contains .git.

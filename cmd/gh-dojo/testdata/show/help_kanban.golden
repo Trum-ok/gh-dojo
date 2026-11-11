@@ -39,4 +39,9 @@ Flags:
       --comments N|all   how many of the latest comments to print, or all (up to 100) (default 5)
       --full             print descriptions and comments without cutting them
   -h, --help             help for show
+
+Global Flags:
+  -q, --jq expression       filter the JSON with a jq expression (implies --json)
+      --json                print the result as JSON (schema_version 1); errors stay text on stderr
+  -t, --template template   format the JSON with a Go template (implies --json)
 --- stderr

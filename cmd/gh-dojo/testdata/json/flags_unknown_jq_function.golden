@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: invalid --jq expression: function not defined: nosuchfn/1
+fix: gh dojo show --help

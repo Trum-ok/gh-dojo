@@ -1,0 +1,10 @@
+code: 0
+--- stdout
+{
+  "schema_version": 1,
+  "number": 3,
+  "repo": "Trum-ok/gh-dojo",
+  "posted": true
+}
+
+--- stderr

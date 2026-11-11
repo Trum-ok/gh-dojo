@@ -197,38 +197,56 @@ func runVerb(cmd *cobra.Command, cfg *config.Config, v config.Verb, n int, args 
 	for _, w := range plan.Warnings {
 		render.Warn(cmd.ErrOrStderr(), "%s", w)
 	}
+	run := &verbRun{first: plan, stderr: cmd.ErrOrStderr()}
+	it := &batchItem{n: n, run: run}
 	if dryRun {
-		fmt.Fprintln(cmd.OutOrStdout(), plan.DryRun())
-		return nil
+		return emit(cmd, verbJSON(v.Name, true, []*batchItem{it}), func(w io.Writer) {
+			fmt.Fprintln(w, plan.DryRun())
+		})
 	}
 	if err := plan.Unconfirmed(); err != nil {
 		return err
 	}
-	run := &verbRun{first: plan, stderr: cmd.ErrOrStderr()}
-	if err := run.apply(ctx, be, plan); err != nil {
-		if !board.IsStale(err) {
-			return run.partial(missing(plan.Ops, run.done), err, err)
-		}
-		// A board ID from the schema cache went stale, and part of the plan
-		// may have been applied. Drop the cache, re-read, re-plan and apply
-		// what is left, once. A transport failure is never retried here:
-		// its outcome is unknown and the agent re-runs the command.
-		if rerr := be.Reset(); rerr != nil {
-			return run.partial(missing(plan.Ops, run.done), err, err)
-		}
-		fresh, perr := readPlan(ctx, be, engine, v, n, args)
-		if perr != nil {
-			return run.partial(missing(plan.Ops, run.done), err, perr)
-		}
-		// What the first attempt confirmed is not sent again, even if the
-		// re-read does not show it yet.
-		fresh.Ops = missing(fresh.Ops, run.done)
-		run.fresh = fresh
-		if err := run.apply(ctx, be, fresh); err != nil {
-			return run.partial(missing(fresh.Ops, run.done), err, err)
-		}
+	it.err = run.applyFresh(ctx, be, func() (*workflow.Plan, error) { return readPlan(ctx, be, engine, v, n, args) })
+	if it.err != nil && len(run.done) == 0 {
+		return it.err // nothing written: stdout stays empty
 	}
-	fmt.Fprintln(cmd.OutOrStdout(), run.applied().Confirm())
+	// A partial write prints what it applied as JSON; its text is the error.
+	return emitResult(cmd, verbJSON(v.Name, false, []*batchItem{it}), func(w io.Writer) {
+		if it.err == nil {
+			fmt.Fprintln(w, run.applied().Confirm())
+		}
+	}, it.err)
+}
+
+// applyFresh applies r.first. When GitHub rejects a board ID from the
+// schema cache, part of the plan may have been applied: it drops the
+// cache, re-plans with replan and applies what is left, once. A transport
+// failure is never retried here: its outcome is unknown and the agent
+// re-runs the command. The error is r.partial's.
+func (r *verbRun) applyFresh(ctx context.Context, be Backend, replan func() (*workflow.Plan, error)) error {
+	plan := r.first
+	err := r.apply(ctx, be, plan)
+	switch {
+	case err == nil:
+		return nil
+	case !board.IsStale(err):
+		return r.partial(missing(plan.Ops, r.done), err, err)
+	}
+	if rerr := be.Reset(); rerr != nil {
+		return r.partial(missing(plan.Ops, r.done), err, err)
+	}
+	fresh, perr := replan()
+	if perr != nil {
+		return r.partial(missing(plan.Ops, r.done), err, perr)
+	}
+	// What the first attempt confirmed is not sent again, even if the
+	// re-read does not show it yet.
+	fresh.Ops = missing(fresh.Ops, r.done)
+	r.fresh = fresh
+	if err := r.apply(ctx, be, fresh); err != nil {
+		return r.partial(missing(fresh.Ops, r.done), err, err)
+	}
 	return nil
 }
 

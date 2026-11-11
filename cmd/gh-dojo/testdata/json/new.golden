@@ -1,0 +1,21 @@
+code: 0
+--- stdout
+{
+  "schema_version": 1,
+  "number": 15,
+  "repo": "Trum-ok/gh-dojo",
+  "title": "Fix login redirect",
+  "created": true,
+  "labels": [
+    "bug",
+    "area:cli"
+  ],
+  "status": "Backlog",
+  "status_set": true,
+  "unarchived": false,
+  "blocked_by": [],
+  "already_blocked_by": [],
+  "error": null
+}
+
+--- stderr

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"slices"
 	"strings"
 
@@ -23,46 +24,53 @@ lifecycle (from → to), the initial, final and resolved statuses, and the exit
 codes. gh dojo <verb> --help has the details of one verb.
 
 It reads only ` + config.FileName + `, never the network. A missing or broken
-config is printed as an error (exit code 1).`,
+config is printed as an error (exit code 1). --json gives the same as data.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg, err := loadConfig()
 			if err != nil {
 				return err
 			}
-			fmt.Fprint(cmd.OutOrStdout(), describeProcess(cfg).text())
-			return nil
+			p := describeProcess(cfg)
+			return emit(cmd, p, func(w io.Writer) { fmt.Fprint(w, p.text()) })
 		},
 	}, nil
 }
 
-// process is what describe prints, as data (for --json later).
+// process is what describe prints, and its JSON.
 type process struct {
 	Config    string            `json:"config"`
-	Preset    string            `json:"preset,omitempty"`
-	Board     string            `json:"board"`           // owner/number
-	Repos     []string          `json:"repos,omitempty"` // the first is the default; none: the current repository
+	Preset    string            `json:"preset"` // "" without one
+	Board     string            `json:"board"`  // owner/number
+	Repos     []string          `json:"repos"`  // the first is the default; none: the current repository
 	Verbs     []processVerb     `json:"verbs"`
-	Statuses  config.Statuses   `json:"statuses"`
-	ExitCodes []processExitCode `json:"exitCodes"`
+	Statuses  processStatuses   `json:"statuses"`
+	ExitCodes []processExitCode `json:"exit_codes"`
 
 	// sprint and fields say some verb sets the sprint or other board
 	// fields, for the sentence on repeats.
 	sprint, fields bool
 }
 
+// processStatuses are the statuses with a role in the process.
+type processStatuses struct {
+	Initial  string   `json:"initial"`  // new issues; "" for none
+	Final    []string `json:"final"`    // list hides them
+	Resolved []string `json:"resolved"` // a blocker in one no longer blocks
+}
+
 // processVerb is one verb as describe shows it.
 type processVerb struct {
 	Name          string   `json:"name"`
 	When          string   `json:"when"`
-	From          []string `json:"from"`         // empty: any status
-	To            string   `json:"to,omitempty"` // empty: the status is not changed
-	Requires      []string `json:"requires,omitempty"`
-	RequiresOneOf []string `json:"requiresOneOf,omitempty"`
-	Optional      []string `json:"optional,omitempty"`
-	Batch         bool     `json:"batch,omitempty"`   // takes several issue numbers
-	Checks        []string `json:"checks,omitempty"`  // beyond from and the arguments
-	Effects       []string `json:"effects,omitempty"` // along the way, beyond the status
+	From          []string `json:"from"` // empty: any status
+	To            string   `json:"to"`   // empty: the status is not changed
+	Requires      []string `json:"requires"`
+	RequiresOneOf []string `json:"requires_one_of"`
+	Optional      []string `json:"optional"`
+	Batch         bool     `json:"batch"`   // takes several issue numbers
+	Checks        []string `json:"checks"`  // beyond from and the arguments
+	Effects       []string `json:"effects"` // along the way, beyond the status
 }
 
 type processExitCode struct {
@@ -178,14 +186,20 @@ const maxTemplateRunes = 60
 // describeProcess collects what describe shows about cfg.
 func describeProcess(cfg *config.Config) *process {
 	p := &process{
-		Config:   cfg.Display,
-		Preset:   cfg.Preset,
-		Board:    fmt.Sprintf("%s/%d", cfg.Board.Owner, cfg.Board.Project),
-		Repos:    cfg.Board.Repos,
-		Statuses: cfg.Statuses,
+		Config: cfg.Display,
+		Preset: cfg.Preset,
+		Board:  fmt.Sprintf("%s/%d", cfg.Board.Owner, cfg.Board.Project),
+		Repos:  orEmpty(cfg.Board.Repos),
+		Verbs:  []processVerb{},
+		Statuses: processStatuses{
+			Initial: cfg.Statuses.Initial, Final: orEmpty(cfg.Statuses.Final), Resolved: orEmpty(cfg.Statuses.Resolved),
+		},
 	}
 	for _, v := range cfg.Verbs {
-		pv := processVerb{Name: v.Name, When: v.When, From: v.From, To: v.To, Batch: v.Batch}
+		pv := processVerb{
+			Name: v.Name, When: v.When, From: orEmpty(v.From), To: v.To, Batch: v.Batch,
+			Requires: []string{}, RequiresOneOf: []string{}, Optional: []string{}, Checks: []string{}, Effects: []string{},
+		}
 		for _, arg := range config.Args() {
 			switch {
 			case slices.Contains(v.Require, arg):
@@ -222,6 +236,7 @@ func describeProcess(cfg *config.Config) *process {
 //
 //	Process from .github/dojo.toml (preset kanban): board acme/3, issues in acme/shop.
 //	Run a verb as gh dojo <verb> <N>; --dry-run shows its plan first.
+//	Every command takes --json (schema_version 1), --jq and --template, as gh does.
 //
 //	Verbs:
 //	  wait        Work is stuck: waiting for another issue or an outside decision
@@ -241,7 +256,8 @@ func (p *process) text() string {
 		issues = strings.Join(p.Repos, ", ")
 	}
 	sections := []string{fmt.Sprintf("%s: board %s, issues in %s.\n"+
-		"Run a verb as gh dojo <verb> <N>; --dry-run shows its plan first.", head, p.Board, issues)}
+		"Run a verb as gh dojo <verb> <N>; --dry-run shows its plan first.\n"+
+		"Every command takes --json (schema_version 1), --jq and --template, as gh does.", head, p.Board, issues)}
 
 	if len(p.Verbs) == 0 {
 		sections = append(sections, "No verbs: add them under [verbs] in "+p.Config+".")

@@ -199,21 +199,44 @@ func (v cardView) isSprint(val issue.Value) bool {
 // sprint is the card's sprint: the iteration with its days, "none", or
 // why it is not known.
 func (v cardView) sprint(c *issue.Card) string {
+	it, unknown := v.sprintOf(c)
 	switch {
-	case c.BoardUnknown:
-		return "unknown (board membership unknown)"
+	case unknown == sprintBoardUnknown:
+		return "unknown (" + unknown + ")"
+	case unknown != "":
+		return "not read (" + unknown + ")"
+	case it != nil:
+		return it.Span()
 	case c.Item == nil:
 		return "none (not on the board)"
 	}
+	return "none"
+}
+
+// Why the sprint of a card is not known, for sprintOf.
+const (
+	sprintBoardUnknown = "board membership unknown"
+	sprintNotRead      = "more fields than read"
+)
+
+// sprintOf returns the card's iteration of the sprint field, nil for none;
+// unknown says why it is not known ("" when it is).
+func (v cardView) sprintOf(c *issue.Card) (it *board.Iteration, unknown string) {
+	switch {
+	case c.BoardUnknown:
+		return nil, sprintBoardUnknown
+	case c.Item == nil:
+		return nil, ""
+	}
 	for _, val := range c.Item.Values {
 		if v.isSprint(val) {
-			return board.Iteration{Title: val.Text, StartDate: val.StartDate, Duration: val.Duration}.Span()
+			return &board.Iteration{Title: val.Text, StartDate: val.StartDate, Duration: val.Duration}, ""
 		}
 	}
 	if c.Item.ValuesTruncated {
-		return "not read (more fields than read)"
+		return nil, sprintNotRead
 	}
-	return "none"
+	return nil, ""
 }
 
 // Now is the App's clock: its loader's (tests fix it), else the system's.

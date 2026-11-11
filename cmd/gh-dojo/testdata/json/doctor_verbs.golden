@@ -1,0 +1,81 @@
+code: 1
+--- stdout
+{
+  "schema_version": 1,
+  "ok": false,
+  "checks": [
+    {
+      "name": "version",
+      "result": "ok",
+      "detail": "gh dojo dev",
+      "allowed": [],
+      "fix": ""
+    },
+    {
+      "name": "config",
+      "result": "ok",
+      "detail": ".github/dojo.toml: preset kanban, 13 verbs",
+      "allowed": [],
+      "fix": ""
+    },
+    {
+      "name": "token",
+      "result": "ok",
+      "detail": "github.com as Trum-ok, with the project scope",
+      "allowed": [],
+      "fix": ""
+    },
+    {
+      "name": "board",
+      "result": "ok",
+      "detail": "Trum-ok/5 \"gh-dojo\": field Status and 6 statuses match",
+      "allowed": [],
+      "fix": ""
+    },
+    {
+      "name": "repo",
+      "result": "ok",
+      "detail": "Trum-ok/gh-dojo (default): visible, issues enabled",
+      "allowed": [],
+      "fix": ""
+    },
+    {
+      "name": "verbs",
+      "result": "problem",
+      "detail": "verbs.tag.labels: no label \"enhancment\" in Trum-ok/gh-dojo",
+      "allowed": [],
+      "fix": "gh label create \"enhancment\" -R Trum-ok/gh-dojo, or fix verbs.tag.labels"
+    },
+    {
+      "name": "verbs",
+      "result": "problem",
+      "detail": "verbs.give.assign: octo-nobody cannot be assigned issues in Trum-ok/gh-dojo",
+      "allowed": [],
+      "fix": "check the login, or give octo-nobody access to Trum-ok/gh-dojo"
+    },
+    {
+      "name": "verbs",
+      "result": "problem",
+      "detail": "verbs.recase.labels: no label \"Dogfood\" in Trum-ok/gh-dojo",
+      "allowed": [],
+      "fix": "write it as \"dogfood\" in verbs.recase.labels"
+    },
+    {
+      "name": "verbs",
+      "result": "problem",
+      "detail": "verbs.tagcase.labels: no label \"Enhancement\" in Trum-ok/gh-dojo",
+      "allowed": [],
+      "fix": "write it as \"enhancement\" in verbs.tagcase.labels"
+    },
+    {
+      "name": "verbs",
+      "result": "problem",
+      "detail": "verbs.untag.labels: no label \"no-such-label\" in Trum-ok/gh-dojo, so -no-such-label never removes anything",
+      "allowed": [],
+      "fix": "edit verbs.untag.labels, or gh label create \"no-such-label\" -R Trum-ok/gh-dojo"
+    }
+  ]
+}
+
+--- stderr
+error: doctor found 5 problems; fix as shown above, then run gh dojo doctor again

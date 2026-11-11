@@ -39,7 +39,8 @@ import (
 // render.NotFound, ...) so the agent gets the right exit code and a short
 // message; Args validation failures become usage errors automatically. A
 // command with subcommands needs no RunE: it prints its help, and an unknown
-// subcommand is a usage error. Write results to cmd.OutOrStdout() and
+// subcommand is a usage error. Print results with emit (output.go), which
+// writes text, or JSON with --json, from the same typed result; write
 // warnings to cmd.ErrOrStderr().
 
 // constructor builds one or more top-level commands.
@@ -86,6 +87,7 @@ func buildRoot(ctors []constructor) (*cobra.Command, error) {
 		RunE:                       func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
 	}
 	root.SetUsageTemplate(rootUsageTemplate(root.UsageTemplate()))
+	addOutputFlags(root)
 	root.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		// `gh dojo start 42 --dry-run` without a loadable config fails on the
 		// verb's flag before the root's Args see "start".

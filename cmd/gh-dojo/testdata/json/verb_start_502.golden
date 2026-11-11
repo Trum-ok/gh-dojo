@@ -1,0 +1,5 @@
+code: 4
+--- stdout
+--- stderr
+warning: #3 has unresolved blockers: #2 (not on the board), #1 (not on the board)
+error: GitHub write failed (HTTP 502); it may have been applied, re-run the command to check

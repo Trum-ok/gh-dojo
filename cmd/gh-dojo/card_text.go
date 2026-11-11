@@ -391,7 +391,7 @@ func (v cardView) writeComments(b *strings.Builder, c *issue.Card) {
 		b.WriteString("comments: none\n")
 		return
 	}
-	shown := nodes[len(nodes)-min(len(nodes), v.comments):]
+	shown, bodies, limit := v.shownComments(c)
 	var hint string
 	switch {
 	case len(shown) == 0:
@@ -406,16 +406,6 @@ func (v cardView) writeComments(b *strings.Builder, c *issue.Card) {
 	} else {
 		fmt.Fprintf(b, "comments (%d):\n", total)
 	}
-	bodies := make([]string, len(shown))
-	lengths := make([]int, len(shown))
-	for i, cm := range shown {
-		bodies[i] = cleanText(cm.Body, cm.ViewerDidAuthor)
-		if bodies[i] == "" {
-			bodies[i] = "(empty)"
-		}
-		lengths[i] = utf8.RuneCountInString(bodies[i])
-	}
-	limit := v.commentLimit(lengths)
 	for i, cm := range shown {
 		fmt.Fprintf(b, "--- %s, %s\n", cardLogin(cm.Author), cardMinute(cm.CreatedAt))
 		text, note := fold(bodies[i], limit)
@@ -424,6 +414,24 @@ func (v cardView) writeComments(b *strings.Builder, c *issue.Card) {
 			b.WriteString("  " + note + "\n")
 		}
 	}
+}
+
+// shownComments returns the last v.comments comments of c, oldest first,
+// their cleaned bodies ("(empty)" for an empty one) and where to cut them
+// (see commentLimit).
+func (v cardView) shownComments(c *issue.Card) (shown []issue.Comment, bodies []string, limit int) {
+	nodes := c.Comments.Nodes
+	shown = nodes[len(nodes)-min(len(nodes), v.comments):]
+	bodies = make([]string, len(shown))
+	lengths := make([]int, len(shown))
+	for i, cm := range shown {
+		bodies[i] = cleanText(cm.Body, cm.ViewerDidAuthor)
+		if bodies[i] == "" {
+			bodies[i] = "(empty)"
+		}
+		lengths[i] = utf8.RuneCountInString(bodies[i])
+	}
+	return shown, bodies, v.commentLimit(lengths)
 }
 
 // commentLimit is where comments of these lengths are cut so that together

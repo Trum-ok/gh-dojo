@@ -1,0 +1,108 @@
+code: 5
+--- stdout
+{
+  "schema_version": 1,
+  "verb": "done",
+  "dry_run": false,
+  "issues": [
+    {
+      "number": 3,
+      "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)",
+      "outcome": "applied",
+      "planned": [
+        {
+          "op": "set_status",
+          "from": "Ready",
+          "to": "Done"
+        },
+        {
+          "op": "close",
+          "reason": "completed"
+        }
+      ],
+      "applied": [
+        {
+          "op": "set_status",
+          "from": "Ready",
+          "to": "Done"
+        },
+        {
+          "op": "close",
+          "reason": "completed"
+        }
+      ],
+      "in_place": [],
+      "needs_yes": false,
+      "warnings": [],
+      "error": null
+    },
+    {
+      "number": 7,
+      "title": "Issue 7",
+      "outcome": "failed",
+      "planned": [
+        {
+          "op": "set_status",
+          "from": "Ready",
+          "to": "Done"
+        },
+        {
+          "op": "close",
+          "reason": "completed"
+        }
+      ],
+      "applied": [],
+      "in_place": [],
+      "needs_yes": false,
+      "warnings": [],
+      "error": {
+        "exit_code": 4,
+        "message": "GitHub write failed (HTTP 502); it may have been applied, re-run the command to check",
+        "allowed": [],
+        "fix": ""
+      }
+    },
+    {
+      "number": 9,
+      "title": "Issue 9",
+      "outcome": "applied",
+      "planned": [
+        {
+          "op": "set_status",
+          "from": "Ready",
+          "to": "Done"
+        },
+        {
+          "op": "close",
+          "reason": "completed"
+        }
+      ],
+      "applied": [
+        {
+          "op": "set_status",
+          "from": "Ready",
+          "to": "Done"
+        },
+        {
+          "op": "close",
+          "reason": "completed"
+        }
+      ],
+      "in_place": [],
+      "needs_yes": false,
+      "warnings": [],
+      "error": null
+    }
+  ],
+  "summary": {
+    "total": 3,
+    "done": 2,
+    "written": 2,
+    "failed": 1,
+    "not_attempted": 0
+  }
+}
+
+--- stderr
+error: 2 of 3 done; #7: GitHub write failed (HTTP 502)
+re-run the same command to retry #7: it skips the issues done

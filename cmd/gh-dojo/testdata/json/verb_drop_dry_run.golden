@@ -1,0 +1,38 @@
+code: 0
+--- stdout
+{
+  "schema_version": 1,
+  "verb": "drop",
+  "dry_run": true,
+  "issues": [
+    {
+      "number": 3,
+      "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)",
+      "outcome": "planned",
+      "planned": [
+        {
+          "op": "add_comment",
+          "body": "Duplicate of #2."
+        },
+        {
+          "op": "close",
+          "reason": "not_planned"
+        }
+      ],
+      "applied": [],
+      "in_place": [],
+      "needs_yes": true,
+      "warnings": [],
+      "error": null
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "done": 1,
+    "written": 0,
+    "failed": 0,
+    "not_attempted": 0
+  }
+}
+
+--- stderr

@@ -1,0 +1,48 @@
+code: 0
+--- stdout
+{
+  "schema_version": 1,
+  "verb": "start",
+  "dry_run": false,
+  "issues": [
+    {
+      "number": 3,
+      "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)",
+      "outcome": "applied",
+      "planned": [
+        {
+          "op": "set_status",
+          "from": "Ready",
+          "to": "In progress"
+        }
+      ],
+      "applied": [
+        {
+          "op": "set_status",
+          "from": "Ready",
+          "to": "In progress"
+        }
+      ],
+      "in_place": [
+        {
+          "op": "add_comment"
+        }
+      ],
+      "needs_yes": false,
+      "warnings": [
+        "#3 has unresolved blockers: #2 (not on the board), #1 (not on the board)"
+      ],
+      "error": null
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "done": 1,
+    "written": 1,
+    "failed": 0,
+    "not_attempted": 0
+  }
+}
+
+--- stderr
+warning: #3 has unresolved blockers: #2 (not on the board), #1 (not on the board)

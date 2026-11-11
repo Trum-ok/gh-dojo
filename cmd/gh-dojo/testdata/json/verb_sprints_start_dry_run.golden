@@ -1,0 +1,48 @@
+code: 0
+--- stdout
+{
+  "schema_version": 1,
+  "verb": "start",
+  "dry_run": true,
+  "issues": [
+    {
+      "number": 43,
+      "title": "Pay with gift cards",
+      "outcome": "planned",
+      "planned": [
+        {
+          "op": "set_status",
+          "from": "Waiting",
+          "to": "In progress"
+        },
+        {
+          "op": "set_iteration",
+          "from": "Sprint 11",
+          "to": "Sprint 12",
+          "start_date": "2026-11-09"
+        },
+        {
+          "op": "add_comment",
+          "body": "Card form first"
+        }
+      ],
+      "applied": [],
+      "in_place": [],
+      "needs_yes": false,
+      "warnings": [
+        "#43 has unresolved blockers: #41 (In progress)"
+      ],
+      "error": null
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "done": 1,
+    "written": 0,
+    "failed": 0,
+    "not_attempted": 0
+  }
+}
+
+--- stderr
+warning: #43 has unresolved blockers: #41 (In progress)

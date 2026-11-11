@@ -167,8 +167,63 @@ func runList(cmd *cobra.Command, o *listOpts) error {
 		repo = r.String()
 	}
 	l := buildList(cfg, field.OptionNames(), items, o)
-	l.write(cmd.OutOrStdout(), repo, cfg, o)
-	return nil
+	return emit(cmd, l.result(o, items), func(w io.Writer) { l.write(w, repo, cfg, o) })
+}
+
+// listResult is list's JSON: the issues printed, in the same order and
+// cut to --limit, and the counts of those left out.
+type listResult struct {
+	// Sprint is the iteration --sprint selects, null without --sprint or
+	// for --sprint none.
+	Sprint  *jsonIteration `json:"sprint"`
+	Issues  []listIssue    `json:"issues"`
+	Matched int            `json:"matched"` // issues that pass the filters; more than len(issues) when cut by --limit
+	// Unchecked counts issues listed though a --label may be among their
+	// labels not read.
+	Unchecked int `json:"unchecked"`
+	Hidden    int `json:"hidden"`   // closed or in a final status: --all shows them
+	Filtered  int `json:"filtered"` // not matching the filters
+	Skipped   struct {
+		DraftIssues  int `json:"draft_issues"`
+		PullRequests int `json:"pull_requests"`
+		Unseen       int `json:"unseen"` // items the token cannot see
+	} `json:"skipped"`
+	// Incomplete: GitHub withheld parts of some items (warned on stderr).
+	Incomplete bool `json:"incomplete"`
+}
+
+type listIssue struct {
+	Repo           string   `json:"repo"`
+	Number         int      `json:"number"`
+	Title          string   `json:"title"`
+	State          string   `json:"state"`  // open or closed
+	Status         string   `json:"status"` // "" for no status
+	Labels         []string `json:"labels"`
+	LabelsTotal    int      `json:"labels_total"`
+	Assignees      []string `json:"assignees"`
+	AssigneesTotal int      `json:"assignees_total"`
+}
+
+// result is the list as JSON, cut to o.limit as write cuts it.
+func (l *list) result(o *listOpts, items *board.Items) listResult {
+	r := listResult{
+		Sprint: iterationJSON(o.sprintIt), Issues: []listIssue{}, Matched: l.shown,
+		Unchecked: l.unchecked, Hidden: l.hidden, Filtered: l.filtered, Incomplete: items.Incomplete,
+	}
+	r.Skipped.DraftIssues, r.Skipped.PullRequests, r.Skipped.Unseen = l.drafts, l.pulls, l.unseen
+	for _, g := range l.groups {
+		for _, it := range g.items {
+			if len(r.Issues) == o.limit {
+				return r
+			}
+			r.Issues = append(r.Issues, listIssue{
+				Repo: it.Repo, Number: it.Number, Title: singleLine(it.Title), State: strings.ToLower(it.State),
+				Status: it.Status, Labels: orEmpty(it.Labels.Nodes), LabelsTotal: max(it.Labels.TotalCount, len(it.Labels.Nodes)),
+				Assignees: orEmpty(it.Assignees.Nodes), AssigneesTotal: max(it.Assignees.TotalCount, len(it.Assignees.Nodes)),
+			})
+		}
+	}
+	return r
 }
 
 // checkFilters validates --status and --sprint against the board (see

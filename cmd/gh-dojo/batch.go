@@ -60,7 +60,7 @@ func runBatch(cmd *cobra.Command, cfg *config.Config, v config.Verb, ns []int, a
 	}
 	ctx := cmd.Context()
 	b := &batchRun{
-		be: be, engine: workflow.New(cfg), v: v, args: args,
+		be: be, engine: workflow.New(cfg), v: v, args: args, json: jsonMode(cmd),
 		stdout: cmd.OutOrStdout(), stderr: cmd.ErrOrStderr(), warned: map[string]bool{},
 	}
 	b.engine.Getenv = getenv
@@ -79,14 +79,16 @@ func runBatch(cmd *cobra.Command, cfg *config.Config, v config.Verb, ns []int, a
 	b.replanStale(ctx, items)
 	if dryRun {
 		for _, it := range items {
-			if it.err == nil {
+			if it.err == nil && !b.json {
 				fmt.Fprintln(b.stdout, it.run.first.DryRun())
 			}
 		}
-		return b.summary(items, true)
+	} else {
+		b.applyAll(ctx, items)
 	}
-	b.applyAll(ctx, items)
-	return b.summary(items, false)
+	// The text was printed issue by issue as it went; JSON comes at the
+	// end, for every issue, also when the summary is an error.
+	return emitResult(cmd, verbJSON(v.Name, dryRun, items), func(io.Writer) {}, b.summary(items, dryRun))
 }
 
 // batchRun is one run of a verb on several issues.
@@ -96,6 +98,7 @@ type batchRun struct {
 	v              config.Verb
 	args           workflow.Args
 	stdout, stderr io.Writer
+	json           bool            // --json: nothing on stdout until runBatch emits the result
 	warned         map[string]bool // warnings printed, each once per run
 	retried        bool            // the stale-schema retry is spent (retryStale)
 	stop           error           // the error that stopped the writes (graph.AffectsAll)
@@ -109,6 +112,8 @@ type batchItem struct {
 	// reason in the summary, without ";" so the summary can list several.
 	err error
 	why string
+	// skipped: not attempted, after an error stopped the writes (skip).
+	skipped bool
 }
 
 // plan plans verb v on the issue read as r, printing its warnings.
@@ -201,7 +206,9 @@ func (b *batchRun) applyAll(ctx context.Context, items []*batchItem) {
 		err := it.run.apply(ctx, b.be, p)
 		switch {
 		case err == nil:
-			fmt.Fprintln(b.stdout, it.run.applied().Confirm())
+			if !b.json {
+				fmt.Fprintln(b.stdout, it.run.applied().Confirm())
+			}
 		case b.retryStale(err, true):
 			// A board ID from the schema cache went stale: re-read this
 			// issue and the ones not applied yet, re-plan them, and go on
@@ -271,6 +278,7 @@ func (it *batchItem) skip(cause error) {
 	e := render.FromError(cause)
 	it.why = "not attempted: " + reason(cause)
 	it.err = &render.Error{Code: e.Code, What: it.why, Fix: e.Fix, Cause: cause}
+	it.skipped = true
 }
 
 // failRun records the failed write of plan p, with cause and err as in
@@ -396,7 +404,7 @@ func (b *batchRun) summary(items []*batchItem, dry bool) error {
 		head = fmt.Sprintf("dry run: %d of %d can be applied", done, len(items))
 	}
 	if len(failed) == 0 {
-		if !dry {
+		if !dry && !b.json {
 			fmt.Fprintln(b.stdout, head)
 		}
 		return nil

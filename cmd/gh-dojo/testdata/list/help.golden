@@ -26,4 +26,9 @@ Flags:
       --mine                 only issues assigned to you
       --sprint string        only issues in this sprint (fields.sprint): "current" (today, in board.timezone), a title, or "none"
       --status stringArray   only issues in this status ("none": without a status); repeat for several
+
+Global Flags:
+  -q, --jq expression       filter the JSON with a jq expression (implies --json)
+      --json                print the result as JSON (schema_version 1); errors stay text on stderr
+  -t, --template template   format the JSON with a Go template (implies --json)
 --- stderr

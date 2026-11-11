@@ -1,0 +1,37 @@
+code: 0
+--- stdout
+{
+  "schema_version": 1,
+  "sprint": null,
+  "issues": [
+    {
+      "repo": "Trum-ok/gh-dojo",
+      "number": 23,
+      "title": "Fix login redirect",
+      "state": "open",
+      "status": "In progress",
+      "labels": [
+        "bug"
+      ],
+      "labels_total": 1,
+      "assignees": [
+        "Trum-ok",
+        "alice"
+      ],
+      "assignees_total": 2
+    }
+  ],
+  "matched": 1,
+  "unchecked": 0,
+  "hidden": 2,
+  "filtered": 6,
+  "skipped": {
+    "draft_issues": 1,
+    "pull_requests": 1,
+    "unseen": 2
+  },
+  "incomplete": true
+}
+
+--- stderr
+warning: GitHub withheld parts of some board items from this token; their lines may be incomplete

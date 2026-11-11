@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"slices"
 	"strconv"
 	"strings"
@@ -88,29 +89,37 @@ printed, with exit code 3.`,
 			if !full {
 				v.bodyRunes, v.commentBudget = maxBodyRunes, commentBudgetRunes
 			}
-			w := cmd.OutOrStdout()
-			printed := 0
+			var cards []*issue.Card
 			var failed []issue.Result
 			for _, r := range res {
 				if r.Err != nil {
 					failed = append(failed, r)
-					continue
-				}
-				switch {
-				case printed == 0:
-				case brief:
-					fmt.Fprintln(w)
-				default:
-					fmt.Fprintln(w, "\n"+cardSeparator)
-				}
-				if brief {
-					fmt.Fprint(w, v.brief(r.Card))
 				} else {
-					fmt.Fprint(w, v.card(r.Card))
+					cards = append(cards, r.Card)
 				}
-				printed++
 			}
-			return showError(repo, ns[len(res):], failed, readErr)
+			unread := ns[len(res):]
+			text := func(w io.Writer) {
+				for i, c := range cards {
+					switch {
+					case i == 0:
+					case brief:
+						fmt.Fprintln(w)
+					default:
+						fmt.Fprintln(w, "\n"+cardSeparator)
+					}
+					if brief {
+						fmt.Fprint(w, v.brief(c))
+					} else {
+						fmt.Fprint(w, v.card(c))
+					}
+				}
+			}
+			err = showError(repo, unread, failed, readErr)
+			if len(cards) == 0 { // it failed outright: stdout stays empty
+				return err
+			}
+			return emitResult(cmd, v.result(cards, brief, failed, unread, readErr), text, err)
 		},
 	}
 	f := cmd.Flags()

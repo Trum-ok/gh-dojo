@@ -1,0 +1,54 @@
+code: 5
+--- stdout
+{
+  "schema_version": 1,
+  "verb": "start",
+  "dry_run": false,
+  "issues": [
+    {
+      "number": 3,
+      "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)",
+      "outcome": "partial",
+      "planned": [
+        {
+          "op": "set_status",
+          "from": "Ready",
+          "to": "In progress"
+        },
+        {
+          "op": "add_comment",
+          "body": "Started. Session: claude://s/abc"
+        }
+      ],
+      "applied": [
+        {
+          "op": "add_comment",
+          "body": "Started. Session: claude://s/abc"
+        }
+      ],
+      "in_place": [],
+      "needs_yes": false,
+      "warnings": [
+        "#3 has unresolved blockers: #2 (not on the board), #1 (not on the board)"
+      ],
+      "error": {
+        "exit_code": 5,
+        "message": "#3 comment left; status not changed: GitHub token is missing a required scope (project); gh auth refresh -s project, then re-run the same command",
+        "allowed": [],
+        "fix": "gh auth refresh -s project"
+      }
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "done": 0,
+    "written": 0,
+    "failed": 1,
+    "not_attempted": 0
+  }
+}
+
+--- stderr
+warning: #3 has unresolved blockers: #2 (not on the board), #1 (not on the board)
+error: #3 comment left; status not changed: GitHub token is missing a required scope (project); gh auth refresh -s project, then re-run the same command
+fix: gh auth refresh -s project

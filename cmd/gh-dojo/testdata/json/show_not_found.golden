@@ -1,0 +1,5 @@
+code: 3
+--- stdout
+--- stderr
+error: issue #9999 not found in Trum-ok/gh-dojo
+fix: gh dojo list

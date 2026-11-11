@@ -49,8 +49,9 @@ network; else 1.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			r := runDoctor(cmd.Context())
-			r.write(cmd.OutOrStdout())
-			return r.err()
+			err := r.err()
+			r.OK = err == nil
+			return emitResult(cmd, r, r.write, err)
 		},
 	}, nil
 }
@@ -67,23 +68,24 @@ type doctorCheck struct {
 	Name    string   `json:"name"`
 	Result  string   `json:"result"` // checkOK, checkProblem or checkSkip
 	Detail  string   `json:"detail"`
-	Allowed []string `json:"allowed,omitempty"`
-	Fix     string   `json:"fix,omitempty"`
+	Allowed []string `json:"allowed"`
+	Fix     string   `json:"fix"` // "" for none
 
 	code render.Code // of a problem: render.ExitNetwork for auth and network, else render.ExitUsage
 }
 
-// doctorReport is what doctor found, as data (for --json later).
+// doctorReport is what doctor found, and its JSON.
 type doctorReport struct {
+	OK     bool          `json:"ok"` // every check is ok
 	Checks []doctorCheck `json:"checks"`
 }
 
 func (r *doctorReport) ok(name, format string, a ...any) {
-	r.Checks = append(r.Checks, doctorCheck{Name: name, Result: checkOK, Detail: fmt.Sprintf(format, a...)})
+	r.Checks = append(r.Checks, doctorCheck{Name: name, Result: checkOK, Detail: fmt.Sprintf(format, a...), Allowed: []string{}})
 }
 
 func (r *doctorReport) skip(name, format string, a ...any) {
-	r.Checks = append(r.Checks, doctorCheck{Name: name, Result: checkSkip, Detail: fmt.Sprintf(format, a...)})
+	r.Checks = append(r.Checks, doctorCheck{Name: name, Result: checkSkip, Detail: fmt.Sprintf(format, a...), Allowed: []string{}})
 }
 
 // problem adds err as a problem: auth and network errors (exit code 4)
@@ -95,7 +97,7 @@ func (r *doctorReport) problem(name string, err error) {
 		code = render.ExitNetwork
 	}
 	r.Checks = append(r.Checks, doctorCheck{
-		Name: name, Result: checkProblem, Detail: e.What, Allowed: e.Allowed, Fix: e.Fix, code: code,
+		Name: name, Result: checkProblem, Detail: e.What, Allowed: orEmpty(e.Allowed), Fix: e.Fix, code: code,
 	})
 }
 
