@@ -88,8 +88,8 @@ type Request struct {
 	// Comments is how many of the latest comments to read: 0 means
 	// DefaultComments; more than MaxComments reads MaxComments.
 	Comments int
-	// Lookup is read in the same request; its result is Card.Found. Only
-	// Read and ReadAll of a single number support it.
+	// Lookup is read in the same request; its result is Card.Found. ReadAll
+	// reads it once per request, and every card of that request gets it.
 	Lookup Lookup
 }
 

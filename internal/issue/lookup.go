@@ -106,6 +106,22 @@ func lookupQuery(l Lookup) (string, map[string]any) {
 	if l.Empty() {
 		return cardQuery, nil
 	}
+	p := l.parts()
+	card := l.widen(cardRepo)
+	return cardHead + p.decls + card + p.repo + "\n  }\n" + p.top + "}\n\n" + cardFragments, p.vars
+}
+
+// lookupParts are the pieces of a Lookup in a card query: variable
+// declarations (each starting with ", "), fields below the repository
+// (each on its own line, indented by four spaces), fields at the top of
+// the document, and the variables.
+type lookupParts struct {
+	decls, repo, top string
+	vars             map[string]any
+}
+
+// parts returns the pieces lookupQuery and batchQuery add for l.
+func (l Lookup) parts() lookupParts {
 	vars := map[string]any{}
 	var decls, repo strings.Builder
 	for i, name := range l.Labels {
@@ -126,14 +142,19 @@ func lookupQuery(l Lookup) (string, map[string]any) {
 	decls.WriteString(l.Links.Decls())
 	top += l.Links.Fields()
 	l.Links.AddVars(vars)
-	card := cardRepo
+	return lookupParts{decls: decls.String(), repo: repo.String(), top: top, vars: vars}
+}
+
+// widen widens the issue's windows of a card selection: labels for
+// Lookup.AllLabels, blockers for Lookup.AllBlockers.
+func (l Lookup) widen(s string) string {
 	if l.AllLabels {
-		card = strings.Replace(card, labelsWindow, allLabelsWindow, 1)
+		s = strings.Replace(s, labelsWindow, allLabelsWindow, 1)
 	}
 	if l.AllBlockers {
-		card = strings.Replace(card, blockersWindow, allBlockersWindow, 1)
+		s = strings.Replace(s, blockersWindow, allBlockersWindow, 1)
 	}
-	return cardHead + decls.String() + card + repo.String() + "\n  }\n" + top + "}\n\n" + cardFragments, vars
+	return s
 }
 
 // repoJSON is the repository of a card response: the issue, and the

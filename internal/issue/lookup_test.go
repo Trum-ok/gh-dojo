@@ -53,12 +53,56 @@ func TestReadLookupEmpty(t *testing.T) {
 	}
 }
 
-// TestReadAllLookup: a lookup goes with a single issue only.
+// TestReadAllLookup reads #3 and #7 with the lookups of a verb in one
+// request: the lookups are read once, and every card gets them. A link
+// GitHub cannot find fails neither the batch nor a card.
 func TestReadAllLookup(t *testing.T) {
+	srv := graphtest.New(t, fixture("cards_3_7_lookup"))
 	req := dojoStatus
-	req.Lookup = issue.Lookup{Viewer: true}
-	if _, err := issue.ReadAll(context.Background(), nil, req, []int{1, 2}); err == nil {
-		t.Error("ReadAll of two issues with a lookup: want an error")
+	req.Lookup = issue.Lookup{
+		Labels: []string{"enhancement", "no-such-label"}, User: "trum-ok", Viewer: true,
+		Links: issue.Links{{Repo: dojo, Number: 2}, {Repo: dojo, Number: 9999}},
+	}
+	res, err := issue.ReadAll(context.Background(), srv.Client(), req, []int{3, 7})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := srv.Requests(); n != 1 {
+		t.Errorf("requests = %d, want exactly 1", n)
+	}
+	if len(res) != 2 || res[0].Card == nil || res[1].Card == nil {
+		t.Fatalf("results %+v", res)
+	}
+	for _, r := range res {
+		f := r.Card.Found
+		switch {
+		case f == nil:
+			t.Fatalf("#%d: no Found", r.Number)
+		case len(f.Labels) != 1 || !strings.HasPrefix(f.Labels["enhancement"], "LA_"):
+			t.Errorf("#%d: labels = %v, want enhancement only", r.Number, f.Labels)
+		case f.User == nil || f.User.Login != "Trum-ok" || f.Viewer == nil || f.Viewer.Login != "Trum-ok":
+			t.Errorf("#%d: user %+v, viewer %+v", r.Number, f.User, f.Viewer)
+		case len(f.Links) != 2 || f.Links[0].Missing || !f.Links[1].Missing:
+			t.Errorf("#%d: links %+v", r.Number, f.Links)
+		}
+	}
+	// #2 blocks both #3 and #7: the link is read once, the check is per card.
+	if l := res[0].Card.Found.Links[0]; !l.Blocks(res[0].Card.ID) || !l.Blocks(res[1].Card.ID) || l.Blocks("I_other") {
+		t.Errorf("#2 blocks #3: %v, #7: %v", l.Blocks(res[0].Card.ID), l.Blocks(res[1].Card.ID))
+	}
+}
+
+// TestReadAllLookupQuery: the batch query reads the lookups once, below
+// the aliased issues, and widens the labels and blockers windows.
+func TestReadAllLookupQuery(t *testing.T) {
+	q := &firstQuery{}
+	req := dojoStatus
+	req.Lookup = issue.Lookup{Labels: []string{"blocked"}, AllLabels: true, AllBlockers: true, Viewer: true}
+	_, _ = issue.ReadAll(context.Background(), q, req, []int{1, 2})
+	for _, want := range []string{"i1: issueOrPullRequest(number: $n1)", "label0: label(name: $label0)", "viewer { id login }", "labels(first: 100)", "blockedBy(first: 50)"} {
+		if strings.Count(q.query, want) != 1 {
+			t.Errorf("query has %d of %q, want 1:\n%s", strings.Count(q.query, want), want, q.query)
+		}
 	}
 }
 
@@ -67,6 +111,17 @@ type queryRecorder struct{ query string }
 
 func (q *queryRecorder) Query(_ context.Context, query string, _ map[string]any, _ any) error {
 	q.query = query
+	return errors.New("not sent")
+}
+
+// firstQuery is a graph.Querier that keeps the first query and fails
+// every one.
+type firstQuery struct{ query string }
+
+func (q *firstQuery) Query(_ context.Context, query string, _ map[string]any, _ any) error {
+	if q.query == "" {
+		q.query = query
+	}
 	return errors.New("not sent")
 }
 

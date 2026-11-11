@@ -2,8 +2,10 @@ package issue
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/cli/go-gh/v2/pkg/api"
@@ -39,6 +41,10 @@ type Result struct {
 // with the card selection aliased once per issue. A single number is read
 // with Read, so it sends exactly the request Read sends.
 //
+// A Lookup is read once per request, at the top of the batch, and every
+// card of the request gets what it found (Card.Found): the labels, users
+// and linked issues a verb needs are the same for every issue it runs on.
+//
 // It returns one Result per number, in order. A missing issue or a pull
 // request number fails only its own Result. When a batch request fails as
 // a whole (a timeout, say), its issues are read once more one by one;
@@ -52,9 +58,6 @@ func ReadAll(ctx context.Context, q graph.Querier, req Request, numbers []int) (
 	}
 	if req.Repo.Owner == "" || req.Repo.Name == "" {
 		return nil, render.Internal("issue.ReadAll: no repository")
-	}
-	if !req.Lookup.Empty() && len(numbers) > 1 {
-		return nil, render.Internal("issue.ReadAll: a lookup needs a single issue")
 	}
 	if len(numbers) == 1 {
 		return readEach(ctx, q, req, numbers)
@@ -112,10 +115,12 @@ func readBatch(ctx context.Context, q graph.Querier, req Request, numbers []int)
 	for i, n := range numbers {
 		vars[fmt.Sprintf("n%d", i)] = n
 	}
-	var resp struct {
-		Repository map[string]*issueJSON `json:"repository"`
+	query, extra := batchQuery(len(numbers), req.Lookup)
+	for k, v := range extra {
+		vars[k] = v
 	}
-	err := q.Query(ctx, batchQuery(len(numbers)), vars, &resp)
+	var resp batchResponse
+	err := q.Query(ctx, query, vars, &resp)
 	var missing map[string]bool
 	var hidden map[string][][]any
 	if err != nil {
@@ -128,6 +133,12 @@ func readBatch(ctx context.Context, q graph.Querier, req Request, numbers []int)
 				WithFix("gh repo view " + req.Repo.String()).WithCause(errors.Join(errRepoMissing, err))
 		default:
 			return nil, err
+		}
+	}
+	var found *Found
+	if !req.Lookup.Empty() {
+		if found, err = req.Lookup.found(resp.lookups, resp.Viewer, resp.data); err != nil {
+			return nil, render.Internal("cannot decode GitHub's answer").WithCause(err)
 		}
 	}
 	out := make([]Result, len(numbers))
@@ -145,6 +156,7 @@ func readBatch(ctx context.Context, q graph.Querier, req Request, numbers []int)
 		default:
 			out[i].Card = node.card(r, hidden[alias])
 			out[i].Card.Incomplete = len(hidden[alias]) > 0
+			out[i].Card.Found = found
 		}
 	}
 	return out, nil
@@ -155,12 +167,57 @@ func pullRequest(req Request) *render.Error {
 		WithFix(ListFix)
 }
 
+// batchResponse is the answer of batchQuery: the issues by alias, the
+// lookups of the repository, the viewer, and the whole "data" object for
+// the links of a Lookup.
+type batchResponse struct {
+	Repository map[string]*issueJSON // by alias; nil when there is none
+	lookups    *repoJSON
+	Viewer     *User
+	data       map[string]json.RawMessage
+}
+
+func (r *batchResponse) UnmarshalJSON(b []byte) error {
+	if err := json.Unmarshal(b, &r.data); err != nil {
+		return err
+	}
+	if raw, ok := r.data["repository"]; ok {
+		var fields map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &fields); err != nil {
+			return err
+		}
+		if fields != nil {
+			r.Repository = map[string]*issueJSON{}
+		}
+		for key, f := range fields {
+			if !isBatchAlias(key) {
+				continue
+			}
+			var node *issueJSON
+			if err := json.Unmarshal(f, &node); err != nil {
+				return err
+			}
+			r.Repository[key] = node
+		}
+		if err := json.Unmarshal(raw, &r.lookups); err != nil {
+			return err
+		}
+	}
+	if raw, ok := r.data["viewer"]; ok {
+		if err := json.Unmarshal(raw, &r.Viewer); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // perIssueErrors sorts the GraphQL errors of a batch by issue alias: a
 // NOT_FOUND at repository.<alias> is a missing issue, a NOT_FOUND or
 // FORBIDDEN below it a part of the card withheld from the token, kept as
 // its path below the alias (list indexes as ints, as Read's nestedPaths).
-// ok is false when any error is something else, which fails the whole
-// request.
+// A NOT_FOUND or FORBIDDEN at a link of the Lookup is that link's alone
+// (Linked.Missing). ok is false when any error is something else, which
+// fails the whole request.
 func perIssueErrors(err error) (missing map[string]bool, hidden map[string][][]any, ok bool) {
 	var gqlErr *api.GraphQLError
 	if !errors.As(err, &gqlErr) || gqlErr == nil || len(gqlErr.Errors) == 0 {
@@ -168,6 +225,9 @@ func perIssueErrors(err error) (missing map[string]bool, hidden map[string][][]a
 	}
 	missing, hidden = map[string]bool{}, map[string][][]any{}
 	for _, item := range gqlErr.Errors {
+		if isLinkPath(item.Path) && (item.Type == "NOT_FOUND" || item.Type == "FORBIDDEN") {
+			continue
+		}
 		if len(item.Path) < 2 || item.Path[0] != "repository" {
 			return nil, nil, false
 		}
@@ -202,21 +262,48 @@ func commentsWindow(n int) int {
 
 func batchAlias(i int) string { return fmt.Sprintf("i%d", i) }
 
+// isBatchAlias reports whether key is an issue alias of batchQuery.
+func isBatchAlias(key string) bool {
+	n, ok := strings.CutPrefix(key, "i")
+	if !ok || n == "" {
+		return false
+	}
+	_, err := strconv.Atoi(n)
+	return err == nil
+}
+
 // batchQuery reads n issues: cardSelection as a fragment, aliased once per
-// issue.
-func batchQuery(n int) string {
+// issue, with the fields of l once (see lookupQuery). It returns l's
+// variables too.
+//
+//	query IssueCards($owner: String!, ..., $n0: Int!, $n1: Int!, $label0: String!) {
+//	  repository(owner: $owner, name: $repo) {
+//	    i0: issueOrPullRequest(number: $n0) { ...card }
+//	    i1: issueOrPullRequest(number: $n1) { ...card }
+//	    label0: label(name: $label0) { id name }
+//	  }
+//	}
+func batchQuery(n int, l Lookup) (string, map[string]any) {
+	var p lookupParts
+	if !l.Empty() {
+		p = l.parts()
+	}
 	var b strings.Builder
 	b.WriteString("query IssueCards($owner: String!, $repo: String!, $comments: Int!, $status: String!")
 	for i := range n {
 		fmt.Fprintf(&b, ", $n%d: Int!", i)
 	}
+	b.WriteString(p.decls)
 	b.WriteString(") {\n  repository(owner: $owner, name: $repo) {\n")
 	for i := range n {
 		fmt.Fprintf(&b, "    %s: issueOrPullRequest(number: $n%d) { ...card }\n", batchAlias(i), i)
 	}
-	b.WriteString("  }\n}\n\nfragment card on IssueOrPullRequest ")
-	b.WriteString(cardSelection)
+	if p.repo != "" {
+		b.WriteString(strings.TrimPrefix(p.repo, "\n") + "\n")
+	}
+	b.WriteString("  }\n" + p.top + "}\n\nfragment card on IssueOrPullRequest ")
+	b.WriteString(l.widen(cardSelection))
 	b.WriteString("\n\n")
 	b.WriteString(cardFragments)
-	return b.String()
+	return b.String(), p.vars
 }
