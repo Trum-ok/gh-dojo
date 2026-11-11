@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -244,14 +245,18 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 	return b.String()
 }
 
-// configNote is appended to the root help when the config cannot be loaded.
+// configNote is appended to the root help when there is no config or it
+// cannot be loaded.
 func configNote() string {
 	_, err := loadConfig()
 	if err == nil {
 		return ""
 	}
+	if errors.Is(err, config.ErrNoConfig) {
+		return fmt.Sprintf("\n\nNo process verbs: no %s found (create one: see %s).", config.FileName, config.DocsURL)
+	}
 	text := strings.ReplaceAll(render.FromError(err).Text(), "\n", "\n  ")
-	return "\n\nNo process verbs: " + config.FileName + " could not be loaded.\n  " + text
+	return "\n\nNo process verbs: " + config.FileName + " could not be loaded:\n  " + text
 }
 
 // verbsUnavailable returns the config error for an unknown command name,

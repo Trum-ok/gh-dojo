@@ -1,0 +1,4 @@
+code: 2
+error: done cannot move #42 from Waiting
+this is a process rule: ask the user how to proceed
+allowed: Ready, In progress

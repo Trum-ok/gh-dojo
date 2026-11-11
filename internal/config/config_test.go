@@ -269,6 +269,12 @@ func checkError(t *testing.T, golden string, err error) {
 func TestMissingFile(t *testing.T) {
 	_, err := Load(t.TempDir())
 	checkError(t, "errors/missing_file", err)
+	if !errors.Is(err, ErrNoConfig) {
+		t.Errorf("Load error %v is not ErrNoConfig", err)
+	}
+	if _, err := Parse([]byte("version = 2\n"), FileName); errors.Is(err, ErrNoConfig) {
+		t.Errorf("a broken config is reported as ErrNoConfig: %v", err)
+	}
 }
 
 func TestFindWalksUp(t *testing.T) {

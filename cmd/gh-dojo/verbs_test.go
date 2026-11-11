@@ -138,6 +138,8 @@ func TestVerbs(t *testing.T) {
 		{"start_no_session", []string{"start", "42", "--comment", "on it"}, issue42("Backlog"), "", render.ExitOK, 1, 1},
 		{"wait_by", []string{"wait", "42", "--by", "12"}, issue42("In progress"), "", render.ExitOK, 1, 1},
 		{"ready_denied", []string{"ready", "42"}, issue42("Backlog"), "", render.ExitDenied, 1, 0},
+		{"done_closed", []string{"done", "42"}, map[int]workflow.Issue{42: {Number: 42, Closed: true, OnBoard: true, Status: "Ready"}},
+			"", render.ExitOK, 1, 1},
 		{"ready_closed", []string{"ready", "42"}, map[int]workflow.Issue{42: {Number: 42, Closed: true}}, "", render.ExitDenied, 1, 0},
 		{"wait_missing_args", []string{"wait", "42"}, issue42("In progress"), "", render.ExitUsage, 0, 0},
 		{"start_unused_by", []string{"start", "42", "--by", "12"}, issue42("Backlog"), "", render.ExitUsage, 0, 0},

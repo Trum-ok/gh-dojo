@@ -27,6 +27,11 @@ const FileName = ".github/dojo.toml"
 // DocsURL is the README section that documents the config format.
 const DocsURL = "https://github.com/Trum-ok/gh-dojo#configuration"
 
+// ErrNoConfig is the cause of the error Find and Load return when there is
+// no config file to load; test for it with errors.Is. Any other error means
+// a config exists but cannot be read or is invalid.
+var ErrNoConfig = errors.New("no " + FileName + " found")
+
 // Version is the only config version this binary understands.
 const Version = 1
 
@@ -173,7 +178,8 @@ func Find(dir string) (string, error) {
 		parent := filepath.Dir(abs)
 		if parent == abs || isRepoRoot(abs) {
 			return "", render.Usage("no %s in this directory or its parents up to the repository root", FileName).
-				WithFix(fmt.Sprintf("create %s in the repository root, example: %s", FileName, DocsURL))
+				WithFix(fmt.Sprintf("create %s in the repository root, example: %s", FileName, DocsURL)).
+				WithCause(ErrNoConfig)
 		}
 		abs = parent
 	}

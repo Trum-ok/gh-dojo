@@ -87,6 +87,10 @@ type Engine struct {
 	// Initial is the status assumed for an issue that is not on the board or
 	// has no status (statuses.initial); may be "".
 	Initial string
+	// Final are the final statuses (statuses.final). A verb whose target is
+	// one of them may run on a closed issue: GitHub closes an issue when a
+	// PR that fixes it is merged, and the issue still has to reach Done.
+	Final []string
 	// Session fills {session} in comment templates.
 	Session config.Session
 	// Getenv reads the session variables; os.Getenv when nil.
@@ -95,7 +99,7 @@ type Engine struct {
 
 // New returns an Engine with the rules of c.
 func New(c *config.Config) *Engine {
-	return &Engine{Verbs: c.Verbs, Initial: c.Statuses.Initial, Session: c.Session}
+	return &Engine{Verbs: c.Verbs, Initial: c.Statuses.Initial, Final: c.Statuses.Final, Session: c.Session}
 }
 
 // byNumberRE matches an issue reference given to --by: "12" or "#12".
@@ -206,7 +210,8 @@ func join(items []string, conj string) string {
 // apply. In order:
 //
 //  1. CheckArgs (exit code 1);
-//  2. a closed issue is refused (exit code 2);
+//  2. a closed issue is refused (exit code 2), unless the verb's target
+//     status is final (Engine.Final);
 //  3. an issue already in the target status gets no status change, and the
 //     from check is skipped, so a repeat is safe;
 //  4. otherwise the current status must be in from (exit code 2). An issue
@@ -222,7 +227,7 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 	if !is.OnBoard {
 		is.Status = ""
 	}
-	if is.Closed {
+	if is.Closed && !e.runsOnClosed(v) {
 		return nil, render.Denied("#%d is closed; %s works only on open issues\n"+
 			"this is a process rule: ask the user what to do with #%d", is.Number, v.Name, is.Number)
 	}
@@ -289,21 +294,30 @@ func (e *Engine) checkFrom(v config.Verb, is Issue) error {
 		what = fmt.Sprintf("%s cannot move #%d from %s", v.Name, is.Number, current)
 	}
 	err := render.Denied("%s", what).WithAllowed(v.From...)
-	if u, ok := e.leadsTo(v, current); ok {
+	if u, ok := e.leadsTo(v, current, is.Closed); ok {
 		return err.WithFix(Example(u, is.Number))
 	}
 	err.What += "\nthis is a process rule: ask the user how to proceed"
 	return err
 }
 
+// runsOnClosed reports whether v may run on a closed issue: its target
+// status is final.
+func (e *Engine) runsOnClosed(v config.Verb) bool {
+	return v.To != "" && slices.Contains(e.Final, v.To)
+}
+
 // leadsTo finds the first other verb that moves an issue from current to a
-// status v starts from.
-func (e *Engine) leadsTo(v config.Verb, current string) (config.Verb, bool) {
+// status v starts from, and that may run on it if it is closed.
+func (e *Engine) leadsTo(v config.Verb, current string, closed bool) (config.Verb, bool) {
 	if current == "" {
 		return config.Verb{}, false
 	}
 	for _, u := range e.Verbs {
 		if u.Name == v.Name || u.To == "" || u.To == current || !slices.Contains(v.From, u.To) {
+			continue
+		}
+		if closed && !e.runsOnClosed(u) {
 			continue
 		}
 		if len(u.From) == 0 || slices.Contains(u.From, current) {
