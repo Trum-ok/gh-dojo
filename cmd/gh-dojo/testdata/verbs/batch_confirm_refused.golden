@@ -1,0 +1,5 @@
+code: 2
+--- stdout
+--- stderr
+error: 0 of 2 done; #1: drop needs the user's go-ahead for #1 (would be: closed as not planned); #4: drop cannot move #4 from Ready, it starts only from Backlog or Done
+this is the user's decision: ask the user, and re-run with --yes only if they agree; this is a process rule: ask the user how to proceed

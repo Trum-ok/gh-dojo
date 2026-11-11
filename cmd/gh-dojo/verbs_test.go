@@ -85,6 +85,7 @@ type fakeBackend struct {
 	applyErrs map[int]error // by issue number, for batches
 	confirmed map[int]int   // with applyErrs: how many ops GitHub confirmed first
 	reads     int           // ReadIssue and ReadIssues calls
+	attempts  int           // Apply calls, failed ones included
 	applied   []*workflow.Plan
 }
 
@@ -112,6 +113,7 @@ func (f *fakeBackend) ReadIssues(_ context.Context, _ config.Verb, ns []int, _ w
 }
 
 func (f *fakeBackend) Apply(_ context.Context, p *workflow.Plan) ([]workflow.Op, error) {
+	f.attempts++
 	if err := f.applyErrs[p.Issue.Number]; err != nil {
 		return p.Ops[:min(f.confirmed[p.Issue.Number], len(p.Ops))], err
 	}

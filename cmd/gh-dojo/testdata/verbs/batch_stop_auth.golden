@@ -1,0 +1,7 @@
+code: 4
+--- stdout
+#3 Done (unchanged), already closed as completed
+--- stderr
+error: 1 of 4 done (0 written); #1: GitHub rejected the token (HTTP 401); #2, #4: not attempted: GitHub rejected the token (HTTP 401)
+re-run the same command to retry #1, #2, #4: it skips the issues done
+fix: gh auth refresh -s project

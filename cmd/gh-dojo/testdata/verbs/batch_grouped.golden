@@ -2,6 +2,6 @@ code: 5
 --- stdout
 #3 Ready → Done, closed as completed
 --- stderr
-error: 1 of 4 applied; #1, #2, #4: GitHub is unavailable (HTTP 502)
-re-run the same command: it skips the issues done and finishes the rest
+error: 1 of 4 done; #1, #2, #4: GitHub is unavailable (HTTP 502)
+re-run the same command to retry #1, #2, #4: it skips the issues done
 fix: gh auth status

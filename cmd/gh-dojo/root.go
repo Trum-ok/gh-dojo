@@ -153,8 +153,8 @@ func exitCodesHelp() string {
 	}
 	if cfg, err := loadConfig(); err == nil && slices.ContainsFunc(cfg.Verbs, func(v config.Verb) bool { return v.Batch }) {
 		b.WriteString("\n  A verb on several issues (batch) exits 0 when all are done, 5 when some were\n" +
-			"  applied and a re-run may finish the rest, else with the code of the failed\n" +
-			"  ones (2 first, then 1, 3, 4); a summary names each issue not done.")
+			"  written and a re-run may finish the rest, else with the code of the failed\n" +
+			"  ones (2 first, then 1, 4, 3); a summary names each issue not done.")
 	}
 	return b.String()
 }

@@ -435,6 +435,32 @@ func IsCycle(err error) bool {
 	return errors.As(err, &gqlErr) && gqlErr != nil && isCycle(gqlErr)
 }
 
+// AffectsAll reports whether err is about the token or the run rather than
+// the request: the token rejected or missing a scope, access denied (SSO,
+// OAuth app restrictions), a primary or secondary rate limit, or the run
+// interrupted. The same request for another issue would fail alike, so a
+// run over several issues stops sending.
+func AffectsAll(err error) bool {
+	var httpErr *api.HTTPError
+	var gqlErr *api.GraphQLError
+	switch {
+	case errors.Is(err, context.Canceled):
+		return true
+	case errors.As(err, &httpErr) && httpErr != nil:
+		s := httpErr.StatusCode
+		return s == http.StatusUnauthorized || s == http.StatusForbidden || s == http.StatusTooManyRequests
+	case errors.As(err, &gqlErr) && gqlErr != nil:
+		for _, item := range gqlErr.Errors {
+			switch {
+			case item.Type == "RATE_LIMITED", item.Type == "INSUFFICIENT_SCOPES", item.Type == "FORBIDDEN",
+				samlFailure(item), strings.Contains(strings.ToLower(item.Message), "oauth app access restrictions"):
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func isCycle(err *api.GraphQLError) bool {
 	for _, item := range err.Errors {
 		if containsAny(strings.ToLower(item.Message), "cycle", "circular") {

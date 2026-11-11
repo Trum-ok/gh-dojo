@@ -3,5 +3,5 @@ code: 0
 #1 Ready → Done, closed as completed
 #2 In progress → Done, closed as completed
 #3 Done (unchanged), already closed
-3 of 3 applied
+3 of 3 done (2 written)
 --- stderr

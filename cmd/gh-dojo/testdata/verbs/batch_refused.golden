@@ -2,5 +2,5 @@ code: 2
 --- stdout
 #1 Ready → Done, closed as completed
 --- stderr
-error: 1 of 3 applied; #2, #3: done cannot move it from Backlog
+error: 1 of 3 done; #2, #3: done cannot move it from Backlog, it starts only from Ready or In progress
 this is a process rule: ask the user how to proceed

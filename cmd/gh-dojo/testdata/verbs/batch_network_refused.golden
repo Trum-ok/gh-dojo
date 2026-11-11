@@ -2,6 +2,7 @@ code: 5
 --- stdout
 #1 Ready → Done, closed as completed
 --- stderr
-error: 1 of 3 applied; #2: GitHub is unavailable (HTTP 502); #3: done cannot move #3 from Backlog
-re-run the same command: it skips the issues done and finishes the rest
+error: 1 of 3 done; #2: GitHub is unavailable (HTTP 502); #3: done cannot move #3 from Backlog, it starts only from Ready or In progress
+re-run the same command to retry #2: it skips the issues done
+this is a process rule: ask the user how to proceed
 fix: gh auth status

@@ -410,41 +410,52 @@ twice counts once. The cards are read in one request per 20 issues, with the
 label, user and `--by` lookups once in each; then each issue is checked,
 planned and written on its own, with its own mutation, so a lost answer or a
 refusal touches that issue alone. An issue that fails is skipped and the
-others go on. `--yes` counts for every issue; `--dry-run` prints the plan of
-each. A stale cached board ID is retried once per run: the issue that hit it
-and the ones not written yet are re-read in one request.
+others go on. An error that would fail every write alike (the token rejected
+or missing a scope, a rate limit, the run interrupted) stops the writes: the
+issues left are reported as not attempted. `--yes` counts for every issue;
+`--dry-run` prints the plan of each. A stale cached board schema is retried
+once per run, whichever step hits it first: the issues it failed are re-read
+in one request.
 
 Each issue done prints its confirmation line; then a summary. When every
-issue is done (applied, or already in place) it is `3 of 3 applied` on
-stdout; otherwise an error names each issue not done with its reason
-(several issues failing alike share one entry):
+issue is done it is `3 of 3 done` on stdout, or `3 of 3 done (2 written)`
+when some were already in place; otherwise an error names each issue not
+done with its reason (several issues failing alike share one entry; when
+the line would grow too long, the rest are named after `also not done`, as
+many as fit, and counted), then what to do next:
 
 ```console
-$ gh dojo done 12 13 14 17
+$ gh dojo done 12 13 14 17 21
 #12 Ready → Done, closed as completed
 #13 In progress → Done, closed as completed
 #14 Done (unchanged), already closed as completed
-error: 3 of 4 applied; #17: done cannot move #17 from Backlog
+error: 3 of 5 done (2 written); #21: GitHub write failed (HTTP 502); #17: done cannot move #17 from Backlog, it starts only from Ready or In progress
+re-run the same command to retry #21: it skips the issues done
 this is a process rule: ask the user how to proceed
 ```
 
+Here the exit code is 5: the re-run finishes #21 and then ends with the
+refusal of #17 (code 2).
+
 The exit code says what to do about the issues not done:
 
-| Outcome                                                                        | Code |
-|--------------------------------------------------------------------------------|------|
-| Every issue applied or already in place                                        | 0    |
-| Something was applied, and an issue failed on the network or partway (re-run)  | 5    |
-| Otherwise, an issue was refused by a process check                             | 2    |
-| Otherwise, bad arguments for an issue (`--by` naming the issue itself)         | 1    |
-| Otherwise, an issue was not found                                              | 3    |
-| Otherwise, network failures with nothing applied                               | 4    |
+| Outcome                                                                                    | Code |
+|--------------------------------------------------------------------------------------------|------|
+| Every issue applied or already in place                                                    | 0    |
+| Something was written, and an issue failed on the network or partway, or was not attempted | 5    |
+| Otherwise, an issue was refused by a process check                                         | 2    |
+| Otherwise, bad arguments for an issue (`--by` naming the issue itself)                     | 1    |
+| Otherwise, network failures with nothing written                                           | 4    |
+| Otherwise, an issue was not found                                                          | 3    |
 
-Re-running the same command is safe and touches only what is left: issues
-already done are in place and cost no write. After a code 5 the re-run
-finishes the rest, or ends with the code of what still fails (2 for a
-refusal). Bad arguments or flags, a config error and a label to add that the
-repository does not have fail the whole command, with nothing written
-(code 1).
+Whatever the code, the error names the issues a re-run may finish
+(`re-run the same command to retry #21`). Re-running the same command is
+safe and touches only what is left: issues already done are in place and
+cost no write. After a code 5 the re-run finishes the rest, or ends with the
+code of what still fails (2 for a refusal). Bad arguments or flags, a config
+error and a label to add that the repository does not have fail the whole
+command, with nothing written (code 1); so does an issue `--by` names that
+does not exist (code 3).
 
 ### Output and exit codes
 

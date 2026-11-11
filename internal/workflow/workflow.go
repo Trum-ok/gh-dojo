@@ -232,16 +232,16 @@ func NormalizeBy(s string) string {
 	return s
 }
 
-// CheckArgs validates the arguments of verb v for issue number (used in the
-// example command of the error). It needs no issue state, so callers run it
-// before reading the issue. Errors have exit code 1:
+// CheckArgs validates the arguments of verb v for the issue numbers (all
+// of them in the example command of the error). It needs no issue state,
+// so callers run it before reading the issue. Errors have exit code 1:
 //
 //   - --comment or --by given while the verb's comment template does not use it;
 //   - --yes given to a verb without confirm = "user";
 //   - an argument of require, or all of require_one_of, missing or blank.
 //
 // A missing --yes is not an argument error: Plan sets Plan.NeedsYes.
-func CheckArgs(v config.Verb, number int, a Args) error {
+func CheckArgs(v config.Verb, a Args, numbers ...int) error {
 	var accepted []string
 	for _, arg := range config.Args() {
 		if v.Uses(arg) {
@@ -254,13 +254,13 @@ func CheckArgs(v config.Verb, number int, a Args) error {
 		}
 		if len(accepted) == 0 {
 			return render.Usage("%s does not use %s; it takes no arguments besides the issue number", v.Name, flag(arg)).
-				WithFix(Example(v, number))
+				WithFix(Example(v, numbers...))
 		}
 		return render.Usage("%s does not use %s", v.Name, flag(arg)).
-			WithAllowed(accepted...).WithFix(Example(v, number))
+			WithAllowed(accepted...).WithFix(Example(v, numbers...))
 	}
 	if a.Yes && !v.Confirm {
-		return render.Usage("%s does not take --yes: it needs no confirmation", v.Name).WithFix(Example(v, number))
+		return render.Usage("%s does not take --yes: it needs no confirmation", v.Name).WithFix(Example(v, numbers...))
 	}
 
 	var missing []string
@@ -292,16 +292,19 @@ func CheckArgs(v config.Verb, number int, a Args) error {
 	if blank {
 		what += " (blank values do not count)"
 	}
-	return render.Usage("%s", what).WithFix(Example(v, number))
+	return render.Usage("%s", what).WithFix(Example(v, numbers...))
 }
 
-// Example returns a command that runs v on issue number with placeholders
-// for the arguments it requires: all of require, the first of
+// Example returns a command that runs v on the issue numbers with
+// placeholders for the arguments it requires: all of require, the first of
 // require_one_of.
 //
 //	gh dojo wait 42 --by "<#N or name>"
-func Example(v config.Verb, number int) string {
-	parts := []string{"gh dojo", v.Name, strconv.Itoa(number)}
+func Example(v config.Verb, numbers ...int) string {
+	parts := []string{"gh dojo", v.Name}
+	for _, n := range numbers {
+		parts = append(parts, strconv.Itoa(n))
+	}
 	args := slices.Clone(v.Require)
 	if len(v.RequireOneOf) > 0 {
 		args = append(args, v.RequireOneOf[0])
@@ -369,7 +372,7 @@ func join(items []string, conj string) string {
 // plan is not empty: a repeat with nothing left to do needs no go-ahead.
 // Call Plan.Unconfirmed before applying.
 func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
-	if err := CheckArgs(v, is.Number, a); err != nil {
+	if err := CheckArgs(v, a, is.Number); err != nil {
 		return nil, err
 	}
 	if !is.OnBoard {

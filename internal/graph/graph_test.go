@@ -426,3 +426,34 @@ func assertError(t *testing.T, err error, code render.Code, golden string) {
 	}
 	testutil.Golden(t, golden, []byte(text+"\n"))
 }
+
+// TestAffectsAll tells errors that would fail every issue of a batch alike
+// (the token, a rate limit, the run interrupted) from errors of one
+// request (a lost answer, a missing node, a stale ID).
+func TestAffectsAll(t *testing.T) {
+	gql := func(typ, msg string) error {
+		return &api.GraphQLError{Errors: []api.GraphQLErrorItem{{Type: typ, Message: msg}}}
+	}
+	for _, tt := range []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"401", &api.HTTPError{StatusCode: http.StatusUnauthorized}, true},
+		{"403", &api.HTTPError{StatusCode: http.StatusForbidden}, true},
+		{"429", &api.HTTPError{StatusCode: http.StatusTooManyRequests}, true},
+		{"rate_limited", gql("RATE_LIMITED", ""), true},
+		{"scopes", gql("INSUFFICIENT_SCOPES", ""), true},
+		{"forbidden", gql("FORBIDDEN", ""), true},
+		{"saml", gql("", "Resource protected by organization SAML enforcement."), true},
+		{"canceled", render.Network("interrupted").WithCause(errors.Join(graph.ErrUnknownOutcome, context.Canceled)), true},
+		{"502", &api.HTTPError{StatusCode: http.StatusBadGateway}, false},
+		{"not_found", gql("NOT_FOUND", ""), false},
+		{"stale", gql("", "Could not resolve to a node with the global id of 'PVTI_x'"), false},
+		{"timeout", context.DeadlineExceeded, false},
+	} {
+		if got := graph.AffectsAll(tt.err); got != tt.want {
+			t.Errorf("%s: AffectsAll = %v, want %v", tt.name, got, tt.want)
+		}
+	}
+}

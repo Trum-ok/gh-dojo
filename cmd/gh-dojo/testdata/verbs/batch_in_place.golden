@@ -1,0 +1,6 @@
+code: 0
+--- stdout
+#1 Ready → Done, closed as completed
+#2 Done (unchanged), already closed
+2 of 2 done (1 written)
+--- stderr

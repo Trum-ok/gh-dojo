@@ -4,5 +4,5 @@ code: 2
 #7 In progress → Done, closed as completed
 #9 Done (unchanged), already closed as completed
 --- stderr
-error: 3 of 4 applied; #17: done cannot move #17 from Backlog
+error: 3 of 4 done (2 written); #17: done cannot move #17 from Backlog, it starts only from Ready or In progress
 this is a process rule: ask the user how to proceed

@@ -91,7 +91,7 @@ type Backend interface {
 	// true: one request per issue.MaxBatch issues, with what v looks up
 	// read once in each. It returns one IssueRead per number, in order; an
 	// issue that fails alone (not found, a pull request, its board place
-	// not read, the issue --by names) has its own Err. err fails them all:
+	// or sprint not read, the issue --by names) has its own Err. err fails them all:
 	// a config error of v (a label to add missing in the repo) or a
 	// request that read nothing. A request that fails after earlier ones
 	// read their issues is the Err of each issue it did not read.
@@ -180,7 +180,7 @@ func newVerbCmd(cfg *config.Config, v config.Verb) *cobra.Command {
 }
 
 func runVerb(cmd *cobra.Command, cfg *config.Config, v config.Verb, n int, args workflow.Args, dryRun bool) error {
-	if err := workflow.CheckArgs(v, n, args); err != nil {
+	if err := workflow.CheckArgs(v, args, n); err != nil {
 		return err
 	}
 	be, err := newBackend(cfg)

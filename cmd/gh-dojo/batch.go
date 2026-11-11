@@ -14,6 +14,7 @@ import (
 
 	"github.com/Trum-ok/gh-dojo/internal/board"
 	"github.com/Trum-ok/gh-dojo/internal/config"
+	"github.com/Trum-ok/gh-dojo/internal/graph"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/Trum-ok/gh-dojo/internal/workflow"
 )
@@ -23,7 +24,9 @@ import (
 // one request per issue.MaxBatch issues, plans each issue on its own, and
 // applies the plans one issue after another, each with its own mutation
 // (two for an issue not on the board). An issue that fails is skipped; the
-// others go on.
+// others go on, unless its error would fail every write alike (the token,
+// a rate limit, the run interrupted: graph.AffectsAll): then the issues
+// left to write are not attempted.
 //
 // Each issue gets its own mutation rather than one aliased mutation for
 // the batch: a lost answer (timeout, 5xx) leaves one issue's outcome
@@ -33,21 +36,22 @@ import (
 //
 // Output: the confirmation line of each issue done (applied, or already in
 // place) on stdout, in the order of the arguments, then a summary. With
-// every issue done it is "3 of 3 applied" on stdout and exit code 0.
-// Otherwise it is an error naming each issue not done with its reason:
+// every issue done it is "3 of 3 done" on stdout ("3 of 3 done (2
+// written)" when one was in place) and exit code 0. Otherwise it is an
+// error naming each issue not done with its reason, then the next steps:
 //
-//	error: 3 of 4 applied; #17: done cannot move #17 from Backlog
+//	error: 3 of 4 done; #17: done cannot move #17 from Backlog, it starts only from Ready or In progress
 //	this is a process rule: ask the user how to proceed
 //
 // and the exit code says what to do about the rest (see batchCode). A
 // re-run of the same command re-reads every issue: those done are in
 // place and cost no write, so it touches only what is left (principle 5).
 //
-// A stale schema ID is retried once per run, as for one issue: the schema
-// is dropped and the issue that hit it is re-read with the issues not
-// applied yet, in one request, then they are applied from fresh plans.
+// A stale schema is retried once per run, as for one issue (see
+// retryStale): the schema is dropped and the issues it failed are re-read
+// in one request, then planned and applied afresh.
 func runBatch(cmd *cobra.Command, cfg *config.Config, v config.Verb, ns []int, args workflow.Args, dryRun bool) error {
-	if err := workflow.CheckArgs(v, ns[0], args); err != nil {
+	if err := workflow.CheckArgs(v, args, ns...); err != nil {
 		return err
 	}
 	be, err := newBackend(cfg)
@@ -61,7 +65,7 @@ func runBatch(cmd *cobra.Command, cfg *config.Config, v config.Verb, ns []int, a
 	}
 	b.engine.Getenv = getenv
 	reads, err := be.ReadIssues(ctx, v, ns, args)
-	if err != nil && b.staleCache(err) {
+	if err != nil && b.retryStale(err, false) {
 		reads, err = be.ReadIssues(ctx, v, ns, args)
 	}
 	if err != nil {
@@ -93,7 +97,8 @@ type batchRun struct {
 	args           workflow.Args
 	stdout, stderr io.Writer
 	warned         map[string]bool // warnings printed, each once per run
-	retried        bool            // the stale-ID retry is spent
+	retried        bool            // the stale-schema retry is spent (retryStale)
+	stop           error           // the error that stopped the writes (graph.AffectsAll)
 }
 
 // batchItem is one issue of a batch run.
@@ -126,12 +131,22 @@ func (b *batchRun) plan(it *batchItem, r IssueRead) {
 	it.run = &verbRun{first: p, stderr: b.stderr}
 }
 
-// staleCache reports whether err may come from a board schema read from
-// the cache (board.IsStale, as readPlanFresh), and if so drops the cache
-// for a retry with a fresh one.
-func (b *batchRun) staleCache(err error) bool {
-	c, ok := b.be.(schemaCacher)
-	return ok && c.SchemaCached() && board.IsStale(err) && b.be.Reset() == nil
+// retryStale reports whether to retry after err with a fresh board
+// schema, and if so drops the cached one. It says yes once per run,
+// whichever step asks first: the read of the batch, the re-read of the
+// issues whose plan failed on the cached schema, or a write GitHub refused
+// for a stale ID (onWrite). err must be board.IsStale. For a read or a
+// plan, the schema must also have come from the cache, as for
+// readPlanFresh: a fresh one would fail the same way.
+func (b *batchRun) retryStale(err error, onWrite bool) bool {
+	if b.retried || !board.IsStale(err) {
+		return false
+	}
+	if c, ok := b.be.(schemaCacher); !onWrite && (!ok || !c.SchemaCached()) {
+		return false
+	}
+	b.retried = true
+	return b.be.Reset() == nil
 }
 
 // replanStale reads and plans once more, with a fresh board schema, the
@@ -148,7 +163,7 @@ func (b *batchRun) replanStale(ctx context.Context, items []*batchItem) {
 			ns = append(ns, it.n)
 		}
 	}
-	if len(stale) == 0 || !b.staleCache(stale[0].err) {
+	if len(stale) == 0 || !b.retryStale(stale[0].err, false) {
 		return
 	}
 	reads, err := b.be.ReadIssues(ctx, b.v, ns, b.args)
@@ -163,7 +178,9 @@ func (b *batchRun) replanStale(ctx context.Context, items []*batchItem) {
 }
 
 // applyAll applies the plan of each issue in turn, printing the
-// confirmation line of each one done.
+// confirmation line of each one done. After an error that would fail
+// every write alike (graph.AffectsAll), the issues left with something to
+// write are not attempted; those already in place are still done.
 func (b *batchRun) applyAll(ctx context.Context, items []*batchItem) {
 	for i := 0; i < len(items); i++ {
 		it := items[i]
@@ -177,25 +194,26 @@ func (b *batchRun) applyAll(ctx context.Context, items []*batchItem) {
 			it.fail(err)
 			continue
 		}
+		if b.stop != nil && !p.Empty() {
+			it.skip(b.stop)
+			continue
+		}
 		err := it.run.apply(ctx, b.be, p)
 		switch {
 		case err == nil:
 			fmt.Fprintln(b.stdout, it.run.applied().Confirm())
-			continue
-		case !board.IsStale(err) || b.retried:
+		case b.retryStale(err, true):
+			// A board ID from the schema cache went stale: re-read this
+			// issue and the ones not applied yet, re-plan them, and go on
+			// from this one.
+			b.reread(ctx, items[i:], err)
+			i-- // this issue again, with its fresh plan
+		default:
 			it.failRun(p, err, err)
-			continue
+			if graph.AffectsAll(err) || ctx.Err() != nil {
+				b.stop = err
+			}
 		}
-		// A board ID from the schema cache went stale: drop the cache,
-		// re-read this issue and the ones not applied yet, re-plan them,
-		// and go on from this one, once per run.
-		b.retried = true
-		if rerr := b.be.Reset(); rerr != nil {
-			it.failRun(p, err, err)
-			continue
-		}
-		b.reread(ctx, items[i:], err)
-		i-- // this issue again, with its fresh plan
 	}
 }
 
@@ -244,7 +262,15 @@ func (b *batchRun) reread(ctx context.Context, items []*batchItem, staleErr erro
 // fail records err for an issue nothing was applied to.
 func (it *batchItem) fail(err error) {
 	it.err = err
-	it.why = reason(err)
+	it.why = issueReason(err)
+}
+
+// skip records an issue not attempted after cause stopped the writes of
+// the run (graph.AffectsAll): the same code, fix and reason.
+func (it *batchItem) skip(cause error) {
+	e := render.FromError(cause)
+	it.why = "not attempted: " + reason(cause)
+	it.err = &render.Error{Code: e.Code, What: it.why, Fix: e.Fix, Cause: cause}
 }
 
 // failRun records the failed write of plan p, with cause and err as in
@@ -263,139 +289,303 @@ func (it *batchItem) failRun(p *workflow.Plan, cause, err error) {
 // wrote reports whether this run applied anything to the issue.
 func (it *batchItem) wrote() bool { return it.run != nil && len(it.run.done) > 0 }
 
-// maxSummaryRunes is how long the summary's first line may grow before the
-// issues left are only named: the error block cuts a line at 200 runes,
-// "error: " included.
+// issueReason is why err failed one issue, for the summary: the first
+// clause of its message (reason), but the whole first line of a refusal,
+// which says what the verb allows ("it starts only from Ready"), with its
+// "; " read ", " since the summary separates issues with ";".
+func issueReason(err error) string {
+	e := render.FromError(err)
+	if e.Code != render.ExitDenied {
+		return reason(err)
+	}
+	what, _, _ := strings.Cut(e.What, "\n")
+	return strings.ReplaceAll(strings.TrimSpace(what), "; ", ", ")
+}
+
+// maxSummaryRunes is how long a line of the summary error may grow: the
+// error block cuts a line at 200 runes, "error: " included, and the
+// summary never relies on that cut, which would hide issues silently.
 const maxSummaryRunes = 190
 
 func runes(s string) int { return utf8.RuneCountInString(s) }
+
+// issueRefRE matches an issue reference in a reason: "#9", "issue #9".
+var issueRefRE = regexp.MustCompile(`(issue )?#(\d+)\b`)
 
 // generalReason words why, the reason issue n failed, without n, so the
 // issues that failed alike share one entry: "issue #9 not found" reads
 // "issue not found", "#9 is closed" reads "it is closed".
 func generalReason(why string, n int) string {
-	re := regexp.MustCompile(`(issue )?#` + strconv.Itoa(n) + `\b`)
-	return re.ReplaceAllStringFunc(why, func(m string) string {
-		if strings.HasPrefix(m, "issue ") {
+	num := strconv.Itoa(n)
+	return issueRefRE.ReplaceAllStringFunc(why, func(m string) string {
+		issue, ref, _ := strings.Cut(m, "#")
+		switch {
+		case ref != num:
+			return m
+		case issue != "":
 			return "issue"
 		}
 		return "it"
 	})
 }
 
-// summary ends the run: "N of N applied" on stdout when every issue is
-// done, else the error that names each issue not done (see runBatch). A dry
-// run applies nothing: it reports only the issues that cannot be planned.
+// failGroup is the issues that failed for one reason.
+type failGroup struct {
+	key, why string // the reason without the issue's number, and with it
+	ns       []int
+	err      error // of the first issue
+	code     render.Code
+}
+
+// reason is the group's reason in the summary.
+func (g *failGroup) reason() string {
+	if len(g.ns) > 1 {
+		return g.key
+	}
+	return g.why
+}
+
+// next is the group's advice, the line after the first of its error
+// ("ask the user how to proceed"), and its fix.
+func (g *failGroup) next() (advice, fix string) {
+	e := render.FromError(g.err)
+	if _, a, ok := strings.Cut(e.What, "\n"); ok {
+		advice = strings.TrimSpace(a)
+		if len(g.ns) > 1 {
+			advice = generalReason(advice, g.ns[0])
+		}
+	}
+	return advice, strings.TrimSpace(e.Fix)
+}
+
+// retryable reports whether a re-run may finish the group's issues:
+// network failures, partial or unconfirmed writes, issues not attempted.
+func (g *failGroup) retryable() bool {
+	return g.code == render.ExitNetwork || g.code == render.ExitPartial
+}
+
+// summary ends the run: "N of N done" on stdout when every issue is done,
+// else the error that names each issue not done (see runBatch). A dry run
+// applies nothing: it reports only the issues that cannot be planned.
+//
+// The error's first line holds one entry per reason ("#17, #18: why"),
+// those of the code that decides first, then in the order of the
+// arguments. Entries that do not fit are named after "also not done", as
+// many as fit, the rest counted ("and 5 more"). Then the next steps, at
+// most two lines: the advice of each kind of failure ("ask the user how
+// to proceed"), and for the issues a re-run may finish, "re-run the same
+// command to retry #21", whatever the code; the fix line is the first
+// failure's that has one.
 func (b *batchRun) summary(items []*batchItem, dry bool) error {
 	var failed []*batchItem
+	written := 0 // issues done with a write
 	for _, it := range items {
-		if it.err != nil {
+		switch {
+		case it.err != nil:
 			failed = append(failed, it)
+		case it.wrote():
+			written++
 		}
+	}
+	done := len(items) - len(failed)
+	head := fmt.Sprintf("%d of %d done", done, len(items))
+	if written < done {
+		head += fmt.Sprintf(" (%d written)", written)
+	}
+	if dry {
+		head = fmt.Sprintf("dry run: %d of %d can be applied", done, len(items))
 	}
 	if len(failed) == 0 {
 		if !dry {
-			fmt.Fprintf(b.stdout, "%d of %d applied\n", len(items), len(items))
+			fmt.Fprintln(b.stdout, head)
 		}
 		return nil
 	}
-	head := fmt.Sprintf("%d of %d applied", len(items)-len(failed), len(items))
-	if dry {
-		head = fmt.Sprintf("dry run: %d of %d can be applied", len(items)-len(failed), len(items))
-	}
+	wrote := slices.ContainsFunc(items, (*batchItem).wrote)
+	groups := failGroups(failed, codeOrder(wrote))
+	out := &render.Error{Code: batchCode(failed, wrote), What: summaryLine(head, groups)}
 
-	// One entry per reason, in the order of the arguments: "#17, #18: why",
-	// the reasons of several issues worded without their own numbers.
-	type group struct {
-		key, why string
-		ns       []int
+	// Next steps: the advice of each kind, the retry of the issues a re-run
+	// may finish, and the first fix.
+	var advice []string
+	var retry []int
+	retryFix := ""
+	for _, g := range groups {
+		a, fix := g.next()
+		if a != "" && !slices.Contains(advice, a) && runes(strings.Join(append(advice, a), "; ")) <= maxSummaryRunes {
+			advice = append(advice, a)
+		}
+		if out.Fix == "" {
+			out.Fix = fix
+		}
+		if g.retryable() {
+			retry = append(retry, g.ns...)
+			if retryFix == "" {
+				retryFix = fix
+			}
+		}
 	}
-	var groups []*group
+	var next []string
+	if len(advice) > 0 {
+		next = append(next, strings.Join(advice, "; "))
+	}
+	if len(retry) > 0 {
+		slices.Sort(retry)
+		lead, tail := "re-run the same command to retry ", ""
+		if retryFix != "" && retryFix != out.Fix {
+			lead = retryFix + ", then " + lead
+		}
+		if !dry {
+			tail = ": it skips the issues done"
+		}
+		hint := lead + refsWithin(retry, maxSummaryRunes-runes(lead+tail)) + tail
+		if out.Code == render.ExitNetwork || out.Code == render.ExitPartial {
+			next = append([]string{hint}, next...) // the step of the code first
+		} else {
+			next = append(next, hint)
+		}
+	}
+	for _, l := range next {
+		out.What += "\n" + l
+	}
+	return out
+}
+
+// failGroups sorts the failed issues into one group per reason, worded
+// without their numbers (generalReason), those whose code comes first in
+// order first, else in the order of the arguments.
+func failGroups(failed []*batchItem, order []render.Code) []*failGroup {
+	var groups []*failGroup
 	for _, it := range failed {
 		key := generalReason(it.why, it.n)
-		i := slices.IndexFunc(groups, func(g *group) bool { return g.key == key })
+		i := slices.IndexFunc(groups, func(g *failGroup) bool { return g.key == key })
 		if i < 0 {
-			groups = append(groups, &group{key: key, why: it.why})
+			groups = append(groups, &failGroup{key: key, why: it.why, err: it.err, code: render.FromError(it.err).Code})
 			i = len(groups) - 1
 		}
 		groups[i].ns = append(groups[i].ns, it.n)
 	}
-	entries := make([]string, len(groups))
-	for i, g := range groups {
-		why := g.why
-		if len(g.ns) > 1 {
-			why = g.key
+	rank := func(c render.Code) int {
+		if i := slices.Index(order, c); i >= 0 {
+			return i
 		}
-		entries[i] = issueRefs(g.ns) + ": " + why
+		return len(order)
 	}
-	line := head
-	for i, entry := range entries {
-		// The issues of the groups after this one, named if they do not fit.
-		var rest []int
-		for _, g := range groups[i+1:] {
-			rest = append(rest, g.ns...)
-		}
-		slices.Sort(rest)
-		more := ""
-		if len(rest) > 0 {
-			more = "; also not applied: " + issueRefs(rest)
-		}
-		if i > 0 && runes(line+"; "+entry+more) > maxSummaryRunes {
-			rest = nil
-			for _, g := range groups[i:] {
-				rest = append(rest, g.ns...)
-			}
-			slices.Sort(rest)
-			line += "; also not applied: " + issueRefs(rest)
-			break
-		}
-		line += "; " + entry
-	}
+	slices.SortStableFunc(groups, func(a, b *failGroup) int { return rank(a.code) - rank(b.code) })
+	return groups
+}
 
-	wrote := slices.ContainsFunc(items, (*batchItem).wrote)
-	code := batchCode(failed, wrote)
-	out := &render.Error{Code: code, What: line}
-	for _, it := range failed {
-		e := render.FromError(it.err)
-		if e.Code != code && (code != render.ExitPartial || e.Code != render.ExitNetwork) {
+// summaryLine is the first line of the summary error: head, then the
+// entry of each group while it fits in maxSummaryRunes with room left to
+// name the issues after it; their issues follow "also not done", as many
+// as fit, the rest counted. The first entry is always given: when it is
+// too long, its issues are named as few as needed (at least one, the rest
+// counted), then its reason is cut, leaving room to name a few issues
+// after it.
+func summaryLine(head string, groups []*failGroup) string {
+	line := head
+	for i, g := range groups {
+		rest := groupNumbers(groups[i+1:])
+		why := g.reason()
+		if entry := "; " + issueRefs(g.ns) + ": " + why; runes(line+entry) <= maxSummaryRunes-tailRunes(rest, 1) {
+			line += entry
 			continue
 		}
-		// The next step of the failure that decides the code: its fix,
-		// and the advice of its message ("ask the user how to proceed").
-		out.Fix = e.Fix
-		if _, advice, ok := strings.Cut(e.What, "\n"); ok && code != render.ExitPartial {
-			out.What += "\n" + advice
+		if i > 0 {
+			return line + alsoNotDone(groupNumbers(groups[i:]), maxSummaryRunes-runes(line))
 		}
-		break
+		room := maxSummaryRunes - runes(line) - tailRunes(rest, 3)
+		refs := refsWithin(g.ns, room-runes("; : "+why))
+		line += "; " + refs + ": " + clipRunes(why, max(room-runes("; "+refs+": "), 2))
+		return line + alsoNotDone(rest, maxSummaryRunes-runes(line))
 	}
-	if code == render.ExitPartial {
-		out.What += "\nre-run the same command: it skips the issues done and finishes the rest"
+	return line
+}
+
+const alsoNotDonePrefix = "; also not done: "
+
+// alsoNotDone names ns after the entries of the summary line, within
+// budget runes; "" for none.
+func alsoNotDone(ns []int, budget int) string {
+	if len(ns) == 0 {
+		return ""
 	}
-	return out
+	return alsoNotDonePrefix + refsWithin(ns, budget-runes(alsoNotDonePrefix))
+}
+
+// tailRunes is the length of alsoNotDone of ns naming up to k of them.
+func tailRunes(ns []int, k int) int {
+	if len(ns) == 0 {
+		return 0
+	}
+	k = min(k, len(ns))
+	return runes(alsoNotDonePrefix + refsText(ns[:k], len(ns)-k))
+}
+
+// groupNumbers lists the issues of groups in ascending order.
+func groupNumbers(groups []*failGroup) []int {
+	var ns []int
+	for _, g := range groups {
+		ns = append(ns, g.ns...)
+	}
+	slices.Sort(ns)
+	return ns
+}
+
+// refsWithin names ns as issueRefs does, as many as fit in budget runes
+// (at least one), the rest counted: "#4, #5 and 12 more".
+func refsWithin(ns []int, budget int) string {
+	for k := min(len(ns), maxErrorRefs); k > 1; k-- {
+		if s := refsText(ns[:k], len(ns)-k); runes(s) <= budget {
+			return s
+		}
+	}
+	return refsText(ns[:1], len(ns)-1)
+}
+
+// refsText is "#1, #2", then " and N more" for more issues not named.
+func refsText(shown []int, more int) string {
+	s := issueRefs(shown)
+	if more > 0 {
+		s += fmt.Sprintf(" and %d more", more)
+	}
+	return s
+}
+
+// codeOrder is the order in which the codes of failed issues decide the
+// code of a batch run (batchCode), wrote when it applied anything.
+func codeOrder(wrote bool) []render.Code {
+	if wrote {
+		return []render.Code{render.ExitPartial, render.ExitNetwork, render.ExitDenied, render.ExitUsage, render.ExitNotFound}
+	}
+	return []render.Code{render.ExitDenied, render.ExitUsage, render.ExitNetwork, render.ExitNotFound, render.ExitPartial}
 }
 
 // batchCode is the exit code of a batch run with failed issues, wrote
 // when it applied anything:
 //
 //   - 5 when it applied something and an issue failed in a way a re-run
-//     may finish (network, an unconfirmed or partial write): re-run it;
+//     may finish (network, an unconfirmed or partial write, not
+//     attempted): re-run it;
 //   - otherwise the code of the failures, the first of 2 (a process
-//     refusal: ask the user), 1 (bad arguments), 3 (not found), 4
-//     (network, nothing applied), 5.
+//     refusal: ask the user), 1 (bad arguments), 4 (network, nothing
+//     applied: a re-run may finish), 3 (not found).
 //
-// 0, every issue done, has no failed issue.
+// 0, every issue done, has no failed issue. Whatever the code, the summary
+// names the issues a re-run may finish.
 func batchCode(failed []*batchItem, wrote bool) render.Code {
 	codes := map[render.Code]bool{}
 	for _, it := range failed {
 		codes[render.FromError(it.err).Code] = true
 	}
-	if wrote && (codes[render.ExitNetwork] || codes[render.ExitPartial]) {
-		return render.ExitPartial
-	}
-	for _, c := range []render.Code{render.ExitDenied, render.ExitUsage, render.ExitNotFound, render.ExitNetwork} {
-		if codes[c] {
-			return c
+	for _, c := range codeOrder(wrote) {
+		if !codes[c] {
+			continue
 		}
+		if c == render.ExitNetwork && wrote {
+			return render.ExitPartial
+		}
+		return c
 	}
 	return render.ExitPartial
 }
@@ -407,7 +597,7 @@ func batchHelp(v config.Verb, line func(label, format string, a ...any)) {
 	}
 	line("Batch", "several numbers at once: gh dojo %s 12 13 14; each issue is applied", v.Name)
 	line("", "on its own, a failed one is skipped, and a summary ends the run:")
-	line("", "\"3 of 4 applied; #17: <reason>\"; a re-run skips what is done")
-	line("", "exit code: 0 all done; 5 some applied and a re-run may finish the rest;")
-	line("", "else the failures' code, 2 first, then 1, 3, 4")
+	line("", "\"3 of 4 done; #17: <reason>\"; a re-run skips what is done")
+	line("", "exit code: 0 all done; 5 some written and a re-run may finish the rest;")
+	line("", "else the failures' code, 2 first, then 1, 4, 3")
 }

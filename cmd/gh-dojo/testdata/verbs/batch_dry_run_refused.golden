@@ -4,5 +4,5 @@ dry run: done #1 "Issue 1"
   status: Ready → Done
   close: as completed
 --- stderr
-error: dry run: 1 of 2 can be applied; #2: done cannot move #2 from Backlog
+error: dry run: 1 of 2 can be applied; #2: done cannot move #2 from Backlog, it starts only from Ready or In progress
 this is a process rule: ask the user how to proceed

@@ -175,6 +175,12 @@ func (r *repoJSON) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &fields); err != nil {
 		return err
 	}
+	return r.fromFields(fields)
+}
+
+// fromFields fills r from the fields of the repository object, decoded
+// once by the caller; fields it does not know are skipped.
+func (r *repoJSON) fromFields(fields map[string]json.RawMessage) error {
 	for key, raw := range fields {
 		var err error
 		switch {

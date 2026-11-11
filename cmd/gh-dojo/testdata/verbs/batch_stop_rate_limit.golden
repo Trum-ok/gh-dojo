@@ -1,0 +1,6 @@
+code: 4
+--- stdout
+#3 Done (unchanged), already closed as completed
+--- stderr
+error: 1 of 4 done (0 written); #1: GitHub API rate limit exceeded; #2, #4: not attempted: GitHub API rate limit exceeded
+re-run the same command to retry #1, #2, #4: it skips the issues done

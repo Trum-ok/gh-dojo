@@ -1,5 +1,6 @@
 code: 2
 --- stdout
 --- stderr
-error: dry run: 0 of 21 can be applied; #1, #2, #3, #4, #5, #6, #7, #8, #9, #10 and 10 more: done cannot move it: not on the board, which counts as Backlog; #21: GitHub API unavailable (HTTP 502)
+error: dry run: 0 of 21 can be applied; #1, #2, #3, #4, #5 and 15 more: done cannot move it: not on the board, which counts as Backlog, it starts only from Ready or In progress; also not done: #21
 this is a process rule: ask the user how to proceed
+re-run the same command to retry #21

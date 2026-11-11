@@ -2,12 +2,20 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
+	"unicode/utf8"
+
+	"github.com/cli/go-gh/v2/pkg/api"
 
 	"github.com/Trum-ok/gh-dojo/internal/board"
 	"github.com/Trum-ok/gh-dojo/internal/config"
+	"github.com/Trum-ok/gh-dojo/internal/graph"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/Trum-ok/gh-dojo/internal/testutil"
 	"github.com/Trum-ok/gh-dojo/internal/workflow"
@@ -135,6 +143,14 @@ func TestBatchOutcomes(t *testing.T) {
 		{"repeat_number", []string{"done", "1", "#1", "1"}, issues("Ready"), nil, nil, render.ExitOK, 1},
 		{"dry_run", []string{"done", "1", "2", "--dry-run", "--comment", "v1.2"}, issues("Ready", "Done"), nil, nil, render.ExitOK, 0},
 		{"dry_run_refused", []string{"done", "1", "2", "--dry-run"}, issues("Ready", "Backlog"), nil, nil, render.ExitDenied, 0},
+		// A refusal and a network failure, nothing written: the refusal
+		// decides (2), and the error still says a re-run retries #2.
+		{"refused_network", []string{"done", "1", "2"}, issues("Backlog", "Ready"), map[int]error{2: network}, nil, render.ExitDenied, 0},
+		// Not found and a network failure, nothing written: 4 before 3, a
+		// re-run may finish #2.
+		{"not_found_network", []string{"done", "1", "2", "9"}, issues("Done", "Ready"), map[int]error{2: network}, nil, render.ExitNetwork, 0},
+		// Every issue done, one of them in place: "done (1 written)".
+		{"in_place", []string{"done", "1", "2"}, issues("Ready", "Done"), nil, nil, render.ExitOK, 1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -160,6 +176,7 @@ func TestBatchConfirm(t *testing.T) {
 	withConfig(t, verbsConfig+`
 [verbs.drop]
 when = "Not needed"
+from = ["Backlog", "Done"]
 close = "not_planned"
 confirm = "user"
 batch = true
@@ -168,6 +185,7 @@ batch = true
 		1: {Number: 1, OnBoard: true, Status: "Backlog"},
 		2: {Number: 2, OnBoard: true, Status: "Backlog"},
 		3: {Number: 3, OnBoard: true, Status: "Done", Closed: true, StateReason: "not_planned"},
+		4: {Number: 4, OnBoard: true, Status: "Ready"},
 	}
 	for _, tt := range []struct {
 		name    string
@@ -177,6 +195,8 @@ batch = true
 	}{
 		{"confirm_no", []string{"drop", "1", "2", "3"}, render.ExitDenied, 0},
 		{"confirm_yes", []string{"drop", "1", "2", "3", "--yes"}, render.ExitOK, 2},
+		// A from refusal next to a missing go-ahead: both next steps.
+		{"confirm_refused", []string{"drop", "1", "4"}, render.ExitDenied, 0},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			f := &fakeBackend{issues: is}
@@ -255,5 +275,117 @@ func TestBatchStaleRead(t *testing.T) {
 	code, out := runOut("done", "1", "2")
 	if code != render.ExitOK || f.reads != 2 || f.resets != 1 || len(f.applied) != 2 {
 		t.Errorf("exit code %d, reads %d, resets %d, applied %d; want 0, 2, 1, 2\n%s", code, f.reads, f.resets, len(f.applied), out)
+	}
+}
+
+// TestBatchSummaryFits: 29 issues refused from as many statuses, the
+// first a long one. The summary line names the issues that fit and counts
+// the rest ("and N more"): no issue is lost to the error block's cut of a
+// long line.
+func TestBatchSummaryFits(t *testing.T) {
+	withConfig(t, verbsConfig)
+	is := map[int]workflow.Issue{1: {Number: 1, OnBoard: true, Status: "Ready"}}
+	args := []string{"done", "1"}
+	for n := 2; n <= 30; n++ {
+		is[n] = workflow.Issue{Number: n, OnBoard: true, Status: fmt.Sprintf("Stage %d", n)}
+		if n == 2 {
+			is[n] = workflow.Issue{Number: n, OnBoard: true, Status: strings.Repeat("Waiting for a review ", 7)}
+		}
+		args = append(args, fmt.Sprint(n))
+	}
+	withBackend(t, &fakeBackend{issues: is})
+	code, out := runOut(args...)
+	if code != render.ExitDenied {
+		t.Errorf("exit code = %d, want %d", code, render.ExitDenied)
+	}
+	checkSummaryCounts(t, string(out), 2, 30)
+	testutil.Golden(t, "verbs/batch_summary_fits", out)
+}
+
+// checkSummaryCounts checks the error line of out: short enough not to be
+// cut, and every issue from lo to hi named in it or counted in an "and N
+// more".
+func checkSummaryCounts(t *testing.T, out string, lo, hi int) {
+	t.Helper()
+	_, line, _ := strings.Cut(out, "error: ")
+	line, _, _ = strings.Cut(line, "\n")
+	// The error block cuts a line at 200 runes; the summary stays within
+	// maxSummaryRunes, so the cut never hides an issue.
+	if utf8.RuneCountInString(line) > maxSummaryRunes {
+		t.Errorf("summary line over %d runes, the error block may cut it:\n%s", maxSummaryRunes, line)
+	}
+	named := map[int]bool{}
+	for _, m := range regexp.MustCompile(`#(\d+)`).FindAllStringSubmatch(line, -1) {
+		n, _ := strconv.Atoi(m[1])
+		named[n] = true
+	}
+	counted := 0
+	for _, m := range regexp.MustCompile(`and (\d+) more`).FindAllStringSubmatch(line, -1) {
+		n, _ := strconv.Atoi(m[1])
+		counted += n
+	}
+	shown := 0
+	for n := lo; n <= hi; n++ {
+		if named[n] {
+			shown++
+		}
+	}
+	if shown+counted != hi-lo+1 {
+		t.Errorf("summary names %d and counts %d issues, want %d in all:\n%s", shown, counted, hi-lo+1, line)
+	}
+}
+
+// TestBatchStopsOnAuth: an error that would fail every write alike (the
+// token rejected, a rate limit, the run interrupted) stops the batch: the
+// issues after it are not attempted, grouped in one entry, while an issue
+// already in place still needs no write and is done.
+func TestBatchStopsOnAuth(t *testing.T) {
+	withConfig(t, verbsConfig)
+	is := map[int]workflow.Issue{
+		1: {Number: 1, OnBoard: true, Status: "Ready"},
+		2: {Number: 2, OnBoard: true, Status: "Ready"},
+		3: {Number: 3, OnBoard: true, Status: "Done", Closed: true, StateReason: "completed"},
+		4: {Number: 4, OnBoard: true, Status: "Ready"},
+	}
+	for _, tt := range []struct {
+		name string
+		err  error
+	}{
+		{"auth", render.Network("GitHub rejected the token (HTTP 401)").WithFix(render.AuthFix).
+			WithCause(&api.HTTPError{StatusCode: http.StatusUnauthorized})},
+		{"rate_limit", render.Network("GitHub API rate limit exceeded; retry later").
+			WithCause(&api.GraphQLError{Errors: []api.GraphQLErrorItem{{Type: "RATE_LIMITED"}}})},
+		{"interrupted", render.Network("GitHub write failed (interrupted); it may have been applied, re-run the command to check").
+			WithCause(errors.Join(graph.ErrUnknownOutcome, context.Canceled))},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			f := &fakeBackend{issues: is, applyErrs: map[int]error{1: tt.err}}
+			withBackend(t, f)
+			code, out := runOut("done", "1", "2", "3", "4")
+			if code != render.ExitNetwork || f.attempts != 1 {
+				t.Errorf("exit code = %d, Apply calls = %d; want %d, 1\n%s", code, f.attempts, render.ExitNetwork, out)
+			}
+			testutil.Golden(t, "verbs/batch_stop_"+tt.name, out)
+		})
+	}
+}
+
+// TestBatchStaleOnce: the stale-schema retry is spent once per run,
+// whichever step hits it: after the read of #2 was retried with a fresh
+// schema, a stale ID on the write of #1 is not retried again.
+func TestBatchStaleOnce(t *testing.T) {
+	withConfig(t, verbsConfig)
+	f := &staleReadBackend{stale: map[int]bool{2: true}}
+	f.issues = map[int]workflow.Issue{
+		1: {Number: 1, OnBoard: true, Status: "Ready"},
+		2: {Number: 2, OnBoard: true, Status: "Ready"},
+	}
+	f.applyErrs = map[int]error{1: render.Usage("unknown option").WithCause(board.ErrUnknownOption)}
+	saved := newBackend
+	t.Cleanup(func() { newBackend = saved })
+	newBackend = func(*config.Config) (Backend, error) { return f, nil }
+	code, out := runOut("done", "1", "2")
+	if code != render.ExitUsage || f.resets != 1 || f.reads != 2 {
+		t.Errorf("exit code %d, resets %d, reads %d; want 1, 1, 2\n%s", code, f.resets, f.reads, out)
 	}
 }

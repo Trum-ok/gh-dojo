@@ -3,5 +3,5 @@ code: 5
 #3 Ready → Done, closed as completed
 #9 Ready → Done, closed as completed
 --- stderr
-error: 2 of 3 applied; #7: GitHub write failed (HTTP 502)
-re-run the same command: it skips the issues done and finishes the rest
+error: 2 of 3 done; #7: GitHub write failed (HTTP 502)
+re-run the same command to retry #7: it skips the issues done

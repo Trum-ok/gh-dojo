@@ -228,26 +228,28 @@ func (a *App) Now() time.Time {
 // the time of the read, the status history, the sprint field with the
 // item's iteration, and the item's values of the fields v sets. The
 // schema is the one the card was read with, so it costs no request.
-func (b *githubBackend) fieldState(ctx context.Context, v config.Verb, card *issue.Card, is *workflow.Issue) error {
+// failed fails this card alone: its sprint was not read (see itemSprint).
+// err fails every card: the config or the board schema is wrong.
+func (b *githubBackend) fieldState(ctx context.Context, v config.Verb, card *issue.Card, is *workflow.Issue) (failed, err error) {
 	is.ReadAt = b.app.Now()
 	if v.Iteration == "" && len(v.Fields) == 0 {
-		return nil
+		return nil, nil
 	}
 	cfg, err := b.app.Config()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	s, err := b.app.Schema(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if v.Iteration != "" {
 		f, err := sprintField(cfg, s)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		if is.Sprint, err = itemSprint(f, card); err != nil {
-			return err
+		if is.Sprint, failed = itemSprint(f, card); failed != nil {
+			return failed, nil
 		}
 		if card.Item != nil {
 			is.AddedAt = card.Item.CreatedAt
@@ -262,14 +264,14 @@ func (b *githubBackend) fieldState(ctx context.Context, v config.Verb, card *iss
 		for _, fv := range v.Fields {
 			f, err := s.Field(fv.Field)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			if val, ok := card.Item.ValueByID(f.ID); ok {
 				is.Fields[fv.Field] = val.Text
 			}
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 // sprintField returns the board's sprint field, which the schema check

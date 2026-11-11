@@ -9,6 +9,7 @@ import (
 	"github.com/Trum-ok/gh-dojo/internal/board"
 	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/graph/graphtest"
+	"github.com/Trum-ok/gh-dojo/internal/issue"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/Trum-ok/gh-dojo/internal/testutil"
 )
@@ -337,4 +338,28 @@ func TestSprintHelp(t *testing.T) {
 		t.Fatalf("describe = %d\n%s", code, out)
 	}
 	testutil.Golden(t, "describe/sprint", out)
+}
+
+// TestSprintNotReadFailsOneCard: a card whose board item has more field
+// values than read, without the sprint among them, fails that issue
+// alone (failed), so a batch goes on with the others; the config and the
+// schema are fine, so nothing fails the whole command (err).
+func TestSprintNotReadFailsOneCard(t *testing.T) {
+	withSprintApp(t, time.Time{})
+	app := newApp()
+	cfg, err := app.Config()
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, ok := cfg.Verb("done")
+	if !ok {
+		t.Fatal("no done verb")
+	}
+	b := &githubBackend{app: app}
+	card := &issue.Card{Number: 42, Repo: issue.Repo{Owner: "acme", Name: "shop"}, State: issue.StateOpen,
+		Item: &issue.Item{ID: "PVTI_acme0042", Status: "Ready", ValuesTruncated: true}}
+	_, failed, err := b.workflowIssue(t.Context(), v, verbLookup(v), card)
+	if err != nil || failed == nil || !strings.Contains(failed.Error(), "the Sprint of #42 was not read") {
+		t.Errorf("workflowIssue: failed = %v, err = %v; want the sprint of #42 not read, nil", failed, err)
+	}
 }

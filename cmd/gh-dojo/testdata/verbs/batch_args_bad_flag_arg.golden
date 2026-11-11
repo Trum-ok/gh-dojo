@@ -3,4 +3,4 @@ code: 1
 --- stderr
 error: done does not use --by
 allowed: --comment
-fix: gh dojo done 1
+fix: gh dojo done 1 2

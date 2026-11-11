@@ -105,11 +105,11 @@ func (b *githubBackend) ReadIssues(ctx context.Context, v config.Verb, ns []int,
 }
 
 // workflowIssue turns a card read with lookup into the state v plans
-// with. failed fails this issue alone: its board place could not be read,
-// a label to remove is spelled another way on it, or an issue --by names
-// is this one or blocked by it. err fails every issue: what v needs is
-// missing for all of them (a label to add, the assignee, a --by issue),
-// or the config or the board schema is wrong.
+// with. failed fails this issue alone: its board place or its sprint could
+// not be read, a label to remove is spelled another way on it, or an issue
+// --by names is this one or blocked by it. err fails every issue: what v
+// needs is missing for all of them (a label to add, the assignee, a --by
+// issue), or the config or the board schema is wrong.
 func (b *githubBackend) workflowIssue(ctx context.Context, v config.Verb, lookup issue.Lookup, card *issue.Card) (is workflow.Issue, failed, err error) {
 	if err := statusUnknown(card); err != nil {
 		return workflow.Issue{}, err, nil
@@ -128,8 +128,8 @@ func (b *githubBackend) workflowIssue(ctx context.Context, v config.Verb, lookup
 			}
 		}
 	}
-	if err := b.fieldState(ctx, v, card, &is); err != nil {
-		return workflow.Issue{}, nil, err
+	if failed, err := b.fieldState(ctx, v, card, &is); failed != nil || err != nil {
+		return workflow.Issue{}, failed, err
 	}
 	if v.ChecksBlockers() {
 		cfg, err := b.app.Config()

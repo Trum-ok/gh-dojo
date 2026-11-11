@@ -1,0 +1,6 @@
+code: 2
+--- stdout
+#1 Ready → Done, closed as completed
+--- stderr
+error: 1 of 30 done; #2: done cannot move #2 from Waiting for a review Waiting for a review Waiting for a review Waiting for a review Waiting for a review Wa…; also not done: #3, #4, #5 and 25 more
+this is a process rule: ask the user how to proceed

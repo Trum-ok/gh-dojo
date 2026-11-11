@@ -187,7 +187,13 @@ func (r *batchResponse) UnmarshalJSON(b []byte) error {
 			return err
 		}
 		if fields != nil {
+			// The aliases are the issues; the other fields are the
+			// lookups, read from the same decoded object.
 			r.Repository = map[string]*issueJSON{}
+			r.lookups = &repoJSON{}
+			if err := r.lookups.fromFields(fields); err != nil {
+				return err
+			}
 		}
 		for key, f := range fields {
 			if !isBatchAlias(key) {
@@ -198,9 +204,6 @@ func (r *batchResponse) UnmarshalJSON(b []byte) error {
 				return err
 			}
 			r.Repository[key] = node
-		}
-		if err := json.Unmarshal(raw, &r.lookups); err != nil {
-			return err
 		}
 	}
 	if raw, ok := r.data["viewer"]; ok {

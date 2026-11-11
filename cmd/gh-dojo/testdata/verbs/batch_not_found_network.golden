@@ -1,0 +1,7 @@
+code: 4
+--- stdout
+#1 Done (unchanged), already closed
+--- stderr
+error: 1 of 3 done (0 written); #2: GitHub is unavailable (HTTP 502); #9: issue #9 not found in acme/shop
+re-run the same command to retry #2: it skips the issues done
+fix: gh auth status
