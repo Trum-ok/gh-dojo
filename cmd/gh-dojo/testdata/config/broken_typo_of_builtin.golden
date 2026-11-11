@@ -2,5 +2,5 @@ code: 1
 --- stdout
 --- stderr
 error: unknown command "bom", did you mean "boom"?
-allowed: board, boom, comment, denied, init, list, new, one, show
+allowed: board, boom, comment, denied, describe, init, list, new, one, show
 fix: gh dojo --help

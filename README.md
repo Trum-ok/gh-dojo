@@ -221,6 +221,19 @@ the keys that name it, e.g. `[verbs.wait] to = "…"`. The file is kept, and
 the exit code is 1 until the board and the file match. An existing config is
 not overwritten without `--force`; `--dry-run` prints the file instead.
 
+### describe
+
+```sh
+gh dojo describe
+```
+
+Prints the project's process in a few lines per verb, short enough for an
+agent's context: when to use each verb, the arguments it needs or takes, what
+it checks and does along the way (the comment it posts, whether it runs on
+closed issues), then the lifecycle (from → to), the initial, final and
+resolved statuses, and the exit codes. It reads only the config, never the
+network; a missing or broken config is printed as an error (exit code 1).
+
 ### Process verbs
 
 ```sh
@@ -233,7 +246,7 @@ own; the [kanban preset](#kanban-preset) defines `start`, `wait`, `ready` and
 Lifecycle, the statuses each one moves an issue from and to, with the
 initial, final and resolved statuses; `gh dojo <verb> --help` shows the
 allowed starting statuses, the target status, the required arguments and the
-comment template.
+comment template; [`gh dojo describe`](#describe) sums up all of them.
 
 A verb takes one issue number and, in one command:
 

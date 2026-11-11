@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: no .github/dojo.toml in this directory or its parents up to the repository root
+fix: gh dojo init

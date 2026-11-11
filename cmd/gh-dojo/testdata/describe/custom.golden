@@ -1,0 +1,38 @@
+code: 0
+--- stdout
+Process from .github/dojo.toml (preset kanban): board acme/3, issues in acme/shop, acme/api.
+Run a verb as gh dojo <verb> <N>; --dry-run shows its plan first.
+
+Verbs:
+  start       берёшь задачу в работу
+              optional --comment; comments "Взял в работу. Сессия: {session} {comment}"
+  wait        Work is stuck: waiting for another issue or an outside decision
+              needs --by or --comment; comments "Waiting for {by}. {comment}"
+  done        The change is released
+              optional --comment; also on closed issues; comments "{comment}"
+  note        Leave a progress note without moving the issue
+              needs --comment; comments "Progress: {comment}"
+  park        Put the issue back
+
+Every verb adds the issue to the board if it is missing and refuses a
+closed issue unless noted. A repeat is safe: a status already set is kept
+and a comment already posted is skipped.
+
+Lifecycle (from → to):
+  start       Backlog, Waiting, Ready → In progress
+  wait        In progress → Waiting
+  done        Ready, In progress → Done
+  note        any status → status unchanged
+  park        any status → Backlog
+  Initial:    Backlog (new issues; also an issue with no status or not on the board)
+  Final:      Done (gh dojo list hides it unless --all)
+  Resolved:   Done (a blocker in these no longer blocks)
+
+Exit codes:
+  0  everything applied: go on
+  1  bad arguments or config: fix them as the error says
+  2  a process check refused: don't work around it; ask the user
+  3  issue or board not found: check the number (gh dojo list) or board.owner/project in .github/dojo.toml
+  4  network, rate limit or auth: retry later, or gh auth refresh -s project
+  5  partially applied: re-run the same command; it finishes the rest
+--- stderr
