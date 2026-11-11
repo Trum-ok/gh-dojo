@@ -51,6 +51,9 @@ func (b *githubBackend) ReadIssue(ctx context.Context, v config.Verb, n int) (wo
 			}
 		}
 	}
+	if err := b.fieldState(ctx, v, card, &is); err != nil {
+		return workflow.Issue{}, err
+	}
 	return is, nil
 }
 
@@ -327,6 +330,9 @@ func (b *githubBackend) ids(ctx context.Context, p *workflow.Plan, card *issue.C
 	ids := effects.IDs{Project: s.ID, Issue: card.ID, Item: card.ItemID()}
 	if ids.Item == "" {
 		ids.Item = b.added[card.Number]
+	}
+	if err := b.fieldIDs(s, p.Ops, &ids); err != nil {
+		return effects.IDs{}, err
 	}
 	if f := card.Found; f != nil {
 		ids.Labels = f.Labels

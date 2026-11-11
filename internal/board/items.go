@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"strings"
 
 	"github.com/cli/go-gh/v2/pkg/api"
 
@@ -63,10 +64,22 @@ const (
 	ContentHidden      = ""
 )
 
+// sprintItemsQuery is itemsQuery that also reads each item's iteration of
+// the field named $sprint (ReadItemsSprint).
+var sprintItemsQuery = strings.NewReplacer(
+	"$status: String!, $cursor", "$status: String!, $sprint: String!, $cursor",
+	"      content {\n", "      sprint: fieldValueByName(name: $sprint) {\n"+
+		"        ... on ProjectV2ItemFieldIterationValue { iterationId title }\n"+
+		"      }\n      content {\n",
+).Replace(itemsQuery)
+
 // Item is a board item. Only issues have the issue fields set.
 type Item struct {
 	Type   string // ContentIssue, ContentPullRequest, ContentDraftIssue or ContentHidden
 	Status string // option name of the status field; "" when unset
+	// SprintID and Sprint are the ID and title of the item's iteration of
+	// the sprint field, read by ReadItemsSprint only; "" when unset.
+	SprintID, Sprint string
 
 	Repo      string // "owner/name"
 	Number    int
@@ -99,11 +112,23 @@ type Items struct {
 // 100 per request, with statusField's value. A board that no longer exists
 // is exit code 3; network and auth problems keep graph's codes.
 func ReadItems(ctx context.Context, q graph.Querier, s *Schema, statusField string) (*Items, error) {
+	return ReadItemsSprint(ctx, q, s, statusField, "")
+}
+
+// ReadItemsSprint is ReadItems that also reads each item's iteration of
+// the field named sprintField (Item.SprintID, Item.Sprint), in the same
+// requests; "" reads none, as ReadItems.
+func ReadItemsSprint(ctx context.Context, q graph.Querier, s *Schema, statusField, sprintField string) (*Items, error) {
 	out := &Items{}
 	tq := &tolerant{q: q}
 	vars := map[string]any{"owner": s.Owner, "number": s.Number, "status": statusField}
+	query := itemsQuery
+	if sprintField != "" {
+		query = sprintItemsQuery
+		vars["sprint"] = sprintField
+	}
 	first := true
-	page, err := graph.Paginate(ctx, tq, itemsQuery, vars, 0, func(r *itemsResponse) *graph.Connection[*itemJSON] {
+	page, err := graph.Paginate(ctx, tq, query, vars, 0, func(r *itemsResponse) *graph.Connection[*itemJSON] {
 		if r.Viewer != nil && out.Viewer == "" {
 			out.Viewer = r.Viewer.Login
 		}
@@ -164,6 +189,10 @@ type itemJSON struct {
 	Status *struct {
 		Name string `json:"name"`
 	} `json:"status"`
+	Sprint *struct {
+		IterationID string `json:"iterationId"`
+		Title       string `json:"title"`
+	} `json:"sprint"`
 	Content *struct {
 		Typename   string `json:"__typename"`
 		Number     int    `json:"number"`
@@ -195,6 +224,9 @@ func (n *itemJSON) item() Item {
 	}
 	if n.Status != nil {
 		it.Status = n.Status.Name
+	}
+	if n.Sprint != nil {
+		it.SprintID, it.Sprint = n.Sprint.IterationID, n.Sprint.Title
 	}
 	c := n.Content
 	if c == nil {

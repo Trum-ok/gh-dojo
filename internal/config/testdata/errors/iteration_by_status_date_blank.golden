@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.done.iteration: "by_status_date:": the status is empty
+fix: iteration = "by_status_date:Ready" picks the iteration of the day the issue entered Ready

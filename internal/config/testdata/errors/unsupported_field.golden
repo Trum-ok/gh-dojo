@@ -1,2 +1,2 @@
-error: .github/dojo.toml: fields.sprint is not supported in this version (sprint fields and iteration effects come in v0.1)
-fix: remove fields.sprint from .github/dojo.toml
+error: .github/dojo.toml: fields.priority is not supported in this version (only fields.status and fields.sprint are used; a verb sets other board fields by name under [verbs.<name>.field])
+fix: remove fields.priority from .github/dojo.toml

@@ -1,0 +1,1 @@
+error: .github/dojo.toml: verbs.done.field.Priority: wrong type: want a string (an option or a text), a number or a date (YYYY-MM-DD)

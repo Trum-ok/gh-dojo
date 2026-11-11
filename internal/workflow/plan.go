@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 )
 
@@ -19,14 +20,16 @@ type Plan struct {
 	Target string // the verb's target status; "" when it leaves the status alone
 
 	// Ops are the operations to apply, in this order, each at most once:
-	// AddToBoard or Unarchive, Reopen, SetStatus, AddLabels, RemoveLabels,
-	// Assign, AddComment, Close. Empty when there is nothing to do.
+	// AddToBoard or Unarchive, Reopen, SetStatus, SetIteration, SetFields,
+	// AddLabels, RemoveLabels, Assign, AddComment, Close. Empty when there
+	// is nothing to do.
 	Ops []Op
 
 	StatusUnchanged bool // the issue is already in Target; no SetStatus
 	CommentPresent  bool // the same comment is the latest gh-dojo comment already; no AddComment
 	// InPlace are the verb's effects found already in place, as the ops
-	// that would have applied them: Reopen, AddLabels, RemoveLabels,
+	// that would have applied them: Reopen, SetIteration (From = To),
+	// SetFields (the fields already set), AddLabels, RemoveLabels,
 	// Assign, and Close with the reason the issue was closed with ("" when
 	// unknown). They are never applied; they give the "already" wording of
 	// the dry run and the confirmation line.
@@ -42,7 +45,8 @@ type Plan struct {
 }
 
 // Op is one operation of a plan: AddToBoard, Unarchive, Reopen, SetStatus,
-// AddLabels, RemoveLabels, Assign, AddComment or Close. Each kind has its
+// SetIteration, SetFields, AddLabels, RemoveLabels, Assign, AddComment or
+// Close. Each kind has its
 // own type, its own field in the mutation (see package effects) and its
 // own words in the dry run, the confirmation line and a partial report.
 type Op interface {
@@ -98,6 +102,41 @@ type Close struct {
 	Reason string
 }
 
+// SetIteration sets the sprint field (fields.sprint) to the iteration To,
+// or clears it when To is empty. From is the iteration read, "" for none.
+// Start is To's start date (YYYY-MM-DD), which tells iterations with the
+// same title apart.
+type SetIteration struct {
+	From, To string
+	Start    string
+	// Unread says the item's iteration was not read (Sprint.Unknown):
+	// From is empty, but the item may have one.
+	Unread bool
+}
+
+func (s SetIteration) transition() string {
+	if s.Unread {
+		return valueTransition("not read", s.To)
+	}
+	return valueTransition(s.From, s.To)
+}
+
+// SetFields sets board fields to the values of the verb's field effect,
+// one change per field, in field name order.
+type SetFields struct {
+	Changes []FieldChange
+}
+
+// FieldChange is one field of SetFields: its board name, the value read
+// ("" for none) and the value to set, as the config writes it.
+type FieldChange struct {
+	Field    string
+	From, To string
+	// Value is the config value To comes from; the executor turns it into
+	// the board's input (board.Schema.FieldInput).
+	Value config.FieldValue
+}
+
 func (AddToBoard) Describe() string     { return "add to the board" }
 func (AddToBoard) Effect() string       { return "added to the board" }
 func (AddToBoard) op()                  {}
@@ -122,11 +161,43 @@ func (Assign) op()                      {}
 func (c AddComment) Describe() string {
 	return "comment: " + strconv.Quote(c.Body)
 }
-func (AddComment) Effect() string { return "comment left" }
-func (AddComment) op()            {}
-func (c Close) Describe() string  { return "close: as " + ReasonText(c.Reason) }
-func (c Close) Effect() string    { return "closed as " + ReasonText(c.Reason) }
-func (Close) op()                 {}
+func (AddComment) Effect() string       { return "comment left" }
+func (AddComment) op()                  {}
+func (c Close) Describe() string        { return "close: as " + ReasonText(c.Reason) }
+func (c Close) Effect() string          { return "closed as " + ReasonText(c.Reason) }
+func (Close) op()                       {}
+func (s SetIteration) Describe() string { return "sprint: " + s.transition() }
+func (s SetIteration) Effect() string   { return "sprint " + s.transition() }
+func (SetIteration) op()                {}
+func (f SetFields) Describe() string    { return strings.Join(f.each(FieldChange.describe), ", ") }
+func (f SetFields) Effect() string      { return strings.Join(f.each(FieldChange.effect), ", ") }
+func (SetFields) op()                   {}
+
+func (f SetFields) each(word func(FieldChange) string) []string {
+	out := make([]string, len(f.Changes))
+	for i, c := range f.Changes {
+		out[i] = word(c)
+	}
+	return out
+}
+
+func (c FieldChange) describe() string { return "field: " + c.effect() }
+func (c FieldChange) effect() string   { return c.Field + " " + valueTransition(c.From, c.To) }
+
+// valueTransition is like render.Transition for a field value: an empty
+// value reads "none".
+func valueTransition(from, to string) string {
+	if from == "" {
+		from = "none"
+	}
+	if to == "" {
+		to = "none"
+	}
+	if from == to {
+		return to + " (unchanged)"
+	}
+	return from + " → " + to
+}
 
 func (l AddLabels) signs() []string    { return signed("+", l.Names) }
 func (l RemoveLabels) signs() []string { return signed("-", l.Names) }
@@ -180,7 +251,8 @@ func (p *Plan) Unconfirmed() error {
 }
 
 // lines returns one entry per effect, in a fixed order: board, reopen,
-// status, labels, assignee, comment, close. dry picks the dry-run wording
+// status, sprint, fields (one entry per field), labels, assignee, comment,
+// close. dry picks the dry-run wording
 // (Describe), otherwise the confirmation wording (Effect). Effects already
 // in place are included. The status change of an issue not on the board
 // reads "not on the board → In progress"; in the confirmation that line
@@ -192,8 +264,12 @@ func (p *Plan) lines(dry bool) []string {
 	if dry {
 		pick = Op.Describe
 	}
-	var board, unarchive, reopen, status, assign, comment, closing []string
+	var board, unarchive, reopen, status, sprint, fields, assign, comment, closing []string
 	var labels, labelsInPlace []string // +name and -name
+	change := FieldChange.effect
+	if dry {
+		change = FieldChange.describe
+	}
 	for _, op := range p.Ops {
 		switch op := op.(type) {
 		case AddToBoard:
@@ -207,6 +283,10 @@ func (p *Plan) lines(dry bool) []string {
 				op.From = notOnBoard
 			}
 			status = append(status, pick(op))
+		case SetIteration:
+			sprint = append(sprint, pick(op))
+		case SetFields:
+			fields = append(fields, op.each(change)...)
 		case AddLabels:
 			labels = append(labels, op.signs()...)
 		case RemoveLabels:
@@ -239,6 +319,10 @@ func (p *Plan) lines(dry bool) []string {
 		switch op := op.(type) {
 		case Reopen:
 			reopen = append(reopen, key("reopen", "already open"))
+		case SetIteration:
+			sprint = append(sprint, pick(op))
+		case SetFields:
+			fields = append(fields, op.each(change)...)
 		case AddLabels:
 			labelsInPlace = append(labelsInPlace, op.signs()...)
 		case RemoveLabels:
@@ -269,7 +353,7 @@ func (p *Plan) lines(dry bool) []string {
 	}
 	board = append(board, unarchive...)
 	var out []string
-	for _, group := range [][]string{board, reopen, status, label, assign, comment, closing} {
+	for _, group := range [][]string{board, reopen, status, sprint, fields, label, assign, comment, closing} {
 		out = append(out, group...)
 	}
 	return out

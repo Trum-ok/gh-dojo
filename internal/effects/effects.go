@@ -42,7 +42,12 @@ const (
 	AliasAssign       = "assign"
 	AliasComment      = "comment"
 	AliasClose        = "close"
+	AliasIteration    = "sprint"
 )
+
+// FieldAlias is the alias of the i-th field a SetFields op sets: field0,
+// field1, ...
+func FieldAlias(i int) string { return fmt.Sprintf("field%d", i) }
 
 // IDs are the node IDs the ops need. Never print them.
 type IDs struct {
@@ -60,6 +65,22 @@ type IDs struct {
 	// ignoring case.
 	Labels map[string]string
 	Users  map[string]string
+	// SprintField is the ID of the sprint field and Iteration the ID of
+	// the iteration to set; SetIteration needs the field, and the
+	// iteration unless it clears the field.
+	SprintField string
+	Iteration   string
+	// Fields maps the board field names of a SetFields op to their IDs
+	// and the values to write.
+	Fields map[string]FieldInput
+}
+
+// FieldInput is a board field to set: its node ID and the value, a
+// ProjectV2FieldValue input such as {"singleSelectOptionId": "..."} or
+// {"number": 3} (see board.Schema.FieldInput).
+type FieldInput struct {
+	ID    string
+	Value map[string]any
 }
 
 // Mutation is one GraphQL mutation document with its variables.
@@ -70,20 +91,34 @@ type Mutation struct {
 	Steps []Step
 }
 
-// Step is one op of a Mutation.
+// Step is one field of a Mutation and the op it applies. An op that sets
+// several board fields (SetFields) has a step per field.
 type Step struct {
 	Alias string
 	Op    workflow.Op
+
+	op int // index of Op in the ops built
+}
+
+// needsItem reports whether op writes a field of the board item, so it
+// needs the item ID.
+func needsItem(op workflow.Op) bool {
+	switch op.(type) {
+	case workflow.SetStatus, workflow.SetIteration, workflow.SetFields:
+		return true
+	}
+	return false
 }
 
 // Batches splits ops into the mutations to send, in order. Usually that is
-// one. An issue not on the board whose status must be set takes two:
-// addProjectV2ItemById returns the item ID the status update needs, and
-// GraphQL cannot feed one field's result into another field of the same
-// document. Adding to the board alongside a comment alone fits in one.
+// one. An issue not on the board whose item fields (status, sprint, other
+// fields) must be set takes two: addProjectV2ItemById returns the item ID
+// the field updates need, and GraphQL cannot feed one field's result into
+// another field of the same document. Adding to the board alongside a
+// comment alone fits in one.
 func Batches(ops []workflow.Op) [][]workflow.Op {
 	i := slices.IndexFunc(ops, func(op workflow.Op) bool { _, ok := op.(workflow.AddToBoard); return ok })
-	if i < 0 || !slices.ContainsFunc(ops, func(op workflow.Op) bool { _, ok := op.(workflow.SetStatus); return ok }) {
+	if i < 0 || !slices.ContainsFunc(ops, needsItem) {
 		if len(ops) == 0 {
 			return nil
 		}
@@ -129,11 +164,14 @@ func Build(ops []workflow.Op, ids IDs) (*Mutation, error) {
 		decls = append(decls, "$"+name+": "+typ)
 		return nil
 	}
-	for _, op := range ops {
+	for n, op := range ops {
 		var (
 			alias, field string
 			err          error
 		)
+		if needsItem(op) && ids.Item == "" {
+			return nil, fmt.Errorf("effects: setting a field of an issue not on the board; add it in an earlier mutation")
+		}
 		switch op := op.(type) {
 		case workflow.AddToBoard:
 			alias = AliasBoard
@@ -145,9 +183,6 @@ func Build(ops []workflow.Op, ids IDs) (*Mutation, error) {
 			field = "unarchiveProjectV2Item(input: {projectId: $project, itemId: $item}) { item { id } }"
 		case workflow.SetStatus:
 			alias = AliasStatus
-			if ids.Item == "" {
-				return nil, fmt.Errorf("effects: setting the status of an issue not on the board; add it in an earlier mutation")
-			}
 			err = firstErr(declare("project", "ID!", ids.Project), declare("item", "ID!", ids.Item),
 				declare("field", "ID!", ids.StatusField), declare("option", "String!", ids.StatusOption))
 			field = "updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field, " +
@@ -183,21 +218,68 @@ func Build(ops []workflow.Op, ids IDs) (*Mutation, error) {
 			err = firstErr(declare("issue", "ID!", ids.Issue),
 				declare("reason", "IssueClosedStateReason!", strings.ToUpper(op.Reason)))
 			field = "closeIssue(input: {issueId: $issue, stateReason: $reason}) { issue { id } }"
+		case workflow.SetIteration:
+			alias = AliasIteration
+			err = firstErr(declare("project", "ID!", ids.Project), declare("item", "ID!", ids.Item),
+				declare("sprintField", "ID!", ids.SprintField))
+			if op.To == "" {
+				field = "clearProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $sprintField}) " +
+					"{ projectV2Item { id } }"
+				break
+			}
+			err = firstErr(err, declare("iteration", "String!", ids.Iteration))
+			field = "updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $sprintField, " +
+				"value: {iterationId: $iteration}}) { projectV2Item { id } }"
+		case workflow.SetFields:
+			// One aliased update per field; Outcome counts the op done
+			// only when all of them are.
+			if len(op.Changes) == 0 {
+				return nil, fmt.Errorf("effects: SetFields without fields")
+			}
+			if err := firstErr(declare("project", "ID!", ids.Project), declare("item", "ID!", ids.Item)); err != nil {
+				return nil, err
+			}
+			for i, c := range op.Changes {
+				in, ok := ids.Fields[c.Field]
+				if !ok || in.ID == "" || len(in.Value) == 0 {
+					return nil, fmt.Errorf("effects: no ID or value for field %q", c.Field)
+				}
+				alias := FieldAlias(i)
+				if err := firstErr(declare(alias, "ID!", in.ID),
+					declare(alias+"Value", "ProjectV2FieldValue!", in.Value)); err != nil {
+					return nil, err
+				}
+				if err := m.add(alias, op, n); err != nil {
+					return nil, err
+				}
+				fields = append(fields, "  "+alias+": updateProjectV2ItemFieldValue(input: {projectId: $project, "+
+					"itemId: $item, fieldId: $"+alias+", value: $"+alias+"Value}) { projectV2Item { id } }")
+			}
+			continue
 		default:
 			return nil, fmt.Errorf("effects: unknown op %T", op)
 		}
 		if err != nil {
 			return nil, err
 		}
-		if slices.ContainsFunc(m.Steps, func(s Step) bool { return s.Alias == alias }) {
-			return nil, fmt.Errorf("effects: two %s ops in one mutation", alias)
+		if err := m.add(alias, op, n); err != nil {
+			return nil, err
 		}
-		m.Steps = append(m.Steps, Step{Alias: alias, Op: op})
 		fields = append(fields, "  "+alias+": "+field)
 	}
 	m.Query = "mutation " + OperationName + "(" + strings.Join(decls, ", ") + ") {\n" +
 		strings.Join(fields, "\n") + "\n}"
 	return m, nil
+}
+
+// add appends the step of the n-th op; an alias already used means two
+// ops of one kind.
+func (m *Mutation) add(alias string, op workflow.Op, n int) error {
+	if slices.ContainsFunc(m.Steps, func(s Step) bool { return s.Alias == alias }) {
+		return fmt.Errorf("effects: two %s ops in one mutation", alias)
+	}
+	m.Steps = append(m.Steps, Step{Alias: alias, Op: op, op: n})
+	return nil
 }
 
 // lookupAll returns the IDs of names in ids, ignoring case.
@@ -230,12 +312,26 @@ func firstErr(errs ...error) error {
 }
 
 // Outcome splits the ops of m by the response data (the "data" object, nil
-// when there was none): done are those whose field came back non-null,
-// missed the rest, each in document order. GraphQL nulls a field that
-// failed, so with a partial error done is what took effect.
+// when there was none): done are those whose fields all came back
+// non-null, missed the rest, each in document order. GraphQL nulls a field
+// that failed, so with a partial error done is what took effect. An op
+// with several fields (SetFields) that took effect in part is missed: a
+// re-run plans the fields still to set.
 func (m *Mutation) Outcome(data map[string]json.RawMessage) (done, missed []workflow.Op) {
-	for _, s := range m.Steps {
-		if v, ok := data[s.Alias]; ok && !isNull(v) {
+	for i, s := range m.Steps {
+		if i > 0 && m.Steps[i-1].op == s.op {
+			continue // judged with the op's first step
+		}
+		ok := true
+		for _, t := range m.Steps[i:] {
+			if t.op != s.op {
+				break
+			}
+			if v, found := data[t.Alias]; !found || isNull(v) {
+				ok = false
+			}
+		}
+		if ok {
 			done = append(done, s.Op)
 		} else {
 			missed = append(missed, s.Op)
@@ -270,9 +366,10 @@ func isNull(v json.RawMessage) bool {
 // Missed says that op did not take effect, for a partial report:
 // "not added to the board", "not unarchived", "not reopened", "status not
 // changed", "labels not added", "labels not removed", "not assigned",
-// "comment not posted", "not closed".
+// "comment not posted", "not closed", "sprint not set", "sprint not
+// cleared", "Priority not set" (one field) or "fields not set".
 func Missed(op workflow.Op) string {
-	switch op.(type) {
+	switch op := op.(type) {
 	case workflow.AddToBoard:
 		return "not added to the board"
 	case workflow.Unarchive:
@@ -291,6 +388,16 @@ func Missed(op workflow.Op) string {
 		return "comment not posted"
 	case workflow.Close:
 		return "not closed"
+	case workflow.SetIteration:
+		if op.To == "" {
+			return "sprint not cleared"
+		}
+		return "sprint not set"
+	case workflow.SetFields:
+		if len(op.Changes) == 1 {
+			return op.Changes[0].Field + " not set"
+		}
+		return "fields not set"
 	}
 	return op.Describe() + " not done"
 }

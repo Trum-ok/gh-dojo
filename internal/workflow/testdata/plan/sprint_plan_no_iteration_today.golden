@@ -1,0 +1,4 @@
+code: 1
+error: Sprint has no iteration for 2026-12-20 (today)
+allowed: Sprint 12 (2026-11-09 to 2026-11-22), Sprint 13 (2026-11-23 to 2026-12-06), Sprint 11 (2026-10-26 to 2026-11-08), Sprint 10 (2026-10-12 to 2026-10-25)
+fix: add an iteration that covers 2026-12-20 to the Sprint field on the board; gh dojo doctor checks today's

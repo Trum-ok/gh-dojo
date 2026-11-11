@@ -128,6 +128,17 @@ func (it Iteration) Contains(t time.Time) bool {
 	return !day.Before(start) && day.Before(start.AddDate(0, 0, it.Duration))
 }
 
+// Span names the iteration with its first and last day: "Sprint 12
+// (2026-11-09 to 2026-11-22)"; the title alone when the dates are unknown.
+func (it Iteration) Span() string {
+	start, err := time.Parse(time.DateOnly, it.StartDate)
+	if err != nil || it.Duration < 1 {
+		return it.Title
+	}
+	end := start.AddDate(0, 0, it.Duration-1)
+	return fmt.Sprintf("%s (%s to %s)", it.Title, it.StartDate, end.Format(time.DateOnly))
+}
+
 // Lookup failures. Errors returned by the lookup helpers are *render.Error
 // (exit code 1) that wrap one of these, so errors.Is tells them apart.
 var (

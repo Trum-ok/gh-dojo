@@ -1,0 +1,4 @@
+code: 0
+--- stdout
+#42 Estimate none → 3, Priority P2 → P1
+--- stderr

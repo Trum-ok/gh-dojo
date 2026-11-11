@@ -3,6 +3,7 @@ board acme/3 Organization "Shop" PVT_kwDOacme0003 https://github.com/orgs/acme/p
   Status [SINGLE_SELECT] PVTSSF_acme_status
     option "Todo" f75ad846
     option "In progress" 47fc9ee4
+    option "Ready" 61e4505c
     option "Done" 98236657
   Sprint [ITERATION] PVTIF_acme_sprint
     iteration "Sprint 12" it12 2026-11-09 +14d completed=false
@@ -10,3 +11,7 @@ board acme/3 Organization "Shop" PVT_kwDOacme0003 https://github.com/orgs/acme/p
     iteration "Sprint 11" it11 2026-10-26 +14d completed=true
     iteration "Sprint 10" it10 2026-10-12 +14d completed=true
   Notes [TEXT] PVTF_acme_notes
+  Priority [SINGLE_SELECT] PVTSSF_acme_priority
+    option "P1" 0a877460
+    option "P2" da944a9c
+  Estimate [NUMBER] PVTF_acme_estimate

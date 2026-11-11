@@ -1,0 +1,21 @@
+code: 0
+--- stdout
+#42 Fix the checkout total
+state: open, opened 2026-10-20 by alice
+board: Ready
+sprint: Sprint 12 (2026-11-09 to 2026-11-22)
+milestone: none
+labels: none
+assignees: alice
+blocked by: none
+blocking: none
+status history:
+  2026-10-20 08:00 no status → Todo by alice
+  2026-10-21 09:00 Todo → In progress by alice
+  2026-11-05 15:00 In progress → Ready by alice
+
+description:
+  The total ignores the discount.
+
+comments: none
+--- stderr

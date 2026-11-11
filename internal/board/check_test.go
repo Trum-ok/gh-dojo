@@ -3,6 +3,8 @@ package board_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/Trum-ok/gh-dojo/internal/board"
@@ -60,6 +62,15 @@ func TestCheckErrors(t *testing.T) {
 		{"several", "[statuses]\nfinal = [\"Shipped\"]\n[verbs.start]\nto = \"In progres\"\n[verbs.wait]\nto = \"Parked\"\n"},
 		{"two", "[verbs.start]\nto = \"In progres\"\nfrom = [\"Todo\"]\n"},
 		{"resolved_typo", "[statuses]\nresolved = [\"Redy\", \"Done\"]\n"},
+		{"sprint_field_type", "[fields]\nsprint = \"Priority\"\n"},
+		{"sprint_field_missing", "[fields]\nsprint = \"Sprint\"\n"},
+		{"iteration_status", "[fields]\nsprint = \"Sprint\"\n[verbs.done]\niteration = \"by_status_date:Redy\"\n"},
+		{"field_unknown", "[verbs.done.field]\nPriorty = \"P1\"\n"},
+		{"field_option", "[verbs.done.field]\nPriority = \"p3\"\n"},
+		{"field_number", "[verbs.done.field]\nEstimate = \"3\"\n"},
+		{"field_date", "[verbs.done.field]\n\"Target date\" = \"tomorrow\"\n"},
+		{"field_builtin", "[verbs.done.field]\nLabels = \"bug\"\n"},
+		{"field_preset_verb", "[verbs.start.field]\nSize = \"XXL\"\n"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -125,6 +136,62 @@ func TestCheckRealMismatchRereadsOnce(t *testing.T) {
 	}
 	if n := srv2.Requests(); n != 1 {
 		t.Errorf("cold cache requests = %d, want 1", n)
+	}
+}
+
+// TestCheckFieldEffects: every kind of field the field effect sets, and a
+// sprint field that is an iteration field, match the board.
+func TestCheckFieldEffects(t *testing.T) {
+	s := loadSchema(t)
+	c := parseConfig(t, dojoBoard+`[verbs.triage]
+when = "Triaged"
+[verbs.triage.field]
+Priority = "P1"
+Estimate = 2.5
+"Start date" = 2026-11-12
+"Target date" = "2026-11-30"
+`)
+	if err := board.Check(c, s); err != nil {
+		t.Fatal(err)
+	}
+	v, _ := c.Verb("triage")
+	var got []string
+	for _, fv := range v.Fields {
+		f, input, err := s.FieldInput(fv)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, fmt.Sprintf("%s %v", f.Name, input))
+	}
+	want := []string{
+		"Estimate map[number:2.5]", "Priority map[singleSelectOptionId:0a877460]",
+		"Start date map[date:2026-11-12]", "Target date map[date:2026-11-30]",
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("inputs = %q, want %q", got, want)
+	}
+
+	l, _, _ := newLoader(t, fixture("iteration_board"))
+	it, err := l.Load(context.Background(), board.Ref{Owner: "acme", Number: 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c = parseConfig(t, `version = 1
+[board]
+owner = "acme"
+project = 3
+[fields]
+status = "Status"
+sprint = "Sprint"
+[verbs.done]
+when = "Released"
+to = "Done"
+iteration = "by_status_date:Ready"
+[verbs.done.field]
+Notes = "released"
+`)
+	if err := board.Check(c, it); err != nil {
+		t.Fatal(err)
 	}
 }
 

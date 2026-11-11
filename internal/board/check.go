@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/render"
@@ -28,9 +30,11 @@ func (l *Loader) LoadChecked(ctx context.Context, c *config.Config) (*Schema, er
 }
 
 // Check reports names in the config that the board does not have: every
-// fields.* must name a board field, the status field must be single-select,
-// and every status the config names (config.StatusRefs) must be an option of
-// it. It needs no network.
+// fields.* must name a board field, the status field must be single-select
+// and the sprint field an iteration field, every status the config names
+// (config.StatusRefs) must be an option of the status field, and every
+// value a verb's field effect sets must fit its board field (FieldInput).
+// It needs no network.
 //
 // The error (exit code 1) shows the first problem with its key path, the
 // allowed values in board order and a near-miss suggestion, then how many
@@ -104,6 +108,8 @@ func Problems(c *config.Config, s *Schema) []Problem {
 			add(key, s.notSingleSelect(f))
 		case name == "status":
 			status = f
+		case name == "sprint" && f.Type != TypeIteration:
+			add(key, s.notIteration(f))
 		}
 	}
 	if status != nil {
@@ -113,7 +119,79 @@ func Problems(c *config.Config, s *Schema) []Problem {
 			}
 		}
 	}
+	for _, v := range c.Verbs {
+		for _, fv := range v.Fields {
+			if _, _, err := s.FieldInput(fv); err != nil {
+				add(config.FieldKey(v.Name, fv.Field), err)
+			}
+		}
+	}
 	return problems
+}
+
+// FieldInput returns the field a verb's field effect sets and the value to
+// write to it (a ProjectV2FieldValue input): the option of a single-select
+// field by name, a text, a number, or a date (YYYY-MM-DD). A field the
+// board does not have, or a value that does not fit its type, is an error
+// that wraps ErrUnknownField, ErrUnknownOption or ErrFieldType.
+func (s *Schema) FieldInput(v config.FieldValue) (*Field, map[string]any, error) {
+	f, err := s.Field(v.Field)
+	if err != nil {
+		return nil, nil, err
+	}
+	typeError := func(format string, a ...any) error {
+		return render.Usage("field %q is %s: %s", f.Name, f.Type, fmt.Sprintf(format, a...)).WithCause(ErrFieldType)
+	}
+	switch f.Type {
+	case TypeSingleSelect:
+		opt, err := f.Option(v.Text)
+		if err != nil {
+			return nil, nil, err
+		}
+		return f, map[string]any{"singleSelectOptionId": opt.ID}, nil
+	case TypeText:
+		return f, map[string]any{"text": v.Text}, nil
+	case TypeNumber:
+		n, err := strconv.ParseFloat(v.Text, 64)
+		if !v.Number || err != nil {
+			return nil, nil, typeError("write a number without quotes, like %s = 3", tomlKey(f.Name))
+		}
+		return f, map[string]any{"number": n}, nil
+	case TypeDate:
+		if _, err := time.Parse(time.DateOnly, v.Text); v.Number || err != nil {
+			return nil, nil, typeError("write a date, like %s = 2026-11-30", tomlKey(f.Name))
+		}
+		return f, map[string]any{"date": v.Text}, nil
+	case TypeIteration:
+		return nil, nil, typeError(`set it with iteration = "current" and fields.sprint = %q`, f.Name)
+	}
+	var writable []string
+	for _, g := range s.Fields {
+		if g.Type.Writable() && g.Type != TypeIteration {
+			writable = append(writable, g.Name)
+		}
+	}
+	return nil, nil, render.Usage("field %q on board %s is %s, which a verb cannot set", f.Name, s.Ref(), f.Type).
+		WithAllowed(writable...).WithCause(ErrFieldType)
+}
+
+// tomlKey quotes a field name for a TOML example when it needs quotes.
+func tomlKey(name string) string {
+	key := config.FieldKey("v", name)
+	return key[len("verbs.v.field."):]
+}
+
+// notIteration is the error for a sprint field of another type; the
+// allowed values are the board's iteration fields.
+func (s *Schema) notIteration(f *Field) error {
+	var names []string
+	for _, g := range s.Fields {
+		if g.Type == TypeIteration {
+			names = append(names, g.Name)
+		}
+	}
+	return render.Usage("field %q on board %s is %s, not an iteration field", f.Name, s.Ref(), f.Type).
+		WithAllowed(names...).WithCause(ErrFieldType)
 }
 
 // notSingleSelect is the error for a status field of another type; the

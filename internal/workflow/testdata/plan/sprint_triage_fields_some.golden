@@ -1,0 +1,5 @@
+dry run: triage #42 "Fix login redirect"
+  status: In progress → Backlog
+  field: Estimate none → 3
+  field: Priority P1 (unchanged)
+confirm: #42 In progress → Backlog, Estimate none → 3, Priority P1 (unchanged)

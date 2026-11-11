@@ -1,0 +1,2 @@
+error: .github/dojo.toml: fields.sprint: field "Priority" on board Trum-ok/5 is SINGLE_SELECT, not an iteration field
+fix: edit fields.sprint in .github/dojo.toml

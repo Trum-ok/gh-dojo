@@ -1,0 +1,3 @@
+error: .github/dojo.toml: verbs.start.field.Size: unknown size "XXL"; did you mean "XL"?
+allowed: XS, S, M, L, XL
+fix: edit verbs.start.field.Size in .github/dojo.toml

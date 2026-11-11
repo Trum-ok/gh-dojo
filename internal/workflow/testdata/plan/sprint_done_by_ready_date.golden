@@ -1,0 +1,5 @@
+dry run: done #42 "Fix login redirect"
+  status: Ready → Done
+  sprint: Sprint 12 → Sprint 11
+  close: as completed
+confirm: #42 Ready → Done, sprint Sprint 12 → Sprint 11, closed as completed

@@ -1,0 +1,6 @@
+code: 0
+--- stdout
+dry run: done #42 "Fix the checkout total"
+  status: Ready → Done
+  sprint: none → Sprint 11
+--- stderr

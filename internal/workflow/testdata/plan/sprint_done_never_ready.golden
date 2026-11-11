@@ -1,0 +1,3 @@
+code: 2
+error: done cannot pick the sprint of #42 by the day it entered Ready (iteration = "by_status_date:Ready"): it never entered Ready on the board
+ask the user how to proceed

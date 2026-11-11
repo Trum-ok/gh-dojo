@@ -13,7 +13,7 @@ import (
 )
 
 // specExample is the example from docs/spec.md without the keys this
-// version does not support (fields.sprint, blockers, iteration, batch);
+// version does not support (blockers, batch);
 // TestSpecExampleUnsupported puts them back. Its drop verb is the spec's,
 // as is: no comment template, so --comment is posted as is.
 const specExample = `
@@ -28,6 +28,7 @@ assignee = "@me"
 
 [fields]
 status = "Status"
+sprint = "Sprint"
 
 [session]
 env = ["CLAUDE_CODE_HOST_SESSION_ID"]
@@ -50,6 +51,7 @@ to = "Ready"
 [verbs.done]
 when = "выкачено на прод"
 to = "Done"
+iteration = "by_status_date:Ready"
 
 [verbs.drop]
 when = "задача не нужна или дубль"
@@ -116,6 +118,13 @@ func dump(c *Config) string {
 			w("  labels: add=%q remove=%q assign: %q close: %q reopen: %v confirm: %v",
 				v.AddLabels, v.RemoveLabels, v.Assign, v.Close, v.Reopen, v.Confirm)
 		}
+		if v.Iteration != "" || len(v.Fields) > 0 {
+			var fields []string
+			for _, f := range v.Fields {
+				fields = append(fields, fmt.Sprintf("%s=%q number=%v date=%v", f.Field, f.Text, f.Number, f.Date))
+			}
+			w("  iteration: %q fields: %s", v.IterationRule(), strings.Join(fields, ", "))
+		}
 	}
 	w("status refs:")
 	for _, r := range c.StatusRefs() {
@@ -170,6 +179,27 @@ assign = false
 [verbs.done]
 close = false
 confirm = false
+`},
+		{"sprint_effects", presetOnly + `sprint = "Sprint"
+
+[verbs.plan]
+when = "The issue is taken into the current sprint"
+iteration = "current"
+
+[verbs.triage]
+when = "The issue is triaged"
+to = "Backlog"
+iteration = "clear"
+
+[verbs.triage.field]
+Priority = "P1"
+"Story points" = 3
+Estimate = 2.5
+Due = 2026-11-30
+Start = "2026-11-12"
+
+[verbs.done]
+iteration = "by_status_date:Ready"
 `},
 		{"add_verb", presetOnly + `
 [verbs.review]
@@ -232,10 +262,23 @@ func TestLoadErrors(t *testing.T) {
 		{"unknown_verb_key", presetOnly + "[verbs.start]\nwhen_ = \"x\"\n"},
 		{"unsupported_key", presetOnly + "[verbs.done]\nbatch = true\n"},
 		{"unsupported_hook", presetOnly + "[verbs.start.pre]\ncmd = \"./check\"\n"},
-		{"unsupported_field", presetOnly + "sprint = \"Sprint\"\n"},
-		{"unsupported_field_first", presetOnly + "sprint = \"Sprint\"\n[verbs.start]\nwhen_ = \"x\"\n"},
+		{"unsupported_field", presetOnly + "priority = \"Priority\"\n"},
+		{"unsupported_field_first", presetOnly + "priority = \"Priority\"\n[verbs.start]\nwhen_ = \"x\"\n"},
 		{"field_wrong_case", strings.Replace(presetOnly, `status = "Status"`, `Status = "Status"`, 1)},
-		{"unsupported_field_table", presetOnly + "[fields.sprint]\nname = \"Sprint\"\n"},
+		{"sprint_wrong_case", presetOnly + "Sprint = \"Sprint\"\n"},
+		{"unsupported_field_table", presetOnly + "[fields.priority]\nname = \"Priority\"\n"},
+		{"sprint_table", presetOnly + "[fields.sprint]\nname = \"Sprint\"\n"},
+		{"iteration_without_sprint", presetOnly + "[verbs.done]\niteration = \"current\"\n"},
+		{"iteration_bad", presetOnly + "sprint = \"Sprint\"\n[verbs.done]\niteration = \"next\"\n"},
+		{"iteration_by_status_date_blank", presetOnly + "sprint = \"Sprint\"\n[verbs.done]\niteration = \"by_status_date:\"\n"},
+		{"iteration_not_string", presetOnly + "sprint = \"Sprint\"\n[verbs.done]\niteration = true\n"},
+		{"field_empty_table", presetOnly + "[verbs.done.field]\n"},
+		{"field_not_table", presetOnly + "[verbs.done]\nfield = \"Priority\"\n"},
+		{"field_bad_type", presetOnly + "[verbs.done.field]\nPriority = true\n"},
+		{"field_datetime", presetOnly + "[verbs.done.field]\nDue = 2026-11-30T10:00:00Z\n"},
+		{"field_blank_value", presetOnly + "[verbs.done.field]\n\"Story points\" = \" \"\n"},
+		{"field_status", presetOnly + "[verbs.done.field]\nStatus = \"Done\"\n"},
+		{"field_sprint", presetOnly + "sprint = \"Sprint\"\n[verbs.done.field]\nSprint = \"Sprint 12\"\n"},
 		{"bad_version", "version = 2\npreset = \"kanban\"\n" + board},
 		{"unknown_preset", "preset = \"scrum\"\n" + board},
 		{"missing_owner", "preset = \"kanban\"\n[board]\nproject = 3\n"},
@@ -489,7 +532,6 @@ func TestSessionResolve(t *testing.T) {
 // are rejected, not silently accepted.
 func TestSpecExampleUnsupported(t *testing.T) {
 	tests := []struct{ after, add, want string }{
-		{`status = "Status"` + "\n", `sprint = "Sprint"` + "\n", "fields.sprint is not supported in this version"},
 		{"[verbs.done]\n", "batch = true\n", "verbs.done.batch is not supported in this version"},
 		{"[verbs.wait]\n", "blockers = \"add\"\n", "verbs.wait.blockers is not supported in this version"},
 	}

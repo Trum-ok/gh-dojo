@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"strings"
 	"syscall"
 
 	"github.com/Trum-ok/gh-dojo/internal/render"
@@ -67,7 +68,7 @@ type Config struct {
 	Preset  string // preset name, or "" when the config sets none
 
 	Board    Board
-	Fields   map[string]string // logical name → board field name; only "status" in this version
+	Fields   map[string]string // logical name → board field name: "status", and "sprint" when set
 	Statuses Statuses
 	Labels   Labels
 	Session  Session
@@ -98,6 +99,28 @@ const (
 
 // ConfirmUser is the only value of confirm: the verb runs only with --yes.
 const ConfirmUser = "user"
+
+// Values of a verb's iteration key, which sets the sprint field
+// (fields.sprint): the iteration of today, the iteration of the day the
+// issue last entered a status ("by_status_date:Ready"), or none.
+const (
+	IterationCurrent      = "current"
+	IterationClear        = "clear"
+	IterationByStatusDate = "by_status_date"
+)
+
+// FieldValue is a board field a verb sets (the field key), with the value
+// from the config. The board decides what the value means: an option name
+// of a single-select field, a text, a number or a date.
+type FieldValue struct {
+	Field string // the board field name, as written in the config
+	// Text is the value as written: a string, a date as YYYY-MM-DD, or a
+	// number in its shortest form ("3", "2.5"). Number tells a TOML number
+	// from a string, Date a TOML date.
+	Text   string
+	Number bool
+	Date   bool
+}
 
 var closeReasons = []string{CloseCompleted, CloseNotPlanned, CloseDuplicate}
 
@@ -150,6 +173,24 @@ type Verb struct {
 	// Confirm says the verb is a decision for the user (confirm = "user"):
 	// it runs only with --yes, which an agent adds after asking.
 	Confirm bool
+
+	// Iteration is how the verb sets the sprint field: IterationCurrent,
+	// IterationClear, or IterationByStatusDate with IterationStatus the
+	// status whose date picks the iteration; "" leaves the sprint alone.
+	Iteration       string
+	IterationStatus string
+	// Fields are the board fields the verb sets to fixed values, sorted
+	// by field name.
+	Fields []FieldValue
+}
+
+// IterationRule is the verb's iteration key as written in the config:
+// "current", "clear" or "by_status_date:Ready"; "" when not set.
+func (v Verb) IterationRule() string {
+	if v.Iteration == IterationByStatusDate {
+		return IterationByStatusDate + ":" + v.IterationStatus
+	}
+	return v.Iteration
 }
 
 // Uses reports whether the verb's comment template uses the placeholder
@@ -287,7 +328,11 @@ func (c *Config) VerbNames() []string {
 }
 
 // StatusField returns the board name of the status field.
-func (c *Config) StatusField() string { return c.Fields["status"] }
+func (c *Config) StatusField() string { return c.Fields[statusField] }
+
+// SprintField returns the board name of the sprint field, an iteration
+// field; "" when fields.sprint is not set.
+func (c *Config) SprintField() string { return c.Fields[sprintField] }
 
 // FieldNames lists the logical field names, "status" first, then sorted.
 func (c *Config) FieldNames() []string {
@@ -302,8 +347,8 @@ func (c *Config) FieldNames() []string {
 }
 
 // StatusRefs lists every status the config names, in a stable order:
-// statuses.initial, statuses.final, statuses.resolved, then each verb's to
-// and from. A status
+// statuses.initial, statuses.final, statuses.resolved, then each verb's to,
+// from and the status of iteration = "by_status_date:<status>". A status
 // named in several places appears once per place, so a check against the
 // board can point at the exact key.
 func (c *Config) StatusRefs() []StatusRef {
@@ -324,15 +369,25 @@ func (c *Config) StatusRefs() []StatusRef {
 		for _, s := range v.From {
 			refs = append(refs, StatusRef{s, "verbs." + v.Name + ".from"})
 		}
+		if v.IterationStatus != "" {
+			refs = append(refs, StatusRef{v.IterationStatus, "verbs." + v.Name + ".iteration"})
+		}
 	}
 	return refs
 }
 
 // KeyPath returns key annotated with the preset that set it, if the value
 // comes from the preset and not from the file:
-// "verbs.start.to (from preset kanban)".
+// "verbs.start.to (from preset kanban)". A key inside a verb's field table
+// (see FieldKey) comes from the preset when the table does.
 func (c *Config) KeyPath(key string) string {
-	if p := c.origin[key]; p != "" {
+	p := c.origin[key]
+	if verb, ok := strings.CutPrefix(key, "verbs."); ok && p == "" {
+		if name, _, ok := strings.Cut(verb, ".field."); ok {
+			p = c.origin["verbs."+name+".field"]
+		}
+	}
+	if p != "" {
 		return fmt.Sprintf("%s (from preset %s)", key, p)
 	}
 	return key

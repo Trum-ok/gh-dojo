@@ -1,0 +1,168 @@
+{
+  "comment": "Hand-crafted from the recorded items_dojo.json query with the sprint field read (list --sprint) on the acme/3 board of iteration_board.json.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "BoardItems",
+      "query": "query BoardItems($owner: String!, $number: Int!, $status: String!, $sprint: String!, $cursor: String) {\n  viewer { login }\n  repositoryOwner(login: $owner) {\n    ... on User { projectV2(number: $number) { ...items } }\n    ... on Organization { projectV2(number: $number) { ...items } }\n  }\n}\n\nfragment items on ProjectV2 {\n  field(name: $status) { ... on ProjectV2SingleSelectField { id } }\n  items(first: 100, after: $cursor) {\n    totalCount\n    pageInfo { hasNextPage endCursor }\n    nodes {\n      status: fieldValueByName(name: $status) {\n        ... on ProjectV2ItemFieldSingleSelectValue { name }\n      }\n      sprint: fieldValueByName(name: $sprint) {\n        ... on ProjectV2ItemFieldIterationValue { iterationId title }\n      }\n      content {\n        __typename\n        ... on Issue {\n          number\n          title\n          state\n          repository { nameWithOwner }\n          labels(first: 100) { totalCount nodes { name } }\n          assignees(first: 10) { totalCount nodes { login } }\n        }\n      }\n    }\n  }\n}",
+      "repeat": true,
+      "variables": {
+        "cursor": null,
+        "number": 3,
+        "owner": "acme",
+        "status": "Status",
+        "sprint": "Sprint"
+      },
+      "response": {
+        "data": {
+          "viewer": {
+            "login": "alice"
+          },
+          "repositoryOwner": {
+            "projectV2": {
+              "field": {
+                "id": "PVTSSF_acme_status"
+              },
+              "items": {
+                "totalCount": 5,
+                "pageInfo": {
+                  "hasNextPage": false,
+                  "endCursor": "Y3Vyc29yOjU"
+                },
+                "nodes": [
+                  {
+                    "status": {
+                      "name": "Ready"
+                    },
+                    "sprint": {
+                      "iterationId": "it11",
+                      "title": "Sprint 11"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 42,
+                      "title": "Fix the checkout total",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "acme/shop"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "In progress"
+                    },
+                    "sprint": {
+                      "iterationId": "it12",
+                      "title": "Sprint 12"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 43,
+                      "title": "Show prices with tax",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "acme/shop"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "Todo"
+                    },
+                    "sprint": null,
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 44,
+                      "title": "Add a gift card option",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "acme/shop"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "Todo"
+                    },
+                    "sprint": {
+                      "iterationId": "it12",
+                      "title": "Sprint 12"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 45,
+                      "title": "Cache the catalog",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "acme/shop"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "Done"
+                    },
+                    "sprint": {
+                      "iterationId": "it12",
+                      "title": "Sprint 12"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 46,
+                      "title": "Fix the cart badge",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "acme/shop"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

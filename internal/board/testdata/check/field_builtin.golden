@@ -1,0 +1,3 @@
+error: .github/dojo.toml: verbs.done.field.Labels: field "Labels" on board Trum-ok/5 is LABELS, which a verb cannot set
+allowed: Status, Priority, Size, Estimate, Start date, Target date
+fix: edit verbs.done.field.Labels in .github/dojo.toml

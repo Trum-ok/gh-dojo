@@ -1,0 +1,17 @@
+code: 0
+--- stdout
+The issue is triaged
+
+  From:      any status
+  To:        the status is not changed
+  Requires:  nothing besides the issue number
+  Board:     adds the issue if it is not there
+  Fields:    sets Estimate 3, Priority P1; a field already at its value is left alone
+
+Usage:
+  gh dojo triage <N> [flags]
+
+Flags:
+      --dry-run   print the plan without changing anything
+  -h, --help      help for triage
+--- stderr

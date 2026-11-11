@@ -191,8 +191,8 @@ func TestDoctorArgs(t *testing.T) {
 	testutil.Golden(t, "doctor/args", out)
 }
 
-// TestDoctorSprint calls the sprint check directly: the config does not
-// accept fields.sprint yet.
+// TestDoctorSprint calls the sprint check directly, with sprint fields the
+// config would reject against the board.
 func TestDoctorSprint(t *testing.T) {
 	srv := graphtest.New(t, boardFixtures+"iteration_board.json")
 	l := board.NewLoader(srv.Client())

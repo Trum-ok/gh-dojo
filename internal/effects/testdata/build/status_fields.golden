@@ -1,0 +1,25 @@
+mutation Verb($project: ID!, $item: ID!, $field: ID!, $option: String!, $field0: ID!, $field0Value: ProjectV2FieldValue!, $field1: ID!, $field1Value: ProjectV2FieldValue!, $issue: ID!, $body: String!) {
+  status: updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field, value: {singleSelectOptionId: $option}}) { projectV2Item { id } }
+  field0: updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field0, value: $field0Value}) { projectV2Item { id } }
+  field1: updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field1, value: $field1Value}) { projectV2Item { id } }
+  comment: addComment(input: {subjectId: $issue, body: $body}) { commentEdge { node { id } } }
+}
+--- vars
+{
+  "body": "Started.\n\n<!-- gh-dojo:start:995a443b -->",
+  "field": "PVTSSF_1",
+  "field0": "PVTF_est",
+  "field0Value": {
+    "number": 3
+  },
+  "field1": "PVTSSF_prio",
+  "field1Value": {
+    "singleSelectOptionId": "0a877460"
+  },
+  "issue": "I_1",
+  "item": "PVTI_1",
+  "option": "47fc9ee4",
+  "project": "PVT_1"
+}
+--- steps
+status, field0, field1, comment

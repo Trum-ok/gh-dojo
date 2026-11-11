@@ -120,8 +120,9 @@ Issue numbers are written `42` or `#42` and refer to the default repository
 gh dojo show <N>... [--brief] [--comments N|all] [--full]
 ```
 
-Reads issues before working on them: state, board status and fields,
-milestone, labels, assignees, blockers both ways with their board status,
+Reads issues before working on them: state, board status and fields, the
+sprint (with [`fields.sprint`](#fields), as `sprint: Sprint 12 (2026-11-09
+to 2026-11-22)`), milestone, labels, assignees, blockers both ways with their board status,
 status history on the board, the description and the latest comments. Times
 are UTC. A blocker is resolved, no longer blocking, when it is closed or its
 board status is in [`statuses.resolved`](#statuses) (kanban: Ready, Done);
@@ -135,8 +136,8 @@ Long content is folded, always with a note saying what is hidden: the last 5
 comments are printed (`--comments N` for the last N, `--comments all` for up
 to 100); the description is cut at 2000 characters and the comments shown
 share 1500. `--full` prints them whole. `--brief` prints three lines per
-issue: title; state, status, milestone, labels and assignees; blockers and
-counts.
+issue: title; state, status, sprint, milestone, labels and assignees;
+blockers and counts.
 
 Several numbers are read in one request (up to 20 issues per request). A
 missing issue or a pull request number is reported after the others are
@@ -145,7 +146,7 @@ printed, with exit code 3.
 ### list
 
 ```sh
-gh dojo list [--status S]... [--label L]... [--mine] [--all] [--limit N]
+gh dojo list [--status S]... [--label L]... [--mine] [--sprint current|TITLE|none] [--all] [--limit N]
 ```
 
 One line per open issue, grouped by status in board order, issues without a
@@ -156,6 +157,11 @@ without a status. Filters combine with AND, and the issues they leave out are
 counted. Only issues are listed: draft issues and pull requests on the board
 are counted. At most `--limit` issues are printed (default 50), with the
 total.
+
+`--sprint` needs [`fields.sprint`](#fields) and keeps the issues in one
+iteration: `current` (the one covering today's UTC date), a title, or `none`
+(no sprint). The first line names the iteration with its days; an unknown
+title lists the iterations.
 
 ### new
 
@@ -259,7 +265,9 @@ ok       verbs    octocat/shop: 2 labels exist, 1 assignee can be assigned
 It checks that the config loads, that gh is logged in with a token that has
 the `project` scope (a token from `GH_TOKEN` gets "set GH_TOKEN to …" as
 the fix), that the board exists, is open and has every field and status the
-config names (each mismatch on its own line), and that every repository of
+config names (each mismatch on its own line), that the sprint field (with
+[`fields.sprint`](#fields)) has an iteration for today's UTC date, and that
+every repository of
 [`board.repos`](#board), or the current one, is visible with issues
 enabled, and that the labels verbs add or remove exist in the default
 repository spelled exactly as there and the users they assign can be
@@ -399,6 +407,7 @@ assignee = "@me"             # who `assign = true` assigns
 
 [fields]                     # logical name = field name on the board
 status = "Status"            # required (the kanban preset sets "Status")
+sprint = "Sprint"            # optional: an iteration field, for iteration
 
 [statuses]
 initial = "Backlog"          # set by `new` and assumed for issues not on the board yet
@@ -445,6 +454,19 @@ when = "A closed issue is needed after all"
 to = "Backlog"
 reopen = true
 
+[verbs.ship]
+when = "The change is released"
+to = "Done"
+iteration = "by_status_date:Ready"  # the sprint in which it became Ready
+
+[verbs.plan]
+when = "The issue is taken into the current sprint"
+iteration = "current"        # or "clear"
+
+[verbs.plan.field]           # board fields set to fixed values
+Priority = "P1"              # single select: an option name
+Estimate = 3                 # number; a text field takes a string, a date field 2026-11-30
+
 [verbs.done]
 close = false                # keep the issue open: false turns off the preset's close
 
@@ -470,11 +492,16 @@ disabled = true              # drop a verb that the preset defines
 
 ### fields
 
-Logical name = field name on the board. `status` is the only entry in this
-version: it is required and must be a single-select field. Other logical
-fields (such as `sprint`, for iteration effects) come in v0.1; until then
-they are rejected with "not supported in this version". The logical name is
-lowercase: `Status = "Status"` is an error suggesting `status`.
+Logical name = field name on the board.
+
+| Key      | Required | Meaning                                                                                        |
+|----------|----------|------------------------------------------------------------------------------------------------|
+| `status` | yes      | The status field: a single-select field                                                        |
+| `sprint` | no       | The sprint field: an iteration field. The [`iteration`](#verbs) effect, `list --sprint` and the sprint line of `show` use it |
+
+Other logical names are rejected; a verb sets any other board field by its
+own name with the [`field`](#verbs) effect. Logical names are lowercase:
+`Status = "Status"` is an error suggesting `status`.
 
 ### statuses
 
@@ -521,17 +548,19 @@ Each `[verbs.<name>]` table becomes `gh dojo <name>`.
 | `close`          | Close the issue with this reason: `completed`, `not_planned` or `duplicate`; `false` turns a preset's off |
 | `reopen`         | `true` reopens a closed issue                                                                    |
 | `confirm`        | `"user"`: the verb is the user's decision and runs only with `--yes`; `false` turns a preset's off |
+| `iteration`      | Set the sprint field: `"current"`, `"by_status_date:<status>"` or `"clear"`; needs `fields.sprint`; `""` turns a preset's off |
+| `field`          | A table of board fields to set: `[verbs.<name>.field]` with `Priority = "P1"`, `Estimate = 3`   |
 | `disabled`       | `true` removes a verb the preset defines; it stands alone in its table                           |
 
 A verb needs at least one effect: `to`, `comment`, `labels`, `assign`,
-`close` or `reopen`. Every argument in `require` and `require_one_of` must
+`close`, `reopen`, `iteration` or `field`. Every argument in `require` and `require_one_of` must
 appear in the verb's comment template; a verb that requires `comment` and
 has no template posts the `--comment` text as is. Verb names are
 lowercase letters, digits and dashes and cannot shadow built-in or planned
 commands (`show`, `list`, `new`, `comment`, `describe`, `init`, `doctor`,
 `help`, `block`, `unblock`, `agent`, `next`, `release`). Keys from the design
-that are not implemented yet (`blockers`, `iteration`, `field`, `batch`,
-`pre`, `post`) are rejected with "not supported in this version".
+that are not implemented yet (`blockers`, `batch`, `pre`, `post`) are
+rejected with "not supported in this version".
 
 Effects:
 
@@ -554,6 +583,24 @@ Effects:
   without linking the original: name it in the comment. A verb that closes
   or reopens runs on closed issues. `close = false` turns off a preset's
   close, such as kanban's `done`.
+- **iteration**: sets the [sprint field](#fields) in the same mutation as
+  the status. Dates are UTC: `current` is the iteration covering today's UTC
+  date; `by_status_date:Ready` is the one covering the day the issue last
+  entered Ready, from its status history on the board, or today when the
+  verb itself moves the issue to Ready; `clear` removes the value. A day no
+  iteration covers is an error (exit code 1) listing the iterations, with
+  [`gh dojo doctor`](#doctor) to check today's. An issue that never entered
+  the status, or entered it before the last 20 status changes gh-dojo reads,
+  is refused (exit code 2): ask the user which sprint it belongs to. GitHub
+  keeps a status history only for a board's built-in `Status` field, so
+  `by_status_date` needs `fields.status = "Status"`. An issue already in the
+  target iteration (or without one, for `clear`) is left alone.
+- **field**: `[verbs.<name>.field]` names board fields, each with a value:
+  an option name for a single-select field, a string for a text field, a
+  number for a number field, a date (`2026-11-30`, or the string
+  `"2026-11-30"`) for a date field. The status and sprint fields are set
+  with `to` and `iteration`, not here. Fields already at their value are
+  left alone.
 - **confirm**: `confirm = "user"` is a signal, not a lock: an agent could add
   `--yes` itself, so tell agents (in a skill or AGENTS.md) to ask first.
   `confirm = false` turns off a preset's.
@@ -575,10 +622,12 @@ your project's language; the CLI itself speaks English.
 ### Checked against the board
 
 Every command that talks to GitHub first checks the config against the
-board: `fields.status` must name a single-select board field, and every
-status the config names (`statuses.initial`, `statuses.final`,
-`statuses.resolved`, each verb's `to` and `from`) must be one of its
-options. A typo is an error with the board's statuses and a suggestion, not
+board: `fields.status` must name a single-select board field and
+`fields.sprint` an iteration field, every status the config names
+(`statuses.initial`, `statuses.final`, `statuses.resolved`, each verb's `to`,
+`from` and `iteration = "by_status_date:<status>"`) must be one of its
+options, and every value of a verb's `field` table must fit its board field
+(an existing option, a number for a number field, a date for a date field). A typo is an error with the board's statuses and a suggestion, not
 a silent skip. The board schema is cached for an hour in `~/.cache/gh-dojo` (or
 `$XDG_CACHE_HOME/gh-dojo`; override with `GH_DOJO_CACHE_DIR`); a mismatch
 re-reads the board before it is reported, so a status just added on the
@@ -623,6 +672,23 @@ without the area prefix is a type) and `labels.area_prefix = "area:"`. Its
 source is [`internal/config/presets/kanban.toml`](internal/config/presets/kanban.toml).
 Override `when` and `comment` to write them in your project's language; this
 repository's own [`.github/dojo.toml`](.github/dojo.toml) does that.
+
+The preset has no sprints. To count work in sprints on a board with an
+iteration field, add it and an `iteration` effect to the verbs:
+
+```toml
+preset = "kanban"
+
+[board]
+owner = "acme"
+project = 3
+
+[fields]
+sprint = "Sprint"
+
+[verbs.done]
+iteration = "by_status_date:Ready"   # the sprint in which the work was finished
+```
 
 ## Roadmap
 

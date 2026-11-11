@@ -2,10 +2,13 @@ package config
 
 import (
 	"fmt"
+	"maps"
+	"math"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var (
@@ -213,8 +216,8 @@ func (c *Config) buildVerb(name string, r *rawVerb) (Verb, error) {
 		return Verb{}, err
 	}
 	if v.To == "" && v.Comment == "" && len(v.AddLabels)+len(v.RemoveLabels) == 0 && v.Assign == "" &&
-		v.Close == "" && !v.Reopen {
-		return Verb{}, c.Errorf("verbs.%s has no effect: set to, comment, labels, assign, close or reopen", name)
+		v.Close == "" && !v.Reopen && v.Iteration == "" && len(v.Fields) == 0 {
+		return Verb{}, c.Errorf("verbs.%s has no effect: set to, comment, labels, assign, close, reopen, iteration or field", name)
 	}
 	for _, list := range []struct {
 		key  string
@@ -326,7 +329,109 @@ func (c *Config) buildEffects(name string, r *rawVerb, v *Verb) error {
 			v.Confirm = true
 		}
 	}
+	if err := c.buildIteration(name, r.Iteration, v); err != nil {
+		return err
+	}
+	return c.buildFieldValues(name, r.Field, v)
+}
+
+// buildIteration validates the iteration key: "current", "clear" or
+// "by_status_date:<status>" ("" sets nothing, to turn off a preset's), and
+// that fields.sprint names the field it sets. The status is checked
+// against the board with the others (see StatusRefs).
+func (c *Config) buildIteration(name string, raw *string, v *Verb) error {
+	if raw == nil || *raw == "" {
+		return nil
+	}
+	key := c.KeyPath("verbs." + name + ".iteration")
+	val := *raw
+	status, byDate := strings.CutPrefix(val, IterationByStatusDate+":")
+	switch {
+	case val == IterationCurrent, val == IterationClear:
+		v.Iteration = val
+	case byDate:
+		if problem := nameProblem(status); problem != "" {
+			return c.Errorf("%s: %q: the status %s", key, val, problem).
+				WithFix(fmt.Sprintf(`iteration = "%s:Ready" picks the iteration of the day the issue entered Ready`, IterationByStatusDate))
+		}
+		v.Iteration, v.IterationStatus = IterationByStatusDate, status
+	default:
+		return c.Errorf("%s: unknown value %q", key, val).
+			WithAllowed(IterationCurrent, IterationClear, IterationByStatusDate+":<status>")
+	}
+	if c.SprintField() == "" {
+		return c.Errorf("%s sets the sprint, but fields.%s is not set", key, sprintField).
+			WithFix(fmt.Sprintf(`add %s = "<iteration field>" under [fields] in %s`, sprintField, c.Display))
+	}
 	return nil
+}
+
+// buildFieldValues validates the field table: board field names with a
+// string, number or date each. Whether the board has the field and the
+// value fits its type is checked against the board (board.Problems).
+func (c *Config) buildFieldValues(name string, raw *rawFields, v *Verb) error {
+	if raw == nil {
+		return nil
+	}
+	if len(raw.values) == 0 {
+		return c.Errorf("%s is empty: name a board field and its value, like Priority = \"P1\"",
+			c.KeyPath("verbs."+name+".field"))
+	}
+	for _, field := range slices.Sorted(maps.Keys(raw.values)) {
+		key := c.KeyPath(FieldKey(name, field))
+		if problem := nameProblem(field); problem != "" {
+			return c.Errorf("%s: the field name %s", key, problem)
+		}
+		fv := FieldValue{Field: field}
+		switch val := raw.values[field].(type) {
+		case string:
+			if problem := nameProblem(val); problem != "" {
+				return c.Errorf("%s %s", key, problem)
+			}
+			fv.Text = val
+		case int64:
+			fv.Text, fv.Number = strconv.FormatInt(val, 10), true
+		case float64:
+			if math.IsNaN(val) || math.IsInf(val, 0) {
+				return c.Errorf("%s: %v is not a number a field can hold", key, val)
+			}
+			fv.Text, fv.Number = strconv.FormatFloat(val, 'f', -1, 64), true
+		case time.Time:
+			// The decoder gives a local date (Due = 2026-11-30) this
+			// location; a date-time has another one.
+			if val.Location().String() != tomlLocalDate {
+				return c.Errorf("%s: write a date as YYYY-MM-DD, without a time", key)
+			}
+			fv.Text, fv.Date = val.Format(time.DateOnly), true
+		default:
+			return c.Errorf("%s: wrong type: want a string (an option or a text), a number or a date (YYYY-MM-DD)", key)
+		}
+		switch field {
+		case c.StatusField():
+			return c.Errorf("%s sets the status field; set the status with to", key)
+		case c.SprintField():
+			return c.Errorf("%s sets the sprint field; set the sprint with iteration", key)
+		}
+		v.Fields = append(v.Fields, fv)
+	}
+	return nil
+}
+
+// tomlLocalDate is the name of the location BurntSushi/toml decodes a
+// local date (no time, no offset) into.
+const tomlLocalDate = "date-local"
+
+// bareKeyRE matches a TOML key that needs no quotes.
+var bareKeyRE = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+
+// FieldKey is the key path of a board field that verb sets in its field
+// table: verbs.triage.field.Priority, or verbs.triage.field."Story points"
+// for a name that needs quotes in TOML.
+func FieldKey(verb, field string) string {
+	if !bareKeyRE.MatchString(field) {
+		field = strconv.Quote(field)
+	}
+	return "verbs." + verb + ".field." + field
 }
 
 // checkRepoVerbs checks the verb names of the repo config, including disabled

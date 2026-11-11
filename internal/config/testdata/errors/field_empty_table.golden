@@ -1,0 +1,1 @@
+error: .github/dojo.toml: verbs.done.field is empty: name a board field and its value, like Priority = "P1"

@@ -1,0 +1,7 @@
+code: 0
+--- stdout
+sprint: none
+Todo (1)
+  #44 Add a gift card option
+filtered out: 4 issues not matching --sprint
+--- stderr

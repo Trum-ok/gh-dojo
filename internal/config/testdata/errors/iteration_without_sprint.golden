@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.done.iteration sets the sprint, but fields.sprint is not set
+fix: add sprint = "<iteration field>" under [fields] in .github/dojo.toml

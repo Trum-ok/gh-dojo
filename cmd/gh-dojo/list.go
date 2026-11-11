@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -31,6 +32,7 @@ const (
 type listOpts struct {
 	statuses []string
 	labels   []string
+	sprint   string
 	mine     bool
 	all      bool
 	limit    int
@@ -38,6 +40,9 @@ type listOpts struct {
 	// want are the statuses --status selects, "" for none; set by
 	// checkStatuses.
 	want []string
+	// sprintIt is the iteration --sprint selects, nil for none (no
+	// sprint); set by checkSprintFlag.
+	sprintIt *board.Iteration
 }
 
 // filterNames lists the filter flags in use, for the filtered-out note.
@@ -48,6 +53,9 @@ func (o *listOpts) filterNames() []string {
 	}
 	if o.mine {
 		names = append(names, "--mine")
+	}
+	if o.sprint != "" {
+		names = append(names, "--sprint")
 	}
 	if len(o.labels) > 0 {
 		names = append(names, "--label")
@@ -69,6 +77,7 @@ func newListCmd() (*cobra.Command, error) {
 		Example: `  gh dojo list
   gh dojo list --status "In progress" --mine
   gh dojo list --status none
+  gh dojo list --sprint current
   gh dojo list --label bug --label area:cli --limit 100`,
 		Args: listArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error { return runList(cmd, &o) },
@@ -76,6 +85,7 @@ func newListCmd() (*cobra.Command, error) {
 	f := cmd.Flags()
 	f.StringArrayVar(&o.statuses, "status", nil, `only issues in this status ("none": without a status); repeat for several`)
 	f.BoolVar(&o.mine, "mine", false, "only issues assigned to you")
+	f.StringVar(&o.sprint, "sprint", "", `only issues in this sprint (fields.sprint): "current" (today, UTC), a title, or "none"`)
 	f.StringArrayVar(&o.labels, "label", nil, "only issues with this label; repeat to require several")
 	f.BoolVar(&o.all, "all", false, "also show closed issues and issues in a final status")
 	f.IntVar(&o.limit, "limit", defaultListLimit, "print at most this many issues")
@@ -119,16 +129,20 @@ func runList(cmd *cobra.Command, o *listOpts) error {
 		if s, err = a.Schema(ctx); err != nil {
 			return nil, err
 		}
-		return checkStatuses(s, cfg, o)
+		return checkFilters(s, cfg, o, a.Now())
 	}
-	field, err := checkStatuses(s, cfg, o)
+	field, err := checkFilters(s, cfg, o, a.Now())
 	if err != nil && board.IsUnknown(err) && s.Cached {
 		field, err = refresh()
 	}
 	if err != nil {
 		return err
 	}
-	items, err := board.ReadItems(ctx, a.Client, s, cfg.StatusField())
+	sprint := ""
+	if o.sprint != "" {
+		sprint = cfg.SprintField()
+	}
+	items, err := board.ReadItemsSprint(ctx, a.Client, s, cfg.StatusField(), sprint)
 	if err != nil {
 		return err
 	}
@@ -155,6 +169,16 @@ func runList(cmd *cobra.Command, o *listOpts) error {
 	l := buildList(cfg, field.OptionNames(), items, o)
 	l.write(cmd.OutOrStdout(), repo, cfg, o)
 	return nil
+}
+
+// checkFilters validates --status and --sprint against the board (see
+// checkStatuses and checkSprintFlag) and returns the status field.
+func checkFilters(s *board.Schema, cfg *config.Config, o *listOpts, now time.Time) (*board.Field, error) {
+	f, err := checkStatuses(s, cfg, o)
+	if err != nil {
+		return nil, err
+	}
+	return f, checkSprintFlag(s, cfg, o, now)
 }
 
 // checkStatuses validates the --status values against the board, sets
@@ -316,6 +340,9 @@ func (o *listOpts) matches(it board.Item, viewer string) (ok, unsure bool) {
 	if o.mine && (viewer == "" || !containsFold(it.Assignees.Nodes, viewer)) {
 		return false, false
 	}
+	if o.sprint != "" && (o.sprintIt == nil && it.SprintID != "" || o.sprintIt != nil && it.SprintID != o.sprintIt.ID) {
+		return false, false
+	}
 	for _, want := range o.labels {
 		if containsFold(it.Labels.Nodes, want) {
 			continue
@@ -335,6 +362,13 @@ func containsFold(list []string, s string) bool {
 // write prints the groups, cut to o.limit issues, then a line for each kind
 // of issue left out (principle 7).
 func (l *list) write(w io.Writer, repo string, cfg *config.Config, o *listOpts) {
+	switch {
+	case o.sprint == "":
+	case o.sprintIt == nil:
+		fmt.Fprintln(w, "sprint: none")
+	default:
+		fmt.Fprintln(w, "sprint: "+o.sprintIt.Span())
+	}
 	left := o.limit
 	var cut []string // groups not printed in full
 	for _, g := range l.groups {

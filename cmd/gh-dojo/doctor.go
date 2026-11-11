@@ -559,11 +559,12 @@ func checkVerbs(ctx context.Context, r *doctorReport, a *App, cfg *config.Config
 	}
 }
 
-// checkSprint checks that the sprint field has an iteration for today. It
-// runs only when fields.sprint is set, which the config rejects until
-// iteration effects come: this is their hook.
+// checkSprint checks that the sprint field has an iteration for today, the
+// UTC date verbs use (iteration = "current"). It runs only when
+// fields.sprint is set.
 func checkSprint(r *doctorReport, cfg *config.Config, s *board.Schema, now time.Time) {
-	name := cfg.Fields["sprint"]
+	now = now.UTC()
+	name := cfg.SprintField()
 	if name == "" {
 		return
 	}

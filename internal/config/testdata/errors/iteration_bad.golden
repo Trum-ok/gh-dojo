@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.done.iteration: unknown value "next"
+allowed: current, clear, by_status_date:<status>

@@ -400,6 +400,7 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 	if v.Reopen {
 		line("Reopen", "reopens a closed issue")
 	}
+	sprintHelp(cfg, v, line)
 	if len(v.AddLabels)+len(v.RemoveLabels) > 0 {
 		var signs []string
 		for _, l := range v.AddLabels {

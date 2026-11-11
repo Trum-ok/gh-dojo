@@ -63,7 +63,25 @@ type rawVerb struct {
 	Close        *rawOff    `toml:"close"`
 	Reopen       *bool      `toml:"reopen"`
 	Confirm      *rawOff    `toml:"confirm"`
+	Iteration    *string    `toml:"iteration"`
+	Field        *rawFields `toml:"field"`
 	Disabled     *bool      `toml:"disabled"`
+}
+
+// rawFields is the table of a verb's field key: board field name → value,
+// a string, a number or a date, kept as decoded; build checks the types.
+type rawFields struct {
+	values map[string]any
+}
+
+// UnmarshalTOML accepts a table.
+func (f *rawFields) UnmarshalTOML(v any) error {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return fmt.Errorf("wrong type: got %s, want table", typeName(fmt.Sprintf("%T", v)))
+	}
+	f.values = m
+	return nil
 }
 
 // rawAssign is the value of a verb's assign key: true (board.assignee),
@@ -119,6 +137,7 @@ func (v *rawVerb) setKeys() []string {
 		{"require", v.Require != nil}, {"require_one_of", v.RequireOneOf != nil},
 		{"comment", v.Comment != nil}, {"labels", v.Labels != nil}, {"assign", v.Assign != nil},
 		{"close", v.Close != nil}, {"reopen", v.Reopen != nil}, {"confirm", v.Confirm != nil},
+		{"iteration", v.Iteration != nil}, {"field", v.Field != nil},
 	} {
 		if k.set {
 			keys = append(keys, k.name)
@@ -137,41 +156,49 @@ var (
 	sessionKeys  = []string{"env", "link"}
 	verbKeys     = []string{
 		"when", "to", "from", "require", "require_one_of", "comment",
-		"labels", "assign", "close", "reopen", "confirm", "disabled",
+		"labels", "assign", "close", "reopen", "confirm", "iteration", "field", "disabled",
 	}
 
 	// unsupportedVerbKeys are verb keys from the spec that this version
 	// recognizes but does not implement yet.
-	unsupportedVerbKeys = []string{"blockers", "iteration", "field", "batch", "pre", "post"}
+	unsupportedVerbKeys = []string{"blockers", "batch", "pre", "post"}
 
 	// unsupportedKeys are other keys from the spec that this version
 	// recognizes but does not implement yet, with what they are for.
 	unsupportedKeys = map[string]string{}
 )
 
-// statusField is the only [fields] entry this version uses; other logical
-// fields (sprint, ...) are rejected until the effects that use them exist.
+// The [fields] entries this version uses: status (required) and sprint.
+// Other logical fields are rejected; a verb sets other board fields by
+// their board names (see Verb.Fields).
 const (
 	statusField     = "status"
-	fieldsLaterNote = "sprint fields and iteration effects come in v0.1"
+	sprintField     = "sprint"
+	fieldsOtherNote = "only fields.status and fields.sprint are used; " +
+		"a verb sets other board fields by name under [verbs.<name>.field]"
 )
 
-// fieldError is the error for a [fields] entry other than status: status
-// in another case is a typo, anything else a field this version does not
-// use yet. Nil for status itself.
+// knownFields are the [fields] entries this version uses.
+var knownFields = []string{statusField, sprintField}
+
+// fieldError is the error for a [fields] entry other than status and
+// sprint: one of them in another case is a typo, anything else a field
+// this version does not use. Nil for status and sprint themselves.
 func fieldError(display, name string) error {
-	switch {
-	case name == statusField:
-		return nil
-	case strings.EqualFold(name, statusField):
-		return render.Usage("%s: unknown key fields.%s; did you mean fields.%s?", display, name, statusField).
-			WithFix(fmt.Sprintf("rename %s to %s in [fields] of %s", name, statusField, display))
+	for _, known := range knownFields {
+		switch {
+		case name == known:
+			return nil
+		case strings.EqualFold(name, known):
+			return render.Usage("%s: unknown key fields.%s; did you mean fields.%s?", display, name, known).
+				WithFix(fmt.Sprintf("rename %s to %s in [fields] of %s", name, known, display))
+		}
 	}
-	return unsupported(display, "fields."+name, fieldsLaterNote)
+	return unsupported(display, "fields."+name, fieldsOtherNote)
 }
 
 // fieldsKeyError returns the fieldError of the first [fields] entry that is
-// not status, in file order, nil when there is none or data does not parse.
+// not status or sprint, in file order, nil when there is none or data does not parse.
 // It reads [fields] values of any type, so an unsupported field written as
 // a table ([fields.sprint]) is reported as unsupported rather than as a
 // type mismatch.
@@ -225,7 +252,7 @@ func parseRaw(data []byte, display string, preset bool) (*rawFile, error) {
 	}
 	for _, key := range md.Keys() { // file order: the first problem wins
 		switch {
-		case len(key) == 2 && key[0] == "fields" && key[1] != statusField:
+		case len(key) == 2 && key[0] == "fields" && !slices.Contains(knownFields, key[1]):
 			return nil, fieldError(display, key[1])
 		case undecoded[key.String()]:
 			return nil, undecodedError(display, key)
@@ -407,6 +434,8 @@ func mergeVerb(m merger, name string, base, over *rawVerb) *rawVerb {
 		Close:        pick(m, p+"close", base.Close, over.Close),
 		Reopen:       pick(m, p+"reopen", base.Reopen, over.Reopen),
 		Confirm:      pick(m, p+"confirm", base.Confirm, over.Confirm),
+		Iteration:    pick(m, p+"iteration", base.Iteration, over.Iteration),
+		Field:        pick(m, p+"field", base.Field, over.Field),
 		Disabled:     over.Disabled,
 	}
 }

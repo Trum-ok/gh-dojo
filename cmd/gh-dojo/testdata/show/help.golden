@@ -2,10 +2,10 @@ code: 0
 --- stdout
 Read issues before working on them: board status, blockers, history, description, comments.
 
-Prints per issue: state, board status and fields, milestone, labels,
-assignees, blockers both ways with their board status, status history on
-the board, the description and the latest comments, indented. Times are
-UTC.
+Prints per issue: state, board status and fields, the sprint (with
+fields.sprint), milestone, labels, assignees, blockers both ways with
+their board status, status history on the board, the description and the
+latest comments, indented. Times are UTC.
 
 A blocker is resolved, no longer blocking, when it is closed or its board
 status is in statuses.resolved of .github/dojo.toml.
@@ -18,7 +18,8 @@ Folding, always with a note saying what is hidden:
   - a description is cut at 2000 characters, and the comments shown share
     1500 (200 to 600 each); --full prints them whole.
 --brief prints three lines per issue (four when GitHub hid part of it):
-title; state, status, milestone, labels, assignees; blockers and counts.
+title; state, status, sprint, milestone, labels, assignees; blockers and
+counts.
 It takes neither --comments nor --full.
 
 Several numbers are read in one request (up to 20 issues per request).

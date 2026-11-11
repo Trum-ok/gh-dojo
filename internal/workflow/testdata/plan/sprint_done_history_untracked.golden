@@ -1,0 +1,3 @@
+code: 1
+error: done cannot date #42 entering Ready (iteration = "by_status_date:Ready"): GitHub keeps a status history only for a board's built-in Status field
+fix: set iteration = "current" in verbs.done

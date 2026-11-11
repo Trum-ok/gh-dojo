@@ -1,0 +1,7 @@
+code: 0
+--- stdout
+sprint: Sprint 11 (2026-10-26 to 2026-11-08)
+Ready (1)
+  #42 Fix the checkout total
+filtered out: 4 issues not matching --sprint
+--- stderr

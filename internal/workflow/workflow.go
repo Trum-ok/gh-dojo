@@ -17,7 +17,9 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/Trum-ok/gh-dojo/internal/board"
 	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 )
@@ -70,9 +72,48 @@ type Issue struct {
 	// means the comment is posted again.
 	Comments []Comment
 
+	// Sprint is the board's sprint field (fields.sprint) with the item's
+	// iteration, for the iteration effect; nil when the config has none.
+	Sprint *Sprint
+	// History is the issue's status changes on the board, oldest first,
+	// for iteration = "by_status_date:<status>". HistoryTruncated says
+	// older changes may exist beyond the window read; HistoryUntracked
+	// that GitHub keeps no history for the status field (it does only for
+	// a board's built-in Status field).
+	History          []StatusChange
+	HistoryTruncated bool
+	HistoryUntracked bool
+	// Fields are the item's values of the board fields the verb's field
+	// effect sets, by field name, as the board shows them (an option name,
+	// a text, a number, a date); a field without a value, or whose value
+	// was not read, is absent and gets set.
+	Fields map[string]string
+	// ReadAt is when the state was read. Its date in UTC is "today" for
+	// iteration = "current" and for a verb that enters the status of
+	// by_status_date itself. Zero means now.
+	ReadAt time.Time
+
 	// Ref is opaque to this package: the reader may keep the node IDs the
 	// executor needs here. It is never printed.
 	Ref any
+}
+
+// Sprint is the board's sprint field and the item's value of it.
+type Sprint struct {
+	Field      string            // the board name of the iteration field
+	Iterations []board.Iteration // the field's iterations, completed ones included
+	// Current is the title of the item's iteration and CurrentID its ID;
+	// both "" when the item has none. Unknown says the item has more
+	// values than were read and the sprint is not among them: it may be
+	// set, so the effect is never taken as in place.
+	Current, CurrentID string
+	Unknown            bool
+}
+
+// StatusChange is one status change of the issue on the board.
+type StatusChange struct {
+	At time.Time
+	To string // "" when the status was cleared
 }
 
 // Comment is an issue comment.
@@ -261,7 +302,9 @@ func join(items []string, conj string) string {
 // allowed with a warning: the verb does not change why it was closed.
 //
 // The plan adds the issue to the board when it is not there, reopens it,
-// sets the target status, adds and removes labels, assigns, posts the
+// sets the target status, sets the sprint (see planIteration; a day
+// without an iteration is exit code 1) and the fields of the field effect,
+// adds and removes labels, assigns, posts the
 // rendered comment unless it renders empty or the same comment is already
 // the verb's latest (see AlreadyPosted), and closes it. Each effect
 // already in place is left out of Ops (StatusUnchanged, CommentPresent,
@@ -322,6 +365,10 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 			p.Ops = append(p.Ops, SetStatus{From: is.Status, To: v.To})
 		}
 	}
+	if err := p.planIteration(v, atTarget); err != nil {
+		return nil, err
+	}
+	p.planFields(v)
 	p.planLabels(v)
 	if v.Assign != "" {
 		login := v.Assign

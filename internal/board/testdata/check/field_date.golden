@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.done.field."Target date": field "Target date" is DATE: write a date, like "Target date" = 2026-11-30
+fix: edit verbs.done.field."Target date" in .github/dojo.toml

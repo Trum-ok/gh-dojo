@@ -1,0 +1,2 @@
+error: .github/dojo.toml: unknown key fields.Sprint; did you mean fields.sprint?
+fix: rename Sprint to sprint in [fields] of .github/dojo.toml

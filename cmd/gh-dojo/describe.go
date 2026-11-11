@@ -69,7 +69,7 @@ type processExitCode struct {
 // verbChecks and verbEffects say, in order, what a verb checks and does
 // beyond its from → to and its arguments, as short phrases joined into its
 // describe line. Each returns "" when the verb does not have the key. A new
-// verb key (blockers, iteration, batch) gets an entry in one of them.
+// verb key (blockers, batch) gets an entry in one of them.
 var (
 	verbChecks = []func(cfg *config.Config, v config.Verb) string{
 		func(cfg *config.Config, v config.Verb) string {
@@ -92,6 +92,8 @@ var (
 			}
 			return ""
 		},
+		describeIteration,
+		describeFields,
 		func(_ *config.Config, v config.Verb) string {
 			var signs []string
 			for _, l := range v.AddLabels {

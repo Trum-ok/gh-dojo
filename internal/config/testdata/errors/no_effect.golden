@@ -1,1 +1,1 @@
-error: .github/dojo.toml: verbs.go has no effect: set to, comment, labels, assign, close or reopen
+error: .github/dojo.toml: verbs.go has no effect: set to, comment, labels, assign, close, reopen, iteration or field

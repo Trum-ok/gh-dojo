@@ -1,0 +1,4 @@
+error: .github/dojo.toml: fields.sprint: unknown field "Sprint" on board Trum-ok/5
+and 1 more problem: verbs.done.iteration
+allowed: Status, Priority, Size, Estimate, Start date, Target date
+fix: edit fields.sprint in .github/dojo.toml

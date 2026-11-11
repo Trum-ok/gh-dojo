@@ -1,0 +1,3 @@
+error: .github/dojo.toml: fields.sprint: unknown field "Sprint" on board Trum-ok/5
+allowed: Status, Priority, Size, Estimate, Start date, Target date
+fix: edit fields.sprint in .github/dojo.toml

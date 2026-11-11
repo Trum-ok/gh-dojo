@@ -1,0 +1,38 @@
+code: 0
+--- stdout
+Process from .github/dojo.toml: board acme/3, issues in acme/shop.
+Run a verb as gh dojo <verb> <N>; --dry-run shows its plan first.
+
+Verbs:
+  start       You begin working on the issue
+              sprint: today's iteration
+  done        выкачено на прод
+              also on closed issues; sprint: the iteration of the day it entered Ready
+  plan        Take the issue into the current sprint
+              sprint: today's iteration
+  unplan      Take the issue out of its sprint
+              clears the sprint
+  triage      The issue is triaged
+              sets Estimate 3, Priority P1
+
+Every verb adds the issue to the board if it is missing and refuses a
+closed issue unless noted. A repeat is safe: an effect already in place
+(status, comment, labels, assignee, closed or open) is skipped.
+
+Lifecycle (from → to):
+  start       any status → In progress
+  done        any status → Done
+  plan        any status → status unchanged
+  unplan      any status → status unchanged
+  triage      any status → status unchanged
+  Initial:    Todo (new issues; also an issue with no status or not on the board)
+  Final:      Done (gh dojo list hides it unless --all)
+
+Exit codes:
+  0  everything applied: go on
+  1  bad arguments or config: fix them as the error says
+  2  a process check refused: don't work around it; ask the user
+  3  issue or board not found: check the number (gh dojo list) or board.owner/project in .github/dojo.toml
+  4  network, rate limit or auth: retry later, or gh auth refresh -s project
+  5  partially applied: re-run the same command; it finishes the rest
+--- stderr

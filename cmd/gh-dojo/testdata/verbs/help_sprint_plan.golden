@@ -1,0 +1,17 @@
+code: 0
+--- stdout
+Take the issue into the current sprint
+
+  From:      any status
+  To:        the status is not changed
+  Requires:  nothing besides the issue number
+  Board:     adds the issue if it is not there
+  Sprint:    sets Sprint to today's iteration (UTC); none for today is an error, see gh dojo doctor
+
+Usage:
+  gh dojo plan <N> [flags]
+
+Flags:
+      --dry-run   print the plan without changing anything
+  -h, --help      help for plan
+--- stderr

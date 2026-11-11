@@ -1,0 +1,17 @@
+code: 0
+--- stdout
+выкачено на прод
+
+  From:      any status
+  To:        Done; an issue already there keeps it, so a repeat is safe
+  Requires:  nothing besides the issue number
+  Board:     adds the issue if it is not there
+  Sprint:    sets Sprint to the iteration of the day it entered Ready; dates are UTC
+
+Usage:
+  gh dojo done <N> [flags]
+
+Flags:
+      --dry-run   print the plan without changing anything
+  -h, --help      help for done
+--- stderr

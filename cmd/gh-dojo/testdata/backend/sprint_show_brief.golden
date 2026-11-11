@@ -1,0 +1,6 @@
+code: 0
+--- stdout
+#42 Fix the checkout total
+open · Ready · sprint: Sprint 12 (2026-11-09 to 2026-11-22) · labels: none · assignees: alice
+blocked by none · blocking none · comments: 0
+--- stderr

@@ -1,0 +1,17 @@
+code: 0
+--- stdout
+Take the issue out of its sprint
+
+  From:      any status
+  To:        the status is not changed
+  Requires:  nothing besides the issue number
+  Board:     adds the issue if it is not there
+  Sprint:    clears Sprint; an issue without one stays as it is
+
+Usage:
+  gh dojo unplan <N> [flags]
+
+Flags:
+      --dry-run   print the plan without changing anything
+  -h, --help      help for unplan
+--- stderr

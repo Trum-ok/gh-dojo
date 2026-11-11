@@ -1,5 +1,5 @@
 {
-  "comment": "Organization board with an iteration field. Shape follows the recorded org_board.json plus ProjectV2IterationField.configuration from the GraphQL schema; IDs are made up.",
+  "comment": "Organization board with an iteration field. Shape follows the recorded org_board.json plus ProjectV2IterationField.configuration from the GraphQL schema; IDs are made up. Priority and Estimate are for the field effect; Ready for iteration = \"by_status_date:Ready\".",
   "handcrafted": true,
   "interactions": [
     {
@@ -38,6 +38,10 @@
                       {
                         "id": "47fc9ee4",
                         "name": "In progress"
+                      },
+                      {
+                        "id": "61e4505c",
+                        "name": "Ready"
                       },
                       {
                         "id": "98236657",
@@ -84,6 +88,26 @@
                     "id": "PVTF_acme_notes",
                     "name": "Notes",
                     "dataType": "TEXT"
+                  },
+                  {
+                    "id": "PVTSSF_acme_priority",
+                    "name": "Priority",
+                    "dataType": "SINGLE_SELECT",
+                    "options": [
+                      {
+                        "id": "0a877460",
+                        "name": "P1"
+                      },
+                      {
+                        "id": "da944a9c",
+                        "name": "P2"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "PVTF_acme_estimate",
+                    "name": "Estimate",
+                    "dataType": "NUMBER"
                   }
                 ]
               }

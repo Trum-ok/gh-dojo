@@ -1,0 +1,10 @@
+code: 0
+--- stdout
+sprint: Sprint 12 (2026-11-09 to 2026-11-22)
+Todo (1)
+  #45 Cache the catalog
+In progress (1)
+  #43 Show prices with tax
+hidden: 1 closed or Done, use --all
+filtered out: 2 issues not matching --sprint
+--- stderr

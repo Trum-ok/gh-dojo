@@ -23,12 +23,22 @@ var (
 	rmLabels  = workflow.RemoveLabels{Names: []string{"blocked"}}
 	assign    = workflow.Assign{Login: "Trum-ok"}
 	closing   = workflow.Close{Reason: "not_planned"}
+	sprint    = workflow.SetIteration{From: "Sprint 11", To: "Sprint 12", Start: "2026-11-09"}
+	unsprint  = workflow.SetIteration{From: "Sprint 12"}
+	setFields = workflow.SetFields{Changes: []workflow.FieldChange{
+		{Field: "Estimate", To: "3"}, {Field: "Priority", From: "P2", To: "P1"},
+	}}
 )
 
 var ids = effects.IDs{
 	Project: "PVT_1", Issue: "I_1", Item: "PVTI_1", StatusField: "PVTSSF_1", StatusOption: "47fc9ee4",
-	Labels: map[string]string{"in-review": "LA_1", "needs qa": "LA_2", "blocked": "LA_3"},
-	Users:  map[string]string{"trum-ok": "U_1"},
+	Labels:      map[string]string{"in-review": "LA_1", "needs qa": "LA_2", "blocked": "LA_3"},
+	Users:       map[string]string{"trum-ok": "U_1"},
+	SprintField: "PVTIF_1", Iteration: "it12",
+	Fields: map[string]effects.FieldInput{
+		"Estimate": {ID: "PVTF_est", Value: map[string]any{"number": 3.0}},
+		"Priority": {ID: "PVTSSF_prio", Value: map[string]any{"singleSelectOptionId": "0a877460"}},
+	},
 }
 
 func TestBuild(t *testing.T) {
@@ -52,6 +62,9 @@ func TestBuild(t *testing.T) {
 		{"labels_assign", []workflow.Op{addLabels, rmLabels, assign}, ids},
 		{"all", []workflow.Op{unarchive, reopen, status, addLabels, rmLabels, assign, comment}, ids},
 		{"board_labels_close", []workflow.Op{toBoard, addLabels, comment, closing}, notOnBoard},
+		{"status_sprint_close", []workflow.Op{status, sprint, closing}, ids},
+		{"sprint_clear", []workflow.Op{unsprint}, ids},
+		{"status_fields", []workflow.Op{status, setFields, comment}, ids},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -85,7 +98,7 @@ func TestBuildDeclaresWhatItUses(t *testing.T) {
 	for _, ops := range [][]workflow.Op{
 		{status, comment}, {status}, {comment}, {toBoard}, {toBoard, comment}, {unarchive, status},
 		{closing}, {reopen}, {addLabels}, {rmLabels}, {assign}, {reopen, status, addLabels, rmLabels, assign, comment},
-		{comment, closing},
+		{comment, closing}, {sprint}, {unsprint}, {setFields}, {status, sprint, setFields, comment},
 	} {
 		m, err := effects.Build(ops, ids)
 		if err != nil {
@@ -118,6 +131,8 @@ func TestBuildErrors(t *testing.T) {
 	noItem.Item = ""
 	noOption := ids
 	noOption.StatusOption = ""
+	noIteration := ids
+	noIteration.Iteration = ""
 	for name, tt := range map[string]struct {
 		ops []workflow.Op
 		ids effects.IDs
@@ -133,6 +148,12 @@ func TestBuildErrors(t *testing.T) {
 		"user_id":      {[]workflow.Op{workflow.Assign{Login: "nobody"}}, ids},
 		"no_labels":    {[]workflow.Op{workflow.AddLabels{}}, ids},
 		"close_twice":  {[]workflow.Op{closing, closing}, ids},
+		"sprint_item":  {[]workflow.Op{sprint}, noItem},
+		"fields_item":  {[]workflow.Op{setFields}, noItem},
+		"no_iteration": {[]workflow.Op{sprint}, noIteration},
+		"no_field":     {[]workflow.Op{workflow.SetFields{Changes: []workflow.FieldChange{{Field: "Size", To: "M"}}}}, ids},
+		"no_changes":   {[]workflow.Op{workflow.SetFields{}}, ids},
+		"fields_twice": {[]workflow.Op{setFields, setFields}, ids},
 	} {
 		if _, err := effects.Build(tt.ops, tt.ids); err == nil {
 			t.Errorf("%s: want an error", name)
@@ -156,6 +177,8 @@ func TestBatches(t *testing.T) {
 			[][]workflow.Op{{toBoard}, {reopen, status, addLabels, comment, closing}}},
 		{[]workflow.Op{toBoard, addLabels, assign, comment, closing},
 			[][]workflow.Op{{toBoard, addLabels, assign, comment, closing}}},
+		{[]workflow.Op{toBoard, sprint, comment}, [][]workflow.Op{{toBoard}, {sprint, comment}}},
+		{[]workflow.Op{toBoard, setFields}, [][]workflow.Op{{toBoard}, {setFields}}},
 	}
 	for _, tt := range tests {
 		if got := effects.Batches(tt.ops); !reflect.DeepEqual(got, tt.want) {
@@ -197,6 +220,40 @@ func TestOutcome(t *testing.T) {
 		if !reflect.DeepEqual(done, tt.done) || !reflect.DeepEqual(missed, tt.missed) {
 			t.Errorf("%d: done %v, missed %v; want %v, %v", i, done, missed, tt.done, tt.missed)
 		}
+	}
+}
+
+// TestOutcomeFields: SetFields is done only when every field it sets is.
+func TestOutcomeFields(t *testing.T) {
+	m, err := effects.Build([]workflow.Op{status, setFields, comment}, ids)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ok := `{"projectV2Item": {"id": "PVTI_1"}}`
+	for _, tt := range []struct {
+		data         string
+		done, missed []workflow.Op
+	}{
+		{`{"status": ` + ok + `, "field0": ` + ok + `, "field1": ` + ok + `, "comment": {}}`,
+			[]workflow.Op{status, setFields, comment}, nil},
+		{`{"status": ` + ok + `, "field0": ` + ok + `, "field1": null, "comment": {}}`,
+			[]workflow.Op{status, comment}, []workflow.Op{setFields}},
+		{`{"status": ` + ok + `, "field0": null, "field1": ` + ok + `}`,
+			[]workflow.Op{status}, []workflow.Op{setFields, comment}},
+	} {
+		var d map[string]json.RawMessage
+		if err := json.Unmarshal([]byte(tt.data), &d); err != nil {
+			t.Fatal(err)
+		}
+		done, missed := m.Outcome(d)
+		if !reflect.DeepEqual(done, tt.done) || !reflect.DeepEqual(missed, tt.missed) {
+			t.Errorf("%s: done %v, missed %v; want %v, %v", tt.data, done, missed, tt.done, tt.missed)
+		}
+	}
+	if got := effects.Missed(sprint) + "; " + effects.Missed(unsprint) + "; " + effects.Missed(setFields) + "; " +
+		effects.Missed(workflow.SetFields{Changes: setFields.Changes[:1]}); got !=
+		"sprint not set; sprint not cleared; fields not set; Estimate not set" {
+		t.Errorf("Missed: %s", got)
 	}
 }
 

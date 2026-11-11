@@ -1,0 +1,6 @@
+code: 1
+--- stdout
+--- stderr
+error: .github/dojo.toml: --sprint needs fields.sprint, the board's iteration field
+allowed: Sprint
+fix: add sprint = "<iteration field>" under [fields] in .github/dojo.toml

@@ -56,9 +56,13 @@ var bidiControls = strings.NewReplacer(
 
 // cardView renders cards with show's flags.
 type cardView struct {
-	statusField string   // board name of the status field, left out of the field list
-	resolved    []string // statuses.resolved: an open blocker in these no longer blocks
-	comments    int      // how many of the latest comments to print
+	statusField string // board name of the status field, left out of the field list
+	// sprintField is the board name of the sprint field (fields.sprint),
+	// shown on a line of its own; "" when not set. sprintFieldID is its
+	// node ID, which finds the value even if the field was renamed.
+	sprintField, sprintFieldID string
+	resolved                   []string // statuses.resolved: an open blocker in these no longer blocks
+	comments                   int      // how many of the latest comments to print
 	// bodyRunes cuts the description and commentBudget is shared by the
 	// comments shown (see commentRunes); 0 prints them whole.
 	bodyRunes, commentBudget int
@@ -72,6 +76,9 @@ func (v cardView) card(c *issue.Card) string {
 	line("#%d %s", c.Number, singleLine(c.Title))
 	line("state: %s, opened %s by %s", cardState(c), cardDay(c.CreatedAt), cardLogin(c.Author))
 	line("board: %s", v.board(c, true))
+	if v.sprintField != "" {
+		line("sprint: %s", v.sprint(c))
+	}
 	line("milestone: %s", cardMilestone(c.Milestone))
 	line("labels: %s", cardNames(c.Labels))
 	line("assignees: %s", cardNames(c.Assignees))
@@ -107,6 +114,9 @@ func (v cardView) brief(c *issue.Card) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "#%d %s\n", c.Number, singleLine(c.Title))
 	fmt.Fprintf(&b, "%s · %s", cardState(c), v.board(c, false))
+	if v.sprintField != "" {
+		fmt.Fprintf(&b, " · sprint: %s", v.sprint(c))
+	}
 	if c.Milestone != nil {
 		fmt.Fprintf(&b, " · milestone: %s", cardMilestone(c.Milestone))
 	}
@@ -180,7 +190,7 @@ func (v cardView) board(c *issue.Card, fields bool) string {
 	}
 	if fields {
 		for _, val := range c.Item.Values {
-			if val.Field != v.statusField {
+			if val.Field != v.statusField && !v.isSprint(val) {
 				parts = append(parts, singleLine(val.Field)+": "+singleLine(val.Text))
 			}
 		}

@@ -1,0 +1,11 @@
+mutation Verb($project: ID!, $item: ID!, $sprintField: ID!) {
+  sprint: clearProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $sprintField}) { projectV2Item { id } }
+}
+--- vars
+{
+  "item": "PVTI_1",
+  "project": "PVT_1",
+  "sprintField": "PVTIF_1"
+}
+--- steps
+sprint
