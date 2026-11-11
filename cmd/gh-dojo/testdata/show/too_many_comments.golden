@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: --comments 101 is more than gh dojo reads (100); use --comments all
+fix: gh dojo show --help

@@ -16,6 +16,7 @@ Process verbs (from .github/dojo.toml):
 
 Additional Commands:
   help        Help about any command
+  show        Read issues before working on them: board status, blockers, history, description, comments
 
 Flags:
   -h, --help      help for gh dojo

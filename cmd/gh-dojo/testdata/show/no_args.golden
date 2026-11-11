@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: show needs an issue number, like 42 or "#42"
+fix: gh dojo show --help

@@ -1,0 +1,48 @@
+== #3
+card Trum-ok/gh-dojo#3 "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)" id=I_kwDOVq9iIs8AAAABeZKr9A
+state OPEN reason="" closed=false url=https://github.com/Trum-ok/gh-dojo/issues/3
+author "Trum-ok" created 2026-11-11T18:19:10Z closed - incomplete=false
+labels [] (0)
+assignees [] (0)
+blocked by (2):
+  #2 OPEN "Коды выхода и короткие ошибки (internal/render)"
+  #1 OPEN "Каркас: Go-модуль, cobra и установка как расширение gh"
+blocking (5):
+  #11 OPEN "Глаголы из конфига: проверки и план эффектов (internal/workflow)"
+  #8 OPEN "Команда list"
+  #7 OPEN "Команда show <N>…"
+  #6 OPEN "Сверка конфига с доской"
+  #4 OPEN "Пресет kanban через embed.FS"
+item PVTI_lAHOBFGd5c4BrMYFzhH6Jn8 archived=false created 2026-11-11T18:19:12Z status="Ready" unknown=false values truncated=false
+  Status [SINGLE_SELECT] "Ready" option=61e4505c iteration= /0 field=PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ
+  Size [SINGLE_SELECT] "M" option=7515a9f1 iteration= /0 field=PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4
+history (truncated=false untracked=false):
+  2026-11-11T18:19:14Z "" → "Backlog" by "github-project-automation" automated=false
+  2026-11-11T18:42:17Z "Backlog" → "In progress" by "Trum-ok" automated=false
+  2026-11-11T19:02:20Z "In progress" → "Ready" by "Trum-ok" automated=false
+comments 0 of 0:
+body: "## Зачем\nПроцесс проекта — данные в конфиге, а не код. Все команды читают конфиг.\n\n## Что сделать\n- Поиск `.github/dojo.toml` вверх от текущей папки.\n- Разбор `version`, `preset`, `[board]` (owner, project, repos, assignee), `[fields]` (`status` обязателен), `[session]` (env, link), `[verbs.*]`.\n- Для глаголов в v0.0: `when`, `to`, `from`, `require`, `require_one_of`, `comment` (шаблон). Остальные ключи из спеки распознаются, но дают понятную ошибку «не поддерживается в этой версии», а не молча игнорируются.\n- Ошибки валидации — код 1, с указанием ключа и допустимых значений.\n- Сверка с доской — отдельная задача.\n\n## Готово, когда\n- Пример конфига из спеки (без неподдерживаемых ключей) загружается.\n- Тесты на отсутствие файла, неизвестный ключ, пустой `fields.status`, глагол без `when`.\n\nСпека: `docs/spec.md`: «Модель и конфиг».\n"
+== #7
+card Trum-ok/gh-dojo#7 "Команда show <N>…" id=I_kwDOVq9iIs8AAAABeZLXnw
+state OPEN reason="" closed=false url=https://github.com/Trum-ok/gh-dojo/issues/7
+author "Trum-ok" created 2026-11-11T18:19:52Z closed - incomplete=false
+labels [] (0)
+assignees [] (0)
+blocked by (3):
+  #3 OPEN "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)"
+  #2 OPEN "Коды выхода и короткие ошибки (internal/render)"
+  #5 OPEN "GraphQL-клиент и схема доски с кэшем (internal/graph, internal/board)"
+blocking (1):
+  #14 OPEN "Skill для агентов и переход на gh dojo (рубеж v0.0)"
+item PVTI_lAHOBFGd5c4BrMYFzhH6Kaw archived=false created 2026-11-11T18:19:54Z status="In progress" unknown=false values truncated=false
+  Status [SINGLE_SELECT] "In progress" option=47fc9ee4 iteration= /0 field=PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ
+  Size [SINGLE_SELECT] "M" option=7515a9f1 iteration= /0 field=PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4
+history (truncated=false untracked=false):
+  2026-11-11T18:19:56Z "" → "Backlog" by "github-project-automation" automated=false
+  2026-11-11T19:28:10Z "Backlog" → "In progress" by "Trum-ok" automated=false
+comments 0 of 0:
+body: "## Зачем\nАгент читает задачу одним запросом и не тратит ходы на gh issue view + project.\n\n## Что сделать\n- `show <N>… [--brief]`: статус на доске, метки, блокеры в обе стороны, описание, комментарии — одним GraphQL-запросом.\n- История статусов — если API отдаёт её в том же запросе; иначе вынести в отдельную задачу.\n- Длинные треды сворачиваются с подсказкой, как развернуть (`--comments all`); обрезка с `totalCount`.\n- Задача не на доске — показать это явно; нет задачи — код 3.\n\n## Готово, когда\n- `show` типичной задачи — до ~2 тыс. токенов.\n- Golden-тесты вывода на записанных ответах.\n\nСпека: `docs/spec.md`: F2.\n"
+== #9999
+code 3
+error: issue #9999 not found in Trum-ok/gh-dojo
+fix: gh issue list -R Trum-ok/gh-dojo

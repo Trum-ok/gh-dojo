@@ -1,0 +1,33 @@
+code: 0
+--- stdout
+Read issues before working on them: board status, blockers, history, description, comments.
+
+Prints per issue: state, board status and fields, labels, assignees,
+blockers both ways (open first), status history on the board, the
+description and the latest comments. Times are UTC.
+
+Folding, always with a note saying what is hidden:
+  - the last 5 comments are printed; --comments N prints the last N,
+    --comments all up to 100 (the most gh dojo reads);
+  - a description over 4000 characters or a comment over 1500
+    is cut; --full prints them whole.
+--brief prints only state, status, labels, assignees, blockers and counts.
+
+Several numbers are read in one request (up to 20 issues per request).
+A missing issue or a pull request number is reported after the others are
+printed, with exit code 3.
+
+Usage:
+  gh dojo show <N>... [flags]
+
+Examples:
+  gh dojo show 42
+  gh dojo show 42 43 57 --brief
+  gh dojo show 42 --comments all
+
+Flags:
+      --brief             three lines per issue: no description, history or comments
+      --comments string   how many of the latest comments to print: a number or all (default "5")
+      --full              print long descriptions and comments whole
+  -h, --help              help for show
+--- stderr

@@ -1,0 +1,41 @@
+#42 Fix login redirect
+state: open (reopened), opened 2026-11-12 by ghost
+board: no status · Sprint: Sprint 12 (archived)
+labels: bug, area:cli (showing 2 of 23)
+assignees: none
+blocked by: 1 open, 1 closed, showing 2 of 25
+  acme/auth#7 Very long title Very long title Very long title Very long title Very long title…
+  #2 Closed one (closed)
+blocking: none
+status history (latest changes only; older ones are not read):
+  2026-11-12 09:30 Backlog → Ready (automation)
+note: GitHub withheld part of this issue from the token (a project or linked issue it cannot see); the rest is accurate
+
+description:
+Steps to reproduce:
+1. Open /settings …
+[cut: 37 of 74 characters shown; --full prints all]
+
+comments (showing 2 of 130, --comments all prints up to 100):
+--- octocat, 2026-11-12 09:30
+ok
+--- octocat, 2026-11-12 09:30
+word word word word word word …
+[cut: 29 of 99 characters shown; --full prints all]
+
+### brief
+#42 Fix login redirect
+open (reopened) · no status (archived) · labels: bug, area:cli (showing 2 of 23) · assignees: none
+blocked by 1 open: acme/auth#7 (showing 2 of 25 blockers) · blocking 0 · comments: 130
+note: GitHub withheld part of this issue from the token; the rest is accurate
+
+### --comments all, last lines
+comments (showing 100 of 130, older ones: gh issue view 42 -R Trum-ok/gh-dojo --comments):
+
+### board unknown
+board: unknown, may be on it (the issue is on 25 projects and only the first 20 were read)
+status history (latest changes only; older ones are not read):
+
+### status unknown, history untracked
+board: status unknown (GitHub did not return it) · more fields not read
+status history: not tracked (GitHub records changes of the built-in Status field only)

@@ -5,7 +5,14 @@ No process verbs: no .github/dojo.toml found (create one: see https://github.com
 
 Usage:
   gh dojo [flags]
+  gh dojo [command]
+
+Available Commands:
+  help        Help about any command
+  show        Read issues before working on them: board status, blockers, history, description, comments
 
 Flags:
   -h, --help      help for gh dojo
   -v, --version   version for gh dojo
+
+Use "gh dojo [command] --help" for more information about a command.

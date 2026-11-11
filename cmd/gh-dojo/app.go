@@ -150,6 +150,30 @@ func (a *App) Card(ctx context.Context, n, comments int) (*issue.Card, error) {
 	return issue.Read(ctx, a.Client, req)
 }
 
+// Cards reads issues ns of the default repository like Card: one request
+// per issue.MaxBatch issues with a warm schema cache (for a single issue,
+// the request Card sends). A missing issue or a pull request number fails
+// only its own issue.Result; see issue.ReadAll.
+func (a *App) Cards(ctx context.Context, ns []int, comments int) ([]issue.Result, error) {
+	repo, err := a.Repo()
+	if err != nil {
+		return nil, err
+	}
+	s, err := a.Schema(ctx)
+	if err != nil {
+		return nil, err
+	}
+	cfg, err := a.Config()
+	if err != nil {
+		return nil, err
+	}
+	req := issue.Request{Repo: repo, Board: s, StatusField: cfg.StatusField(), Comments: comments}
+	if f, err := s.Field(req.StatusField); err == nil { // Schema checked it
+		req.StatusFieldID = f.ID
+	}
+	return issue.ReadAll(ctx, a.Client, req, ns)
+}
+
 // workflowIssue is the state workflow plans with. Ref keeps the card, so an
 // executor finds the node IDs it needs there: card.ID for the issue,
 // card.ItemID() for the board item ("" when not on the board: add it with

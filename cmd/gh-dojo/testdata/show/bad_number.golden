@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: "abc" is not an issue number; pass numbers like 42 or "#42"
+fix: gh dojo show --help

@@ -1,0 +1,12 @@
+code: 3
+--- stdout
+#3 Конфиг: загрузка и валидация .github/dojo.toml (internal/config)
+open · Ready · labels: none · assignees: none
+blocked by 2 open: #2, #1 · blocking 5 · comments: 0
+
+#7 Команда show <N>…
+open · In progress · labels: none · assignees: none
+blocked by 3 open: #3, #2, #5 · blocking 1 · comments: 0
+--- stderr
+error: issue #9999 not found in Trum-ok/gh-dojo
+fix: gh issue list -R Trum-ok/gh-dojo

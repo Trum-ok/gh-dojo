@@ -1,0 +1,20 @@
+== #42
+card Trum-ok/gh-dojo#42 "Fix login redirect" id=I_kwDOVq9iIs8AAAABeLong42
+state CLOSED reason="COMPLETED" closed=true url=https://github.com/Trum-ok/gh-dojo/issues/42
+author "Trum-ok" created 2026-11-11T18:19:10Z closed 2026-11-12T10:00:00Z incomplete=true
+labels [bug area:cli] (2)
+assignees [Trum-ok] (1)
+blocked by (1):
+  acme/auth#7 CLOSED "Auth library upgrade"
+blocking (0):
+item: board membership unknown: GitHub withheld some of the issue's projects from this token
+history (truncated=true untracked=false):
+  2026-11-11T18:19:14Z "" → "Backlog" by "github-project-automation" automated=false
+  2026-11-11T18:42:17Z "Backlog" → "In progress" by "Trum-ok" automated=false
+  2026-11-11T19:02:20Z "In progress" → "Ready" by "Trum-ok" automated=false
+comments 0 of 0:
+body: "Login redirects to /home instead of the page the user came from."
+== #15
+code 3
+error: #15 in Trum-ok/gh-dojo is a pull request, not an issue
+fix: gh pr view 15 -R Trum-ok/gh-dojo

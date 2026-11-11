@@ -1,0 +1,36 @@
+code: 0
+--- stdout
+#3 Конфиг: загрузка и валидация .github/dojo.toml (internal/config)
+state: open, opened 2026-11-11 by Trum-ok
+board: not on the board (a verb adds it)
+labels: none
+assignees: none
+blocked by: 2 open
+  #2 Коды выхода и короткие ошибки (internal/render)
+  #1 Каркас: Go-модуль, cobra и установка как расширение gh
+blocking: 5 open
+  #11 Глаголы из конфига: проверки и план эффектов (internal/workflow)
+  #8 Команда list
+  #7 Команда show <N>…
+  #6 Сверка конфига с доской
+  #4 Пресет kanban через embed.FS
+
+description:
+## Зачем
+Процесс проекта — данные в конфиге, а не код. Все команды читают конфиг.
+
+## Что сделать
+- Поиск `.github/dojo.toml` вверх от текущей папки.
+- Разбор `version`, `preset`, `[board]` (owner, project, repos, assignee), `[fields]` (`status` обязателен), `[session]` (env, link), `[verbs.*]`.
+- Для глаголов в v0.0: `when`, `to`, `from`, `require`, `require_one_of`, `comment` (шаблон). Остальные ключи из спеки распознаются, но дают понятную ошибку «не поддерживается в этой версии», а не молча игнорируются.
+- Ошибки валидации — код 1, с указанием ключа и допустимых значений.
+- Сверка с доской — отдельная задача.
+
+## Готово, когда
+- Пример конфига из спеки (без неподдерживаемых ключей) загружается.
+- Тесты на отсутствие файла, неизвестный ключ, пустой `fields.status`, глагол без `when`.
+
+Спека: `docs/spec.md`: «Модель и конфиг».
+
+comments: none
+--- stderr

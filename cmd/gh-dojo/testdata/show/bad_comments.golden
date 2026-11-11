@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: invalid --comments "few": want a number or all
+fix: gh dojo show --help

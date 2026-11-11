@@ -1,0 +1,45 @@
+code: 0
+--- stdout
+#42 Fix login redirect
+state: closed (completed) 2026-11-12, opened 2026-11-11 by Trum-ok
+board: Ready · Size: M · Sprint: Sprint 12 · Estimate: 2.5 · Target date: 2026-11-20
+labels: bug, area:cli
+assignees: Trum-ok
+blocked by: 1 closed
+  acme/auth#7 Auth library upgrade (closed)
+blocking: none
+status history (latest changes only; older ones are not read):
+  2026-11-11 18:19 no status → Backlog (automation)
+  2026-11-11 18:42 Backlog → In progress by Trum-ok
+  2026-11-11 19:02 In progress → Ready by Trum-ok
+
+description:
+Login redirects to /home instead of the page the user came from.
+
+comments (showing 3 of 45, --comments all prints up to 100):
+--- octocat, 2026-11-13 18:00
+(empty)
+--- octocat, 2026-11-13 19:00
+Log from the staging run:
+001 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
+002 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
+003 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
+004 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
+005 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
+006 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
+007 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
+008 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
+009 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
+010 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
+011 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
+012 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
+013 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
+014 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
+015 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
+016 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
+017 GET /login?next=/settings -> 302 /home (session cookie set, next dropped)
+018 GET /login?next=/settings -> 302 /home (session cookie set, next dropped) …
+[cut: 1429 of 2365 characters shown; --full prints all]
+--- Trum-ok, 2026-11-13 20:00
+Done.
+--- stderr
