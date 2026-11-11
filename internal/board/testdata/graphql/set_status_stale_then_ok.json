@@ -1,0 +1,27 @@
+{
+  "comment": "A status write rejected because the cached option ID went stale, then accepted after a re-read. Not recorded (mutation); error wording is a best guess, see internal/graph/testdata/graphql/set_status_stale_option.json.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "SetStatus",
+      "query": "mutation SetStatus($project: ID!, $item: ID!, $field: ID!, $option: String!) {\n  updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field, value: {singleSelectOptionId: $option}}) {\n    projectV2Item { id }\n  }\n}",
+      "response": {
+        "data": {"updateProjectV2ItemFieldValue": null},
+        "errors": [
+          {
+            "path": ["updateProjectV2ItemFieldValue"],
+            "locations": [{"line": 2, "column": 3}],
+            "message": "The single select option Id does not belong to the field"
+          }
+        ]
+      }
+    },
+    {
+      "operation": "SetStatus",
+      "query": "mutation SetStatus($project: ID!, $item: ID!, $field: ID!, $option: String!) {\n  updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field, value: {singleSelectOptionId: $option}}) {\n    projectV2Item { id }\n  }\n}",
+      "response": {
+        "data": {"updateProjectV2ItemFieldValue": {"projectV2Item": {"id": "PVTI_lAHOBFGd5c4BrMYFzhH6JM0"}}}
+      }
+    }
+  ]
+}

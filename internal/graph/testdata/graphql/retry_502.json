@@ -4,13 +4,23 @@
   "interactions": [
     {
       "operation": "Viewer",
+      "query": "query Viewer { viewer { login } }",
       "status": 502,
-      "headers": {"Content-Type": "text/html"},
+      "headers": {
+        "Content-Type": "text/html"
+      },
       "response": "<html><body><h1>502 Bad Gateway</h1></body></html>"
     },
     {
       "operation": "Viewer",
-      "response": {"data": {"viewer": {"login": "Trum-ok"}}}
+      "query": "query Viewer { viewer { login } }",
+      "response": {
+        "data": {
+          "viewer": {
+            "login": "Trum-ok"
+          }
+        }
+      }
     }
   ]
 }

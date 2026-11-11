@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -45,18 +46,21 @@ type File struct {
 type Interaction struct {
 	// Operation is the operation name, e.g. "BoardSchema".
 	Operation string `json:"operation"`
-	// Query, if set, must match the request's query (whitespace and commas
-	// ignored), so a changed query doesn't replay a stale response.
-	// Recorded fixtures always have it.
-	Query string `json:"query,omitempty"`
+	// Query must match the request's query (whitespace and commas ignored),
+	// so a changed query never replays a stale response. Required.
+	Query string `json:"query"`
 	// Variables must equal the request's variables. Omitted (null) matches
 	// any variables.
 	Variables json.RawMessage `json:"variables,omitempty"`
+	// Repeat lets the interaction answer more than once. Off by default:
+	// every request must be expected.
+	Repeat bool `json:"repeat,omitempty"`
 	// Status is the HTTP status; 0 means 200.
 	Status int `json:"status,omitempty"`
 	// Headers are extra response headers, e.g. Retry-After.
 	Headers map[string]string `json:"headers,omitempty"`
-	// Response is the response body.
+	// Response is the response body; a JSON string when the Content-Type
+	// header says it is not JSON.
 	Response json.RawMessage `json:"response"`
 
 	file int // index into Server.files
@@ -84,11 +88,11 @@ type Server struct {
 // files (paths relative to the test's package, e.g.
 // "testdata/graphql/user_board.json"). Files are combined in order.
 //
-// Matching: a request matches an interaction with the same operation name
-// and variables. Among matches the first not yet used one answers; once all
-// are used the last one keeps answering (so a fixture of one 502 answers
-// every retry). A request with no match fails the test; so does an
-// interaction never requested, at cleanup.
+// Matching: a request matches an interaction with the same operation name,
+// query and variables. Each interaction answers once, in file order; one
+// with "repeat": true keeps answering after that (the last such match
+// does). A request with no answer fails the test; so does an interaction
+// never requested, at cleanup.
 //
 // In record mode (GH_DOJO_RECORD=1) requests go to GitHub with gh's real
 // token and the responses are written back at cleanup: each interaction to
@@ -131,11 +135,26 @@ func readFile(path string) (*File, error) {
 		return nil, fmt.Errorf("%s: %v", path, err)
 	}
 	for i, in := range f.Interactions {
-		if in.Operation == "" {
-			return nil, fmt.Errorf("%s: interaction %d has no operation", path, i)
+		if in.Query == "" {
+			return nil, fmt.Errorf("%s: interaction %d has no query; copy the query the code sends", path, i)
+		}
+		if _, op, ok := operation(in.Query); !ok || op != in.Operation {
+			return nil, fmt.Errorf("%s: interaction %d: operation %q does not match its query (want %q)", path, i, in.Operation, op)
 		}
 	}
 	return &f, nil
+}
+
+// opRE finds the leading named operation of a document. graph's callers
+// put the operation first and name it.
+var opRE = regexp.MustCompile(`^\s*(?:#[^\n]*\n\s*)*(query|mutation|subscription)\s+([A-Za-z_][A-Za-z0-9_]*)`)
+
+func operation(query string) (kind, name string, ok bool) {
+	m := opRE.FindStringSubmatch(query)
+	if m == nil {
+		return "", "", false
+	}
+	return m[1], m[2], true
 }
 
 // Client returns a graph client wired to the server: a fake token and
@@ -184,6 +203,9 @@ type request struct {
 
 // RoundTrip implements http.RoundTripper.
 func (s *Server) RoundTrip(req *http.Request) (*http.Response, error) {
+	if err := req.Context().Err(); err != nil {
+		return nil, err
+	}
 	body, err := io.ReadAll(req.Body)
 	req.Body.Close()
 	if err != nil {
@@ -194,7 +216,12 @@ func (s *Server) RoundTrip(req *http.Request) (*http.Response, error) {
 		s.t.Errorf("graphtest: request body is not GraphQL JSON: %v", err)
 		return nil, err
 	}
-	kind, op := graph.ParseOperation(r.Query)
+	kind, op, ok := operation(r.Query)
+	if !ok {
+		err := fmt.Errorf("query must start with a named operation: %.60q", r.Query)
+		s.t.Errorf("graphtest: %v", err)
+		return nil, err
+	}
 	vars := canonical(r.Variables)
 
 	s.mu.Lock()
@@ -215,27 +242,34 @@ func (s *Server) RoundTrip(req *http.Request) (*http.Response, error) {
 func (s *Server) match(op, query, vars string) (*Interaction, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	var last *Interaction
+	var repeat, used *Interaction
 	for _, in := range s.list {
 		anyVars := len(in.Variables) == 0 || string(in.Variables) == "null"
 		if in.Operation != op || !anyVars && canonical(in.Variables) != vars {
 			continue
 		}
-		if in.Query != "" && normalize(in.Query) != normalize(query) {
-			return nil, fmt.Errorf("%s in %s was recorded for a different query; re-record: %s=1 go test ./... -run %s",
+		if normalize(in.Query) != normalize(query) {
+			return nil, fmt.Errorf("%s in %s has a different query than the code sends; re-record (%s=1 go test -run %s) or update the hand-crafted fixture",
 				op, s.files[in.file], recordEnv, s.t.Name())
 		}
 		if in.used == 0 {
 			in.used++
 			return in, nil
 		}
-		last = in
+		used = in
+		if in.Repeat {
+			repeat = in
+		}
 	}
-	if last == nil {
-		return nil, fmt.Errorf("unexpected request %s %s: no fixture in %s", op, vars, strings.Join(s.files, ", "))
+	switch {
+	case repeat != nil:
+		repeat.used++
+		return repeat, nil
+	case used != nil:
+		return nil, fmt.Errorf("request %s %s answered already by %s; add another interaction or \"repeat\": true",
+			op, vars, s.files[used.file])
 	}
-	last.used++
-	return last, nil
+	return nil, fmt.Errorf("unexpected request %s %s: no fixture in %s", op, vars, strings.Join(s.files, ", "))
 }
 
 func (s *Server) forward(req *http.Request, body []byte, kind, op, query, vars string) (*http.Response, error) {
@@ -323,7 +357,10 @@ func (s *Server) finish() {
 	}
 }
 
-// write saves recorded interactions, grouped by target file.
+// write saves recorded interactions, grouped by target file. Identical
+// consecutive answers to the same query collapse into one with "repeat":
+// true; mutations never collapse. A "repeat" flag already in the file is
+// kept.
 func (s *Server) write() {
 	if s.t.Failed() {
 		s.t.Log("graphtest: test failed; fixtures not written")
@@ -333,8 +370,13 @@ func (s *Server) write() {
 	for _, in := range s.recorded {
 		target := s.target(in.Operation)
 		prev := byFile[target]
-		if dup := lastWithKey(prev, in); dup != nil && dup.Status == in.Status && bytes.Equal(dup.Response, in.Response) {
-			continue // identical repeat, e.g. a re-fetch after cache expiry
+		if old := lastWithKey(s.loaded[target].Interactions, in); old != nil && old.Repeat {
+			in.Repeat = true
+		}
+		kind, _, _ := operation(in.Query)
+		if dup := lastWithKey(prev, in); kind != "mutation" && dup != nil && dup.Status == in.Status && bytes.Equal(dup.Response, in.Response) {
+			dup.Repeat = true
+			continue
 		}
 		byFile[target] = append(prev, in)
 	}

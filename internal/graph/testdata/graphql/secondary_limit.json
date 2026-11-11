@@ -4,8 +4,11 @@
   "interactions": [
     {
       "operation": "Viewer",
+      "query": "query Viewer { viewer { login } }",
       "status": 403,
-      "headers": {"Retry-After": "5"},
+      "headers": {
+        "Retry-After": "5"
+      },
       "response": {
         "documentation_url": "https://docs.github.com/free-pro-team@latest/rest/overview/rate-limits-for-the-rest-api#about-secondary-rate-limits",
         "message": "You have exceeded a secondary rate limit. Please wait a few minutes before you try again."
@@ -13,7 +16,14 @@
     },
     {
       "operation": "Viewer",
-      "response": {"data": {"viewer": {"login": "Trum-ok"}}}
+      "query": "query Viewer { viewer { login } }",
+      "response": {
+        "data": {
+          "viewer": {
+            "login": "Trum-ok"
+          }
+        }
+      }
     }
   ]
 }

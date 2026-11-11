@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cli/go-gh/v2/pkg/auth"
+
 	"github.com/Trum-ok/gh-dojo/internal/graph"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 )
@@ -42,7 +44,10 @@ func DefaultCacheDir() (string, error) {
 
 // Loader reads board schemas through a cache.
 type Loader struct {
-	Client graph.Doer
+	Client graph.Querier
+	// Host is the GitHub host, part of the cache key. Empty means gh's
+	// default host (GH_HOST or gh config).
+	Host string
 	// Dir is the cache directory. Empty means DefaultCacheDir(); if that
 	// fails too, the cache is off.
 	Dir string
@@ -53,7 +58,7 @@ type Loader struct {
 }
 
 // NewLoader returns a Loader with the default cache directory, TTL and clock.
-func NewLoader(c graph.Doer) *Loader { return &Loader{Client: c} }
+func NewLoader(c graph.Querier) *Loader { return &Loader{Client: c} }
 
 // Load returns the board schema from the cache if it is younger than the
 // TTL, else fetches it (one GraphQL request) and caches it.
@@ -75,7 +80,7 @@ func (l *Loader) Fetch(ctx context.Context, ref Ref) (*Schema, error) {
 		return nil, err
 	}
 	var resp schemaResponse
-	err := l.Client.Do(ctx, schemaQuery, map[string]any{"owner": ref.Owner, "number": ref.Number}, &resp)
+	err := l.Client.Query(ctx, schemaQuery, map[string]any{"owner": ref.Owner, "number": ref.Number}, &resp)
 	if err != nil {
 		if render.FromError(err).Code == render.ExitNotFound {
 			return nil, notFound(ref, err)
@@ -108,19 +113,25 @@ func (l *Loader) Invalidate(ref Ref) error {
 	return nil
 }
 
-// Resolve loads the schema and calls fn with it. If fn fails with an
-// unknown field, option or iteration (see IsUnknown) on a cached schema,
-// the board is re-read once and fn called again: the board may have changed
-// within the TTL. It returns the schema fn last saw.
+// Resolve loads the schema and calls fn with it. If fn fails in a way a
+// stale cache explains (IsStale: an unknown field, option or iteration, a
+// changed field type, or an ID GitHub rejected) and the schema came from
+// the cache, the cache is dropped, the board re-read and fn called once
+// more. It returns the schema fn last saw.
+//
+// fn may run a mutation, but then it must re-read whatever state it
+// depends on when called again: a rejected mutation may have been partly
+// applied.
 func (l *Loader) Resolve(ctx context.Context, ref Ref, fn func(*Schema) error) (*Schema, error) {
 	s, err := l.Load(ctx, ref)
 	if err != nil {
 		return nil, err
 	}
 	err = fn(s)
-	if err == nil || !s.Cached || !IsUnknown(err) {
+	if err == nil || !s.Cached || !IsStale(err) {
 		return s, err
 	}
+	_ = l.Invalidate(ref)
 	if s, err = l.Fetch(ctx, ref); err != nil {
 		return nil, err
 	}
@@ -161,8 +172,26 @@ func (l *Loader) path(ref Ref) (string, bool) {
 	if ref.Validate() != nil {
 		return "", false
 	}
-	name := fmt.Sprintf("board-%s-%d.json", strings.ToLower(ref.Owner), ref.Number)
+	host := l.Host
+	if host == "" {
+		host, _ = auth.DefaultHost()
+	}
+	name := fmt.Sprintf("board-%s-%s-%d.json", safeHost(host), strings.ToLower(ref.Owner), ref.Number)
 	return filepath.Join(dir, name), true
+}
+
+// safeHost makes a host name safe for a file name.
+func safeHost(host string) string {
+	host = strings.ToLower(host)
+	if host == "" {
+		return "github.com"
+	}
+	return strings.Map(func(r rune) rune {
+		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '.' || r == '-' {
+			return r
+		}
+		return '_'
+	}, host)
 }
 
 type cacheFile struct {
@@ -212,6 +241,7 @@ func (l *Loader) writeCache(ref Ref, s *Schema) {
 	if os.MkdirAll(dir, 0o700) != nil {
 		return
 	}
+	removeStaleTemps(dir, time.Now())
 	tmp, err := os.CreateTemp(dir, ".board-*.tmp")
 	if err != nil {
 		return
@@ -220,5 +250,18 @@ func (l *Loader) writeCache(ref Ref, s *Schema) {
 	cerr := tmp.Close()
 	if werr != nil || cerr != nil || os.Rename(tmp.Name(), path) != nil {
 		os.Remove(tmp.Name())
+	}
+}
+
+// staleTempAge is how old a leftover temp file (from a killed process) must
+// be before it is removed; younger ones may belong to a concurrent write.
+const staleTempAge = 10 * time.Minute
+
+func removeStaleTemps(dir string, now time.Time) {
+	temps, _ := filepath.Glob(filepath.Join(dir, ".board-*.tmp"))
+	for _, path := range temps {
+		if info, err := os.Stat(path); err == nil && now.Sub(info.ModTime()) > staleTempAge {
+			os.Remove(path)
+		}
 	}
 }

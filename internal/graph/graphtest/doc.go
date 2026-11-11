@@ -18,9 +18,11 @@
 //
 // The test fails on a request that no fixture answers and, at cleanup, on a
 // fixture interaction that was never requested. A fixture answers requests
-// with the same operation name and variables; repeats are answered in file
-// order, and the last match keeps answering (a single 502 answers every
-// retry). Give every query and mutation a name (query BoardSchema(...)).
+// with the same operation name, query and variables, once each, in file
+// order; mark an interaction "repeat": true to let it answer again (a 503
+// that answers every retry, a schema read before and after a cache
+// expiry). Name every operation and put it first in the document
+// (query BoardSchema(...) {...} fragment ...).
 //
 // # Fixture files
 //
@@ -34,6 +36,7 @@
 //	      "operation": "BoardSchema",
 //	      "query": "query BoardSchema(...) {...}",
 //	      "variables": {"owner": "Trum-ok", "number": 5},
+//	      "repeat": true,
 //	      "status": 502,
 //	      "headers": {"Retry-After": "1"},
 //	      "response": {"data": {...}}
@@ -41,10 +44,11 @@
 //	  ]
 //	}
 //
-// Only operation and response are required. Omitted variables match any
-// variables; omitted status means 200. A recorded "query" must match the
-// request's query (whitespace ignored), so editing a query without
-// re-recording fails loudly instead of replaying a stale shape.
+// operation, query and response are required. The query must match the
+// one the code sends (whitespace and commas ignored), so editing a query
+// without updating its fixtures fails loudly instead of replaying a stale
+// shape; hand-crafted fixtures copy the query too. Omitted variables match
+// any variables; omitted status means 200.
 //
 // # Recording
 //
@@ -54,7 +58,9 @@
 //
 // In record mode requests go to GitHub with gh's own token (or GH_TOKEN) and
 // the responses are written at cleanup, each to the first file that already
-// has the same operation, else to the last file passed to New. Only response
+// has the same operation, else to the last file passed to New. Identical
+// repeated answers are stored once with "repeat": true (never for
+// mutations), and a "repeat" already in the file is kept. Only response
 // bodies and the Retry-After / X-RateLimit-Remaining headers are stored;
 // request headers (and so the token) never are, and a file that would
 // contain the token is not written. Mutations are refused unless

@@ -1,0 +1,32 @@
+{
+  "comment": "Recorded: a node ID that no longer resolves (NOT_FOUND).",
+  "interactions": [
+    {
+      "operation": "Node",
+      "query": "query Node($id: ID!) { node(id: $id) { id } }",
+      "variables": {
+        "id": "PVTI_lAHOBFGd5c4BrMYFzhH6JM0x"
+      },
+      "response": {
+        "data": {
+          "node": null
+        },
+        "errors": [
+          {
+            "type": "NOT_FOUND",
+            "path": [
+              "node"
+            ],
+            "locations": [
+              {
+                "line": 1,
+                "column": 24
+              }
+            ],
+            "message": "Could not resolve to a node with the global id of 'PVTI_lAHOBFGd5c4BrMYFzhH6JM0x'"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,1 +1,1 @@
-error: GitHub API error (HTTP 502) during a write; it may have been applied, re-run the command to check
+error: GitHub write failed (HTTP 502); it may have been applied, re-run the command to check

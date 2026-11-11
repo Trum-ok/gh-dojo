@@ -1,0 +1,33 @@
+{
+  "comment": "Recorded: a query GitHub's schema validation rejects (undefinedField).",
+  "interactions": [
+    {
+      "operation": "Invalid",
+      "query": "query Invalid { viewer { foo } }",
+      "variables": {},
+      "response": {
+        "errors": [
+          {
+            "path": [
+              "query Invalid",
+              "viewer",
+              "foo"
+            ],
+            "extensions": {
+              "code": "undefinedField",
+              "typeName": "User",
+              "fieldName": "foo"
+            },
+            "locations": [
+              {
+                "line": 1,
+                "column": 26
+              }
+            ],
+            "message": "Field 'foo' doesn't exist on type 'User'"
+          }
+        ]
+      }
+    }
+  ]
+}

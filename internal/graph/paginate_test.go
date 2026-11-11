@@ -2,10 +2,12 @@ package graph_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/Trum-ok/gh-dojo/internal/graph"
 	"github.com/Trum-ok/gh-dojo/internal/graph/graphtest"
+	"github.com/Trum-ok/gh-dojo/internal/render"
 )
 
 // itemsQuery pages through the gh-dojo board 5 items at a time, so the
@@ -91,8 +93,8 @@ func TestPaginateLimitKeepsTotalCount(t *testing.T) {
 func TestPaginateMissingParent(t *testing.T) {
 	srv := graphtest.New(t, fixture("board_items_missing"))
 	page, err := graph.Paginate(context.Background(), srv.Client(), itemsQuery, boardVars, 0, items)
-	if err != nil {
-		t.Fatal(err)
+	if !errors.Is(err, graph.ErrParentNotFound) || render.FromError(err).Code != render.ExitNotFound {
+		t.Errorf("err = %v, want not found wrapping ErrParentNotFound", err)
 	}
 	if len(page.Nodes) != 0 || page.TotalCount != 0 {
 		t.Errorf("page = %+v, want empty", page)

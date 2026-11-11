@@ -1,14 +1,30 @@
 {
-  "comment": "Token without the project scope. GitHub answers 200 with an INSUFFICIENT_SCOPES error; message copied from a real response.",
+  "comment": "Token without the project scope reading board items. GitHub answers 200 with null data and an INSUFFICIENT_SCOPES error; message copied from a real response.",
   "handcrafted": true,
   "interactions": [
     {
-      "operation": "Viewer",
+      "operation": "BoardItems",
+      "query": "query BoardItems($owner: String!, $number: Int!, $cursor: String) {\n  user(login: $owner) {\n    projectV2(number: $number) {\n      items(first: 5, after: $cursor) {\n        totalCount\n        pageInfo { hasNextPage endCursor }\n        nodes { id type }\n      }\n    }\n  }\n}",
+      "variables": {
+        "cursor": null,
+        "number": 5,
+        "owner": "Trum-ok"
+      },
       "response": {
+        "data": {
+          "user": {
+            "projectV2": null
+          }
+        },
         "errors": [
           {
             "type": "INSUFFICIENT_SCOPES",
-            "locations": [{"line": 5, "column": 19}],
+            "locations": [
+              {
+                "line": 5,
+                "column": 19
+              }
+            ],
             "message": "Your token has not been granted the required scopes to execute this query. The 'projectV2' field requires one of the following scopes: ['read:project'], but your token has only been granted the: ['gist', 'read:org', 'repo'] scopes. Please modify your token's scopes at: https://github.com/settings/tokens."
           }
         ]

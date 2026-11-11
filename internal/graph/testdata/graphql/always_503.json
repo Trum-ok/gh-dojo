@@ -4,8 +4,12 @@
   "interactions": [
     {
       "operation": "Viewer",
+      "query": "query Viewer { viewer { login } }",
       "status": 503,
-      "response": {"message": "Service Unavailable"}
+      "response": {
+        "message": "Service Unavailable"
+      },
+      "repeat": true
     }
   ]
 }

@@ -39,6 +39,7 @@ func newLoader(t *testing.T, fixtures ...string) (*board.Loader, *graphtest.Serv
 	l := board.NewLoader(srv.Client())
 	l.Dir = t.TempDir()
 	l.Now = clk.Now
+	l.Host = "github.com"
 	return l, srv, clk
 }
 
@@ -169,7 +170,7 @@ func TestCacheMisses(t *testing.T) {
 			if _, err := l.Load(ctx, userBoard); err != nil {
 				t.Fatal(err)
 			}
-			spoil(t, filepath.Join(l.Dir, "board-trum-ok-5.json"), clk)
+			spoil(t, filepath.Join(l.Dir, cacheFile), clk)
 			s, err := l.Load(ctx, userBoard)
 			if err != nil || s.Cached || srv.Requests() != 2 {
 				t.Errorf("err %v, requests %d; want a re-fetch", err, srv.Requests())
@@ -178,15 +179,18 @@ func TestCacheMisses(t *testing.T) {
 	}
 }
 
+const cacheFile = "board-github.com-trum-ok-5.json"
+
 func TestCacheDirEnv(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv(board.CacheDirEnv, dir)
+	t.Setenv("GH_HOST", "github.com")
 	srv := graphtest.New(t, fixture("user_board"))
 	l := board.NewLoader(srv.Client())
 	if _, err := l.Load(context.Background(), userBoard); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "board-trum-ok-5.json")); err != nil {
+	if _, err := os.Stat(filepath.Join(dir, cacheFile)); err != nil {
 		t.Errorf("cache not written to %s: %v", board.CacheDirEnv, err)
 	}
 	entries, _ := os.ReadDir(dir)
@@ -202,7 +206,7 @@ func TestResolveRereadsStaleCacheOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The cached copy predates the "Waiting" status.
-	editCache(t, filepath.Join(l.Dir, "board-trum-ok-5.json"), func(m map[string]any) {
+	editCache(t, filepath.Join(l.Dir, cacheFile), func(m map[string]any) {
 		for _, f := range m["schema"].(map[string]any)["fields"].([]any) {
 			f := f.(map[string]any)
 			if f["name"] == "Status" {
@@ -262,7 +266,7 @@ func TestLookupErrors(t *testing.T) {
 	est, _ := s.Field("Estimate")
 	_, err = est.Option("1")
 	assertError(t, err, render.ExitUsage, "errors/wrong_field_type")
-	if !errors.Is(err, board.ErrFieldType) || board.IsUnknown(err) {
+	if !errors.Is(err, board.ErrFieldType) || !board.IsUnknown(err) || !board.IsStale(err) {
 		t.Errorf("err %v is not ErrFieldType", err)
 	}
 }
@@ -300,7 +304,7 @@ func TestMissingProjectScope(t *testing.T) {
 func TestInvalidRef(t *testing.T) {
 	l := board.NewLoader(nil)
 	l.Dir = t.TempDir()
-	for _, ref := range []board.Ref{{Owner: "", Number: 1}, {Owner: "../etc", Number: 1}, {Owner: "acme", Number: 0}} {
+	for _, ref := range []board.Ref{{Owner: "", Number: 1}, {Owner: "../etc", Number: 1}, {Owner: "acme", Number: 0}, {Owner: "a b", Number: 1}} {
 		_, err := l.Load(context.Background(), ref)
 		if render.FromError(err).Code != render.ExitUsage {
 			t.Errorf("Load(%+v) = %v, want a usage error", ref, err)
@@ -357,4 +361,86 @@ func editCache(t *testing.T, path string, edit func(map[string]any)) {
 	edit(m)
 	data, _ = json.Marshal(m)
 	writeFile(t, path, string(data))
+}
+
+func TestEMULogin(t *testing.T) {
+	if err := (board.Ref{Owner: "jdoe_acme", Number: 1}).Validate(); err != nil {
+		t.Errorf("EMU login rejected: %v", err)
+	}
+}
+
+func TestCacheKeyIncludesHost(t *testing.T) {
+	l, srv, _ := newLoader(t, fixture("user_board"))
+	ctx := context.Background()
+	if _, err := l.Load(ctx, userBoard); err != nil {
+		t.Fatal(err)
+	}
+	l.Host = "ghe.example.com"
+	if s, err := l.Load(ctx, userBoard); err != nil || s.Cached || srv.Requests() != 2 {
+		t.Errorf("other host: err %v, requests %d; want its own cache entry", err, srv.Requests())
+	}
+	for _, name := range []string{cacheFile, "board-ghe.example.com-trum-ok-5.json"} {
+		if _, err := os.Stat(filepath.Join(l.Dir, name)); err != nil {
+			t.Error(err)
+		}
+	}
+}
+
+func TestStaleTempFilesRemoved(t *testing.T) {
+	l, _, _ := newLoader(t, fixture("user_board"))
+	old := filepath.Join(l.Dir, ".board-123.tmp")
+	fresh := filepath.Join(l.Dir, ".board-456.tmp")
+	writeFile(t, old, "partial")
+	writeFile(t, fresh, "in progress")
+	past := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(old, past, past); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := l.Load(context.Background(), userBoard); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(old); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("old temp file kept: %v", err)
+	}
+	if _, err := os.Stat(fresh); err != nil {
+		t.Errorf("fresh temp file removed: %v", err)
+	}
+}
+
+const setStatus = `mutation SetStatus($project: ID!, $item: ID!, $field: ID!, $option: String!) {
+  updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field, value: {singleSelectOptionId: $option}}) {
+    projectV2Item { id }
+  }
+}`
+
+// TestResolveRetriesStaleIDOnce is the flow verbs use: resolve the option
+// from the cached schema, write; if GitHub rejects the cached ID, re-read
+// the board and write again.
+func TestResolveRetriesStaleIDOnce(t *testing.T) {
+	l, srv, _ := newLoader(t, fixture("user_board"), fixture("set_status_stale_then_ok"))
+	ctx := context.Background()
+	if _, err := l.Load(ctx, userBoard); err != nil {
+		t.Fatal(err)
+	}
+	writes := 0
+	_, err := l.Resolve(ctx, userBoard, func(s *board.Schema) error {
+		status, err := s.Field("Status")
+		if err != nil {
+			return err
+		}
+		opt, err := status.Option("In progress")
+		if err != nil {
+			return err
+		}
+		writes++
+		return srv.Client().Mutate(ctx, setStatus, map[string]any{
+			"project": s.ID, "item": "PVTI_lAHOBFGd5c4BrMYFzhH6JM0", "field": status.ID, "option": opt.ID,
+		}, nil)
+	})
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	if writes != 2 || srv.Requests() != 4 {
+		t.Errorf("writes = %d, requests = %d; want 2 writes, 4 requests (read, write, re-read, write)", writes, srv.Requests())
+	}
 }

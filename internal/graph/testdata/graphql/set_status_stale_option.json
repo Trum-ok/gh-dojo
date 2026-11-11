@@ -1,0 +1,20 @@
+{
+  "comment": "A status write with an option ID from a stale cache. Not recorded (it is a mutation); the message follows what GitHub reports for an option of another field, the exact wording is a best guess.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "SetStatus",
+      "query": "mutation SetStatus($project: ID!, $item: ID!, $field: ID!, $option: String!) {\n  updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field, value: {singleSelectOptionId: $option}}) {\n    projectV2Item { id }\n  }\n}",
+      "response": {
+        "data": {"updateProjectV2ItemFieldValue": null},
+        "errors": [
+          {
+            "path": ["updateProjectV2ItemFieldValue"],
+            "locations": [{"line": 2, "column": 3}],
+            "message": "The single select option Id does not belong to the field PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ"
+          }
+        ]
+      }
+    }
+  ]
+}

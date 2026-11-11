@@ -1,0 +1,12 @@
+{
+  "comment": "A proxy answers 200 with an HTML page instead of JSON.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "Viewer",
+      "query": "query Viewer { viewer { login } }",
+      "headers": {"Content-Type": "text/html"},
+      "response": "<html><body>Please sign in to the proxy</body></html>"
+    }
+  ]
+}

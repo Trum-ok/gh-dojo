@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Trum-ok/gh-dojo/internal/graph"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 )
 
@@ -22,7 +23,9 @@ type Ref struct {
 
 func (r Ref) String() string { return fmt.Sprintf("%s/%d", r.Owner, r.Number) }
 
-var loginRE = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$`)
+// loginRE accepts GitHub logins, including Enterprise Managed User logins
+// with an "_shortcode" suffix.
+var loginRE = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$`)
 
 // Validate reports a malformed ref as a usage error (exit code 1).
 func (r Ref) Validate() error {
@@ -133,11 +136,18 @@ var (
 	ErrFieldType        = errors.New("wrong field type")
 )
 
-// IsUnknown reports whether err is an unknown field, option or iteration:
-// the kind of error a stale cache causes.
+// IsUnknown reports whether a lookup failed on an unknown field, option or
+// iteration, or on a field whose type is not the expected one: the kind of
+// error a stale cached schema causes.
 func IsUnknown(err error) bool {
-	return errors.Is(err, ErrUnknownField) || errors.Is(err, ErrUnknownOption) || errors.Is(err, ErrUnknownIteration)
+	return errors.Is(err, ErrUnknownField) || errors.Is(err, ErrUnknownOption) ||
+		errors.Is(err, ErrUnknownIteration) || errors.Is(err, ErrFieldType)
 }
+
+// IsStale reports whether err may come from an out-of-date cached schema:
+// a failed lookup (IsUnknown) or an ID GitHub rejected (graph.IsStaleID).
+// Invalidate the cache, re-read and try once more; Resolve does that.
+func IsStale(err error) bool { return IsUnknown(err) || graph.IsStaleID(err) }
 
 // Field returns the field with exactly this name. Built-in fields (Title,
 // Labels, ...) are found too, but the error lists only writable ones.

@@ -4,13 +4,28 @@
   "interactions": [
     {
       "operation": "BoardSchema",
-      "variables": {"owner": "Trum-ok", "number": 5},
+      "query": "query BoardSchema($owner: String!, $number: Int!) {\n  repositoryOwner(login: $owner) {\n    __typename\n    login\n    ... on User { projectV2(number: $number) { ...board } }\n    ... on Organization { projectV2(number: $number) { ...board } }\n  }\n}\n\nfragment board on ProjectV2 {\n  id\n  title\n  url\n  closed\n  fields(first: 100) {\n    nodes {\n      ... on ProjectV2FieldCommon { id name dataType }\n      ... on ProjectV2SingleSelectField { options { id name } }\n      ... on ProjectV2IterationField {\n        configuration {\n          iterations { id title startDate duration }\n          completedIterations { id title startDate duration }\n        }\n      }\n    }\n  }\n}",
+      "variables": {
+        "owner": "Trum-ok",
+        "number": 5
+      },
       "response": {
-        "data": {"repositoryOwner": {"__typename": "User", "login": "Trum-ok", "projectV2": null}},
+        "data": {
+          "repositoryOwner": {
+            "__typename": "User",
+            "login": "Trum-ok",
+            "projectV2": null
+          }
+        },
         "errors": [
           {
             "type": "INSUFFICIENT_SCOPES",
-            "locations": [{"line": 5, "column": 19}],
+            "locations": [
+              {
+                "line": 5,
+                "column": 19
+              }
+            ],
             "message": "Your token has not been granted the required scopes to execute this query. The 'projectV2' field requires one of the following scopes: ['read:project'], but your token has only been granted the: ['gist', 'read:org', 'repo'] scopes. Please modify your token's scopes at: https://github.com/settings/tokens."
           }
         ]

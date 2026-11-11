@@ -1,0 +1,14 @@
+{
+  "comment": "503 with Retry-After: 8 every time; the total retry wait cap stops after one pause.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "Viewer",
+      "query": "query Viewer { viewer { login } }",
+      "repeat": true,
+      "status": 503,
+      "headers": {"Retry-After": "8"},
+      "response": {"message": "Service Unavailable"}
+    }
+  ]
+}

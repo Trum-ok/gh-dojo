@@ -1,0 +1,12 @@
+{
+  "comment": "A status write answered with an empty 200 body: the outcome is unknown.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "SetStatus",
+      "query": "mutation SetStatus($project: ID!, $item: ID!, $field: ID!, $option: String!) {\n  updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field, value: {singleSelectOptionId: $option}}) {\n    projectV2Item { id }\n  }\n}",
+      "headers": {"Content-Type": "text/plain"},
+      "response": ""
+    }
+  ]
+}

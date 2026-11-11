@@ -1,0 +1,21 @@
+{
+  "comment": "A status write for a project item that was deleted. NOT_FOUND shape copied from a recorded node query (node_not_found.json).",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "SetStatus",
+      "query": "mutation SetStatus($project: ID!, $item: ID!, $field: ID!, $option: String!) {\n  updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field, value: {singleSelectOptionId: $option}}) {\n    projectV2Item { id }\n  }\n}",
+      "response": {
+        "data": {"updateProjectV2ItemFieldValue": null},
+        "errors": [
+          {
+            "type": "NOT_FOUND",
+            "path": ["updateProjectV2ItemFieldValue"],
+            "locations": [{"line": 2, "column": 3}],
+            "message": "Could not resolve to a node with the global id of 'PVTI_lAHOBFGd5c4BrMYFzhH6JM0x'"
+          }
+        ]
+      }
+    }
+  ]
+}

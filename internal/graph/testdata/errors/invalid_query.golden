@@ -1,0 +1,2 @@
+error: internal error (not your arguments): GitHub rejected gh-dojo's GraphQL query
+fix: re-run the command; if it repeats, report it to the user

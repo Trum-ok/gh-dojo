@@ -4,9 +4,13 @@
   "interactions": [
     {
       "operation": "Viewer",
+      "query": "query Viewer { viewer { login } }",
       "response": {
         "errors": [
-          {"type": "RATE_LIMITED", "message": "API rate limit exceeded for user ID 72457701."}
+          {
+            "type": "RATE_LIMITED",
+            "message": "API rate limit exceeded for user ID 72457701."
+          }
         ]
       }
     }

@@ -8,6 +8,7 @@
         "number": 5,
         "owner": "Trum-ok"
       },
+      "repeat": true,
       "response": {
         "data": {
           "repositoryOwner": {

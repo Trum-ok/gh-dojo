@@ -2,8 +2,15 @@ package graph
 
 import (
 	"context"
+	"errors"
 	"maps"
+
+	"github.com/Trum-ok/gh-dojo/internal/render"
 )
+
+// ErrParentNotFound is wrapped by the error Paginate returns when the
+// connection's parent is missing (e.g. "user": null).
+var ErrParentNotFound = errors.New("connection parent not found")
 
 // PageInfo is the pageInfo object of a GraphQL connection.
 type PageInfo struct {
@@ -38,22 +45,27 @@ func (p Page[T]) Truncated() bool { return len(p.Nodes) < p.TotalCount }
 //
 // The query must declare "$cursor: String" and pass it as "after: $cursor";
 // Paginate sets vars["cursor"] (vars itself is not modified). R is the type
-// of the response data and conn picks the connection out of it; return nil
-// when the connection's parent is missing (e.g. "node": null) to stop.
+// of the response data and conn picks the connection out of it, returning
+// nil when the connection's parent is missing: Paginate then fails with a
+// not-found error (exit code 3) wrapping ErrParentNotFound, along with the
+// nodes collected so far.
 //
 // limit > 0 stops once that many nodes are collected (one page may overshoot,
 // the extra nodes are dropped); limit <= 0 collects everything. TotalCount
 // comes from the server, so Page tells how much was left out.
 //
 //	type resp struct {
-//		Node struct {
+//		Node *struct {
 //			Items graph.Connection[item] `json:"items"`
 //		} `json:"node"`
 //	}
 //	page, err := graph.Paginate(ctx, c, q, vars, 200, func(r *resp) *graph.Connection[item] {
+//		if r.Node == nil {
+//			return nil
+//		}
 //		return &r.Node.Items
 //	})
-func Paginate[R, T any](ctx context.Context, d Doer, query string, vars map[string]any, limit int, conn func(*R) *Connection[T]) (Page[T], error) {
+func Paginate[R, T any](ctx context.Context, q Querier, query string, vars map[string]any, limit int, conn func(*R) *Connection[T]) (Page[T], error) {
 	var page Page[T]
 	v := maps.Clone(vars)
 	if v == nil {
@@ -62,12 +74,12 @@ func Paginate[R, T any](ctx context.Context, d Doer, query string, vars map[stri
 	v["cursor"] = nil
 	for {
 		var r R
-		if err := d.Do(ctx, query, v, &r); err != nil {
+		if err := q.Query(ctx, query, v, &r); err != nil {
 			return page, err
 		}
 		c := conn(&r)
 		if c == nil {
-			return page, nil
+			return page, render.NotFound("GitHub API: not found").WithCause(ErrParentNotFound)
 		}
 		page.TotalCount = c.TotalCount
 		page.Nodes = append(page.Nodes, c.Nodes...)

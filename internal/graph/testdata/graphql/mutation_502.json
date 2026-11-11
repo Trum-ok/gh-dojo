@@ -4,9 +4,15 @@
   "interactions": [
     {
       "operation": "AddComment",
-      "variables": {"subject": "I_kwDOexample", "body": "hello"},
+      "query": "mutation AddComment($subject: ID!, $body: String!) {\n  addComment(input: {subjectId: $subject, body: $body}) { clientMutationId }\n}",
+      "variables": {
+        "subject": "I_kwDOexample",
+        "body": "hello"
+      },
       "status": 502,
-      "response": {"message": "Server Error"}
+      "response": {
+        "message": "Server Error"
+      }
     }
   ]
 }

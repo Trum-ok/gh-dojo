@@ -4,7 +4,12 @@
   "interactions": [
     {
       "operation": "BoardItems",
-      "response": {"data": {"user": null}}
+      "query": "query BoardItems($owner: String!, $number: Int!, $cursor: String) {\n  user(login: $owner) {\n    projectV2(number: $number) {\n      items(first: 5, after: $cursor) {\n        totalCount\n        pageInfo { hasNextPage endCursor }\n        nodes { id type }\n      }\n    }\n  }\n}",
+      "response": {
+        "data": {
+          "user": null
+        }
+      }
     }
   ]
 }

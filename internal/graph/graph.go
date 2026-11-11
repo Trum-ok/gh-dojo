@@ -2,8 +2,11 @@ package graph
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -20,19 +23,27 @@ const (
 	// MaxAttempts is how many times a query is sent before giving up on
 	// 5xx responses and secondary rate limits. Mutations are sent once.
 	MaxAttempts = 3
+	// MaxRetryWait caps the total pause between query retries: an agent
+	// would rather get exit code 4 than wait a minute.
+	MaxRetryWait = 10 * time.Second
 
 	baseDelay      = time.Second
-	maxRetryAfter  = 60 * time.Second
 	defaultTimeout = 30 * time.Second
 )
 
 // LoginFix is the fix command when gh has no token at all.
 const LoginFix = "gh auth login -s project"
 
-// Doer runs one GraphQL operation. *Client implements it; packages that only
-// read or write through GraphQL should accept a Doer.
+// Querier runs read-only GraphQL queries.
+type Querier interface {
+	Query(ctx context.Context, query string, vars map[string]any, out any) error
+}
+
+// Doer runs GraphQL queries and mutations. *Client implements it; packages
+// should accept the narrowest interface they need.
 type Doer interface {
-	Do(ctx context.Context, query string, vars map[string]any, out any) error
+	Querier
+	Mutate(ctx context.Context, mutation string, vars map[string]any, out any) error
 }
 
 // Options configure a Client. The zero value talks to the gh default host
@@ -45,7 +56,7 @@ type Options struct {
 	// Transport overrides the HTTP transport. Tests set a graphtest server.
 	Transport http.RoundTripper
 	// Sleep waits between retries. Default: a timer that honours ctx.
-	// Tests set a no-op so retries are instant.
+	// Tests set one that returns at once.
 	Sleep func(ctx context.Context, d time.Duration) error
 	// Timeout limits each HTTP request. Default: 30s.
 	Timeout time.Duration
@@ -58,14 +69,15 @@ type Client struct {
 	opts     Options
 	requests atomic.Int64
 
-	once  sync.Once
-	gql   *api.GraphQLClient
-	token string
-	err   error
+	once        sync.Once
+	gql         *api.GraphQLClient
+	token       string
+	tokenSource string // env var name, "oauth_token", "gh" or "" (Options.AuthToken)
+	err         error
 }
 
 // New returns a Client. It never touches the network or gh config; auth
-// problems surface from the first Do as exit-code-4 errors.
+// problems surface from the first request as exit-code-4 errors.
 func New(opts Options) *Client {
 	if opts.Sleep == nil {
 		opts.Sleep = sleep
@@ -87,7 +99,7 @@ func (c *Client) init() {
 	}
 	token := c.opts.AuthToken
 	if token == "" {
-		token, _ = auth.TokenForHost(host)
+		token, c.tokenSource = auth.TokenForHost(host)
 	}
 	if token == "" {
 		c.err = render.Network("not logged in to GitHub (%s)", host).WithFix(LoginFix)
@@ -101,32 +113,46 @@ func (c *Client) init() {
 		Timeout:   c.opts.Timeout,
 	})
 	if err != nil {
-		c.err = render.Usage("GitHub client: %s", c.scrub(err.Error()))
+		c.err = render.Internal("GitHub client setup failed").WithCause(err)
 		return
 	}
 	c.gql = gql
 }
 
-// Do sends one GraphQL operation and decodes its "data" into out (a pointer
-// to a struct with json tags, or nil).
-//
-// The operation kind is read from the query text. Queries are retried on 5xx
-// responses and secondary rate limits with exponential backoff, at most
-// MaxAttempts sends in total. Mutations are never retried: after a failed
-// mutation the caller must re-read state before deciding to send it again.
+// Query sends a GraphQL query and decodes its "data" into out (a pointer to
+// a struct with json tags, or nil). It is retried on 5xx responses and
+// secondary rate limits with exponential backoff (honouring Retry-After), at
+// most MaxAttempts sends and MaxRetryWait of pauses in total.
 //
 // Every error is a *render.Error with the right exit code and a short
-// message; the original error is kept as its Cause, so errors.As(err,
-// new(*api.GraphQLError)) still works. On a GraphQL error out may hold
-// partial data. Use named operations (query BoardSchema(...)): the name keys
-// the recorded test fixtures.
-func (c *Client) Do(ctx context.Context, query string, vars map[string]any, out any) error {
+// message that never contains raw GraphQL text, node IDs, the endpoint or
+// the token. The original error is its Cause, so errors.As(err,
+// new(*api.GraphQLError)) and IsStaleID still work. On a GraphQL error out
+// may hold partial data.
+//
+// Name every operation and put it first in the document
+// (query BoardSchema(...) {...} fragment ...): graphtest keys fixtures by it.
+func (c *Client) Query(ctx context.Context, query string, vars map[string]any, out any) error {
+	return c.do(ctx, query, vars, out, false)
+}
+
+// Mutate sends a GraphQL mutation once; it is never retried. When the
+// outcome is unknown (5xx, timeout, dropped connection, garbled response)
+// the error says the write may have been applied: the caller must re-read
+// state before deciding to send it again.
+func (c *Client) Mutate(ctx context.Context, mutation string, vars map[string]any, out any) error {
+	return c.do(ctx, mutation, vars, out, true)
+}
+
+func (c *Client) do(ctx context.Context, query string, vars map[string]any, out any, mutation bool) error {
 	c.once.Do(c.init)
 	if c.err != nil {
 		return c.err
 	}
-	kind, _ := ParseOperation(query)
-	mutation := kind == "mutation"
+	if err := ctx.Err(); err != nil {
+		return c.mapError(err, false) // nothing sent yet
+	}
+	var waited time.Duration
 	for attempt := 1; ; attempt++ {
 		c.requests.Add(1)
 		err := c.gql.DoWithContext(ctx, query, vars, out)
@@ -134,37 +160,33 @@ func (c *Client) Do(ctx context.Context, query string, vars map[string]any, out 
 			return nil
 		}
 		delay, retry := retryDelay(err, attempt)
-		if !retry || mutation || attempt >= MaxAttempts {
+		if mutation || !retry || attempt >= MaxAttempts || waited+delay > MaxRetryWait {
 			return c.mapError(err, mutation)
 		}
 		if serr := c.opts.Sleep(ctx, delay); serr != nil {
-			return c.mapError(err, mutation)
+			return c.mapError(serr, false) // canceled during backoff
 		}
+		waited += delay
 	}
 }
 
-// retryDelay says whether a failed attempt (1-based) may be retried and
-// after which pause.
+// retryDelay says whether a failed query attempt (1-based) may be retried
+// and after which pause.
 func retryDelay(err error, attempt int) (time.Duration, bool) {
 	var httpErr *api.HTTPError
-	if !errors.As(err, &httpErr) {
+	if !errors.As(err, &httpErr) || httpErr == nil {
 		return 0, false
 	}
-	backoff := baseDelay << (attempt - 1)
-	switch {
-	case httpErr.StatusCode >= 500:
-		return backoff, true
-	case isSecondaryRateLimit(httpErr):
-		if s := httpErr.Headers.Get("Retry-After"); s != "" {
-			secs, perr := strconv.Atoi(strings.TrimSpace(s))
-			if perr != nil || secs < 0 || time.Duration(secs)*time.Second > maxRetryAfter {
-				return 0, false
-			}
-			return max(time.Duration(secs)*time.Second, backoff), true
-		}
-		return backoff, true
+	if httpErr.StatusCode < 500 && !isSecondaryRateLimit(httpErr) {
+		return 0, false
 	}
-	return 0, false
+	delay := baseDelay << (attempt - 1)
+	if s := httpErr.Headers.Get("Retry-After"); s != "" {
+		if secs, perr := strconv.Atoi(strings.TrimSpace(s)); perr == nil && secs >= 0 {
+			delay = max(delay, time.Duration(secs)*time.Second)
+		}
+	}
+	return delay, true
 }
 
 func isSecondaryRateLimit(e *api.HTTPError) bool {
@@ -178,15 +200,13 @@ func isSecondaryRateLimit(e *api.HTTPError) bool {
 		strings.Contains(strings.ToLower(e.Message), "secondary rate limit")
 }
 
-func isPrimaryRateLimit(e *api.HTTPError) bool {
-	return (e.StatusCode == http.StatusForbidden || e.StatusCode == http.StatusTooManyRequests) &&
-		e.Headers.Get("X-RateLimit-Remaining") == "0"
-}
-
-// mapError turns a go-gh or transport error into a short *render.Error.
-// Raw GraphQL JSON and the token never reach the message.
+// mapError turns a go-gh or transport error into a short *render.Error,
+// starting from render's mapping and tightening it for GraphQL.
 func (c *Client) mapError(err error, mutation bool) error {
 	e := c.describe(err, mutation)
+	if e.Fix == render.AuthFix {
+		e.Fix = c.authFix()
+	}
 	e.What = c.scrub(e.What)
 	e.Fix = c.scrub(e.Fix)
 	return e.WithCause(err)
@@ -195,32 +215,137 @@ func (c *Client) mapError(err error, mutation bool) error {
 func (c *Client) describe(err error, mutation bool) *render.Error {
 	var httpErr *api.HTTPError
 	var gqlErr *api.GraphQLError
+	var syntaxErr *json.SyntaxError
+	var typeErr *json.UnmarshalTypeError
 	switch {
-	case errors.As(err, &httpErr):
+	case errors.As(err, &httpErr) && httpErr != nil:
 		switch s := httpErr.StatusCode; {
 		case s == http.StatusUnauthorized:
 			return render.Network("GitHub rejected the token (HTTP 401)").WithFix(render.AuthFix)
-		case isPrimaryRateLimit(httpErr):
-			return render.Network("GitHub API rate limit exceeded; retry later")
-		case isSecondaryRateLimit(httpErr):
-			return render.Network("GitHub secondary rate limit hit; retry in a minute")
 		case s >= 500 && mutation:
-			return render.Network("GitHub API error (HTTP %d) during a write; it may have been applied, re-run the command to check", s)
-		case s >= 500:
-			return render.Network("GitHub API unavailable (HTTP %d); retry later", s)
+			return mayHaveApplied("HTTP " + strconv.Itoa(s))
 		}
-	case errors.As(err, &gqlErr) && len(gqlErr.Errors) > 0:
-		item := gqlErr.Errors[0]
-		switch item.Type {
-		case "INSUFFICIENT_SCOPES":
-			return render.Network("GitHub token is missing a required scope%s", scopesHint(item.Message)).WithFix(render.AuthFix)
-		case "RATE_LIMITED":
-			return render.Network("GitHub API rate limit exceeded; retry later")
+		return render.FromError(httpErr)
+	case errors.As(err, &gqlErr) && gqlErr != nil:
+		return describeGraphQL(gqlErr)
+	case errors.As(err, &typeErr):
+		return render.Internal("unexpected shape of a GitHub API response")
+	case errors.As(err, &syntaxErr): // includes an empty or HTML 200 body
+		if mutation {
+			return mayHaveApplied("garbled response")
 		}
+		return render.Network("GitHub API returned an invalid response; retry later")
 	case errors.Is(err, context.Canceled):
-		return render.Network("request canceled")
+		if mutation {
+			return mayHaveApplied("interrupted")
+		}
+		return render.FromError(context.Canceled)
 	}
-	return render.FromError(err)
+	reason := transportReason(err)
+	if mutation {
+		return mayHaveApplied(reason)
+	}
+	return render.Network("cannot reach GitHub (%s); retry later", reason)
+}
+
+// describeGraphQL maps GraphQL errors without printing their messages, which
+// carry queries, field names and node IDs.
+func describeGraphQL(err *api.GraphQLError) *render.Error {
+	for _, item := range err.Errors {
+		if item.Type == "" && item.Extensions["code"] != nil {
+			// Schema validation ("Field 'x' doesn't exist", "Variable $y is
+			// declared but not used"): gh-dojo sent a bad query.
+			return render.Internal("GitHub rejected gh-dojo's GraphQL query")
+		}
+	}
+	has := func(t string) (api.GraphQLErrorItem, bool) {
+		for _, item := range err.Errors {
+			if item.Type == t {
+				return item, true
+			}
+		}
+		return api.GraphQLErrorItem{}, false
+	}
+	if _, ok := has("RATE_LIMITED"); ok {
+		return render.FromError(err)
+	}
+	if item, ok := has("INSUFFICIENT_SCOPES"); ok {
+		return render.Network("GitHub token is missing a required scope%s", scopesHint(item.Message)).WithFix(render.AuthFix)
+	}
+	if _, ok := has("FORBIDDEN"); ok {
+		return render.Network("GitHub denied access; the token may lack the project scope or access to the owner").WithFix(render.AuthFix)
+	}
+	if _, ok := has("NOT_FOUND"); ok {
+		return render.NotFound("GitHub API: not found")
+	}
+	return render.New(render.ExitUsage, "GitHub API rejected the request")
+}
+
+func mayHaveApplied(reason string) *render.Error {
+	return render.Network("GitHub write failed (%s); it may have been applied, re-run the command to check", reason)
+}
+
+// transportReason describes a failed round trip without the request URL.
+func transportReason(err error) string {
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() || errors.Is(err, context.DeadlineExceeded) {
+		return "timeout"
+	}
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) && urlErr.Err != nil {
+		err = urlErr.Err
+	}
+	msg := strings.TrimSpace(err.Error())
+	if i := strings.IndexByte(msg, '\n'); i >= 0 {
+		msg = msg[:i]
+	}
+	if msg == "" || strings.Contains(msg, "://") {
+		return "connection failed"
+	}
+	return msg
+}
+
+// authFix is the fix for a token GitHub rejects or that lacks a scope.
+// gh auth refresh can't change a token set in the environment.
+func (c *Client) authFix() string {
+	switch c.tokenSource {
+	case "GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN":
+		return "set " + c.tokenSource + " to a token with the project scope"
+	}
+	return render.AuthFix
+}
+
+// IsStaleID reports whether GitHub rejected an ID gh-dojo sent: a node ID
+// that no longer resolves, or an option or iteration ID that does not
+// belong to the field. Cached board schemas cause these; callers should
+// drop the cache, re-read and try once more.
+func IsStaleID(err error) bool {
+	var gqlErr *api.GraphQLError
+	if !errors.As(err, &gqlErr) || gqlErr == nil {
+		return false
+	}
+	for _, item := range gqlErr.Errors {
+		msg := strings.ToLower(item.Message)
+		switch {
+		case item.Type == "NOT_FOUND" && strings.Contains(msg, "global id"):
+			return true
+		case strings.Contains(msg, "does not belong to"):
+			return true
+		case containsAny(msg, "optionid", "option id", "iterationid", "iteration id", "fieldid", "field id") &&
+			containsAny(msg, "invalid", "not found", "does not exist", "doesn't exist", "could not resolve"):
+			return true
+		}
+	}
+	return false
+}
+
+func containsAny(s string, subs ...string) bool {
+	for _, sub := range subs {
+		if strings.Contains(s, sub) {
+			return true
+		}
+	}
+	return false
 }
 
 // scopesHint extracts "['read:project']" from GitHub's INSUFFICIENT_SCOPES
@@ -237,11 +362,18 @@ func scopesHint(msg string) string {
 	if j < 0 {
 		return ""
 	}
-	scopes := strings.NewReplacer("'", "", `"`, "", " ", "").Replace(rest[:j])
-	if scopes == "" {
+	var scopes []string
+	for s := range strings.SplitSeq(rest[:j], ",") {
+		s = strings.Trim(strings.TrimSpace(s), `'"`)
+		if s == "" || strings.ContainsAny(s, " \t") || len(s) > 40 {
+			return ""
+		}
+		scopes = append(scopes, s)
+	}
+	if len(scopes) == 0 {
 		return ""
 	}
-	return " (" + strings.ReplaceAll(scopes, ",", " or ") + ")"
+	return " (" + strings.Join(scopes, " or ") + ")"
 }
 
 func (c *Client) scrub(s string) string {
@@ -260,84 +392,4 @@ func sleep(ctx context.Context, d time.Duration) error {
 	case <-t.C:
 		return nil
 	}
-}
-
-// ParseOperation returns the kind ("query", "mutation" or "subscription")
-// and the name of the first operation in a GraphQL document. A shorthand
-// query ("{ viewer { login } }") has kind "query" and an empty name.
-// Fragment definitions before the operation are skipped.
-func ParseOperation(doc string) (kind, name string) {
-	depth := 0
-	for s := skipIgnored(doc); s != ""; s = skipIgnored(s) {
-		switch c := s[0]; {
-		case c == '{':
-			if depth == 0 {
-				return "query", "" // shorthand query
-			}
-			depth++
-			s = s[1:]
-		case c == '}':
-			depth--
-			s = s[1:]
-		case c == '"':
-			s = skipString(s)
-		case depth == 0 && isNameStart(c):
-			word := leadingName(s)
-			s = s[len(word):]
-			switch word {
-			case "query", "mutation", "subscription":
-				return word, leadingName(skipIgnored(s))
-			case "fragment": // skip "name on Type @directives" up to the body
-				i := strings.IndexByte(s, '{')
-				if i < 0 {
-					return "query", ""
-				}
-				s, depth = s[i+1:], 1
-			}
-		default:
-			s = s[1:]
-		}
-	}
-	return "query", ""
-}
-
-func isNameStart(c byte) bool { return c == '_' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' }
-
-func skipString(s string) string {
-	for i := 1; i < len(s); i++ {
-		switch s[i] {
-		case '\\':
-			i++
-		case '"':
-			return s[i+1:]
-		}
-	}
-	return ""
-}
-
-func skipIgnored(s string) string {
-	for s != "" {
-		switch s[0] {
-		case ' ', '\t', '\n', '\r', ',':
-			s = s[1:]
-		case '#':
-			if i := strings.IndexByte(s, '\n'); i >= 0 {
-				s = s[i+1:]
-			} else {
-				s = ""
-			}
-		default:
-			return s
-		}
-	}
-	return s
-}
-
-func leadingName(s string) string {
-	for i, r := range s {
-		if !(r == '_' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || i > 0 && r >= '0' && r <= '9') {
-			return s[:i]
-		}
-	}
-	return s
 }
