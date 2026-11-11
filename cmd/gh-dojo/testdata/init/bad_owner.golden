@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: invalid board owner "../etc": want a GitHub user or organization login
+fix: gh dojo init --help

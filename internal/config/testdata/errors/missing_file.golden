@@ -1,2 +1,2 @@
 error: no .github/dojo.toml in this directory or its parents up to the repository root
-fix: create .github/dojo.toml in the repository root, example: https://github.com/Trum-ok/gh-dojo#configuration
+fix: gh dojo init

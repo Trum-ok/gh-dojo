@@ -181,7 +181,7 @@ func Find(dir string) (string, error) {
 		parent := filepath.Dir(abs)
 		if parent == abs || isRepoRoot(abs) {
 			return "", render.Usage("no %s in this directory or its parents up to the repository root", FileName).
-				WithFix(fmt.Sprintf("create %s in the repository root, example: %s", FileName, DocsURL)).
+				WithFix("gh dojo init").
 				WithCause(ErrNoConfig)
 		}
 		abs = parent

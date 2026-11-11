@@ -1,0 +1,13 @@
+# gh-dojo: the board and the process verbs of this repository.
+# Format and keys: https://github.com/Trum-ok/gh-dojo#configuration
+# Preset kanban brings the verbs, statuses and fields; override any of
+# them below, e.g. [verbs.start] when = "..." in your project's language.
+# gh dojo --help shows the verbs this file gives.
+
+version = 1
+preset = "kanban"
+
+[board]
+owner = "Trum-ok"
+project = 5  # gh-dojo
+repos = ["Trum-ok/gh-dojo"]  # the first one is the default repository

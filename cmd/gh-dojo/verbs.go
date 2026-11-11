@@ -398,7 +398,7 @@ func configNote() string {
 		return ""
 	}
 	if errors.Is(err, config.ErrNoConfig) {
-		return fmt.Sprintf("\n\nNo process verbs: no %s found (create one: see %s).", config.FileName, config.DocsURL)
+		return fmt.Sprintf("\n\nNo process verbs: no %s found (create one: gh dojo init; format: %s).", config.FileName, config.DocsURL)
 	}
 	text := strings.ReplaceAll(render.FromError(err).Text(), "\n", "\n  ")
 	return "\n\nNo process verbs: " + config.FileName + " could not be loaded:\n  " + text

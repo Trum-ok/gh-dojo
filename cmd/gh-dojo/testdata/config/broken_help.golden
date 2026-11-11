@@ -14,6 +14,7 @@ Usage:
 Available Commands:
   comment     Comment on an issue without changing its status
   help        Help about any command
+  init        Write .github/dojo.toml for a board and check it against the board
   list        See what is on the board: one line per open issue, grouped by status
   new         Create an issue with labels, on the board, in the initial status
   show        Read issues before working on them: board status, blockers, history, description, comments

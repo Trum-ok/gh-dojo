@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: not in a git repository: .github/dojo.toml goes to the repository root
+fix: cd into the repository's working copy and run gh dojo init again

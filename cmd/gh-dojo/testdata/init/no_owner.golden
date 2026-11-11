@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: --owner is required: the current repository is unknown: no git remote
+fix: gh dojo init --owner <login>

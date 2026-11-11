@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: .github/dojo.toml already exists; init does not overwrite it
+fix: gh dojo init --owner Trum-ok --project 5 --force

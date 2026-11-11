@@ -1,0 +1,5 @@
+code: 3
+--- stdout
+--- stderr
+error: board Trum-ok/99 not found
+fix: gh dojo init --owner Trum-ok

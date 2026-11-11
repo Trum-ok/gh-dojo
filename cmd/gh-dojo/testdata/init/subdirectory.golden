@@ -1,0 +1,4 @@
+code: 0
+--- stdout
+wrote ../../.github/dojo.toml for board Trum-ok/5 "gh-dojo" with preset kanban, repo Trum-ok/gh-dojo, matches the board
+--- stderr

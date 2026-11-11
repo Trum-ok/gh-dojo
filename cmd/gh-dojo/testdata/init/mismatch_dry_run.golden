@@ -1,0 +1,30 @@
+code: 1
+--- stdout
+# gh-dojo: the board and the process verbs of this repository.
+# Format and keys: https://github.com/Trum-ok/gh-dojo#configuration
+# Preset kanban brings the verbs, statuses and fields; override any of
+# them below, e.g. [verbs.start] when = "..." in your project's language.
+# gh dojo --help shows the verbs this file gives.
+
+version = 1
+preset = "kanban"
+
+[board]
+owner = "github"
+project = 4247  # GitHub Public Roadmap
+# repos = ["owner/name"]  # unset: the current repository (GH_REPO, else the git remote)
+--- stderr
+dry run, not written: .github/dojo.toml for board github/4247 "GitHub Public Roadmap" with preset kanban, no repos (the current repository is used)
+problem: board github/4247 has no status "Backlog", used by statuses.initial, verbs.start.from
+  fix: add "Backlog" to field "Status" on the board (https://github.com/orgs/github/projects/4247), or override in .github/dojo.toml: [statuses] initial = "…"; [verbs.start] from = […]
+problem: board github/4247 has no status "Done", used by statuses.final, statuses.resolved, verbs.done.to
+  fix: add "Done" to field "Status" on the board (https://github.com/orgs/github/projects/4247), or override in .github/dojo.toml: [statuses] final = […]; [statuses] resolved = […]; [verbs.done] to = "…"
+problem: board github/4247 has no status "Ready", used by statuses.resolved, verbs.start.from, verbs.ready.to, verbs.done.from
+  fix: add "Ready" to field "Status" on the board (https://github.com/orgs/github/projects/4247), or override in .github/dojo.toml: [statuses] resolved = […]; [verbs.start] from = […]; [verbs.ready] to = "…"; [verbs.done] from = […]
+problem: board github/4247 has no status "In progress", used by verbs.start.to, verbs.wait.from, verbs.ready.from, verbs.done.from
+  fix: add "In progress" to field "Status" on the board (https://github.com/orgs/github/projects/4247), or override in .github/dojo.toml: [verbs.start] to = "…"; [verbs.wait] from = […]; [verbs.ready] from = […]; [verbs.done] from = […]
+problem: board github/4247 has no status "Waiting", used by verbs.start.from, verbs.wait.to, verbs.ready.from
+  fix: add "Waiting" to field "Status" on the board (https://github.com/orgs/github/projects/4247), or override in .github/dojo.toml: [verbs.start] from = […]; [verbs.wait] to = "…"; [verbs.ready] from = […]
+error: .github/dojo.toml would not match board github/4247: 5 problems above
+allowed: Up Next, Exploring, Shipped, Paused
+fix: gh dojo init --owner github --project 4247

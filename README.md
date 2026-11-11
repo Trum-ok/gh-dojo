@@ -80,7 +80,14 @@ also be authorized for it.
 
 1. Make sure the board's status field has the [kanban preset](#kanban-preset)
    statuses: Backlog, In progress, Waiting, Ready, Done.
-2. Create `.github/dojo.toml` in the repository root:
+2. Create `.github/dojo.toml` in the repository root with [`init`](#init):
+
+   ```sh
+   gh dojo init                          # lists the owner's projects
+   gh dojo init --owner acme --project 3 # writes the config, checks the board
+   ```
+
+   or by hand:
 
    ```toml
    preset = "kanban"
@@ -187,6 +194,33 @@ Text starting with `-` goes after `--`: `gh dojo comment 42 -- "-1, still broken
 When the issue's last comment is yours with the same text, it is not posted
 again.
 
+### init
+
+```sh
+gh dojo init [--owner LOGIN] [--project N] [--preset kanban] [--repo OWNER/NAME] [--force] [--dry-run]
+```
+
+Writes `.github/dojo.toml` at the repository root, without questions.
+Without `--project` it lists the owner's projects (a user or an
+organization; `--owner` defaults to the current repository's owner), one
+line each, and exits with code 1 and the command to run:
+
+```console
+$ gh dojo init --owner acme
+1  Roadmap  (12 items, closed)
+3  Shop  (48 items)
+error: choose a project: --project is required (organization acme has 2 projects, listed above)
+fix: gh dojo init --owner acme --project 3
+```
+
+With `--project` it writes the board (`owner`, `project`, and `repos` set
+to `--repo` or the current repository) and the preset, nothing the preset
+already provides, then checks the file against the board. Each status the
+board lacks is listed with its fix: add the status on the board, or override
+the keys that name it, e.g. `[verbs.wait] to = "…"`. The file is kept, and
+the exit code is 1 until the board and the file match. An existing config is
+not overwritten without `--force`; `--dry-run` prints the file instead.
+
 ### Process verbs
 
 ```sh
@@ -257,8 +291,9 @@ resumes the issue it created.
 
 gh-dojo reads `.github/dojo.toml`, looking in the current directory and then
 in each parent up to the repository root (the first directory with `.git`).
-There is no `gh dojo init` yet: create the file by hand. Unknown keys are
-errors, and every error names the file and the key.
+[`gh dojo init`](#init) writes one for a board; this section documents
+every key. Unknown keys are errors, and every error names the file and the
+key.
 
 A full example:
 

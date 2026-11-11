@@ -1,0 +1,20 @@
+code: 1
+--- stdout
+ 4247  GitHub Public Roadmap  (648 items)
+ 9557  GitHub Actions VS Code Extension  (218 items)
+12106  Coding Standards Public Development Board  (576 items)
+12731  GitHub OSPO OSS Board  (11 items)
+16162  MLH Fellowship Spring '23 (classic)  (16 items)
+16712  GHAS + Issue Tracking Integration Development  (15 items)
+16737  Precise ASTs  (14 items)
+17079  PR Creation  (0 items)
+17318  Feature work planning  (0 items)
+17411  Maintainer workflow  (0 items)
+18315  Campus Experts + GitHub Docs program  (64 items)
+18394  Polish tasks  (0 items)
+18966  BUGS  (0 items)
+19351  PR list view/issue list view.  (0 items)
+20381  gh-skyline  (120 items)
+--- stderr
+error: choose a project: --project is required (organization github has 15 projects, listed above)
+fix: gh dojo init --owner github --project <number> --repo github/roadmap

@@ -1,0 +1,10 @@
+code: 1
+--- stdout
+1  @Trum-ok's untitled project  (0 items, closed)
+2  Emote  (0 items, closed)
+3  @Trum-ok's untitled project  (0 items, closed)
+4  IT Stupino Fall 2026 Kanban  (0 items)
+5  gh-dojo  (36 items)
+--- stderr
+error: choose a project: --project is required (user Trum-ok has 5 projects, listed above)
+fix: gh dojo init --owner Trum-ok --project 5

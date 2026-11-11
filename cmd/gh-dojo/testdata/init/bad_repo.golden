@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: invalid repository "gh-dojo": want owner/name
+fix: gh dojo init --help

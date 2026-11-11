@@ -1,0 +1,9 @@
+code: 1
+--- stdout
+wrote .github/dojo.toml for board Trum-ok/5 "gh-dojo" with preset kanban, repo Trum-ok/gh-dojo
+--- stderr
+problem: board Trum-ok/5 has no field "Status" (fields.status)
+  fix: add a single-select field "Status" on the board (https://github.com/users/Trum-ok/projects/5), or set [fields] status = "…" in .github/dojo.toml
+error: .github/dojo.toml does not match board Trum-ok/5: 1 problem above; the file is kept, fix the board or the file
+allowed: Stage, Priority, Size
+fix: gh dojo list

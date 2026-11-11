@@ -1,0 +1,17 @@
+code: 1
+--- stdout
+wrote .github/dojo.toml for board github/4247 "GitHub Public Roadmap" with preset kanban, repo acme/shop
+--- stderr
+problem: board github/4247 has no status "Backlog", used by statuses.initial, verbs.start.from
+  fix: add "Backlog" to field "Status" on the board (https://github.com/orgs/github/projects/4247), or override in .github/dojo.toml: [statuses] initial = "…"; [verbs.start] from = […]
+problem: board github/4247 has no status "Done", used by statuses.final, statuses.resolved, verbs.done.to
+  fix: add "Done" to field "Status" on the board (https://github.com/orgs/github/projects/4247), or override in .github/dojo.toml: [statuses] final = […]; [statuses] resolved = […]; [verbs.done] to = "…"
+problem: board github/4247 has no status "Ready", used by statuses.resolved, verbs.start.from, verbs.ready.to, verbs.done.from
+  fix: add "Ready" to field "Status" on the board (https://github.com/orgs/github/projects/4247), or override in .github/dojo.toml: [statuses] resolved = […]; [verbs.start] from = […]; [verbs.ready] to = "…"; [verbs.done] from = […]
+problem: board github/4247 has no status "In progress", used by verbs.start.to, verbs.wait.from, verbs.ready.from, verbs.done.from
+  fix: add "In progress" to field "Status" on the board (https://github.com/orgs/github/projects/4247), or override in .github/dojo.toml: [verbs.start] to = "…"; [verbs.wait] from = […]; [verbs.ready] from = […]; [verbs.done] from = […]
+problem: board github/4247 has no status "Waiting", used by verbs.start.from, verbs.wait.to, verbs.ready.from
+  fix: add "Waiting" to field "Status" on the board (https://github.com/orgs/github/projects/4247), or override in .github/dojo.toml: [verbs.start] from = […]; [verbs.wait] to = "…"; [verbs.ready] from = […]
+error: .github/dojo.toml does not match board github/4247: 5 problems above; the file is kept, fix the board or the file
+allowed: Up Next, Exploring, Shipped, Paused
+fix: gh dojo list

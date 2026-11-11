@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: unknown command "5" for "gh dojo init"
+fix: gh dojo init --help

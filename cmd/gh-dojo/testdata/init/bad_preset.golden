@@ -1,0 +1,6 @@
+code: 1
+--- stdout
+--- stderr
+error: unknown preset "scrum"
+allowed: kanban
+fix: gh dojo init --help
