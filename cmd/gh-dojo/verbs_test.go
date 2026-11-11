@@ -94,12 +94,12 @@ func (f *fakeBackend) ReadIssue(_ context.Context, n int) (workflow.Issue, error
 	return is, nil
 }
 
-func (f *fakeBackend) Apply(_ context.Context, p *workflow.Plan) error {
+func (f *fakeBackend) Apply(_ context.Context, p *workflow.Plan) ([]workflow.Op, error) {
 	if f.applyErr != nil {
-		return f.applyErr
+		return nil, f.applyErr
 	}
 	f.applied = append(f.applied, p)
-	return nil
+	return p.Ops, nil
 }
 
 func (f *fakeBackend) Reset() error { return nil }

@@ -45,7 +45,8 @@ type Op interface {
 // need the project item.
 type AddToBoard struct{}
 
-// Unarchive restores the issue's archived board item. It comes first, like
+// Unarchive restores the issue's archived board item when a verb moves it
+// to a status that is not final (see Engine.Plan). It comes first, like
 // AddToBoard, which it replaces for an issue already on the board.
 type Unarchive struct{}
 

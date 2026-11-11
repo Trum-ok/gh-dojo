@@ -219,10 +219,16 @@ func TestPlan(t *testing.T) {
 		{name: "ready_empty_template", verb: "ready", issue: onBoard("In progress"), hasOps: 1},
 		{name: "ready_repeat_nothing_to_do", verb: "ready", issue: onBoard("Ready"), noOps: true},
 		{name: "ping_no_changes", verb: "ping", issue: onBoard("Backlog"), noOps: true},
-		// An archived item is unarchived by any verb, even one with nothing else to do.
+		// An archived item is unarchived only by a move to a status that is not final.
 		{name: "start_archived", verb: "start", hasOps: 3,
 			issue: Issue{Number: 42, OnBoard: true, Archived: true, Status: "Backlog"}},
-		{name: "ready_repeat_archived", verb: "ready", hasOps: 1,
+		{name: "ready_repeat_archived", verb: "ready", noOps: true,
+			issue: Issue{Number: 42, OnBoard: true, Archived: true, Status: "Ready"}},
+		{name: "start_repeat_archived_comment", verb: "start", hasOps: 1,
+			issue: Issue{Number: 42, OnBoard: true, Archived: true, Status: "In progress"}},
+		{name: "done_archived", verb: "done", hasOps: 1,
+			issue: Issue{Number: 42, OnBoard: true, Archived: true, Status: "Ready"}},
+		{name: "note_archived", verb: "note", hasOps: 1, args: Args{Comment: "hi", HasComment: true},
 			issue: Issue{Number: 42, OnBoard: true, Archived: true, Status: "Ready"}},
 		{name: "start_archived_not_on_board", verb: "start", hasOps: 3,
 			issue: Issue{Number: 42, Archived: true}},

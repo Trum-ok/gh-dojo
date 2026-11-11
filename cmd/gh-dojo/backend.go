@@ -4,9 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"strings"
-
-	"github.com/cli/go-gh/v2/pkg/api"
 
 	"github.com/Trum-ok/gh-dojo/internal/effects"
 	"github.com/Trum-ok/gh-dojo/internal/issue"
@@ -21,7 +18,8 @@ import (
 // mutation, or two for an issue not on the board whose status is set (see
 // effects.Batches).
 type githubBackend struct {
-	app *App
+	app   *App
+	added map[int]string // issue number → board item added in this run
 }
 
 func (b *githubBackend) ReadIssue(ctx context.Context, n int) (workflow.Issue, error) {
@@ -63,46 +61,67 @@ func statusUnknown(c *issue.Card) error {
 
 func (b *githubBackend) Reset() error { return b.app.ResetSchema() }
 
-// Apply sends the plan's ops as effects.Batches, one mutation each. It
-// stops at the first failed mutation: when nothing took effect yet that
-// error is returned as is; otherwise a render.Partial error says what was
-// done and what was not (see partial). Either way the cause stays
-// reachable, so board.IsStale sees a rejected schema ID.
-func (b *githubBackend) Apply(ctx context.Context, p *workflow.Plan) error {
+// Apply sends the plan's ops as effects.Batches, one mutation each, and
+// returns the ops GitHub confirmed. It stops at the first mutation that
+// left an op unconfirmed. A mutation that answered for every field but
+// also carried errors counts as done; its error is returned at the end if
+// nothing else failed, for runVerb to warn about. Errors keep their cause,
+// so board.IsStale sees a rejected schema ID.
+func (b *githubBackend) Apply(ctx context.Context, p *workflow.Plan) ([]workflow.Op, error) {
 	card, ok := p.Issue.Ref.(*issue.Card)
 	if !ok || card == nil {
-		return render.Internal("the plan of #%d has no issue card to apply it to", p.Issue.Number)
+		return nil, render.Internal("the plan of #%d has no issue card to apply it to", p.Issue.Number)
 	}
 	ids, err := b.ids(ctx, p, card)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	var done []workflow.Op
-	batches := effects.Batches(p.Ops)
-	for i, batch := range batches {
+	var (
+		done    []workflow.Op
+		ignored error // an error next to a result for every field
+	)
+	for _, batch := range effects.Batches(p.Ops) {
 		m, err := effects.Build(batch, ids)
-		if err != nil {
-			return render.Internal("cannot build the mutation for #%d", p.Issue.Number).WithCause(err)
+		switch {
+		case err != nil && len(done) == 0:
+			return nil, render.Internal("cannot build the mutation for #%d", p.Issue.Number).WithCause(err)
+		case err != nil:
+			// An earlier mutation answered without an ID this one needs,
+			// such as the new board item.
+			return done, render.Network("GitHub's answer lacked an ID the next write needs").
+				WithCause(errors.Join(errNotSent, err))
 		}
 		var data map[string]json.RawMessage
 		err = b.app.Client.Mutate(ctx, m.Query, m.Vars, &data)
 		ok, missed := m.Outcome(data)
 		done = append(done, ok...)
-		ids.Item = m.ItemID(data, ids.Item)
-		if err == nil && len(missed) > 0 {
-			err = render.Network("GitHub returned no result for part of the write")
+		if item := m.ItemID(data, ""); item != "" {
+			ids.Item = item
+			b.remember(card.Number, item)
 		}
-		if err == nil && i+1 < len(batches) && ids.Item == "" {
-			err = render.Network("GitHub did not return the board item of #%d", p.Issue.Number)
-		}
-		if err != nil {
-			for _, rest := range batches[i+1:] {
-				missed = append(missed, rest...)
-			}
-			return partial(p, done, missed, err)
+		switch {
+		case len(missed) == 0 && err != nil:
+			ignored = err
+		case len(missed) > 0 && err == nil:
+			return done, render.Network("GitHub returned no result for part of the write")
+		case err != nil:
+			return done, err
 		}
 	}
-	return nil
+	return done, ignored
+}
+
+// errNotSent marks an Apply error after which the remaining ops were never
+// sent, so they are known not to have happened.
+var errNotSent = errors.New("not sent")
+
+// remember keeps the board item this run added for issue n: a re-read
+// right after the write may not show it yet.
+func (b *githubBackend) remember(n int, item string) {
+	if b.added == nil {
+		b.added = map[int]string{}
+	}
+	b.added[n] = item
 }
 
 // ids collects the node IDs the plan's ops need: the issue's from its card,
@@ -113,6 +132,9 @@ func (b *githubBackend) ids(ctx context.Context, p *workflow.Plan, card *issue.C
 		return effects.IDs{}, err
 	}
 	ids := effects.IDs{Project: s.ID, Issue: card.ID, Item: card.ItemID()}
+	if ids.Item == "" {
+		ids.Item = b.added[card.Number]
+	}
 	for _, op := range p.Ops {
 		set, ok := op.(workflow.SetStatus)
 		if !ok {
@@ -133,38 +155,4 @@ func (b *githubBackend) ids(ctx context.Context, p *workflow.Plan, card *issue.C
 		ids.StatusField, ids.StatusOption = field.ID, opt.ID
 	}
 	return ids, nil
-}
-
-// partial reports a write that failed with err after done took effect and
-// missed did not. With nothing done, err itself is the answer. Otherwise it
-// is exit code 5, re-run the same command: the re-run re-reads the issue,
-// so its plan leaves out what is done.
-//
-//	#42 added to the board; status not changed, comment not posted: GitHub API rejected the request; re-run the same command
-//
-// When GitHub answered with per-field errors the missed ops are known not
-// to have happened; when the answer was lost (timeout, 5xx) they are only
-// unconfirmed.
-func partial(p *workflow.Plan, done, missed []workflow.Op, err error) error {
-	if len(done) == 0 {
-		return err
-	}
-	e := render.FromError(err)
-	reason, _, _ := strings.Cut(strings.TrimSpace(strings.SplitN(e.What, "\n", 2)[0]), ";")
-	shown := *p
-	shown.Ops = done
-	head := shown.Confirm()
-
-	var what string
-	if gqlErr := (*api.GraphQLError)(nil); errors.As(err, &gqlErr) {
-		words := make([]string, len(missed))
-		for i, op := range missed {
-			words[i] = effects.Missed(op)
-		}
-		what = strings.Join(words, ", ")
-	} else {
-		what = "the rest is unconfirmed"
-	}
-	return render.Partial("%s; %s: %s; re-run the same command", head, what, reason).
-		WithFix(e.Fix).WithCause(err)
 }

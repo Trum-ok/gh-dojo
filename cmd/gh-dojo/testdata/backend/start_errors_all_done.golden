@@ -1,0 +1,5 @@
+code: 0
+--- stdout
+#3 Ready → In progress, comment left
+--- stderr
+warning: GitHub reported an error after applying every change: GitHub API rejected the request

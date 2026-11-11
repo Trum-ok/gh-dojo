@@ -1,0 +1,4 @@
+dry run: note #42
+  comment: "hi"
+confirm: #42 comment left
+post: "hi\n\n<!-- gh-dojo:note:99e47bfd -->"

@@ -4,15 +4,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
+	"reflect"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
 
+	"github.com/cli/go-gh/v2/pkg/api"
+
 	"github.com/Trum-ok/gh-dojo/internal/board"
 	"github.com/Trum-ok/gh-dojo/internal/config"
+	"github.com/Trum-ok/gh-dojo/internal/effects"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/Trum-ok/gh-dojo/internal/workflow"
 	"github.com/spf13/cobra"
@@ -63,7 +68,8 @@ var getenv = os.Getenv
 // run ReadIssue → Plan → Apply again, never to replay the old plan: the
 // fresh plan leaves out what is already done, including a comment already
 // posted (see workflow.AlreadyPosted). runVerb does that once on a stale
-// schema ID; after a partial failure the agent re-runs the command.
+// schema ID, also dropping what Apply confirmed in case the re-read lags
+// behind it; after a partial failure the agent re-runs the command.
 type Backend interface {
 	// ReadIssue returns the state of issue n in the default repo, filled as
 	// workflow.Issue documents (comments with viewerDidAuthor), with a
@@ -72,10 +78,12 @@ type Backend interface {
 	// remote of the current directory.
 	ReadIssue(ctx context.Context, n int) (workflow.Issue, error)
 	// Apply applies every op of a non-empty plan, finding the issue's node
-	// IDs in p.Issue.Ref. On success the command prints p.Confirm(); a
-	// partial failure is a render.Partial error that says what was done.
-	// Errors keep their cause, so board.IsStale tells a rejected schema ID.
-	Apply(ctx context.Context, p *workflow.Plan) error
+	// IDs in p.Issue.Ref. It returns the ops GitHub confirmed, also with an
+	// error: the rest of p.Ops did not take effect, or their outcome is
+	// unknown. An error with every op confirmed is only worth a warning.
+	// runVerb reports a partial write (exit code 5); errors keep their
+	// cause, so board.IsStale tells a rejected schema ID.
+	Apply(ctx context.Context, p *workflow.Plan) ([]workflow.Op, error)
 	// Reset drops the cached board schema after GitHub rejected one of its
 	// IDs, so the next ReadIssue and Apply use a fresh one.
 	Reset() error
@@ -151,29 +159,126 @@ func runVerb(cmd *cobra.Command, cfg *config.Config, v config.Verb, n int, args 
 		fmt.Fprintln(cmd.OutOrStdout(), plan.DryRun())
 		return nil
 	}
-	if err := apply(ctx, be, plan); err != nil {
+	run := &verbRun{first: plan, stderr: cmd.ErrOrStderr()}
+	if err := run.apply(ctx, be, plan); err != nil {
 		if !board.IsStale(err) {
-			return err
+			return run.partial(missing(plan.Ops, run.done), err, err)
 		}
 		// A board ID from the schema cache went stale, and part of the plan
 		// may have been applied. Drop the cache, re-read, re-plan and apply
 		// what is left, once. A transport failure is never retried here:
 		// its outcome is unknown and the agent re-runs the command.
 		if rerr := be.Reset(); rerr != nil {
-			return err
+			return run.partial(missing(plan.Ops, run.done), err, err)
 		}
 		fresh, perr := readPlan(ctx, be, engine, v, n, args)
 		if perr != nil {
-			return perr
+			return run.partial(missing(plan.Ops, run.done), err, perr)
 		}
-		if err := apply(ctx, be, fresh); err != nil {
-			return err
+		// What the first attempt confirmed is not sent again, even if the
+		// re-read does not show it yet.
+		fresh.Ops = missing(fresh.Ops, run.done)
+		run.fresh = fresh
+		if err := run.apply(ctx, be, fresh); err != nil {
+			return run.partial(missing(fresh.Ops, run.done), err, err)
 		}
 	}
-	// The first plan's line even after a retry: it starts from the state
-	// this command found, and the retry only finished it.
-	fmt.Fprintln(cmd.OutOrStdout(), plan.Confirm())
+	fmt.Fprintln(cmd.OutOrStdout(), run.applied().Confirm())
 	return nil
+}
+
+// verbRun is what one verb command applied, across a stale-ID retry.
+type verbRun struct {
+	first  *workflow.Plan // planned from the state the command found
+	fresh  *workflow.Plan // the re-plan of a retry; nil without one
+	done   []workflow.Op  // ops GitHub confirmed, from both attempts
+	stderr io.Writer
+}
+
+// apply applies p and records what GitHub confirmed. An error with every
+// op of p confirmed is a warning.
+func (r *verbRun) apply(ctx context.Context, be Backend, p *workflow.Plan) error {
+	if p.Empty() {
+		return nil
+	}
+	done, err := be.Apply(ctx, p)
+	r.done = append(r.done, done...)
+	if err != nil && len(missing(p.Ops, done)) == 0 {
+		render.Warn(r.stderr, "GitHub reported an error after applying every change: %s", reason(err))
+		return nil
+	}
+	return err
+}
+
+// applied is the plan of what this command did, for the confirmation
+// line: the first plan's starting state with the confirmed ops. After a
+// retry, a status or comment the re-read found in place counts as such.
+func (r *verbRun) applied() *workflow.Plan {
+	shown := *r.first
+	shown.Ops = r.done
+	if r.fresh != nil {
+		shown.StatusUnchanged = r.first.StatusUnchanged ||
+			r.fresh.StatusUnchanged && !hasKind(r.done, workflow.SetStatus{})
+		shown.CommentPresent = r.first.CommentPresent ||
+			r.fresh.CommentPresent && !hasKind(r.done, workflow.AddComment{})
+	}
+	return &shown
+}
+
+// partial reports a failed write. With nothing confirmed, err itself is
+// the answer. Otherwise it is exit code 5, naming what was done and what
+// was not:
+//
+//	#42 comment left; status not changed: GitHub token is missing a required scope (project); gh auth refresh -s project, then re-run the same command
+//
+// The re-run re-reads the issue, so its plan leaves out what is done. cause
+// is the error of the write that left missed undone: per-field GraphQL
+// errors or ops never sent (errNotSent) mean they did not happen, a lost
+// answer (timeout, 5xx) that they are unconfirmed. err is what stopped the command, and gives the reason.
+func (r *verbRun) partial(missed []workflow.Op, cause, err error) error {
+	if len(r.done) == 0 {
+		return err
+	}
+	var gqlErr *api.GraphQLError
+	what := "the rest is unconfirmed"
+	if (errors.As(cause, &gqlErr) || errors.Is(cause, errNotSent)) && len(missed) > 0 {
+		words := make([]string, len(missed))
+		for i, op := range missed {
+			words[i] = effects.Missed(op)
+		}
+		what = strings.Join(words, ", ")
+	}
+	e := render.FromError(err)
+	next := "re-run the same command"
+	if fix := strings.TrimSpace(e.Fix); fix != "" {
+		next = fix + ", then " + next
+	}
+	return render.Partial("%s; %s: %s; %s", r.applied().Confirm(), what, reason(err), next).
+		WithFix(e.Fix).WithCause(err)
+}
+
+// reason is the first clause of an error's message, for a partial report.
+func reason(err error) string {
+	what, _, _ := strings.Cut(render.FromError(err).What, "\n")
+	what, _, _ = strings.Cut(what, ";")
+	return strings.TrimSpace(what)
+}
+
+// missing returns the ops whose kind is not among done.
+func missing(ops, done []workflow.Op) []workflow.Op {
+	var out []workflow.Op
+	for _, op := range ops {
+		if !hasKind(done, op) {
+			out = append(out, op)
+		}
+	}
+	return out
+}
+
+// hasKind reports whether ops has an op of the same kind as op (a plan has
+// at most one of each).
+func hasKind(ops []workflow.Op, op workflow.Op) bool {
+	return slices.ContainsFunc(ops, func(o workflow.Op) bool { return reflect.TypeOf(o) == reflect.TypeOf(op) })
 }
 
 // readPlan reads issue n and plans verb v on it.
@@ -183,14 +288,6 @@ func readPlan(ctx context.Context, be Backend, e *workflow.Engine, v config.Verb
 		return nil, err
 	}
 	return e.Plan(v, is, args)
-}
-
-// apply applies a plan with something to do.
-func apply(ctx context.Context, be Backend, p *workflow.Plan) error {
-	if p.Empty() {
-		return nil
-	}
-	return be.Apply(ctx, p)
 }
 
 var issueRE = regexp.MustCompile(`^#?[1-9][0-9]*$`)

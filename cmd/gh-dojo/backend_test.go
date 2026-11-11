@@ -161,3 +161,44 @@ func TestVerbBoardMismatch(t *testing.T) {
 	}
 	testutil.Golden(t, "backend/board_mismatch", out)
 }
+
+// Regressions from the review of #12: a stale-ID retry keeps what the first
+// attempt did, never repeats a confirmed write, and reports what was
+// actually applied.
+func TestVerbStaleRetry(t *testing.T) {
+	for _, tt := range []struct {
+		fixture  string
+		code     render.Code
+		requests int
+	}{
+		// Status stale twice: exit 5, and the comment of the first attempt is named.
+		{"start_stale_twice", render.ExitPartial, 5},
+		// The re-read fails (502, retried 3 times): exit 5 with the comment named.
+		{"start_stale_reread_fails", render.ExitPartial, 6},
+		// The re-read lags behind the comment just posted: it is not posted again.
+		{"start_stale_lag", render.ExitOK, 5},
+		// The re-read lags behind the item just added: the status goes on that item.
+		{"start_stale_lag_board", render.ExitOK, 6},
+		// Someone else moved the issue meanwhile: the line says what this command did.
+		{"start_stale_moved", render.ExitOK, 4},
+	} {
+		t.Run(tt.fixture, func(t *testing.T) {
+			srv, before := withWarmVerbApp(t, verbFixture(tt.fixture))
+			checkRuns(t, srv, before, runs{[]string{"start", "3"}, tt.code, tt.requests, tt.fixture})
+		})
+	}
+}
+
+// TestVerbErrorsAllDone: GraphQL errors next to a result for every field
+// are a warning, not a failure.
+func TestVerbErrorsAllDone(t *testing.T) {
+	srv, before := withWarmVerbApp(t, verbFixture("start_errors_all_done"))
+	checkRuns(t, srv, before, runs{[]string{"start", "3"}, render.ExitOK, 2, "start_errors_all_done"})
+}
+
+// TestVerbBoardNoItem: the issue was added but the second mutation cannot
+// be built without the item ID: exit 5 naming the addition.
+func TestVerbBoardNoItem(t *testing.T) {
+	srv, before := withWarmVerbApp(t, verbFixture("start_board_no_item"))
+	checkRuns(t, srv, before, runs{[]string{"start", "3"}, render.ExitPartial, 2, "start_board_no_item"})
+}

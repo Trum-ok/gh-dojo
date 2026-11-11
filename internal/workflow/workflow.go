@@ -223,10 +223,12 @@ func join(items []string, conj string) string {
 //  4. otherwise the current status must be in from (exit code 2). An issue
 //     not on the board or without a status counts as Engine.Initial.
 //
-// The plan adds the issue to the board when it is not there (or unarchives
-// its item when archived: a verb means the issue is live), sets the
+// The plan adds the issue to the board when it is not there, sets the
 // target status, and posts the rendered comment unless it renders empty or
-// the same comment is already the verb's latest (see AlreadyPosted).
+// the same comment is already the verb's latest (see AlreadyPosted). An
+// archived item is unarchived only when the verb moves it to a status that
+// is not final: the issue is live again. A repeat that changes nothing, a
+// comment alone, or a move to a final status leaves it archived.
 func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 	if err := CheckArgs(v, is.Number, a); err != nil {
 		return nil, err
@@ -246,10 +248,11 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 			return nil, err
 		}
 	}
+	moves := v.To != "" && !atTarget
 	switch {
 	case !is.OnBoard:
 		p.Ops = append(p.Ops, AddToBoard{})
-	case is.Archived:
+	case is.Archived && moves && !slices.Contains(e.Final, v.To):
 		p.Ops = append(p.Ops, Unarchive{})
 	}
 	if v.To != "" {
