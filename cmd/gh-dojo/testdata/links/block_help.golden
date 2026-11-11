@@ -1,0 +1,23 @@
+code: 0
+--- stdout
+Mark issue N blocked by the issues --by names, without changing its status.
+
+--by takes 12, "#12" or owner/repo#12; repeat it, or separate numbers with
+commas. A link already there is not an error: the line says "already". An
+issue that does not exist fails before anything is written (exit code 3).
+
+A blocker stops blocking once it is closed or in a resolved status
+(statuses.resolved); a verb with blockers = "warn" or "deny" checks that,
+and gh dojo show lists the unresolved blockers first.
+
+Usage:
+  gh dojo block <N> --by <M>... [flags]
+
+Examples:
+  gh dojo block 42 --by 17
+  gh dojo block 42 --by 17,18 --by acme/api#7
+
+Flags:
+      --by issue   the blocking issue: 12, "#12" or owner/repo#12; repeatable, or comma-separated
+  -h, --help       help for block
+--- stderr

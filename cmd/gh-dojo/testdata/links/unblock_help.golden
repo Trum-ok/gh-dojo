@@ -1,0 +1,19 @@
+code: 0
+--- stdout
+Remove the blocked-by links between issue N and the issues --by names,
+without changing its status.
+
+--by takes 12, "#12" or owner/repo#12; repeat it, or separate numbers with
+commas. A link already gone is not an error: the line says "already". An
+issue that does not exist fails before anything is written (exit code 3).
+
+Usage:
+  gh dojo unblock <N> --by <M>... [flags]
+
+Examples:
+  gh dojo unblock 42 --by 17
+
+Flags:
+      --by issue   the blocking issue: 12, "#12" or owner/repo#12; repeatable, or comma-separated
+  -h, --help       help for unblock
+--- stderr

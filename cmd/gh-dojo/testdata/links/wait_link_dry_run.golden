@@ -1,0 +1,7 @@
+code: 0
+--- stdout
+dry run: wait #3 "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)"
+  status: In progress → Waiting
+  blocked by: #2 already linked
+  comment: "Waiting for #2."
+--- stderr

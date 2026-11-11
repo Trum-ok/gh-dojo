@@ -1,0 +1,5 @@
+code: 3
+--- stdout
+--- stderr
+error: --by #9999, Trum-ok/no-such-repo#1: no such issue, or the token cannot see it
+fix: gh dojo list

@@ -1,5 +1,7 @@
 package issue
 
+import "encoding/json"
+
 // cardQuery reads a whole card in one request (principle 6). Windows:
 // labels 20 (100 with Lookup.AllLabels), assignees 10, blockers 20 each way (each with its first 10
 // project items), project items 20 (each with up to 100 field values), the
@@ -113,8 +115,27 @@ fragment field on ProjectV2FieldCommon { id name dataType }`
 const historyWindow = 20
 
 type cardResponse struct {
-	Repository *repoJSON `json:"repository"`
-	Viewer     *User     `json:"viewer"` // read for Lookup.Viewer only
+	Repository *repoJSON
+	Viewer     *User // read for Lookup.Viewer only
+	// data is the whole "data" object, for the links of a Lookup.
+	data map[string]json.RawMessage
+}
+
+func (r *cardResponse) UnmarshalJSON(b []byte) error {
+	if err := json.Unmarshal(b, &r.data); err != nil {
+		return err
+	}
+	if raw, ok := r.data["repository"]; ok {
+		if err := json.Unmarshal(raw, &r.Repository); err != nil {
+			return err
+		}
+	}
+	if raw, ok := r.data["viewer"]; ok {
+		if err := json.Unmarshal(raw, &r.Viewer); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type login struct {

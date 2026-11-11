@@ -13,12 +13,14 @@ verb start
   from: ["Backlog" "Waiting" "Ready"]
   require: [] require_one_of: []
   comment: "Сессия: {session}"
+  blockers: "warn"
 verb wait
   when: работа встала: ждём задачу или внешнее решение
   to: "Waiting"
   from: ["In progress"]
   require: [] require_one_of: ["by" "comment"]
   comment: "Waiting for {by}.\n\n{comment}"
+  blockers: "link"
 verb ready
   when: сделано, проверено, закоммичено
   to: "Ready"

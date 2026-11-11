@@ -32,6 +32,7 @@ when = "Work is stuck: waiting for another issue or an outside decision"
 to = "Waiting"
 from = ["In progress"]
 require_one_of = ["by", "comment"]
+blockers = "link"              # --by 12 also marks the issue blocked by #12
 comment = """
 Waiting for {by}.
 

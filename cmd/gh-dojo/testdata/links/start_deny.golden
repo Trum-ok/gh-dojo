@@ -1,0 +1,5 @@
+code: 2
+--- stdout
+--- stderr
+error: start cannot move #3 while it has unresolved blockers: #2 (status not read), #1 (In progress), 1 not read (counted as unresolved)
+this is a process rule: ask the user how to proceed

@@ -19,6 +19,7 @@ verb wait
   from: ["In progress"]
   require: [] require_one_of: ["by" "comment"]
   comment: "Waiting for {by}.\n\n{comment}"
+  blockers: "link"
 verb ready
   when: The work is done, verified and committed, but not released yet
   to: "Ready"

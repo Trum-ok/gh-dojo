@@ -1,0 +1,5 @@
+dry run: wait #42
+  status: Waiting (unchanged)
+  blocked by: #12 already linked
+  comment: already present, not posted again
+confirm: #42 Waiting (unchanged), already blocked by #12, comment already present

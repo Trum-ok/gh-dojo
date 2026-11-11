@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.ready.blockers = "link" takes the blocking issue from --by, but verbs.ready.comment (from preset kanban) does not use {by}
+fix: add {by} to verbs.ready.comment (from preset kanban), e.g. "Waiting for {by}."

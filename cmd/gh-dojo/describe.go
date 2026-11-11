@@ -84,6 +84,15 @@ var (
 			}
 			return ""
 		},
+		func(_ *config.Config, v config.Verb) string {
+			switch v.Blockers {
+			case config.BlockersWarn:
+				return "warns about unresolved blockers"
+			case config.BlockersDeny:
+				return "refused while a blocker is unresolved"
+			}
+			return ""
+		},
 	}
 	verbEffects = []func(cfg *config.Config, v config.Verb) string{
 		func(_ *config.Config, v config.Verb) string {
@@ -115,6 +124,12 @@ var (
 				return "assigns you"
 			}
 			return "assigns " + v.Assign
+		},
+		func(_ *config.Config, v config.Verb) string {
+			if v.Blockers == config.BlockersLink {
+				return "--by N also marks it blocked by #N"
+			}
+			return ""
 		},
 		func(_ *config.Config, v config.Verb) string {
 			if v.Comment == "" {
@@ -218,7 +233,8 @@ func (p *process) text() string {
 		sections = append(sections, b.String(),
 			"Every verb adds the issue to the board if it is missing and refuses a\n"+
 				"closed issue unless noted. A repeat is safe: an effect already in place\n"+
-				"(status, comment, labels, assignee, closed or open) is skipped.")
+				"(status, comment, labels, assignee, blocked-by link, closed or open) is\n"+
+				"skipped.")
 	}
 	// The root help's sections, each starting with a blank line; the
 	// lifecycle is empty without verbs and statuses.

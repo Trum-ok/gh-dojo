@@ -28,6 +28,7 @@ var (
 	setFields = workflow.SetFields{Changes: []workflow.FieldChange{
 		{Field: "Estimate", To: "3"}, {Field: "Priority", From: "P2", To: "P1"},
 	}}
+	blockedBy = workflow.AddBlockedBy{Ref: "#12"}
 )
 
 var ids = effects.IDs{
@@ -39,6 +40,7 @@ var ids = effects.IDs{
 		"Estimate": {ID: "PVTF_est", Value: map[string]any{"number": 3.0}},
 		"Priority": {ID: "PVTSSF_prio", Value: map[string]any{"singleSelectOptionId": "0a877460"}},
 	},
+	Blocker: "I_12",
 }
 
 func TestBuild(t *testing.T) {
@@ -65,6 +67,7 @@ func TestBuild(t *testing.T) {
 		{"status_sprint_close", []workflow.Op{status, sprint, closing}, ids},
 		{"sprint_clear", []workflow.Op{unsprint}, ids},
 		{"status_fields", []workflow.Op{status, setFields, comment}, ids},
+		{"status_blocked_by_comment", []workflow.Op{status, blockedBy, comment}, ids},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -98,7 +101,7 @@ func TestBuildDeclaresWhatItUses(t *testing.T) {
 	for _, ops := range [][]workflow.Op{
 		{status, comment}, {status}, {comment}, {toBoard}, {toBoard, comment}, {unarchive, status},
 		{closing}, {reopen}, {addLabels}, {rmLabels}, {assign}, {reopen, status, addLabels, rmLabels, assign, comment},
-		{comment, closing}, {sprint}, {unsprint}, {setFields}, {status, sprint, setFields, comment},
+		{comment, closing}, {sprint}, {unsprint}, {setFields}, {status, sprint, setFields, comment}, {blockedBy}, {status, blockedBy, comment},
 	} {
 		m, err := effects.Build(ops, ids)
 		if err != nil {
@@ -133,6 +136,8 @@ func TestBuildErrors(t *testing.T) {
 	noOption.StatusOption = ""
 	noIteration := ids
 	noIteration.Iteration = ""
+	noBlocker := ids
+	noBlocker.Blocker = ""
 	for name, tt := range map[string]struct {
 		ops []workflow.Op
 		ids effects.IDs
@@ -154,6 +159,7 @@ func TestBuildErrors(t *testing.T) {
 		"no_field":     {[]workflow.Op{workflow.SetFields{Changes: []workflow.FieldChange{{Field: "Size", To: "M"}}}}, ids},
 		"no_changes":   {[]workflow.Op{workflow.SetFields{}}, ids},
 		"fields_twice": {[]workflow.Op{setFields, setFields}, ids},
+		"blocker_id":   {[]workflow.Op{blockedBy}, noBlocker},
 	} {
 		if _, err := effects.Build(tt.ops, tt.ids); err == nil {
 			t.Errorf("%s: want an error", name)
@@ -280,11 +286,11 @@ func TestItemID(t *testing.T) {
 
 func TestMissed(t *testing.T) {
 	var got []string
-	for _, op := range []workflow.Op{toBoard, unarchive, reopen, status, addLabels, rmLabels, assign, comment, closing} {
+	for _, op := range []workflow.Op{toBoard, unarchive, reopen, status, addLabels, rmLabels, assign, blockedBy, comment, closing} {
 		got = append(got, effects.Missed(op))
 	}
 	want := []string{"not added to the board", "not unarchived", "not reopened", "status not changed",
-		"labels not added", "labels not removed", "not assigned", "comment not posted", "not closed"}
+		"labels not added", "labels not removed", "not assigned", "not blocked by #12", "comment not posted", "not closed"}
 	if !slices.Equal(got, want) {
 		t.Errorf("Missed = %q, want %q", got, want)
 	}

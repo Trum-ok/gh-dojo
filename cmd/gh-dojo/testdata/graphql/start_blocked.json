@@ -1,0 +1,34 @@
+{
+  "comment": "Hand-crafted from internal/issue/testdata/graphql/card_3.json and card_3_links.json (recorded); mutations are never sent to GitHub, their payloads follow the GraphQL schema (addBlockedBy.issue, removeBlockedBy.issue). The start mutation of start_ok.json alone, for a start on card_3_blocked.json with blockers = \"warn\".",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "Verb",
+      "query": "mutation Verb($project: ID!, $item: ID!, $field: ID!, $option: String!, $issue: ID!, $body: String!) {\n  status: updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field, value: {singleSelectOptionId: $option}}) { projectV2Item { id } }\n  comment: addComment(input: {subjectId: $issue, body: $body}) { commentEdge { node { id } } }\n}",
+      "variables": {
+        "project": "PVT_kwHOBFGd5c4BrMYF",
+        "item": "PVTI_lAHOBFGd5c4BrMYFzhH6Jn8",
+        "field": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
+        "option": "47fc9ee4",
+        "issue": "I_kwDOVq9iIs8AAAABeZKr9A",
+        "body": "Started. Session: claude://s/abc\n\n<!-- gh-dojo:start:c1bb1323 -->"
+      },
+      "response": {
+        "data": {
+          "status": {
+            "projectV2Item": {
+              "id": "PVTI_lAHOBFGd5c4BrMYFzhH6Jn8"
+            }
+          },
+          "comment": {
+            "commentEdge": {
+              "node": {
+                "id": "IC_kwDOVq9iIs7Example01"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+dry run: wait #42 "Fix login redirect"
+  status: In progress → Waiting
+  blocked by: acme/api#7 already linked
+  comment: "Waiting for acme/api#7."
+confirm: #42 In progress → Waiting, already blocked by acme/api#7, comment left
+post: "Waiting for acme/api#7.\n\n<!-- gh-dojo:wait:ec80e67c -->"

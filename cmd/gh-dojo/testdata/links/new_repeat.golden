@@ -1,0 +1,4 @@
+code: 0
+--- stdout
+#15 "Fix login redirect" already created, labels bug, area:cli, In progress (unchanged), already blocked by #26
+--- stderr

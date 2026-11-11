@@ -13,7 +13,7 @@ import (
 )
 
 // specExample is the example from docs/spec.md without the keys this
-// version does not support (blockers, batch);
+// version does not support (batch);
 // TestSpecExampleUnsupported puts them back. Its drop verb is the spec's,
 // as is: no comment template, so --comment is posted as is.
 const specExample = `
@@ -37,6 +37,7 @@ link = "claude://claude.ai/epitaxy/{id}"
 [verbs.start]
 when = "берёшь задачу в работу"
 to = "In progress"
+blockers = "warn"
 comment = "Сессия: {session}"
 
 [verbs.wait]
@@ -125,6 +126,9 @@ func dump(c *Config) string {
 			}
 			w("  iteration: %q fields: %s", v.IterationRule(), strings.Join(fields, ", "))
 		}
+		if v.Blockers != "" {
+			w("  blockers: %q", v.Blockers)
+		}
 	}
 	w("status refs:")
 	for _, r := range c.StatusRefs() {
@@ -140,6 +144,8 @@ func TestLoad(t *testing.T) {
 	}{
 		{"spec_example", specExample},
 		{"preset_only", presetOnly},
+		{"blockers_off", presetOnly + "[verbs.wait]\nblockers = false\n"},
+		{"blockers_deny", presetOnly + "[verbs.start]\nblockers = \"deny\"\n[verbs.wait]\nblockers = \"warn\"\n"},
 		{"override_verb_key", presetOnly + `
 [verbs.start]
 when = "Take the issue"
@@ -319,6 +325,10 @@ func TestLoadErrors(t *testing.T) {
 		{"confirm_not_string", presetOnly + "[verbs.done]\nconfirm = true\n"},
 		{"confirm_wrong_type", presetOnly + "[verbs.done]\nconfirm = 1\n"},
 		{"close_true", presetOnly + "[verbs.done]\nclose = true\n"},
+		{"blockers_bad", presetOnly + "[verbs.start]\nblockers = \"add\"\n"},
+		{"blockers_true", presetOnly + "[verbs.start]\nblockers = true\n"},
+		{"blockers_number", presetOnly + "[verbs.start]\nblockers = 1\n"},
+		{"blockers_link_without_by", presetOnly + "[verbs.ready]\nblockers = \"link\"\n"},
 		{"require_one_of_unused", presetOnly + "[verbs.wait]\ncomment = \"Waiting for {by}.\"\n"},
 		{"require_duplicate", presetOnly + "[verbs.go]\nwhen = \"x\"\ncomment = \"{comment}\"\nrequire = [\"comment\", \"comment\"]\n"},
 		{"require_overlap", presetOnly + "[verbs.wait]\nrequire = [\"comment\"]\n"},
@@ -533,7 +543,6 @@ func TestSessionResolve(t *testing.T) {
 func TestSpecExampleUnsupported(t *testing.T) {
 	tests := []struct{ after, add, want string }{
 		{"[verbs.done]\n", "batch = true\n", "verbs.done.batch is not supported in this version"},
-		{"[verbs.wait]\n", "blockers = \"add\"\n", "verbs.wait.blockers is not supported in this version"},
 	}
 	for _, tt := range tests {
 		if !strings.Contains(specExample, tt.after) {

@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: block needs --by with the blocking issue, like: gh dojo block 3 --by 17
+fix: gh dojo block --help

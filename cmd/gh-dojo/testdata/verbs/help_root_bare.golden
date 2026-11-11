@@ -11,6 +11,7 @@ Process verbs (from .github/dojo.toml):
   note        You want to leave a note without moving the issue
 
 Additional Commands:
+  block       Mark an issue blocked by other issues, without changing its status
   comment     Comment on an issue without changing its status
   describe    Learn this project's process: verbs, statuses and exit codes in a few lines
   doctor      Find what is broken in the setup: config, token scope, board, repositories
@@ -19,6 +20,7 @@ Additional Commands:
   list        See what is on the board: one line per open issue, grouped by status
   new         Create an issue with labels, on the board, in the initial status
   show        Read issues before working on them: board status, blockers, history, description, comments
+  unblock     Remove blocked-by links of an issue, without changing its status
 
 Lifecycle (from → to):
   note        any status → status unchanged

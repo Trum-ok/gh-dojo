@@ -1,0 +1,5 @@
+dry run: wait #42 "Fix login redirect"
+  status: In progress → Waiting
+  comment: "Waiting for the API team."
+confirm: #42 In progress → Waiting, comment left
+post: "Waiting for the API team.\n\n<!-- gh-dojo:wait:00fbeda6 -->"

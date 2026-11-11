@@ -1,0 +1,7 @@
+code: 0
+--- stdout
+dry run: start #3 "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)"
+  status: Ready → In progress
+  comment: "Started. Session: claude://s/abc"
+--- stderr
+warning: #3 has unresolved blockers: #2 (status not read), #1 (In progress), 1 not read (counted as unresolved)

@@ -7,7 +7,7 @@ Verbs:
   start       You begin working on the issue
               optional --comment; comments "Started. Session: {session} {comment}"
   wait        Work is stuck: waiting for another issue or an outside decision
-              needs --by or --comment; comments "Waiting for {by}. {comment}"
+              needs --by or --comment; --by N also marks it blocked by #N; comments "Waiting for {by}. {comment}"
   ready       The work is done, verified and committed, but not released yet
               optional --comment; comments "{comment}"
   done        The change is released
@@ -33,7 +33,8 @@ Verbs:
 
 Every verb adds the issue to the board if it is missing and refuses a
 closed issue unless noted. A repeat is safe: an effect already in place
-(status, comment, labels, assignee, closed or open) is skipped.
+(status, comment, labels, assignee, blocked-by link, closed or open) is
+skipped.
 
 Lifecycle (from → to):
   start       Backlog, Waiting, Ready → In progress

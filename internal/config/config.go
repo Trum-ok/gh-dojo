@@ -122,6 +122,22 @@ type FieldValue struct {
 	Date   bool
 }
 
+// Values of a verb's blockers key. Warn and deny are checks of the issue's
+// unresolved blockers (see Statuses.Resolved); link is the blockers effect.
+const (
+	// BlockersWarn: the verb runs, warning on stderr about each unresolved
+	// blocker.
+	BlockersWarn = "warn"
+	// BlockersDeny: the verb is refused (exit code 2) while the issue has an
+	// unresolved blocker.
+	BlockersDeny = "deny"
+	// BlockersLink: a --by naming an issue (12, #12 or owner/repo#12) also
+	// marks the issue blocked by it; free text stays comment-only.
+	BlockersLink = "link"
+)
+
+var blockersValues = []string{BlockersWarn, BlockersDeny, BlockersLink}
+
 var closeReasons = []string{CloseCompleted, CloseNotPlanned, CloseDuplicate}
 
 // CloseReasons lists the reasons close accepts.
@@ -182,6 +198,16 @@ type Verb struct {
 	// Fields are the board fields the verb sets to fixed values, sorted
 	// by field name.
 	Fields []FieldValue
+	// Blockers is the blockers key: BlockersWarn or BlockersDeny check the
+	// issue's unresolved blockers, BlockersLink turns --by N into a
+	// blocked-by link; "" does neither.
+	Blockers string
+}
+
+// ChecksBlockers reports whether the verb checks the issue's unresolved
+// blockers (blockers = "warn" or "deny").
+func (v Verb) ChecksBlockers() bool {
+	return v.Blockers == BlockersWarn || v.Blockers == BlockersDeny
 }
 
 // IterationRule is the verb's iteration key as written in the config:

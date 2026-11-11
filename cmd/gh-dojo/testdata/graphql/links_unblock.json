@@ -1,0 +1,162 @@
+{
+  "comment": "Hand-crafted from internal/issue/testdata/graphql/links_3.json (recorded: #2 blocks #3, #26 does not); mutations are never sent to GitHub, their payloads follow the GraphQL schema (addBlockedBy.issue, removeBlockedBy.issue). gh dojo unblock 3 --by 2 --by 26: one mutation removes #2; the repeat finds neither linked.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "IssueLinks",
+      "query": "query IssueLinks($owner: String!, $repo: String!, $number: Int!, $link0Owner: String!, $link0Repo: String!, $link0Number: Int!, $link1Owner: String!, $link1Repo: String!, $link1Number: Int!) {\n  repository(owner: $owner, name: $repo) {\n    issueOrPullRequest(number: $number) { __typename ... on Issue { id title } }\n  }\n  link0: repository(owner: $link0Owner, name: $link0Repo) {\n    issueOrPullRequest(number: $link0Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } } }\n  }\n  link1: repository(owner: $link1Owner, name: $link1Repo) {\n    issueOrPullRequest(number: $link1Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } } }\n  }\n}",
+      "variables": {
+        "link0Number": 2,
+        "link0Owner": "Trum-ok",
+        "link0Repo": "gh-dojo",
+        "link1Number": 26,
+        "link1Owner": "Trum-ok",
+        "link1Repo": "gh-dojo",
+        "number": 3,
+        "owner": "Trum-ok",
+        "repo": "gh-dojo"
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "issueOrPullRequest": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8AAAABeZKr9A",
+              "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)"
+            }
+          },
+          "link0": {
+            "issueOrPullRequest": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8AAAABeZKieQ",
+              "title": "Коды выхода и короткие ошибки (internal/render)",
+              "state": "OPEN",
+              "blocking": {
+                "nodes": [
+                  {
+                    "id": "I_kwDOVq9iIs8AAAABeZL4lg"
+                  },
+                  {
+                    "id": "I_kwDOVq9iIs8AAAABeZLtRg"
+                  },
+                  {
+                    "id": "I_kwDOVq9iIs8AAAABeZLhqw"
+                  },
+                  {
+                    "id": "I_kwDOVq9iIs8AAAABeZLXnw"
+                  },
+                  {
+                    "id": "I_kwDOVq9iIs8AAAABeZK-9Q"
+                  },
+                  {
+                    "id": "I_kwDOVq9iIs8AAAABeZKr9A"
+                  }
+                ]
+              }
+            }
+          },
+          "link1": {
+            "issueOrPullRequest": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8AAAABeb-QYw",
+              "title": "Блокеры: block/unblock, new --blocked-by, проверка blockers, эффект blockers",
+              "state": "OPEN",
+              "blocking": {
+                "nodes": [
+                  {
+                    "id": "I_kwDOVq9iIs8AAAABeb-zgQ"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "Unblock",
+      "query": "mutation Unblock($issue: ID!, $link0: ID!) {\n  link0: removeBlockedBy(input: {issueId: $issue, blockingIssueId: $link0}) { issue { id } }\n}",
+      "variables": {
+        "issue": "I_kwDOVq9iIs8AAAABeZKr9A",
+        "link0": "I_kwDOVq9iIs8AAAABeZKieQ"
+      },
+      "response": {
+        "data": {
+          "link0": {
+            "issue": {
+              "id": "I_kwDOVq9iIs8AAAABeZKr9A"
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "IssueLinks",
+      "query": "query IssueLinks($owner: String!, $repo: String!, $number: Int!, $link0Owner: String!, $link0Repo: String!, $link0Number: Int!, $link1Owner: String!, $link1Repo: String!, $link1Number: Int!) {\n  repository(owner: $owner, name: $repo) {\n    issueOrPullRequest(number: $number) { __typename ... on Issue { id title } }\n  }\n  link0: repository(owner: $link0Owner, name: $link0Repo) {\n    issueOrPullRequest(number: $link0Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } } }\n  }\n  link1: repository(owner: $link1Owner, name: $link1Repo) {\n    issueOrPullRequest(number: $link1Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } } }\n  }\n}",
+      "variables": {
+        "link0Number": 2,
+        "link0Owner": "Trum-ok",
+        "link0Repo": "gh-dojo",
+        "link1Number": 26,
+        "link1Owner": "Trum-ok",
+        "link1Repo": "gh-dojo",
+        "number": 3,
+        "owner": "Trum-ok",
+        "repo": "gh-dojo"
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "issueOrPullRequest": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8AAAABeZKr9A",
+              "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)"
+            }
+          },
+          "link0": {
+            "issueOrPullRequest": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8AAAABeZKieQ",
+              "title": "Коды выхода и короткие ошибки (internal/render)",
+              "state": "OPEN",
+              "blocking": {
+                "nodes": [
+                  {
+                    "id": "I_kwDOVq9iIs8AAAABeZL4lg"
+                  },
+                  {
+                    "id": "I_kwDOVq9iIs8AAAABeZLtRg"
+                  },
+                  {
+                    "id": "I_kwDOVq9iIs8AAAABeZLhqw"
+                  },
+                  {
+                    "id": "I_kwDOVq9iIs8AAAABeZLXnw"
+                  },
+                  {
+                    "id": "I_kwDOVq9iIs8AAAABeZK-9Q"
+                  }
+                ]
+              }
+            }
+          },
+          "link1": {
+            "issueOrPullRequest": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8AAAABeb-QYw",
+              "title": "Блокеры: block/unblock, new --blocked-by, проверка blockers, эффект blockers",
+              "state": "OPEN",
+              "blocking": {
+                "nodes": [
+                  {
+                    "id": "I_kwDOVq9iIs8AAAABeb-zgQ"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

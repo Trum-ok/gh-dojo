@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/Trum-ok/gh-dojo/internal/board"
 	"github.com/Trum-ok/gh-dojo/internal/config"
+	"github.com/Trum-ok/gh-dojo/internal/effects"
 	"github.com/Trum-ok/gh-dojo/internal/graph"
 	"github.com/Trum-ok/gh-dojo/internal/issue"
 	"github.com/Trum-ok/gh-dojo/internal/render"
@@ -22,9 +24,10 @@ import (
 // initial status.
 //
 // Requests with a warm schema cache: one read (newContextQuery: repo ID,
-// labels, recent issues), createIssue (with its labels),
-// addProjectV2ItemById, then the status: four. Without statuses.initial the
-// status write is skipped.
+// labels, recent issues, and the --blocked-by issues), createIssue (with
+// its labels), addProjectV2ItemById, then the status with the blocked-by
+// links (addBlockedBy, aliased, in the same mutation): four. Without
+// statuses.initial and --blocked-by the last write is skipped.
 //
 // The board item is added explicitly rather than with createIssue's
 // projectV2Ids: GitHub adds those asynchronously, so the createIssue answer
@@ -40,7 +43,8 @@ import (
 // read looks for it among the repo's newDedupWindow newest open issues,
 // keeping those the viewer wrote. A match is resumed instead of created
 // again: missing labels are added, the issue is unarchived or put on the
-// board and, if it has no status, given the initial one. So filing an open
+// board and, if it has no status, given the initial one; blocked-by links
+// it lacks are added. So filing an open
 // issue again with the same title within the window resumes it. An issue
 // that dropped out of the window (newDedupWindow newer open issues in the
 // repo, by anyone) or was closed is created again.
@@ -97,6 +101,17 @@ const newContextQuery = `query NewIssueContext($owner: String!, $repo: String!, 
     }
   }
 }`
+
+// newContextQueryWith is newContextQuery that also reads links, the
+// --blocked-by issues (see issue.Links); without links it is
+// newContextQuery itself.
+func newContextQueryWith(links issue.Links) string {
+	if len(links) == 0 {
+		return newContextQuery
+	}
+	q := strings.Replace(newContextQuery, "$window: Int!)", "$window: Int!"+links.Decls()+")", 1)
+	return strings.TrimSuffix(q, "}") + links.Fields() + "}"
+}
 
 // newLabelsQuery reads all repo labels; only needed past the first 100.
 const newLabelsQuery = `query RepoLabels($owner: String!, $repo: String!, $cursor: String) {
@@ -164,6 +179,10 @@ type newOptions struct {
 	Type   string // "" when --type is not given
 	Areas  []string
 	Labels []string
+	// BlockedBy are the --blocked-by values as given; Blockers the issues
+	// they name, parsed before any request.
+	BlockedBy []string
+	Blockers  []issue.Ref
 }
 
 func newNewCmd() (*cobra.Command, error) {
@@ -177,6 +196,7 @@ func newNewCmd() (*cobra.Command, error) {
 		Long:  newHelp(),
 		Example: `  gh dojo new "Fix login redirect" --type bug --area cli
   gh dojo new "Support org boards" --label enhancement --body-file - < notes.md
+  gh dojo new "Release v1.2" --blocked-by 17 --blocked-by 18
   gh dojo new -- "-v is ignored by list"`,
 		Args: newArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -205,7 +225,17 @@ func newNewCmd() (*cobra.Command, error) {
 			if err := checkNewFlags(cfg, o); err != nil {
 				return err // before any request
 			}
-			line, err := runNew(cmd.Context(), newApp(), cfg, o, cmd.ErrOrStderr())
+			a := newApp()
+			if len(o.BlockedBy) > 0 {
+				repo, err := a.Repo()
+				if err != nil {
+					return err
+				}
+				if o.Blockers, err = parseBlockers(o.BlockedBy, "blocked-by", repo, 0, cmd.CommandPath()+" --help"); err != nil {
+					return err // before any request
+				}
+			}
+			line, err := runNew(cmd.Context(), a, cfg, o, cmd.ErrOrStderr())
 			if err != nil {
 				return err
 			}
@@ -219,6 +249,8 @@ func newNewCmd() (*cobra.Command, error) {
 	f.StringArrayVar(&o.Labels, "label", nil, "any existing repo `label`; repeatable")
 	f.StringVar(&o.Body, "body", "", "issue body (markdown); one starting with - goes as --body=...")
 	f.StringVar(&bodyFile, bodyFileFlag, "", "read the body from `file`; - reads stdin")
+	f.StringArrayVar(&o.BlockedBy, "blocked-by", nil,
+		"the blocking `issue`: 12, \"#12\" or owner/repo#12; repeatable, or comma-separated")
 	return cmd, nil
 }
 
@@ -264,12 +296,16 @@ created, listing the allowed values.
 The body comes from --body or --body-file (a file, or - for stdin). A title
 starting with - goes after --: gh dojo new -- "-v is ignored".
 
+--blocked-by marks the new issue blocked by other issues (12, "#12" or
+owner/repo#12; repeatable, or comma-separated). An issue that does not exist
+fails before anything is created (exit code 3).
+
 A repeat is safe: the body ends with a hidden marker of the title, and a run
 that finds it on one of the repo's 20 newest open issues, written by you,
-finishes that issue (labels, board, status) instead of creating another. So
-filing an open issue again with the same title (ignoring case and spacing)
-resumes it. If a run fails after creating the issue, it exits with code 5:
-run the same command again.`)
+finishes that issue (labels, board, status, blocked-by links) instead of
+creating another. So filing an open issue again with the same title
+(ignoring case and spacing) resumes it. If a run fails after creating the
+issue, it exits with code 5: run the same command again.`)
 	cfg, err := loadConfig()
 	if err != nil {
 		return b.String()
@@ -370,6 +406,10 @@ type newRun struct {
 	status     string // the status found, "" for none
 	statusSet  bool   // the status was set to the initial one now
 	noInitial  bool   // statuses.initial is empty: no status was set
+
+	repo        issue.Repo      // the default repository, for the refs of links
+	linked      []*issue.Linked // blocked-by links added now
+	linkedFound []*issue.Linked // blocked-by links a resumed issue had already
 }
 
 // newStepError says which write failed, as "setting status Backlog failed".
@@ -404,12 +444,16 @@ func (r *newRun) run(ctx context.Context) error {
 		r.noInitial = true
 	}
 
-	nc, err := readNewContext(ctx, r.Client, repo, statusField.Name)
+	r.repo = repo
+	nc, err := readNewContext(ctx, r.Client, repo, statusField.Name, r.opts.Blockers)
 	if err != nil {
 		return err
 	}
 	labels, err := nc.resolve(ctx, r.Client, r.cfg, repo, r.opts)
 	if err != nil {
+		return err
+	}
+	if err := issue.LinksError("--blocked-by", nc.Links, repo); err != nil {
 		return err
 	}
 	for _, l := range labels {
@@ -419,6 +463,11 @@ func (r *newRun) run(ctx context.Context) error {
 	marker := workflow.Marker(newMarkerVerb, newDedupKey(r.opts.Title))
 	found := nc.find(marker, s.ID)
 	if found != nil {
+		for _, l := range nc.Links {
+			if l.ID == found.ID {
+				return selfBlock(found.Number, "--blocked-by")
+			}
+		}
 		r.resumed = true
 	} else if err := r.create(ctx, nc.RepoID, withMarker(r.opts.Body, marker), labels); err != nil {
 		if r.number != 0 || !errors.Is(err, graph.ErrUnknownOutcome) {
@@ -461,12 +510,94 @@ func (r *newRun) run(ctx context.Context) error {
 	}
 	// A resumed issue keeps a status it already has: someone may have
 	// moved it on purpose.
-	if initial != nil && (!r.resumed || r.status == "") {
+	if initial != nil && r.resumed && r.status != "" {
+		initial = nil
+	}
+	var pending []*issue.Linked // links the issue lacks
+	for _, l := range nc.Links {
+		if l.Blocks(r.id) {
+			r.linkedFound = append(r.linkedFound, l)
+		} else {
+			pending = append(pending, l)
+		}
+	}
+	if len(pending) > 0 {
+		return r.finish(ctx, s.ID, statusField.ID, initial, pending)
+	}
+	if initial != nil {
 		vars := map[string]any{"project": s.ID, "item": r.itemID, "field": statusField.ID, "option": initial.ID}
 		if err := r.Client.Mutate(ctx, newSetStatusMutation, vars, nil); err != nil {
 			return &newStepError{"setting status " + initial.Name + " failed", err}
 		}
 		r.status, r.statusSet = initial.Name, true
+	}
+	return nil
+}
+
+// newFinishMutation sets the status (status) and adds n blocked-by links
+// of $issue, one aliased field each (see newRun.finish).
+func newFinishMutation(status bool, n int) string {
+	decls := []string{"$issue: ID!"}
+	var fields []string
+	if status {
+		decls = append(decls, "$project: ID!", "$item: ID!", "$field: ID!", "$option: String!")
+		fields = append(fields, "  status: updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, "+
+			"fieldId: $field, value: {singleSelectOptionId: $option}}) { projectV2Item { id } }")
+	}
+	for i := range n {
+		decls = append(decls, "$"+linkAlias(i)+": ID!")
+		fields = append(fields, "  "+linkAlias(i)+": "+effects.BlockedByField(true, "issue", linkAlias(i)))
+	}
+	return "mutation NewFinish(" + strings.Join(decls, ", ") + ") {\n" + strings.Join(fields, "\n") + "\n}"
+}
+
+// finish sets the status initial (nil leaves it alone) and adds the
+// blocked-by links in one mutation, the status first:
+//
+//	mutation NewFinish($issue: ID!, $project: ID!, $item: ID!, $field: ID!, $option: String!, $link0: ID!) {
+//	  status: updateProjectV2ItemFieldValue(...) { projectV2Item { id } }
+//	  link0: addBlockedBy(input: {issueId: $issue, blockingIssueId: $link0}) { issue { id } }
+//	}
+//
+// What took effect is recorded (r.statusSet, r.linked) even when the rest
+// failed; an error after everything took effect is only a warning.
+func (r *newRun) finish(ctx context.Context, projectID, fieldID string, initial *board.Option, links []*issue.Linked) error {
+	vars := map[string]any{"issue": r.id}
+	for i, l := range links {
+		vars[linkAlias(i)] = l.ID
+	}
+	if initial != nil {
+		vars["project"], vars["item"], vars["field"], vars["option"] = projectID, r.itemID, fieldID, initial.ID
+	}
+	var data map[string]json.RawMessage
+	err := r.Client.Mutate(ctx, newFinishMutation(initial != nil, len(links)), vars, &data)
+	var steps []string
+	if initial != nil {
+		if raw, ok := data["status"]; ok && !isJSONNull(raw) {
+			r.status, r.statusSet = initial.Name, true
+		} else {
+			steps = append(steps, "setting status "+initial.Name)
+		}
+	}
+	var missed []*issue.Linked
+	for i, l := range links {
+		if raw, ok := data[linkAlias(i)]; ok && !isJSONNull(raw) {
+			r.linked = append(r.linked, l)
+		} else {
+			missed = append(missed, l)
+		}
+	}
+	if len(missed) > 0 {
+		steps = append(steps, "marking it blocked by "+joinRefs(missed, r.repo))
+	}
+	switch {
+	case len(steps) == 0 && err != nil:
+		r.warnings = append(r.warnings, "GitHub reported an error after applying every change: "+reason(err))
+	case len(steps) > 0 && err == nil:
+		err = render.Network("GitHub returned no result for part of the write")
+		fallthrough
+	case len(steps) > 0:
+		return &newStepError{strings.Join(steps, " and ") + " failed", err}
 	}
 	return nil
 }
@@ -557,7 +688,7 @@ func (r *newRun) recheck(ctx context.Context, repo issue.Repo, statusField, mark
 	if !recheckPause(ctx) {
 		return nil
 	}
-	nc, err := readNewContext(ctx, r.Client, repo, statusField)
+	nc, err := readNewContext(ctx, r.Client, repo, statusField, nil)
 	if err != nil {
 		return nil
 	}
@@ -601,6 +732,7 @@ func (r *newRun) create(ctx context.Context, repoID, body string, labels []newLa
 // confirm is the confirmation line of a finished run:
 //
 //	#57 "Fix login redirect" created, labels bug, area:cli, no status → Backlog
+//	#57 "Fix login redirect" created, no status → Backlog, blocked by #12 and #13
 //	#57 "Fix login redirect" already created, labels bug, unarchived, Backlog (unchanged)
 func (r *newRun) confirm() string {
 	effects := []string{"created"}
@@ -620,6 +752,12 @@ func (r *newRun) confirm() string {
 		effects = append(effects, render.Transition(r.status, r.status))
 	case r.noInitial:
 		effects = append(effects, "on the board with no status (statuses.initial is not set)")
+	}
+	if len(r.linked) > 0 {
+		effects = append(effects, "blocked by "+joinRefs(r.linked, r.repo))
+	}
+	if len(r.linkedFound) > 0 {
+		effects = append(effects, "already blocked by "+joinRefs(r.linkedFound, r.repo))
 	}
 	title := r.title
 	if title == "" {
@@ -656,6 +794,8 @@ type newContext struct {
 	Labels    graph.Connection[newLabel]
 	Issues    []*newIssueJSON
 	allLabels []newLabel // all repo labels, once read past the first page
+	// Links are the --blocked-by issues, in order (see issue.Links).
+	Links []*issue.Linked
 }
 
 type newLabel struct {
@@ -690,27 +830,43 @@ type newIssueJSON struct {
 	} `json:"projectItems"`
 }
 
-func readNewContext(ctx context.Context, q graph.Querier, repo issue.Repo, statusField string) (*newContext, error) {
-	var out struct {
-		Repository *struct {
-			ID     string                     `json:"id"`
-			Labels graph.Connection[newLabel] `json:"labels"`
-			Issues struct {
-				Nodes []*newIssueJSON `json:"nodes"`
-			} `json:"issues"`
-		} `json:"repository"`
+// readNewContext reads what new needs before writing, with the issues of
+// links (the --blocked-by ones): a missing one is issue.Linked.Missing,
+// not an error.
+func readNewContext(ctx context.Context, q graph.Querier, repo issue.Repo, statusField string, links issue.Links) (*newContext, error) {
+	var r *struct {
+		ID     string                     `json:"id"`
+		Labels graph.Connection[newLabel] `json:"labels"`
+		Issues struct {
+			Nodes []*newIssueJSON `json:"nodes"`
+		} `json:"issues"`
 	}
 	vars := map[string]any{"owner": repo.Owner, "repo": repo.Name, "status": statusField, "window": newDedupWindow}
-	err := q.Query(ctx, newContextQuery, vars, &out)
-	if out.Repository == nil && (err == nil || render.FromError(err).Code == render.ExitNotFound) {
+	links.AddVars(vars)
+	var data map[string]json.RawMessage
+	err := q.Query(ctx, newContextQueryWith(links), vars, &data)
+	if raw, ok := data["repository"]; ok {
+		if uerr := json.Unmarshal(raw, &r); uerr != nil {
+			return nil, render.Internal("cannot decode GitHub's answer").WithCause(uerr)
+		}
+	}
+	if err != nil && r != nil && issue.OnlyLinkErrors(err) {
+		err = nil // a missing --blocked-by issue: LinksError names it
+	}
+	if r == nil && (err == nil || render.FromError(err).Code == render.ExitNotFound) {
 		return nil, render.NotFound("repository %s not found, or the token cannot see it", repo).
 			WithFix("gh repo view " + repo.String()).WithCause(err)
 	}
 	if err != nil {
 		return nil, err
 	}
-	r := out.Repository
-	return &newContext{RepoID: r.ID, Labels: r.Labels, Issues: r.Issues.Nodes}, nil
+	nc := &newContext{RepoID: r.ID, Labels: r.Labels, Issues: r.Issues.Nodes}
+	if len(links) > 0 {
+		if nc.Links, err = links.Decode(data); err != nil {
+			return nil, render.Internal("cannot decode GitHub's answer").WithCause(err)
+		}
+	}
+	return nc, nil
 }
 
 // foundIssue is an issue an earlier run created, as find returns it.

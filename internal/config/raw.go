@@ -65,6 +65,7 @@ type rawVerb struct {
 	Confirm      *rawOff    `toml:"confirm"`
 	Iteration    *string    `toml:"iteration"`
 	Field        *rawFields `toml:"field"`
+	Blockers     *rawOff    `toml:"blockers"`
 	Disabled     *bool      `toml:"disabled"`
 }
 
@@ -138,6 +139,7 @@ func (v *rawVerb) setKeys() []string {
 		{"comment", v.Comment != nil}, {"labels", v.Labels != nil}, {"assign", v.Assign != nil},
 		{"close", v.Close != nil}, {"reopen", v.Reopen != nil}, {"confirm", v.Confirm != nil},
 		{"iteration", v.Iteration != nil}, {"field", v.Field != nil},
+		{"blockers", v.Blockers != nil},
 	} {
 		if k.set {
 			keys = append(keys, k.name)
@@ -156,12 +158,12 @@ var (
 	sessionKeys  = []string{"env", "link"}
 	verbKeys     = []string{
 		"when", "to", "from", "require", "require_one_of", "comment",
-		"labels", "assign", "close", "reopen", "confirm", "iteration", "field", "disabled",
+		"labels", "assign", "close", "reopen", "confirm", "iteration", "field", "blockers", "disabled",
 	}
 
 	// unsupportedVerbKeys are verb keys from the spec that this version
 	// recognizes but does not implement yet.
-	unsupportedVerbKeys = []string{"blockers", "batch", "pre", "post"}
+	unsupportedVerbKeys = []string{"batch", "pre", "post"}
 
 	// unsupportedKeys are other keys from the spec that this version
 	// recognizes but does not implement yet, with what they are for.
@@ -436,6 +438,7 @@ func mergeVerb(m merger, name string, base, over *rawVerb) *rawVerb {
 		Confirm:      pick(m, p+"confirm", base.Confirm, over.Confirm),
 		Iteration:    pick(m, p+"iteration", base.Iteration, over.Iteration),
 		Field:        pick(m, p+"field", base.Field, over.Field),
+		Blockers:     pick(m, p+"blockers", base.Blockers, over.Blockers),
 		Disabled:     over.Disabled,
 	}
 }

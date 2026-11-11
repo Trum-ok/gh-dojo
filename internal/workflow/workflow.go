@@ -93,6 +93,20 @@ type Issue struct {
 	// by_status_date itself. Zero means now.
 	ReadAt time.Time
 
+	// Unresolved are the issue's blockers that still block: open and not
+	// in a resolved status (config statuses.resolved), or with a status
+	// that could not be read. UnreadBlockers counts the blockers that were
+	// not read at all (beyond the window, or withheld from the token); they
+	// count as unresolved too. Only a verb with blockers = "warn" or
+	// "deny" looks at them.
+	Unresolved     []Blocker
+	UnreadBlockers int
+
+	// ByIssue is the issue --by names, read for a verb with blockers =
+	// "link" when --by is an issue reference; nil otherwise, and then --by
+	// is only text for the comment.
+	ByIssue *ByIssue
+
 	// Ref is opaque to this package: the reader may keep the node IDs the
 	// executor needs here. It is never printed.
 	Ref any
@@ -114,6 +128,23 @@ type Sprint struct {
 type StatusChange struct {
 	At time.Time
 	To string // "" when the status was cleared
+}
+
+// Blocker is an unresolved blocker of an issue, as the blockers check
+// names it.
+type Blocker struct {
+	Ref   string // "#12", or "owner/repo#12" in another repository
+	Place string // where it stands: "In progress", "not on the board", "status not read: ..."
+}
+
+func (b Blocker) String() string { return b.Ref + " (" + b.Place + ")" }
+
+// ByIssue is the issue --by names for the blockers = "link" effect.
+type ByIssue struct {
+	Ref string // "#12", or "owner/repo#12" in another repository
+	// Blocks reports that it blocks the issue already: the link is in
+	// place.
+	Blocks bool
 }
 
 // Comment is an issue comment.
@@ -296,7 +327,11 @@ func join(items []string, conj string) string {
 //     a verb without a target that closes it (a board workflow such as
 //     "Item closed" may have moved it since the verb closed it);
 //  4. otherwise the current status must be in from (exit code 2). An issue
-//     not on the board or without a status counts as Engine.Initial.
+//     not on the board or without a status counts as Engine.Initial;
+//  5. then, for a verb with blockers = "warn" or "deny", the issue's
+//     unresolved blockers (Issue.Unresolved, Issue.UnreadBlockers) add a
+//     warning or refuse it (exit code 2). Like from, the check is skipped
+//     for an issue already in the target status.
 //
 // Moving an issue closed as not planned or duplicate to a final status is
 // allowed with a warning: the verb does not change why it was closed.
@@ -304,7 +339,8 @@ func join(items []string, conj string) string {
 // The plan adds the issue to the board when it is not there, reopens it,
 // sets the target status, sets the sprint (see planIteration; a day
 // without an iteration is exit code 1) and the fields of the field effect,
-// adds and removes labels, assigns, posts the
+// adds and removes labels, assigns, marks the issue blocked by
+// Issue.ByIssue (blockers = "link"), posts the
 // rendered comment unless it renders empty or the same comment is already
 // the verb's latest (see AlreadyPosted), and closes it. Each effect
 // already in place is left out of Ops (StatusUnchanged, CommentPresent,
@@ -336,6 +372,11 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 	closedRepeat := v.To == "" && v.Close != "" && is.Closed
 	if !atTarget && !closedRepeat {
 		if err := e.checkFrom(v, is); err != nil {
+			return nil, err
+		}
+	}
+	if !atTarget && v.ChecksBlockers() {
+		if err := p.checkBlockers(v); err != nil {
 			return nil, err
 		}
 	}
@@ -387,6 +428,14 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 			// Not among the assignees read: assign, even if the list was
 			// truncated; assigning someone twice changes nothing.
 			p.Ops = append(p.Ops, Assign{Login: login})
+		}
+	}
+
+	if v.Blockers == config.BlockersLink && is.ByIssue != nil {
+		if is.ByIssue.Blocks {
+			p.InPlace = append(p.InPlace, AddBlockedBy{Ref: is.ByIssue.Ref})
+		} else {
+			p.Ops = append(p.Ops, AddBlockedBy{Ref: is.ByIssue.Ref})
 		}
 	}
 
@@ -470,6 +519,45 @@ func (p *Plan) planLabels(v config.Verb) {
 	if len(removeInPlace) > 0 {
 		p.InPlace = append(p.InPlace, RemoveLabels{Names: removeInPlace})
 	}
+}
+
+// maxBlockers is how many unresolved blockers a warning or refusal names.
+const maxBlockers = 3
+
+// checkBlockers runs the blockers check of v (blockers = "warn" or
+// "deny") on p.Issue: with unresolved or unread blockers it adds a warning,
+// or refuses with exit code 2. A refusal has no fix line: it ends with
+// asking the user, never with a command that works around the process.
+//
+//	start cannot move #42 while it has unresolved blockers: #12 (In progress), #15 (not on the board)
+//	this is a process rule: ask the user how to proceed
+func (p *Plan) checkBlockers(v config.Verb) error {
+	is := p.Issue
+	if len(is.Unresolved) == 0 && is.UnreadBlockers == 0 {
+		return nil
+	}
+	var names []string
+	for i, b := range is.Unresolved {
+		if i == maxBlockers {
+			names = append(names, fmt.Sprintf("%d more", len(is.Unresolved)-maxBlockers))
+			break
+		}
+		names = append(names, b.String())
+	}
+	if n := is.UnreadBlockers; n > 0 {
+		names = append(names, fmt.Sprintf("%d not read (counted as unresolved)", n))
+	}
+	list := strings.Join(names, ", ")
+	if v.Blockers == config.BlockersWarn {
+		p.Warnings = append(p.Warnings, fmt.Sprintf("#%d has unresolved blockers: %s", is.Number, list))
+		return nil
+	}
+	action := "move"
+	if v.To == "" {
+		action = "run on"
+	}
+	return render.Denied("%s cannot %s #%d while it has unresolved blockers: %s\n"+
+		"this is a process rule: ask the user how to proceed", v.Name, action, is.Number, list)
 }
 
 // checkFrom refuses an issue whose status is not in v.From.

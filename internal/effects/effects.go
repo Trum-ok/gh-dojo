@@ -40,6 +40,7 @@ const (
 	AliasAddLabels    = "addLabels"
 	AliasRemoveLabels = "removeLabels"
 	AliasAssign       = "assign"
+	AliasBlockedBy    = "blockedBy"
 	AliasComment      = "comment"
 	AliasClose        = "close"
 	AliasIteration    = "sprint"
@@ -73,6 +74,9 @@ type IDs struct {
 	// Fields maps the board field names of a SetFields op to their IDs
 	// and the values to write.
 	Fields map[string]FieldInput
+	// Blocker is the node ID of the issue AddBlockedBy links as blocking
+	// the issue.
+	Blocker string
 }
 
 // FieldInput is a board field to set: its node ID and the value, a
@@ -209,6 +213,10 @@ func Build(ops []workflow.Op, ids IDs) (*Mutation, error) {
 			users, err = lookupAll("user", ids.Users, []string{op.Login})
 			err = firstErr(err, declare("issue", "ID!", ids.Issue), declare("assignees", "[ID!]!", users))
 			field = "addAssigneesToAssignable(input: {assignableId: $issue, assigneeIds: $assignees}) { clientMutationId }"
+		case workflow.AddBlockedBy:
+			alias = AliasBlockedBy
+			err = firstErr(declare("issue", "ID!", ids.Issue), declare("blocker", "ID!", ids.Blocker))
+			field = BlockedByField(true, "issue", "blocker")
 		case workflow.AddComment:
 			alias = AliasComment
 			err = firstErr(declare("issue", "ID!", ids.Issue), declare("body", "String!", op.Text()))
@@ -280,6 +288,20 @@ func (m *Mutation) add(alias string, op workflow.Op, n int) error {
 	}
 	m.Steps = append(m.Steps, Step{Alias: alias, Op: op, op: n})
 	return nil
+}
+
+// BlockedByField is the mutation field that adds (add) or removes a
+// blocked-by link: the issue in $<issue> is blocked by the issue in
+// $<blocker>, both node IDs. It answers the blocked issue's ID, so a
+// non-null result means the field took effect.
+//
+//	addBlockedBy(input: {issueId: $issue, blockingIssueId: $blocker}) { issue { id } }
+func BlockedByField(add bool, issue, blocker string) string {
+	name := "removeBlockedBy"
+	if add {
+		name = "addBlockedBy"
+	}
+	return name + "(input: {issueId: $" + issue + ", blockingIssueId: $" + blocker + "}) { issue { id } }"
 }
 
 // lookupAll returns the IDs of names in ids, ignoring case.
@@ -366,7 +388,7 @@ func isNull(v json.RawMessage) bool {
 // Missed says that op did not take effect, for a partial report:
 // "not added to the board", "not unarchived", "not reopened", "status not
 // changed", "labels not added", "labels not removed", "not assigned",
-// "comment not posted", "not closed", "sprint not set", "sprint not
+// "not blocked by #12", "comment not posted", "not closed", "sprint not set", "sprint not
 // cleared", "Priority not set" (one field) or "fields not set".
 func Missed(op workflow.Op) string {
 	switch op := op.(type) {
@@ -384,6 +406,8 @@ func Missed(op workflow.Op) string {
 		return "labels not removed"
 	case workflow.Assign:
 		return "not assigned"
+	case workflow.AddBlockedBy:
+		return "not blocked by " + op.Ref
 	case workflow.AddComment:
 		return "comment not posted"
 	case workflow.Close:

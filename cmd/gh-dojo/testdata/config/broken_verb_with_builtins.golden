@@ -2,5 +2,5 @@ code: 1
 --- stdout
 --- stderr
 error: unknown command "start"; verbs unavailable: .github/dojo.toml: unknown preset "kanbn"
-allowed: board, boom, comment, denied, describe, doctor, init, list, new, one, show
+allowed: block, board, boom, comment, denied, describe, doctor, init, list, new, one, show, unblock
 fix: gh dojo --help

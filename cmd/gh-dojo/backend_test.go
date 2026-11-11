@@ -132,7 +132,7 @@ func TestVerbDryRun(t *testing.T) {
 // mutation.
 func TestVerbRefused(t *testing.T) {
 	srv, before := withWarmVerbApp(t, verbFixture("card_3"))
-	checkRuns(t, srv, before, runs{[]string{"wait", "3", "--by", "12"}, render.ExitDenied, 1, "wait_refused"})
+	checkRuns(t, srv, before, runs{[]string{"wait", "3", "--by", "the API team"}, render.ExitDenied, 1, "wait_refused"})
 }
 
 // TestVerbBoardUnknown: when the card cannot tell whether the issue is on

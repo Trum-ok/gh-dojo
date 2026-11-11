@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.start.blockers = true: want "warn", "deny" or "link", or false to turn it off
+allowed: "warn", "deny", "link", false

@@ -1,0 +1,4 @@
+code: 0
+--- stdout
+#3 no longer blocked by #2, already not blocked by #26
+--- stderr

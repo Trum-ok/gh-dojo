@@ -21,8 +21,8 @@ type Plan struct {
 
 	// Ops are the operations to apply, in this order, each at most once:
 	// AddToBoard or Unarchive, Reopen, SetStatus, SetIteration, SetFields,
-	// AddLabels, RemoveLabels, Assign, AddComment, Close. Empty when there
-	// is nothing to do.
+	// AddLabels, RemoveLabels, Assign, AddBlockedBy, AddComment, Close.
+	// Empty when there is nothing to do.
 	Ops []Op
 
 	StatusUnchanged bool // the issue is already in Target; no SetStatus
@@ -30,7 +30,7 @@ type Plan struct {
 	// InPlace are the verb's effects found already in place, as the ops
 	// that would have applied them: Reopen, SetIteration (From = To),
 	// SetFields (the fields already set), AddLabels, RemoveLabels,
-	// Assign, and Close with the reason the issue was closed with ("" when
+	// Assign, AddBlockedBy, and Close with the reason the issue was closed with ("" when
 	// unknown). They are never applied; they give the "already" wording of
 	// the dry run and the confirmation line.
 	InPlace []Op
@@ -45,8 +45,8 @@ type Plan struct {
 }
 
 // Op is one operation of a plan: AddToBoard, Unarchive, Reopen, SetStatus,
-// SetIteration, SetFields, AddLabels, RemoveLabels, Assign, AddComment or
-// Close. Each kind has its
+// SetIteration, SetFields, AddLabels, RemoveLabels, Assign, AddBlockedBy,
+// AddComment or Close. Each kind has its
 // own type, its own field in the mutation (see package effects) and its
 // own words in the dry run, the confirmation line and a partial report.
 type Op interface {
@@ -87,6 +87,12 @@ type RemoveLabels struct {
 // Assign adds Login to the issue's assignees; the others stay.
 type Assign struct {
 	Login string
+}
+
+// AddBlockedBy marks the issue blocked by the issue Ref ("#12" or
+// "owner/repo#12"): the blockers = "link" effect of --by.
+type AddBlockedBy struct {
+	Ref string
 }
 
 // AddComment posts a comment. Post Text, which ends with the marker.
@@ -158,6 +164,9 @@ func (RemoveLabels) op()                {}
 func (a Assign) Describe() string       { return "assign: " + a.Login }
 func (a Assign) Effect() string         { return "assigned " + a.Login }
 func (Assign) op()                      {}
+func (b AddBlockedBy) Describe() string { return "blocked by: " + b.Ref }
+func (b AddBlockedBy) Effect() string   { return "blocked by " + b.Ref }
+func (AddBlockedBy) op()                {}
 func (c AddComment) Describe() string {
 	return "comment: " + strconv.Quote(c.Body)
 }
@@ -251,8 +260,8 @@ func (p *Plan) Unconfirmed() error {
 }
 
 // lines returns one entry per effect, in a fixed order: board, reopen,
-// status, sprint, fields (one entry per field), labels, assignee, comment,
-// close. dry picks the dry-run wording
+// status, sprint, fields (one entry per field), labels, assignee,
+// blocked-by link, comment, close. dry picks the dry-run wording
 // (Describe), otherwise the confirmation wording (Effect). Effects already
 // in place are included. The status change of an issue not on the board
 // reads "not on the board → In progress"; in the confirmation that line
@@ -264,7 +273,7 @@ func (p *Plan) lines(dry bool) []string {
 	if dry {
 		pick = Op.Describe
 	}
-	var board, unarchive, reopen, status, sprint, fields, assign, comment, closing []string
+	var board, unarchive, reopen, status, sprint, fields, assign, blocked, comment, closing []string
 	var labels, labelsInPlace []string // +name and -name
 	change := FieldChange.effect
 	if dry {
@@ -293,6 +302,8 @@ func (p *Plan) lines(dry bool) []string {
 			labels = append(labels, op.signs()...)
 		case Assign:
 			assign = append(assign, pick(op))
+		case AddBlockedBy:
+			blocked = append(blocked, pick(op))
 		case AddComment:
 			comment = append(comment, pick(op))
 		case Close:
@@ -329,6 +340,12 @@ func (p *Plan) lines(dry bool) []string {
 			labelsInPlace = append(labelsInPlace, op.signs()...)
 		case Assign:
 			assign = append(assign, key("assign", op.Login+" already assigned"))
+		case AddBlockedBy:
+			if dry {
+				blocked = append(blocked, "blocked by: "+op.Ref+" already linked")
+			} else {
+				blocked = append(blocked, "already blocked by "+op.Ref)
+			}
 		case Close:
 			text := "already closed"
 			if op.Reason != "" {
@@ -353,7 +370,7 @@ func (p *Plan) lines(dry bool) []string {
 	}
 	board = append(board, unarchive...)
 	var out []string
-	for _, group := range [][]string{board, reopen, status, sprint, fields, label, assign, comment, closing} {
+	for _, group := range [][]string{board, reopen, status, sprint, fields, label, assign, blocked, comment, closing} {
 		out = append(out, group...)
 	}
 	return out

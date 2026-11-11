@@ -77,6 +77,23 @@ close = "not_planned"
 [verbs.give]
 when = "Hand it over"
 assign = "octocat"
+
+# The blockers check: begin warns, claim and check refuse.
+[verbs.begin]
+when = "Begin, even if blocked"
+to = "In progress"
+blockers = "warn"
+
+[verbs.claim]
+when = "Claim an unblocked issue"
+to = "In progress"
+from = ["Backlog"]
+blockers = "deny"
+
+[verbs.check]
+when = "Note something on an unblocked issue"
+comment = "{comment}"
+blockers = "deny"
 `
 
 func testEngine(t *testing.T) (*Engine, *config.Config) {
@@ -120,6 +137,23 @@ func show(p *Plan, err error) string {
 
 func onBoard(status string) Issue {
 	return Issue{Number: 42, Title: "Fix login redirect", OnBoard: true, Status: status}
+}
+
+// blocked gives is n unresolved blockers, in varied places, and unread
+// ones that were not read.
+func blocked(is Issue, n, unread int) Issue {
+	places := []string{"In progress", "not on the board", "status not read"}
+	for i := range n {
+		is.Unresolved = append(is.Unresolved, Blocker{Ref: fmt.Sprintf("#%d", 12+i), Place: places[i%len(places)]})
+	}
+	is.UnreadBlockers = unread
+	return is
+}
+
+// byIssue gives is the issue --by names, as the reader finds it.
+func byIssue(is Issue, ref string, blocks bool) Issue {
+	is.ByIssue = &ByIssue{Ref: ref, Blocks: blocks}
+	return is
 }
 
 func TestPlan(t *testing.T) {
@@ -332,6 +366,30 @@ func TestPlan(t *testing.T) {
 			issue: Issue{Number: 42, OnBoard: true, Archived: true, Status: "Ready"}},
 		{name: "start_archived_not_on_board", verb: "start", hasOps: 3,
 			issue: Issue{Number: 42, Archived: true}},
+		// blockers = "warn" / "deny": unresolved and unread blockers.
+		{name: "begin_blocked_warns", verb: "begin", hasOps: 1, issue: blocked(onBoard("Backlog"), 2, 0)},
+		{name: "begin_unread_warns", verb: "begin", hasOps: 1, issue: blocked(onBoard("Backlog"), 0, 3)},
+		{name: "begin_unblocked", verb: "begin", hasOps: 1, issue: onBoard("Backlog")},
+		{name: "claim_blocked_refused", verb: "claim", code: render.ExitDenied, issue: blocked(onBoard("Backlog"), 2, 0)},
+		{name: "claim_many_blocked_refused", verb: "claim", code: render.ExitDenied, issue: blocked(onBoard("Backlog"), 7, 1)},
+		{name: "claim_unblocked", verb: "claim", hasOps: 1, issue: onBoard("Backlog")},
+		// Like from, the check is skipped for an issue already in the target.
+		{name: "claim_repeat_blocked", verb: "claim", noOps: true, issue: blocked(onBoard("In progress"), 1, 0)},
+		// from is checked first.
+		{name: "claim_wrong_from_blocked", verb: "claim", code: render.ExitDenied, issue: blocked(onBoard("Ready"), 1, 0)},
+		{name: "check_blocked_refused", verb: "check", code: render.ExitDenied,
+			args: Args{Comment: "x", HasComment: true}, issue: blocked(onBoard("Ready"), 1, 0)},
+		// blockers = "link" (kanban's wait): --by names an issue the reader found.
+		{name: "wait_links", verb: "wait", hasOps: 3, args: Args{By: "12", HasBy: true},
+			issue: byIssue(onBoard("In progress"), "#12", false)},
+		{name: "wait_link_in_place", verb: "wait", hasOps: 2, args: Args{By: "acme/api#7", HasBy: true},
+			issue: byIssue(onBoard("In progress"), "acme/api#7", true)},
+		{name: "wait_link_repeat", verb: "wait", noOps: true, args: Args{By: "12", HasBy: true},
+			issue: byIssue(Issue{Number: 42, OnBoard: true, Status: "Waiting",
+				Comments: []Comment{posted("wait", "Waiting for #12.")}}, "#12", true)},
+		// Free text in --by: the reader names no issue, the comment alone.
+		{name: "wait_by_text_no_link", verb: "wait", hasOps: 2, args: Args{By: "the API team", HasBy: true},
+			issue: onBoard("In progress")},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -1,0 +1,4 @@
+warning: #42 has unresolved blockers: #12 (In progress), #13 (not on the board)
+dry run: begin #42 "Fix login redirect"
+  status: Backlog → In progress
+confirm: #42 Backlog → In progress

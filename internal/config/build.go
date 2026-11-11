@@ -257,7 +257,8 @@ func requires(r *rawVerb, arg string) bool {
 	return false
 }
 
-// buildEffects validates labels, assign, close, reopen and confirm.
+// buildEffects validates labels, assign, close, reopen, confirm, blockers,
+// iteration and field.
 func (c *Config) buildEffects(name string, r *rawVerb, v *Verb) error {
 	p := "verbs." + name + "."
 	if r.Labels != nil {
@@ -329,10 +330,42 @@ func (c *Config) buildEffects(name string, r *rawVerb, v *Verb) error {
 			v.Confirm = true
 		}
 	}
+	if err := c.buildBlockers(name, r.Blockers, v); err != nil {
+		return err
+	}
 	if err := c.buildIteration(name, r.Iteration, v); err != nil {
 		return err
 	}
 	return c.buildFieldValues(name, r.Field, v)
+}
+
+// buildBlockers validates the blockers key: "warn" or "deny" (checks),
+// "link" (the effect, which needs {by} in the comment template), or false
+// to turn off a preset's.
+func (c *Config) buildBlockers(name string, o *rawOff, v *Verb) error {
+	p := "verbs." + name + "."
+	if o != nil {
+		key := c.KeyPath(p + "blockers")
+		switch b := deref(o.Str); {
+		case o.Bool != nil && *o.Bool:
+			return c.Errorf("%s = true: want %q, %q or %q, or false to turn it off",
+				key, BlockersWarn, BlockersDeny, BlockersLink).
+				WithAllowed(strconv.Quote(BlockersWarn), strconv.Quote(BlockersDeny), strconv.Quote(BlockersLink), "false")
+		case o.Bool != nil:
+			// false: no check and no link, turning off a preset's.
+		case !slices.Contains(blockersValues, b):
+			return c.Errorf("%s: unknown value %q: %q and %q check the issue's unresolved blockers, "+
+				"%q marks the issue blocked by the --by issue", key, b, BlockersWarn, BlockersDeny, BlockersLink).
+				WithAllowed(blockersValues...)
+		case b == BlockersLink && !v.Uses(ArgBy):
+			return c.Errorf("%s = %q takes the blocking issue from --by, but %s does not use {%s}",
+				key, b, c.KeyPath(p+"comment"), ArgBy).
+				WithFix(fmt.Sprintf(`add {%s} to %s, e.g. "Waiting for {%s}."`, ArgBy, c.KeyPath(p+"comment"), ArgBy))
+		default:
+			v.Blockers = b
+		}
+	}
+	return nil
 }
 
 // buildIteration validates the iteration key: "current", "clear" or

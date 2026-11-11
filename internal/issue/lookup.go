@@ -23,10 +23,15 @@ type Lookup struct {
 	// issue) instead of the card's 20, for a verb that removes labels: a
 	// label beyond the window would read as absent.
 	AllLabels bool
+	// Links are issues to read for blocked-by links (see Links), such as
+	// the issue --by names for blockers = "link".
+	Links Links
 }
 
 // Empty reports whether there is nothing to look up.
-func (l Lookup) Empty() bool { return len(l.Labels) == 0 && l.User == "" && !l.Viewer && !l.AllLabels }
+func (l Lookup) Empty() bool {
+	return len(l.Labels) == 0 && l.User == "" && !l.Viewer && !l.AllLabels && len(l.Links) == 0
+}
 
 // Found is what a Lookup found. Its IDs are for mutations only; never
 // print them.
@@ -39,6 +44,9 @@ type Found struct {
 	User *User
 	// Viewer is the authenticated user when Lookup.Viewer is set.
 	Viewer *User
+	// Links are the issues of Lookup.Links, in order; a missing one is
+	// Linked.Missing, and the card is still read.
+	Links []*Linked
 }
 
 // User is a GitHub user.
@@ -71,8 +79,9 @@ const (
 func labelAlias(i int) string { return fmt.Sprintf("label%d", i) }
 
 // lookupQuery is cardQuery with the fields of l: aliased label lookups and
-// the assignable user below the repository, the viewer at the top. It
-// returns the extra variables too. An empty l gives cardQuery itself.
+// the assignable user below the repository, the viewer and the links at
+// the top. It returns the extra variables too. An empty l gives cardQuery
+// itself.
 //
 // AllLabels widens the issue's labels window.
 //
@@ -105,6 +114,9 @@ func lookupQuery(l Lookup) (string, map[string]any) {
 	if l.Viewer {
 		top = "  viewer { id login }\n"
 	}
+	decls.WriteString(l.Links.Decls())
+	top += l.Links.Fields()
+	l.Links.AddVars(vars)
 	card := cardRepo
 	if l.AllLabels {
 		card = strings.Replace(card, labelsWindow, allLabelsWindow, 1)
@@ -154,7 +166,7 @@ func (r *repoJSON) UnmarshalJSON(data []byte) error {
 }
 
 // found turns the lookups of a response into Found.
-func (l Lookup) found(r *repoJSON, viewer *User) *Found {
+func (l Lookup) found(r *repoJSON, viewer *User, data map[string]json.RawMessage) (*Found, error) {
 	f := &Found{Labels: map[string]string{}}
 	if r != nil {
 		for i, name := range l.Labels {
@@ -174,5 +186,12 @@ func (l Lookup) found(r *repoJSON, viewer *User) *Found {
 	if l.Viewer && viewer != nil && viewer.ID != "" {
 		f.Viewer = viewer
 	}
-	return f
+	if len(l.Links) > 0 {
+		links, err := l.Links.Decode(data)
+		if err != nil {
+			return nil, err
+		}
+		f.Links = links
+	}
+	return f, nil
 }

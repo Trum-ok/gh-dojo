@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.start.blockers: unknown value "add": "warn" and "deny" check the issue's unresolved blockers, "link" marks the issue blocked by the --by issue
+allowed: warn, deny, link

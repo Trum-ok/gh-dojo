@@ -396,7 +396,9 @@ func Read(ctx context.Context, q graph.Querier, req Request) (*Card, error) {
 	c := node.card(req, hidden)
 	c.Incomplete = len(hidden) > 0
 	if !req.Lookup.Empty() {
-		c.Found = req.Lookup.found(resp.Repository, resp.Viewer)
+		if c.Found, err = req.Lookup.found(resp.Repository, resp.Viewer, resp.data); err != nil {
+			return nil, render.Internal("cannot decode GitHub's answer").WithCause(err)
+		}
 	}
 	return c, nil
 }
@@ -412,13 +414,18 @@ func notFound(req Request) *render.Error {
 }
 
 // onlyNested reports whether every GraphQL error points below the issue
-// (repository.issueOrPullRequest.<field>...), so the issue itself was read.
+// (repository.issueOrPullRequest.<field>...), so the issue itself was read,
+// or at a link of the Lookup (see OnlyLinkErrors), which only that link
+// misses.
 func onlyNested(err error) bool {
 	var gqlErr *api.GraphQLError
 	if !errors.As(err, &gqlErr) || gqlErr == nil || len(gqlErr.Errors) == 0 {
 		return false
 	}
 	for _, item := range gqlErr.Errors {
+		if isLinkPath(item.Path) && (item.Type == "NOT_FOUND" || item.Type == "FORBIDDEN") {
+			continue
+		}
 		if len(item.Path) < 3 || item.Path[0] != "repository" || item.Path[1] != "issueOrPullRequest" {
 			return false
 		}
@@ -440,7 +447,7 @@ func nestedPaths(err error) [][]any {
 	}
 	var paths [][]any
 	for _, item := range gqlErr.Errors {
-		if len(item.Path) < 3 {
+		if len(item.Path) < 3 || item.Path[0] != "repository" || item.Path[1] != "issueOrPullRequest" {
 			continue
 		}
 		path := make([]any, 0, len(item.Path)-2)

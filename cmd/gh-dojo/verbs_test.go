@@ -86,7 +86,7 @@ type fakeBackend struct {
 	applied  []*workflow.Plan
 }
 
-func (f *fakeBackend) ReadIssue(_ context.Context, _ config.Verb, n int) (workflow.Issue, error) {
+func (f *fakeBackend) ReadIssue(_ context.Context, _ config.Verb, n int, _ workflow.Args) (workflow.Issue, error) {
 	f.reads++
 	is, ok := f.issues[n]
 	if !ok {

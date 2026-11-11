@@ -1,0 +1,5 @@
+code: 3
+--- stdout
+--- stderr
+error: --by #9999: no such issue in Trum-ok/gh-dojo, or the token cannot see it
+fix: gh dojo list

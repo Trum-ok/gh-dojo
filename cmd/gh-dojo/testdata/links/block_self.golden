@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: --by names #3 itself; an issue cannot block itself
+fix: pass the number of the issue #3 waits for

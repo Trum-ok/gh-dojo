@@ -1,0 +1,4 @@
+code: 0
+--- stdout
+#3 Waiting (unchanged), blocked by #26, comment already present
+--- stderr

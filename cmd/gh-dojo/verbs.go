@@ -79,7 +79,12 @@ type Backend interface {
 	// in another case than the repo's, or an assignee who cannot be
 	// assigned). The default repo comes from the app wiring:
 	// board.repos[0], or the git remote of the current directory.
-	ReadIssue(ctx context.Context, v config.Verb, n int) (workflow.Issue, error)
+	//
+	// For a verb with blockers = "warn" or "deny" it fills the unresolved
+	// blockers; for blockers = "link" with --by naming an issue (a), that
+	// issue (workflow.Issue.ByIssue), with exit code 3 when it does not
+	// exist and 1 when it is the issue itself.
+	ReadIssue(ctx context.Context, v config.Verb, n int, a workflow.Args) (workflow.Issue, error)
 	// Apply applies every op of a non-empty plan, finding the issue's node
 	// IDs in p.Issue.Ref. It returns the ops GitHub confirmed, also with an
 	// error: the rest of p.Ops did not take effect, or their outcome is
@@ -128,7 +133,11 @@ func newVerbCmd(cfg *config.Config, v config.Verb) *cobra.Command {
 	}
 	f := cmd.Flags()
 	f.StringVar(&args.Comment, config.ArgComment, "", "text for {comment} in the comment")
-	f.StringVar(&args.By, config.ArgBy, "", "value for {by} in the comment: an issue number (12 or #12) or free text")
+	byUsage := "value for {by} in the comment: an issue number (12 or #12) or free text"
+	if v.Blockers == config.BlockersLink {
+		byUsage = "value for {by} in the comment: an issue (12, #12 or owner/repo#12), also marked as blocking this one, or free text"
+	}
+	f.StringVar(&args.By, config.ArgBy, "", byUsage)
 	f.BoolVar(&dryRun, "dry-run", false, "print the plan without changing anything")
 	f.BoolVar(&args.Yes, "yes", false, "the user agreed: run a verb that is the user's decision")
 	// Flags the comment template does not use stay registered but hidden, so
@@ -302,7 +311,7 @@ func hasKind(ops []workflow.Op, op workflow.Op) bool {
 
 // readPlan reads issue n and plans verb v on it.
 func readPlan(ctx context.Context, be Backend, e *workflow.Engine, v config.Verb, n int, args workflow.Args) (*workflow.Plan, error) {
-	is, err := be.ReadIssue(ctx, v, n)
+	is, err := be.ReadIssue(ctx, v, n, args)
 	if err != nil {
 		return nil, err
 	}
@@ -418,6 +427,14 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 	default:
 		line("Assign", "%s; other assignees stay", v.Assign)
 	}
+	switch v.Blockers {
+	case config.BlockersWarn:
+		line("Blockers", "warns about unresolved blockers (%s), then runs", unresolvedMeaning(cfg))
+	case config.BlockersDeny:
+		line("Blockers", "refused (exit code 2) while a blocker is unresolved (%s): ask the user", unresolvedMeaning(cfg))
+	case config.BlockersLink:
+		line("Blockers", "--by naming an issue (12, #12, owner/repo#12) also marks this one blocked by it")
+	}
 	if v.Close != "" {
 		line("Close", "closes the issue as %s; an issue already closed stays as it is", workflow.ReasonText(v.Close))
 	}
@@ -434,6 +451,19 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 		}
 	}
 	return b.String()
+}
+
+// unresolvedMeaning says when a blocker is unresolved under cfg's
+// statuses.resolved: "open and not in Ready or Done".
+func unresolvedMeaning(cfg *config.Config) string {
+	r := cfg.Statuses.Resolved
+	switch len(r) {
+	case 0:
+		return "open"
+	case 1:
+		return "open and not in " + r[0]
+	}
+	return "open and not in " + strings.Join(r[:len(r)-1], ", ") + " or " + r[len(r)-1]
 }
 
 // configNote is appended to the root help when there is no config or it

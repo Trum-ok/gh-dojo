@@ -23,16 +23,28 @@ import (
 // Requests with a warm schema cache: ReadIssue sends one query, Apply one
 // mutation, or two for an issue not on the board whose status is set (see
 // effects.Batches). The label and user IDs of the labels and assign
-// effects come with the card's query (issue.Lookup); only a label to add
-// or a user that does not exist costs one more read, for the error's
-// allowed list.
+// effects, and the issue --by names for blockers = "link", come with the
+// card's query (issue.Lookup); only a label to add or a user that does not
+// exist costs one more read, for the error's allowed list.
 type githubBackend struct {
 	app   *App
 	added map[int]string // issue number → board item added in this run
 }
 
-func (b *githubBackend) ReadIssue(ctx context.Context, v config.Verb, n int) (workflow.Issue, error) {
+func (b *githubBackend) ReadIssue(ctx context.Context, v config.Verb, n int, a workflow.Args) (workflow.Issue, error) {
 	lookup := verbLookup(v)
+	if v.Blockers == config.BlockersLink && a.HasBy {
+		repo, err := b.app.Repo()
+		if err != nil {
+			return workflow.Issue{}, err
+		}
+		if ref, ok := issue.ParseRef(a.By, repo); ok {
+			if ref.Same(issue.Ref{Repo: repo, Number: n}) {
+				return workflow.Issue{}, selfBlock(n, v.Name+" --by")
+			}
+			lookup.Links = issue.Links{ref}
+		}
+	}
 	card, err := b.app.LookupCard(ctx, n, lookup)
 	if err != nil {
 		return workflow.Issue{}, err
@@ -54,7 +66,53 @@ func (b *githubBackend) ReadIssue(ctx context.Context, v config.Verb, n int) (wo
 	if err := b.fieldState(ctx, v, card, &is); err != nil {
 		return workflow.Issue{}, err
 	}
+	if v.ChecksBlockers() {
+		cfg, err := b.app.Config()
+		if err != nil {
+			return workflow.Issue{}, err
+		}
+		is.Unresolved, is.UnreadBlockers = unresolvedBlockers(card, cfg.Statuses.Resolved)
+	}
+	if len(lookup.Links) > 0 {
+		var links []*issue.Linked
+		if card.Found != nil {
+			links = card.Found.Links
+		}
+		if len(links) != 1 {
+			return workflow.Issue{}, render.Internal("the issue --by names was not read")
+		}
+		l := links[0]
+		if err := issue.LinksError("--by", links, card.Repo); err != nil {
+			return workflow.Issue{}, err
+		}
+		if l.ID == card.ID {
+			return workflow.Issue{}, selfBlock(n, v.Name+" --by")
+		}
+		is.ByIssue = &workflow.ByIssue{Ref: l.Ref.String(card.Repo), Blocks: l.Blocks(card.ID)}
+	}
 	return is, nil
+}
+
+// selfBlock is the error for an issue named as its own blocker by flag.
+func selfBlock(n int, flag string) error {
+	return render.Usage("%s names #%d itself; an issue cannot block itself", flag, n).
+		WithFix(fmt.Sprintf("pass the number of the issue #%d waits for", n))
+}
+
+// unresolvedBlockers returns the card's blockers that still block (see
+// issue.Card.UnresolvedBlockers), each with where it stands as show says
+// it, but without why a status was not read (show has it), and how many
+// blockers were not read at all.
+func unresolvedBlockers(c *issue.Card, resolved []string) ([]workflow.Blocker, int) {
+	var out []workflow.Blocker
+	for _, l := range c.UnresolvedBlockers(resolved) {
+		place := linkPlace(l)
+		if l.StatusUnknown != "" {
+			place = "status not read"
+		}
+		out = append(out, workflow.Blocker{Ref: l.Ref(c.Repo), Place: place})
+	}
+	return out, max(0, c.BlockedBy.TotalCount-len(c.BlockedBy.Nodes))
 }
 
 // verbLookup is what the effects of v need looked up with the card: the
@@ -335,6 +393,9 @@ func (b *githubBackend) ids(ctx context.Context, p *workflow.Plan, card *issue.C
 		return effects.IDs{}, err
 	}
 	if f := card.Found; f != nil {
+		if len(f.Links) == 1 {
+			ids.Blocker = f.Links[0].ID
+		}
 		ids.Labels = f.Labels
 		ids.Users = map[string]string{}
 		for _, u := range []*issue.User{f.User, f.Viewer} {
