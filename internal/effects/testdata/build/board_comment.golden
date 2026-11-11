@@ -1,0 +1,12 @@
+mutation Verb($project: ID!, $issue: ID!, $body: String!) {
+  board: addProjectV2ItemById(input: {projectId: $project, contentId: $issue}) { item { id } }
+  comment: addComment(input: {subjectId: $issue, body: $body}) { commentEdge { node { id } } }
+}
+--- vars
+{
+  "body": "Started.\n\n<!-- gh-dojo:start:995a443b -->",
+  "issue": "I_1",
+  "project": "PVT_1"
+}
+--- steps
+board, comment

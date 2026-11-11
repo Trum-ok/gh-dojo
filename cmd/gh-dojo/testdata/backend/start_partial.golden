@@ -1,0 +1,5 @@
+code: 5
+--- stdout
+--- stderr
+error: #3 comment left; status not changed: GitHub token is missing a required scope (project); re-run the same command
+fix: gh auth refresh -s project

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/Trum-ok/gh-dojo/internal/board"
 	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/Trum-ok/gh-dojo/internal/workflow"
@@ -51,7 +52,7 @@ var loadConfig = sync.OnceValues(func() (*config.Config, error) {
 var getenv = os.Getenv
 
 // Backend reads issues and applies plans; it is the only part of a verb that
-// talks to GitHub.
+// talks to GitHub. The GitHub one is githubBackend (backend.go).
 //
 // Requests: one query for ReadIssue and one mutation for Apply, so 2 with a
 // warm board cache. An issue not on the board needs a second mutation:
@@ -59,10 +60,10 @@ var getenv = os.Getenv
 // that case takes 3 requests.
 //
 // Retries: after a stale ID or a partial failure, the way to resume is to
-// run ReadIssue → Plan → Apply again (in runVerb), never to replay the old
-// plan: the fresh plan leaves out what is already done, including a comment
-// already posted (see workflow.AlreadyPosted). That loop is for the #12
-// implementer to add.
+// run ReadIssue → Plan → Apply again, never to replay the old plan: the
+// fresh plan leaves out what is already done, including a comment already
+// posted (see workflow.AlreadyPosted). runVerb does that once on a stale
+// schema ID; after a partial failure the agent re-runs the command.
 type Backend interface {
 	// ReadIssue returns the state of issue n in the default repo, filled as
 	// workflow.Issue documents (comments with viewerDidAuthor), with a
@@ -73,30 +74,16 @@ type Backend interface {
 	// Apply applies every op of a non-empty plan, finding the issue's node
 	// IDs in p.Issue.Ref. On success the command prints p.Confirm(); a
 	// partial failure is a render.Partial error that says what was done.
+	// Errors keep their cause, so board.IsStale tells a rejected schema ID.
 	Apply(ctx context.Context, p *workflow.Plan) error
+	// Reset drops the cached board schema after GitHub rejected one of its
+	// IDs, so the next ReadIssue and Apply use a fresh one.
+	Reset() error
 }
 
-// newBackend returns the backend for cfg. Tests replace it.
-//
-// The GitHub backend (#12) is built on newApp (app.go): ReadIssue is
-// a.Card(ctx, n, 0) mapped with workflowIssue, whose Ref is the
-// *issue.Card with the node IDs; Apply uses a.Schema for field and option
-// IDs and a.Client.Mutate, and a.ResetSchema once on a stale ID.
-var newBackend = func(cfg *config.Config) (Backend, error) { return pendingBackend{}, nil }
-
-// pendingBackend stands in until the GitHub reader and executor land
-// (issue #12).
-type pendingBackend struct{}
-
-func (pendingBackend) ReadIssue(context.Context, int) (workflow.Issue, error) {
-	return workflow.Issue{}, errNotImplemented()
-}
-
-func (pendingBackend) Apply(context.Context, *workflow.Plan) error { return errNotImplemented() }
-
-func errNotImplemented() error {
-	return render.Internal("verbs cannot reach GitHub yet, the backend is not implemented in this build")
-}
+// newBackend returns the backend for cfg: GitHub through one App per run,
+// which loads the same config. Tests replace it.
+var newBackend = func(*config.Config) (Backend, error) { return &githubBackend{app: newApp()}, nil }
 
 func newVerbCmds() ([]*cobra.Command, error) {
 	cfg, err := loadConfig()
@@ -151,13 +138,9 @@ func runVerb(cmd *cobra.Command, cfg *config.Config, v config.Verb, n int, args 
 		return err
 	}
 	ctx := cmd.Context()
-	issue, err := be.ReadIssue(ctx, n)
-	if err != nil {
-		return err
-	}
 	engine := workflow.New(cfg)
 	engine.Getenv = getenv
-	plan, err := engine.Plan(v, issue, args)
+	plan, err := readPlan(ctx, be, engine, v, n, args)
 	if err != nil {
 		return err
 	}
@@ -168,13 +151,46 @@ func runVerb(cmd *cobra.Command, cfg *config.Config, v config.Verb, n int, args 
 		fmt.Fprintln(cmd.OutOrStdout(), plan.DryRun())
 		return nil
 	}
-	if !plan.Empty() {
-		if err := be.Apply(ctx, plan); err != nil {
+	if err := apply(ctx, be, plan); err != nil {
+		if !board.IsStale(err) {
+			return err
+		}
+		// A board ID from the schema cache went stale, and part of the plan
+		// may have been applied. Drop the cache, re-read, re-plan and apply
+		// what is left, once. A transport failure is never retried here:
+		// its outcome is unknown and the agent re-runs the command.
+		if rerr := be.Reset(); rerr != nil {
+			return err
+		}
+		fresh, perr := readPlan(ctx, be, engine, v, n, args)
+		if perr != nil {
+			return perr
+		}
+		if err := apply(ctx, be, fresh); err != nil {
 			return err
 		}
 	}
+	// The first plan's line even after a retry: it starts from the state
+	// this command found, and the retry only finished it.
 	fmt.Fprintln(cmd.OutOrStdout(), plan.Confirm())
 	return nil
+}
+
+// readPlan reads issue n and plans verb v on it.
+func readPlan(ctx context.Context, be Backend, e *workflow.Engine, v config.Verb, n int, args workflow.Args) (*workflow.Plan, error) {
+	is, err := be.ReadIssue(ctx, n)
+	if err != nil {
+		return nil, err
+	}
+	return e.Plan(v, is, args)
+}
+
+// apply applies a plan with something to do.
+func apply(ctx context.Context, be Backend, p *workflow.Plan) error {
+	if p.Empty() {
+		return nil
+	}
+	return be.Apply(ctx, p)
 }
 
 var issueRE = regexp.MustCompile(`^#?[1-9][0-9]*$`)

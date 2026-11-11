@@ -18,8 +18,9 @@ type Plan struct {
 	Issue  Issue  // the state the plan was built from; Issue.Status is "" when not on the board
 	Target string // the verb's target status; "" when it leaves the status alone
 
-	// Ops are the operations to apply, in this order: AddToBoard, SetStatus,
-	// AddComment, each at most once. Empty when there is nothing to do.
+	// Ops are the operations to apply, in this order: AddToBoard or
+	// Unarchive, SetStatus, AddComment, each at most once. Empty when there
+	// is nothing to do.
 	Ops []Op
 
 	StatusUnchanged bool // the issue is already in Target; no SetStatus
@@ -30,7 +31,8 @@ type Plan struct {
 	Warnings []string
 }
 
-// Op is one operation of a plan: AddToBoard, SetStatus or AddComment.
+// Op is one operation of a plan: AddToBoard, Unarchive, SetStatus or
+// AddComment.
 type Op interface {
 	// Describe is the op's line in a dry run.
 	Describe() string
@@ -42,6 +44,10 @@ type Op interface {
 // AddToBoard adds the issue to the project. It comes first: the other ops
 // need the project item.
 type AddToBoard struct{}
+
+// Unarchive restores the issue's archived board item. It comes first, like
+// AddToBoard, which it replaces for an issue already on the board.
+type Unarchive struct{}
 
 // SetStatus sets the status field. From is the status read, "" for none.
 type SetStatus struct {
@@ -57,6 +63,9 @@ type AddComment struct {
 func (AddToBoard) Describe() string  { return "add to the board" }
 func (AddToBoard) Effect() string    { return "added to the board" }
 func (AddToBoard) op()               {}
+func (Unarchive) Describe() string   { return "unarchive on the board" }
+func (Unarchive) Effect() string     { return "unarchived" }
+func (Unarchive) op()                {}
 func (s SetStatus) Describe() string { return "status: " + render.Transition(s.From, s.To) }
 func (s SetStatus) Effect() string   { return render.Transition(s.From, s.To) }
 func (SetStatus) op()                {}
@@ -91,12 +100,15 @@ func (p *Plan) Empty() bool { return len(p.Ops) == 0 }
 // status, comment. Effects already in place are included. The status change
 // of an issue not on the board reads "not on the board → In progress"; with
 // short set, that line alone stands for adding the issue to the board.
+// Unarchiving is a board effect too, but always has its own line.
 func (p *Plan) lines(pick func(Op) string, short bool) []string {
-	var board, status, comment []string
+	var board, unarchive, status, comment []string
 	for _, op := range p.Ops {
 		switch op := op.(type) {
 		case AddToBoard:
 			board = append(board, pick(op))
+		case Unarchive:
+			unarchive = append(unarchive, pick(op))
 		case SetStatus:
 			if !p.Issue.OnBoard {
 				op.From = notOnBoard
@@ -115,6 +127,7 @@ func (p *Plan) lines(pick func(Op) string, short bool) []string {
 	if p.CommentPresent {
 		comment = append(comment, pick(commentSkipped{}))
 	}
+	board = append(board, unarchive...)
 	return append(append(board, status...), comment...)
 }
 

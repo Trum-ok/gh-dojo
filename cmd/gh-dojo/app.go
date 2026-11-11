@@ -161,12 +161,13 @@ func (a *App) Card(ctx context.Context, n, comments int) (*issue.Card, error) {
 // (card.Archived()) is OnBoard.
 func workflowIssue(c *issue.Card) workflow.Issue {
 	is := workflow.Issue{
-		Number:  c.Number,
-		Title:   c.Title,
-		Closed:  c.Closed(),
-		OnBoard: c.OnBoard(),
-		Status:  c.Status(),
-		Ref:     c,
+		Number:   c.Number,
+		Title:    c.Title,
+		Closed:   c.Closed(),
+		OnBoard:  c.OnBoard(),
+		Status:   c.Status(),
+		Archived: c.Archived(),
+		Ref:      c,
 	}
 	for _, cm := range c.Comments.Nodes {
 		is.Comments = append(is.Comments, workflow.Comment{Body: cm.Body, ViewerDidAuthor: cm.ViewerDidAuthor})

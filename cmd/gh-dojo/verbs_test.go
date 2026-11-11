@@ -26,7 +26,6 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	loadConfig = func() (*config.Config, error) { return config.Load(dir) }
-	newBackend = func(*config.Config) (Backend, error) { return pendingBackend{}, nil }
 	getenv = func(string) string { return "" }
 	newApp = noApp // see withApp
 	code := m.Run()
@@ -102,6 +101,8 @@ func (f *fakeBackend) Apply(_ context.Context, p *workflow.Plan) error {
 	f.applied = append(f.applied, p)
 	return nil
 }
+
+func (f *fakeBackend) Reset() error { return nil }
 
 func withBackend(t *testing.T, f *fakeBackend) {
 	t.Helper()
@@ -190,15 +191,6 @@ func TestVerbApplyError(t *testing.T) {
 		t.Errorf("exit code = %d, want %d\n%s", code, render.ExitPartial, out)
 	}
 	testutil.Golden(t, "verbs/apply_partial", out)
-}
-
-func TestVerbPendingBackend(t *testing.T) {
-	withConfig(t, verbsConfig)
-	code, out := runOut("start", "42", "--dry-run")
-	if code != render.ExitUsage {
-		t.Errorf("exit code = %d, want %d\n%s", code, render.ExitUsage, out)
-	}
-	testutil.Golden(t, "verbs/pending_backend", out)
 }
 
 func TestVerbHelp(t *testing.T) {

@@ -1,0 +1,5 @@
+code: 2
+--- stdout
+--- stderr
+error: wait cannot move #3 from Ready; it starts only from In progress
+this is a process rule: ask the user how to proceed

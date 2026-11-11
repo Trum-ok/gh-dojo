@@ -1,0 +1,6 @@
+dry run: start #42
+  unarchive on the board
+  status: Backlog → In progress
+  comment: "Started. Session: claude://s/abc"
+confirm: #42 unarchived, Backlog → In progress, comment left
+post: "Started. Session: claude://s/abc\n\n<!-- gh-dojo:start:c1bb1323 -->"

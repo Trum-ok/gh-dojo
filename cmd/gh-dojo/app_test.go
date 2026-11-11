@@ -352,6 +352,13 @@ func TestWorkflowIssue(t *testing.T) {
 	if len(is.Comments) != 2 || is.Comments[0].Body != "a" || !is.Comments[1].ViewerDidAuthor {
 		t.Errorf("comments = %+v", is.Comments)
 	}
+	if is.Archived {
+		t.Errorf("archived: %+v", is)
+	}
+	card.Item.Archived = true
+	if is := workflowIssue(card); !is.Archived {
+		t.Errorf("archived item: %+v", is)
+	}
 	if is := workflowIssue(&issue.Card{Number: 1, State: issue.StateOpen}); is.OnBoard || is.Status != "" || is.Closed {
 		t.Errorf("not on board: %+v", is)
 	}

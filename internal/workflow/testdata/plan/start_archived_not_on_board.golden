@@ -1,0 +1,6 @@
+dry run: start #42
+  add to the board
+  status: not on the board → In progress
+  comment: "Started. Session: claude://s/abc"
+confirm: #42 not on the board → In progress, comment left
+post: "Started. Session: claude://s/abc\n\n<!-- gh-dojo:start:c1bb1323 -->"

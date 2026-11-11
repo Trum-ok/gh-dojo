@@ -32,6 +32,10 @@ type Issue struct {
 	// no status; it is ignored when OnBoard is false.
 	OnBoard bool
 	Status  string
+	// Archived reports that the board item is archived: hidden from the
+	// board's views. A verb unarchives it (see Unarchive). Ignored when
+	// OnBoard is false.
+	Archived bool
 
 	// Comments are the issue's latest comments, oldest first (GraphQL
 	// comments(last: N) returns them in this order), each with its body
@@ -219,7 +223,8 @@ func join(items []string, conj string) string {
 //  4. otherwise the current status must be in from (exit code 2). An issue
 //     not on the board or without a status counts as Engine.Initial.
 //
-// The plan adds the issue to the board when it is not there, sets the
+// The plan adds the issue to the board when it is not there (or unarchives
+// its item when archived: a verb means the issue is live), sets the
 // target status, and posts the rendered comment unless it renders empty or
 // the same comment is already the verb's latest (see AlreadyPosted).
 func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
@@ -228,6 +233,7 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 	}
 	if !is.OnBoard {
 		is.Status = ""
+		is.Archived = false
 	}
 	if is.Closed && !e.runsOnClosed(v) {
 		return nil, render.Denied("#%d is closed; %s works only on open issues\n"+
@@ -240,8 +246,11 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 			return nil, err
 		}
 	}
-	if !is.OnBoard {
+	switch {
+	case !is.OnBoard:
 		p.Ops = append(p.Ops, AddToBoard{})
+	case is.Archived:
+		p.Ops = append(p.Ops, Unarchive{})
 	}
 	if v.To != "" {
 		if atTarget {

@@ -1,0 +1,10 @@
+mutation Verb($project: ID!, $issue: ID!) {
+  board: addProjectV2ItemById(input: {projectId: $project, contentId: $issue}) { item { id } }
+}
+--- vars
+{
+  "issue": "I_1",
+  "project": "PVT_1"
+}
+--- steps
+board
