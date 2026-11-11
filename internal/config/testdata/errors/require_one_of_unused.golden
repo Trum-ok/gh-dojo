@@ -1,0 +1,1 @@
+error: .github/dojo.toml: verbs.wait.require_one_of (from preset kanban) names "comment", but verbs.wait.comment does not use {comment}

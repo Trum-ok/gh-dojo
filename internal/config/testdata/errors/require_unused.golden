@@ -1,0 +1,1 @@
+error: .github/dojo.toml: verbs.go.require names "comment", but verbs.go.comment does not use {comment}

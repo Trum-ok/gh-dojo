@@ -1,0 +1,2 @@
+error: .github/dojo.toml: unknown key labels.type_prefix
+allowed: types, area_prefix

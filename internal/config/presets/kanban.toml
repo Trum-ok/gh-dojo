@@ -14,7 +14,7 @@ initial = "Backlog"
 final = ["Done"]
 
 [labels]
-type_prefix = ""
+types = []
 area_prefix = "area:"
 
 [verbs.start]

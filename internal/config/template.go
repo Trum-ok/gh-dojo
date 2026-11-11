@@ -39,14 +39,26 @@ func checkTemplate(tmpl string, allowed []string) (string, bool) {
 //   - a line with placeholders that all came out empty is dropped, so an
 //     optional part disappears with its surrounding text: with by unset,
 //     "Waiting for {by}." vanishes;
-//   - runs of blank lines collapse into one, and leading and trailing blank
-//     lines and spaces are trimmed.
+//   - a blank template line that follows a blank output line is dropped, so
+//     dropped parts leave one blank line, not several;
+//   - trailing spaces of every output line are cut, and leading and
+//     trailing blank lines are dropped. Leading indentation stays.
+//
+// There is no escape syntax: a literal "{comment}" cannot be written in a
+// template. Braces that do not form {name}, such as "{}" or "{ x }", are
+// plain text. Values are inserted as is and never expanded again.
 //
 // The result is "" when nothing is left; callers post no comment then.
 func Render(tmpl string, vars map[string]string) string {
 	var out []string
 	for _, line := range strings.Split(tmpl, "\n") {
 		matches := placeholderRE.FindAllStringSubmatch(line, -1)
+		if len(matches) == 0 && strings.TrimSpace(line) == "" {
+			if len(out) > 0 && out[len(out)-1] != "" {
+				out = append(out, "")
+			}
+			continue
+		}
 		empty := len(matches) > 0
 		for _, m := range matches {
 			if strings.TrimSpace(vars[m[1]]) != "" {
@@ -59,12 +71,17 @@ func Render(tmpl string, vars map[string]string) string {
 		line = placeholderRE.ReplaceAllStringFunc(line, func(s string) string {
 			return vars[s[1:len(s)-1]]
 		})
-		if strings.TrimSpace(line) == "" && (len(out) == 0 || out[len(out)-1] == "") {
-			continue
+		for _, l := range strings.Split(line, "\n") {
+			out = append(out, strings.TrimRight(l, " \t\r"))
 		}
-		out = append(out, strings.TrimRight(line, " \t\r"))
 	}
-	return strings.TrimSpace(strings.Join(out, "\n"))
+	for len(out) > 0 && out[0] == "" {
+		out = out[1:]
+	}
+	for len(out) > 0 && out[len(out)-1] == "" {
+		out = out[:len(out)-1]
+	}
+	return strings.Join(out, "\n")
 }
 
 // Session says how to find the agent's session: the first non-empty
@@ -74,8 +91,13 @@ type Session struct {
 	Link string // template with {id}; "{id}" when not configured
 }
 
+// Configured reports whether the config names any session variable.
+// Callers warn about a missing session only when it is configured.
+func (s Session) Configured() bool { return len(s.Env) > 0 }
+
 // Resolve returns the session link for {session}, or "" and false when no
-// variable in Env is set; callers warn then, they do not fail. getenv is
+// variable in Env is set. Check Configured to tell "not configured" (no
+// warning) from "configured but unset" (warn, do not fail). getenv is
 // os.Getenv when nil.
 func (s Session) Resolve(getenv func(string) string) (string, bool) {
 	if getenv == nil {

@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.drop: disabled = true, but preset kanban has no verb "drop"
+allowed: start, wait, ready, done

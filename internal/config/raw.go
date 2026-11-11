@@ -41,8 +41,8 @@ type rawStatuses struct {
 }
 
 type rawLabels struct {
-	TypePrefix *string `toml:"type_prefix"`
-	AreaPrefix *string `toml:"area_prefix"`
+	Types      *[]string `toml:"types"`
+	AreaPrefix *string   `toml:"area_prefix"`
 }
 
 type rawSession struct {
@@ -60,13 +60,31 @@ type rawVerb struct {
 	Disabled     *bool     `toml:"disabled"`
 }
 
+// setKeys lists the keys of v that are set, other than disabled.
+func (v *rawVerb) setKeys() []string {
+	var keys []string
+	for _, k := range []struct {
+		name string
+		set  bool
+	}{
+		{"when", v.When != nil}, {"to", v.To != nil}, {"from", v.From != nil},
+		{"require", v.Require != nil}, {"require_one_of", v.RequireOneOf != nil},
+		{"comment", v.Comment != nil},
+	} {
+		if k.set {
+			keys = append(keys, k.name)
+		}
+	}
+	return keys
+}
+
 // Allowed keys per table, in documentation order.
 var (
 	topKeys      = []string{"version", "preset", "board", "fields", "statuses", "labels", "session", "verbs"}
 	presetKeys   = []string{"version", "fields", "statuses", "labels", "session", "verbs"}
 	boardKeys    = []string{"owner", "project", "repos", "assignee"}
 	statusesKeys = []string{"initial", "final"}
-	labelsKeys   = []string{"type_prefix", "area_prefix"}
+	labelsKeys   = []string{"types", "area_prefix"}
 	sessionKeys  = []string{"env", "link"}
 	verbKeys     = []string{"when", "to", "from", "require", "require_one_of", "comment", "disabled"}
 
@@ -104,6 +122,9 @@ func parseRaw(data []byte, display string, preset bool) (*rawFile, error) {
 			if !slices.Contains(presetKeys, k) && md.IsDefined(k) {
 				return nil, render.Usage("%s: %s is not allowed in a preset", display, k)
 			}
+		}
+		if raw.Version == nil || *raw.Version != Version {
+			return nil, render.Usage("%s: version must be %d", display, Version)
 		}
 	}
 	for _, key := range md.Keys() {
@@ -225,7 +246,7 @@ func merge(preset, repo *rawFile, name string, origin map[string]string) *rawFil
 	}
 	out.Statuses.Initial = pick(m, "statuses.initial", preset.Statuses.Initial, repo.Statuses.Initial)
 	out.Statuses.Final = pick(m, "statuses.final", preset.Statuses.Final, repo.Statuses.Final)
-	out.Labels.TypePrefix = pick(m, "labels.type_prefix", preset.Labels.TypePrefix, repo.Labels.TypePrefix)
+	out.Labels.Types = pick(m, "labels.types", preset.Labels.Types, repo.Labels.Types)
 	out.Labels.AreaPrefix = pick(m, "labels.area_prefix", preset.Labels.AreaPrefix, repo.Labels.AreaPrefix)
 	out.Session.Env = pick(m, "session.env", preset.Session.Env, repo.Session.Env)
 	out.Session.Link = pick(m, "session.link", preset.Session.Link, repo.Session.Link)

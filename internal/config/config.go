@@ -14,7 +14,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
+	"syscall"
 
 	"github.com/Trum-ok/gh-dojo/internal/render"
 )
@@ -36,15 +38,20 @@ const (
 	ArgBy      = "by"
 )
 
-// Args lists the verb arguments in the order they are documented.
-var Args = []string{ArgComment, ArgBy}
+var (
+	args     = []string{ArgComment, ArgBy}
+	builtins = []string{
+		"agent", "block", "comment", "describe", "doctor", "help", "init",
+		"list", "new", "next", "release", "show", "unblock",
+	}
+)
 
-// Builtins are the command names verbs cannot take: commands that exist now
-// or are planned.
-var Builtins = []string{
-	"agent", "block", "comment", "describe", "doctor", "help", "init",
-	"list", "new", "next", "release", "show", "unblock",
-}
+// Args lists the verb arguments in the order they are documented.
+func Args() []string { return slices.Clone(args) }
+
+// Builtins lists the command names verbs cannot take: commands that exist
+// now or are planned.
+func Builtins() []string { return slices.Clone(builtins) }
 
 // Config is a loaded and validated .github/dojo.toml with its preset applied.
 type Config struct {
@@ -79,10 +86,13 @@ type Statuses struct {
 	Final   []string // hidden by `list`, with a counter
 }
 
-// Labels maps `new` flags to label names: `--type bug` → TypePrefix+"bug",
-// `--area cli` → AreaPrefix+"cli".
+// Labels maps `new` flags to label names.
 type Labels struct {
-	TypePrefix string
+	// Types are the labels `new --type` accepts, used as is (`--type bug` →
+	// "bug"). When empty, --type accepts any repo label that does not start
+	// with AreaPrefix.
+	Types []string
+	// AreaPrefix is prepended to `new --area`: `--area cli` → "area:cli".
 	AreaPrefix string
 }
 
@@ -95,6 +105,18 @@ type Verb struct {
 	Require      []string // arguments (ArgComment, ArgBy) that must all be given
 	RequireOneOf []string // arguments of which at least one must be given
 	Comment      string   // comment template (see Render); "" posts no comment
+}
+
+// Uses reports whether the verb's comment template uses the placeholder
+// {arg}. Every argument in Require and RequireOneOf is used; a verb should
+// reject --comment or --by when its template does not use them.
+func (v Verb) Uses(arg string) bool {
+	for _, m := range placeholderRE.FindAllStringSubmatch(v.Comment, -1) {
+		if m[1] == arg {
+			return true
+		}
+	}
+	return false
 }
 
 // StatusRef is a status name the config refers to, with the key path that
@@ -131,7 +153,9 @@ func Load(dir string) (*Config, error) {
 }
 
 // Find returns the absolute path of the nearest .github/dojo.toml in dir or
-// one of its parents, up to the filesystem root.
+// one of its parents. The search stops after the repository root, the first
+// directory that contains .git (a directory, or a file in worktrees and
+// submodules), or at the filesystem root outside a repository.
 func Find(dir string) (string, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
@@ -143,16 +167,27 @@ func Find(dir string) (string, error) {
 		switch {
 		case err == nil && !info.IsDir():
 			return path, nil
-		case err != nil && !errors.Is(err, fs.ErrNotExist):
+		case err != nil && !notExist(err):
 			return "", render.Usage("cannot read %s: %v", path, errors.Unwrap(err)).WithCause(err)
 		}
 		parent := filepath.Dir(abs)
-		if parent == abs {
-			return "", render.Usage("no %s in this directory or any parent", FileName).
+		if parent == abs || isRepoRoot(abs) {
+			return "", render.Usage("no %s in this directory or its parents up to the repository root", FileName).
 				WithFix(fmt.Sprintf("create %s in the repository root, example: %s", FileName, DocsURL))
 		}
 		abs = parent
 	}
+}
+
+// notExist reports a missing path, including one below a regular file
+// (ENOTDIR, e.g. when .github is a file).
+func notExist(err error) bool {
+	return errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ENOTDIR)
+}
+
+func isRepoRoot(dir string) bool {
+	_, err := os.Lstat(filepath.Join(dir, ".git"))
+	return err == nil
 }
 
 // Parse parses and validates config data. display names the file in errors.
@@ -162,17 +197,23 @@ func Parse(data []byte, display string) (*Config, error) {
 		return nil, err
 	}
 	c := &Config{Display: display, origin: map[string]string{}}
-	merged := repo
+	var preset *rawFile
 	if repo.Preset != nil {
 		name := *repo.Preset
-		preset, err := loadPreset(name)
+		preset, err = loadPreset(name)
 		if errors.Is(err, errUnknownPreset) {
 			return nil, c.Errorf("unknown preset %q", name).WithAllowed(Presets()...)
 		}
 		if err != nil {
 			return nil, err
 		}
-		merged = merge(preset, repo, name, c.origin)
+	}
+	if err := c.checkRepoVerbs(repo, preset); err != nil {
+		return nil, err
+	}
+	merged := repo
+	if preset != nil {
+		merged = merge(preset, repo, *repo.Preset, c.origin)
 	}
 	if err := c.build(merged); err != nil {
 		return nil, err

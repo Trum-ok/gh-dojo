@@ -1,0 +1,1 @@
+error: .github/dojo.toml: verbs.wait.require_one_of (from preset kanban): "comment" is also in verbs.wait.require

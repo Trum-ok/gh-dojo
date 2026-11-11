@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"regexp"
 	"slices"
 	"strconv"
@@ -31,7 +32,9 @@ func (c *Config) build(r *rawFile) error {
 	if err := c.buildStatuses(r.Statuses); err != nil {
 		return err
 	}
-	c.Labels = Labels{TypePrefix: deref(r.Labels.TypePrefix), AreaPrefix: deref(r.Labels.AreaPrefix)}
+	if err := c.buildLabels(r.Labels); err != nil {
+		return err
+	}
 	if err := c.buildSession(r.Session); err != nil {
 		return err
 	}
@@ -61,8 +64,11 @@ func (c *Config) buildBoard(r rawBoard) error {
 		return c.Errorf("board.project must be a project number, 1 or greater")
 	}
 	if r.Repos != nil {
+		if err := c.checkList("board.repos", *r.Repos); err != nil {
+			return err
+		}
 		for _, repo := range *r.Repos {
-			if !repoRE.MatchString(repo) {
+			if !repoRE.MatchString(repo) || strings.HasSuffix(repo, ".git") {
 				return c.Errorf("board.repos: %q is not owner/name", repo)
 			}
 		}
@@ -81,28 +87,50 @@ func (c *Config) buildFields(fields map[string]string) error {
 		c.Fields[k] = v
 	}
 	for _, k := range c.FieldNames() {
-		if strings.TrimSpace(c.Fields[k]) == "" {
-			return c.Errorf("%s is empty: set the name of the board field", c.KeyPath("fields."+k))
+		if err := c.checkName("fields."+k, c.Fields[k]); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
 func (c *Config) buildStatuses(r rawStatuses) error {
-	c.Statuses.Initial = deref(r.Initial)
+	if r.Initial != nil && *r.Initial != "" {
+		if err := c.checkName("statuses.initial", *r.Initial); err != nil {
+			return err
+		}
+		c.Statuses.Initial = *r.Initial
+	}
 	if r.Final != nil {
-		if slices.Contains(*r.Final, "") {
-			return c.Errorf("%s has an empty status", c.KeyPath("statuses.final"))
+		if err := c.checkList("statuses.final", *r.Final); err != nil {
+			return err
 		}
 		c.Statuses.Final = *r.Final
 	}
 	return nil
 }
 
+func (c *Config) buildLabels(r rawLabels) error {
+	c.Labels.AreaPrefix = deref(r.AreaPrefix)
+	if r.Types == nil {
+		return nil
+	}
+	if err := c.checkList("labels.types", *r.Types); err != nil {
+		return err
+	}
+	for _, t := range *r.Types {
+		if p := c.Labels.AreaPrefix; p != "" && strings.HasPrefix(t, p) {
+			return c.Errorf("%s: %q starts with labels.area_prefix %q", c.KeyPath("labels.types"), t, p)
+		}
+	}
+	c.Labels.Types = *r.Types
+	return nil
+}
+
 func (c *Config) buildSession(r rawSession) error {
 	if r.Env != nil {
-		if slices.Contains(*r.Env, "") {
-			return c.Errorf("%s has an empty variable name", c.KeyPath("session.env"))
+		if err := c.checkList("session.env", *r.Env); err != nil {
+			return err
 		}
 		c.Session.Env = *r.Env
 	}
@@ -122,24 +150,36 @@ func (c *Config) buildSession(r rawSession) error {
 
 func (c *Config) buildVerb(name string, r *rawVerb) (Verb, error) {
 	p := "verbs." + name + "."
-	if !verbNameRE.MatchString(name) {
-		return Verb{}, c.Errorf("verb name %q is not a valid command name: use lowercase letters, digits and dashes", name)
-	}
-	if slices.Contains(Builtins, name) {
-		return Verb{}, c.Errorf("verb name %q is taken by a built-in command; rename [verbs.%s]", name, name)
+	if err := c.checkVerbName(name); err != nil {
+		return Verb{}, err
 	}
 	v := Verb{Name: name, When: strings.TrimSpace(deref(r.When)), To: deref(r.To), Comment: deref(r.Comment)}
 	switch {
 	case v.When == "":
 		return Verb{}, c.Errorf("%s is required: one line saying when to use the verb", c.KeyPath(p+"when"))
-	case strings.Contains(v.When, "\n"):
+	case strings.ContainsAny(v.When, "\r\n"):
 		return Verb{}, c.Errorf("%s must be one line", c.KeyPath(p+"when"))
 	}
+	if v.To != "" {
+		if err := c.checkName(p+"to", v.To); err != nil {
+			return Verb{}, err
+		}
+	}
 	if r.From != nil {
-		if slices.Contains(*r.From, "") {
-			return Verb{}, c.Errorf("%s has an empty status", c.KeyPath(p+"from"))
+		if err := c.checkList(p+"from", *r.From); err != nil {
+			return Verb{}, err
 		}
 		v.From = *r.From
+	}
+	if bad, ok := checkTemplate(v.Comment, commentVars); !ok {
+		allowed := make([]string, len(commentVars))
+		for i, name := range commentVars {
+			allowed[i] = "{" + name + "}"
+		}
+		return Verb{}, c.Errorf("%s: unknown placeholder {%s}", c.KeyPath(p+"comment"), bad).WithAllowed(allowed...)
+	}
+	if v.To == "" && v.Comment == "" {
+		return Verb{}, c.Errorf("verbs.%s has no effect: set to or comment", name)
 	}
 	for _, list := range []struct {
 		key  string
@@ -149,21 +189,93 @@ func (c *Config) buildVerb(name string, r *rawVerb) (Verb, error) {
 		if list.src == nil {
 			continue
 		}
+		key := c.KeyPath(p + list.key)
+		if err := c.checkList(p+list.key, *list.src); err != nil {
+			return Verb{}, err
+		}
 		for _, arg := range *list.src {
-			if !slices.Contains(Args, arg) {
-				return Verb{}, c.Errorf("%s: unknown argument %q", c.KeyPath(p+list.key), arg).WithAllowed(Args...)
+			if !slices.Contains(args, arg) {
+				return Verb{}, c.Errorf("%s: unknown argument %q", key, arg).WithAllowed(args...)
+			}
+			if list.key == "require_one_of" && slices.Contains(v.Require, arg) {
+				return Verb{}, c.Errorf("%s: %q is also in %s", key, arg, c.KeyPath(p+"require"))
+			}
+			if !v.Uses(arg) {
+				return Verb{}, c.Errorf("%s names %q, but %s does not use {%s}", key, arg, c.KeyPath(p+"comment"), arg)
 			}
 		}
 		*list.dest = *list.src
 	}
-	if bad, ok := checkTemplate(v.Comment, commentVars); !ok {
-		allowed := make([]string, len(commentVars))
-		for i, name := range commentVars {
-			allowed[i] = "{" + name + "}"
-		}
-		return Verb{}, c.Errorf("%s: unknown placeholder {%s}", c.KeyPath(p+"comment"), bad).WithAllowed(allowed...)
-	}
 	return v, nil
+}
+
+// checkRepoVerbs checks the verb names of the repo config, including disabled
+// ones, and that disabled = true stands alone and removes a preset verb.
+func (c *Config) checkRepoVerbs(repo, preset *rawFile) error {
+	for _, name := range repo.verbOrder {
+		if err := c.checkVerbName(name); err != nil {
+			return err
+		}
+		v := repo.Verbs[name]
+		if v.Disabled == nil || !*v.Disabled {
+			continue
+		}
+		if other := v.setKeys(); len(other) > 0 {
+			return c.Errorf("verbs.%s.%s is set next to disabled = true; remove one of them", name, other[0])
+		}
+		if preset == nil {
+			return c.Errorf("verbs.%s: disabled = true removes a preset verb, but no preset is set", name)
+		}
+		if preset.Verbs[name] == nil {
+			return c.Errorf("verbs.%s: disabled = true, but preset %s has no verb %q", name, *repo.Preset, name).
+				WithAllowed(preset.verbOrder...)
+		}
+	}
+	return nil
+}
+
+// checkVerbName rejects names that are not valid commands or shadow a
+// built-in command.
+func (c *Config) checkVerbName(name string) error {
+	if !verbNameRE.MatchString(name) {
+		return c.Errorf("verb name %q is not a valid command name: use lowercase letters, digits and dashes", name)
+	}
+	if slices.Contains(builtins, name) {
+		return c.Errorf("verb name %q is taken by a built-in command; rename [verbs.%s]", name, name)
+	}
+	return nil
+}
+
+// checkName rejects an empty name and one with surrounding whitespace.
+func (c *Config) checkName(key, s string) error {
+	if problem := nameProblem(s); problem != "" {
+		return c.Errorf("%s %s", c.KeyPath(key), problem)
+	}
+	return nil
+}
+
+// checkList rejects empty entries, entries with surrounding whitespace and
+// duplicates.
+func (c *Config) checkList(key string, list []string) error {
+	for i, s := range list {
+		if problem := nameProblem(s); problem != "" {
+			return c.Errorf("%s: entry %d %s", c.KeyPath(key), i+1, problem)
+		}
+		if slices.Index(list, s) < i {
+			return c.Errorf("%s lists %q twice", c.KeyPath(key), s)
+		}
+	}
+	return nil
+}
+
+func nameProblem(s string) string {
+	switch {
+	case strings.TrimSpace(s) == "":
+		return "is empty"
+	case strings.TrimSpace(s) != s:
+		return fmt.Sprintf("%q has leading or trailing spaces", s)
+	}
+	return ""
 }
 
 func deref[T any](p *T) T {

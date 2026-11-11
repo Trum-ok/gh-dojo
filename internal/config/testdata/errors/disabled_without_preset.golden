@@ -1,0 +1,1 @@
+error: .github/dojo.toml: verbs.old: disabled = true removes a preset verb, but no preset is set

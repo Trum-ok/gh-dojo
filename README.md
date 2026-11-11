@@ -29,7 +29,7 @@ extension already installed is replaced, and put back if the install fails.
 ## Configuration
 
 gh-dojo reads `.github/dojo.toml`, looking in the current directory and then
-in each parent. There is no `gh dojo init` yet: create the file by hand. The
+in each parent up to the repository root (the first directory with `.git`). There is no `gh dojo init` yet: create the file by hand. The
 smallest working config uses the [kanban preset](#kanban-preset):
 
 ```toml
@@ -61,7 +61,7 @@ initial = "Backlog"          # set by `new` and assumed for issues not on the bo
 final = ["Done"]             # hidden by `list`, with a counter
 
 [labels]
-type_prefix = ""             # `new --type bug` → label "bug"
+types = ["bug", "feature"]   # labels `new --type` accepts; empty = any label without area_prefix
 area_prefix = "area:"        # `new --area cli` → label "area:cli"
 
 [session]                    # fills {session} in comment templates
@@ -84,7 +84,9 @@ disabled = true              # drop a verb that the preset defines
 ```
 
 Verb keys: `when` (required), `to`, `from`, `require` and `require_one_of`
-(argument names: `comment`, `by`), `comment`, `disabled`. Keys from the
+(argument names: `comment`, `by`; each must appear in the verb's comment
+template), `comment`, `disabled`. A verb needs `to` or `comment`.
+`disabled = true` stands alone and only removes a verb the preset defines. Keys from the
 design that are not implemented yet (`blockers`, `confirm`, `iteration`,
 `field`, `assign`, `labels`, `close`, `reopen`, `batch`, `pre`, `post`) are
 rejected with "not supported in this version", and any other unknown key is an
@@ -95,9 +97,12 @@ shadow built-in commands (`show`, `list`, `new`, `comment`, `describe`,
 **Comment templates** may use `{session}`, `{comment}` (the `--comment`
 text) and `{by}` (the `--by` value). A line whose placeholders all come out
 empty is dropped, so `"Waiting for {by}."` disappears when `--by` is not
-given; blank lines collapse and the result is trimmed. A template that renders
-to nothing posts no comment. When no `[session].env` variable is set,
-`{session}` is empty and gh-dojo warns.
+given; runs of blank template lines collapse, trailing spaces and leading and
+trailing blank lines are cut, and indentation stays. A template that renders
+to nothing posts no comment. There is no escape for a literal `{comment}`;
+other braces such as `{}` are plain text. A verb whose template does not use
+`{comment}` or `{by}` rejects `--comment` or `--by`. When `[session].env` is
+set but none of its variables is, `{session}` is empty and gh-dojo warns.
 
 **Presets.** With `preset = "kanban"` the file is applied on top of the
 preset: `[fields]`, `[statuses]`, `[labels]` and `[session]` override key by
@@ -124,8 +129,8 @@ The board's status field must have these options:
 | `ready` | Ready       | In progress, Waiting     |                       | `--comment`                      |
 | `done`  | Done        | Ready, In progress       |                       | `--comment`                      |
 
-The preset also sets `fields.status = "Status"` and `labels.area_prefix =
-"area:"`. Its source is
+The preset also sets `fields.status = "Status"`, `labels.types = []` (any
+label without the area prefix is a type) and `labels.area_prefix = "area:"`. Its source is
 [`internal/config/presets/kanban.toml`](internal/config/presets/kanban.toml).
 Override `when` and `comment` to write them in your project's language.
 

@@ -53,6 +53,7 @@ to = "Done"
 [verbs.drop]
 when = "задача не нужна или дубль"
 require = ["comment"]
+comment = "Не нужна: {comment}"
 `
 
 const presetOnly = `
@@ -100,7 +101,7 @@ func dump(c *Config) string {
 		w("fields.%s: %q", name, c.Fields[name])
 	}
 	w("statuses: initial=%q final=%q", c.Statuses.Initial, c.Statuses.Final)
-	w("labels: type_prefix=%q area_prefix=%q", c.Labels.TypePrefix, c.Labels.AreaPrefix)
+	w("labels: types=%q area_prefix=%q", c.Labels.Types, c.Labels.AreaPrefix)
 	w("session: env=%q link=%q", c.Session.Env, c.Session.Link)
 	for _, v := range c.Verbs {
 		w("verb %s", v.Name)
@@ -156,7 +157,7 @@ status = "Stage"
 final = ["Done", "Won't do"]
 [labels]
 area_prefix = ""
-type_prefix = "type:"
+types = ["bug", "feature"]
 `},
 		{"no_preset", `
 version = 1
@@ -168,8 +169,6 @@ status = "Status"
 [verbs.go]
 when = "Go"
 to = "Doing"
-[verbs.old]
-disabled = true
 `},
 	}
 	for _, tt := range tests {
@@ -207,13 +206,35 @@ func TestLoadErrors(t *testing.T) {
 		{"verb_name_collision", presetOnly + "[verbs.list]\nwhen = \"x\"\n"},
 		{"verb_name_invalid", presetOnly + "[verbs.Do_it]\nwhen = \"x\"\n"},
 		{"bad_placeholder", presetOnly + "[verbs.start]\ncomment = \"Session {sesion}\"\n"},
-		{"bad_require_arg", presetOnly + "[verbs.go]\nwhen = \"x\"\nrequire = [\"reason\"]\n"},
+		{"bad_require_arg", presetOnly + "[verbs.go]\nwhen = \"x\"\ncomment = \"{comment}\"\nrequire = [\"reason\"]\n"},
 		{"empty_from", presetOnly + "[verbs.ready]\nfrom = [\"In progress\", \"\"]\n"},
 		{"bad_link_placeholder", presetOnly + "[session]\nenv = [\"X\"]\nlink = \"https://x/{session}\"\n"},
 		{"link_without_id", presetOnly + "[session]\nenv = [\"X\"]\nlink = \"https://x/\"\n"},
 		{"bad_require_one_of", presetOnly + "[verbs.wait]\nrequire_one_of = [\"by\", \"why\"]\n"},
 		{"repos_type", "preset = \"kanban\"\n" + board + "repos = \"acme/shop\"\n"},
 		{"verb_not_table", presetOnly + "[verbs]\nstart = \"x\"\n"},
+		{"no_effect", presetOnly + "[verbs.go]\nwhen = \"x\"\n"},
+		{"require_unused", presetOnly + "[verbs.go]\nwhen = \"x\"\nto = \"Doing\"\nrequire = [\"comment\"]\n"},
+		{"require_one_of_unused", presetOnly + "[verbs.wait]\ncomment = \"Waiting for {by}.\"\n"},
+		{"require_duplicate", presetOnly + "[verbs.go]\nwhen = \"x\"\ncomment = \"{comment}\"\nrequire = [\"comment\", \"comment\"]\n"},
+		{"require_overlap", presetOnly + "[verbs.wait]\nrequire = [\"comment\"]\n"},
+		{"disabled_unknown_verb", presetOnly + "[verbs.drop]\ndisabled = true\n"},
+		{"disabled_without_preset", board + "[fields]\nstatus = \"Status\"\n[verbs.old]\ndisabled = true\n"},
+		{"disabled_with_keys", presetOnly + "[verbs.done]\ndisabled = true\nwhen = \"x\"\n"},
+		{"disabled_bad_name", presetOnly + "[verbs.list]\ndisabled = true\n"},
+		{"initial_spaces", presetOnly + "[statuses]\ninitial = \" Backlog\"\n"},
+		{"final_duplicate", presetOnly + "[statuses]\nfinal = [\"Done\", \"Done\"]\n"},
+		{"final_blank", presetOnly + "[statuses]\nfinal = [\"  \"]\n"},
+		{"field_spaces", presetOnly + "sprint = \"Sprint \"\n"},
+		{"env_spaces", presetOnly + "[session]\nenv = [\" X\"]\n"},
+		{"env_duplicate", presetOnly + "[session]\nenv = [\"X\", \"X\"]\n"},
+		{"to_spaces", presetOnly + "[verbs.start]\nto = \"In progress \"\n"},
+		{"when_carriage_return", presetOnly + "[verbs.start]\nwhen = \"a\\rb\"\n"},
+		{"repo_duplicate", "preset = \"kanban\"\n" + board + "repos = [\"acme/shop\", \"acme/shop\"]\n"},
+		{"repo_git_suffix", "preset = \"kanban\"\n" + board + "repos = [\"acme/shop.git\"]\n"},
+		{"types_area_prefix", presetOnly + "[labels]\ntypes = [\"bug\", \"area:cli\"]\n"},
+		{"types_duplicate", presetOnly + "[labels]\ntypes = [\"bug\", \"bug\"]\n"},
+		{"old_type_prefix", presetOnly + "[labels]\ntype_prefix = \"\"\n"},
 		{"verbs_not_table", "verbs = 1\n" + presetOnly},
 		{"field_not_string", presetOnly + "sprint = 2\n"},
 		{"unknown_session_key", presetOnly + "[session]\nenvs = [\"X\"]\n"},
@@ -342,17 +363,20 @@ func TestKanbanComments(t *testing.T) {
 }
 
 func TestRender(t *testing.T) {
-	vars := map[string]string{"a": "A", "b": "", "multi": "x\ny"}
+	vars := map[string]string{"a": "A", "b": "", "multi": "x\ny", "spaced": "p  \n\n\nq\n"}
 	tests := []struct{ tmpl, want string }{
 		{"", ""},
 		{"plain text", "plain text"},
 		{"{a} and {b}", "A and"},
+		{"  indented {a}\n    more  \n", "  indented A\n    more"},
+		{"\n  \n\t{a}", "\tA"},
 		{"only {b}", ""},
 		{"{missing}", ""},
 		{"head\n\n{b}\n\n\ntail", "head\n\ntail"},
 		{"\n\n{a}\n\n", "A"},
 		{"json {} and { a } stay", "json {} and { a } stay"},
 		{"{multi}!", "x\ny!"},
+		{"{spaced}", "p\n\n\nq"},
 		{"no {a} re-expansion of {a}", "no A re-expansion of A"},
 	}
 	for _, tt := range tests {
