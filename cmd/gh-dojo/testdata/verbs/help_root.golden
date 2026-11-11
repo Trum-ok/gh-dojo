@@ -21,6 +21,23 @@ Additional Commands:
   new         Create an issue with labels, on the board, in the initial status
   show        Read issues before working on them: board status, blockers, history, description, comments
 
+Lifecycle (from → to):
+  start       Backlog, Waiting, Ready → In progress
+  wait        In progress → Waiting
+  ready       In progress, Waiting → Ready
+  done        Ready, In progress → Done
+  park        any status → Backlog
+  Initial:    Backlog (new issues; also an issue with no status or not on the board)
+  Final:      Done (gh dojo list hides it unless --all)
+
+Exit codes:
+  0  everything applied: go on
+  1  bad arguments or config: fix them as the error says
+  2  a process check refused: don't work around it; ask the user
+  3  issue or board not found: check the number with gh dojo list
+  4  network, rate limit or auth: retry later, or gh auth refresh -s project
+  5  partially applied: re-run the same command; it finishes the rest
+
 Flags:
   -h, --help      help for gh dojo
   -v, --version   version for gh dojo

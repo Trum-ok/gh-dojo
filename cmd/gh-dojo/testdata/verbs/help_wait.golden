@@ -6,8 +6,10 @@ Work is stuck: waiting for another issue or an outside decision
   To:        Waiting; an issue already there keeps it, so a repeat is safe
   Requires:  at least one of --by, --comment
   Board:     adds the issue if it is not there
-  Comment:   "Waiting for {by}.\n\n{comment}"
-             skipped when it renders empty or is already the latest gh-dojo comment
+  Comment:   posted unless it renders empty or is already the latest gh-dojo comment:
+               Waiting for {by}.
+
+               {comment}
 
 Usage:
   gh dojo wait <N> [flags]

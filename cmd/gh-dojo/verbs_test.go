@@ -216,6 +216,39 @@ func TestVerbHelp(t *testing.T) {
 	}
 }
 
+// TestVerbHelpBare checks the help of a config without a preset: no
+// initial or final status, a verb that keeps the status and a comment
+// template with CRLF line ends and trailing spaces.
+func TestVerbHelpBare(t *testing.T) {
+	withConfig(t, `
+version = 1
+
+[board]
+owner = "acme"
+project = 3
+
+[fields]
+status = "Status"
+
+[verbs.note]
+when = "You want to leave a note without moving the issue"
+comment = "Note:  \r\n\r\n{comment}\n"
+`)
+	for _, tt := range []struct {
+		name string
+		args []string
+	}{
+		{"root_bare", []string{"--help"}},
+		{"note", []string{"note", "--help"}},
+	} {
+		code, out := runOut(tt.args...)
+		if code != render.ExitOK {
+			t.Fatalf("run(%q) = %d\n%s", tt.args, code, out)
+		}
+		testutil.Golden(t, "verbs/help_"+tt.name, out)
+	}
+}
+
 // TestConfigErrorBuiltins checks unknown commands next to built-in ones: a
 // typo still gets a suggestion, and a possible verb lists the built-ins
 // with the reason no verbs are loaded.

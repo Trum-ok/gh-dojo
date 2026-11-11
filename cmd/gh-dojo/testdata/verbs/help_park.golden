@@ -6,8 +6,8 @@ Put the issue back
   To:        Backlog; an issue already there keeps it, so a repeat is safe
   Requires:  nothing besides the issue number
   Board:     adds the issue if it is not there
-  Comment:   "Parked."
-             skipped when it renders empty or is already the latest gh-dojo comment
+  Comment:   posted unless it renders empty or is already the latest gh-dojo comment:
+               Parked.
 
 Usage:
   gh dojo park <N> [flags]

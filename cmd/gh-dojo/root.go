@@ -2,7 +2,9 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/spf13/cobra"
@@ -69,8 +71,11 @@ func buildRoot(ctors []constructor) (*cobra.Command, error) {
 		Long: "gh dojo moves issues through a GitHub Projects board with process verbs\n" +
 			"defined in .github/dojo.toml, so agents never deal with field or option IDs." +
 			configNote(),
-		Version:                    version,
-		Annotations:                map[string]string{cobra.CommandDisplayNameAnnotation: "gh dojo"},
+		Version: version,
+		Annotations: map[string]string{
+			cobra.CommandDisplayNameAnnotation: "gh dojo",
+			rootSectionsAnnotation:             processHelp() + exitCodesHelp(),
+		},
 		SilenceUsage:               true,
 		SilenceErrors:              true,
 		CompletionOptions:          cobra.CompletionOptions{DisableDefaultCmd: true},
@@ -78,6 +83,7 @@ func buildRoot(ctors []constructor) (*cobra.Command, error) {
 		SuggestionsMinimumDistance: 2,
 		RunE:                       func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
 	}
+	root.SetUsageTemplate(rootUsageTemplate(root.UsageTemplate()))
 	root.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		// `gh dojo start 42 --dry-run` without a loadable config fails on the
 		// verb's flag before the root's Args see "start".
@@ -120,6 +126,30 @@ func buildRoot(ctors []constructor) (*cobra.Command, error) {
 	}
 	prepare(root)
 	return root, nil
+}
+
+// rootSectionsAnnotation holds the root help sections that follow the
+// command list: the process (see processHelp) and the exit codes.
+const rootSectionsAnnotation = "gh-dojo:sections"
+
+// rootUsageTemplate adds the root help sections to cobra's usage template,
+// right before the flags. Subcommands inherit the template, so it prints
+// them only for the root.
+func rootUsageTemplate(tmpl string) string {
+	const flags = "{{if .HasAvailableLocalFlags}}"
+	sections := `{{if not .HasParent}}{{index .Annotations "` + rootSectionsAnnotation + `"}}{{end}}`
+	return strings.Replace(tmpl, flags, sections+flags, 1)
+}
+
+// exitCodesHelp lists the exit codes with what to do next, for the root
+// help.
+func exitCodesHelp() string {
+	var b strings.Builder
+	b.WriteString("\n\nExit codes:")
+	for _, c := range render.ExitCodes {
+		fmt.Fprintf(&b, "\n  %d  %s: %s", c.Code, c.Meaning, c.Next)
+	}
+	return b.String()
 }
 
 // newHelpCmd replaces cobra's help command, which prints the root help and

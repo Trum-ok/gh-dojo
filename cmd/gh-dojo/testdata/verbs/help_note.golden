@@ -1,0 +1,22 @@
+code: 0
+--- stdout
+You want to leave a note without moving the issue
+
+  From:      any status
+  To:        the status is not changed
+  Requires:  nothing besides the issue number
+  Optional:  --comment
+  Board:     adds the issue if it is not there
+  Comment:   posted unless it renders empty or is already the latest gh-dojo comment:
+               Note:
+
+               {comment}
+
+Usage:
+  gh dojo note <N> [flags]
+
+Flags:
+      --comment string   text for {comment} in the comment
+      --dry-run          print the plan without changing anything
+  -h, --help             help for note
+--- stderr

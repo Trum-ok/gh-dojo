@@ -376,8 +376,16 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 
 	line("Board", "adds the issue if it is not there")
 	if v.Comment != "" {
-		line("Comment", "%s", strconv.Quote(v.Comment))
-		line("", "skipped when it renders empty or is already the latest gh-dojo comment")
+		line("Comment", "posted unless it renders empty or is already the latest gh-dojo comment:")
+		// The template as it will read in the issue, indented below the
+		// label; blank lines stay blank, without trailing spaces.
+		for _, l := range strings.Split(strings.Trim(v.Comment, "\r\n"), "\n") {
+			if l = strings.TrimRight(l, " \t\r"); l == "" {
+				b.WriteString("\n")
+			} else {
+				line("", "  %s", l)
+			}
+		}
 	}
 	return b.String()
 }
@@ -394,6 +402,49 @@ func configNote() string {
 	}
 	text := strings.ReplaceAll(render.FromError(err).Text(), "\n", "\n  ")
 	return "\n\nNo process verbs: " + config.FileName + " could not be loaded:\n  " + text
+}
+
+// processHelp is the lifecycle section of the root help: the statuses each
+// verb moves an issue from and to, in config order, then the initial and
+// final statuses. It is empty when the config cannot be loaded (see
+// configNote).
+//
+//	Lifecycle (from → to):
+//	  start       Backlog, Waiting, Ready → In progress
+//	  Initial:    Backlog (new issues; also an issue with no status or not on the board)
+func processHelp() string {
+	cfg, err := loadConfig()
+	if err != nil {
+		return ""
+	}
+	width := 11 // cobra's minimum, so the names line up with the command list
+	for _, v := range cfg.Verbs {
+		width = max(width, len(v.Name))
+	}
+	var b strings.Builder
+	line := func(name, format string, a ...any) {
+		fmt.Fprintf(&b, "\n  %-*s %s", width, name, fmt.Sprintf(format, a...))
+	}
+	for _, v := range cfg.Verbs {
+		from, to := "any status", "status unchanged"
+		if len(v.From) > 0 {
+			from = strings.Join(v.From, ", ")
+		}
+		if v.To != "" {
+			to = v.To
+		}
+		line(v.Name, "%s → %s", from, to)
+	}
+	if s := cfg.Statuses.Initial; s != "" {
+		line("Initial:", "%s (new issues; also an issue with no status or not on the board)", s)
+	}
+	if s := cfg.Statuses.Final; len(s) > 0 {
+		line("Final:", "%s (gh dojo list hides it unless --all)", strings.Join(s, ", "))
+	}
+	if b.Len() == 0 {
+		return ""
+	}
+	return "\n\nLifecycle (from → to):" + b.String()
 }
 
 // verbsUnavailable says in one line why no verbs are loaded, or returns ""

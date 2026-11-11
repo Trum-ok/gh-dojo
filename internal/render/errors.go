@@ -29,6 +29,20 @@ const (
 	ExitPartial  Code = 5 // partially applied: re-run the same command to finish
 )
 
+// ExitCodes describes every exit code, in order, with what the agent
+// should do next; the root help lists them.
+var ExitCodes = []struct {
+	Code          Code
+	Meaning, Next string
+}{
+	{ExitOK, "everything applied", "go on"},
+	{ExitUsage, "bad arguments or config", "fix them as the error says"},
+	{ExitDenied, "a process check refused", "don't work around it; ask the user"},
+	{ExitNotFound, "issue or board not found", "check the number with gh dojo list"},
+	{ExitNetwork, "network, rate limit or auth", "retry later, or gh auth refresh -s project"},
+	{ExitPartial, "partially applied", "re-run the same command; it finishes the rest"},
+}
+
 const (
 	maxWhatLines = 3   // the error block is at most 5 lines: what (≤3), allowed, fix
 	maxLineRunes = 200 // long lines are cut with "…"

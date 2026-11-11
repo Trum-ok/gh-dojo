@@ -1,0 +1,36 @@
+code: 0
+--- stdout
+gh dojo moves issues through a GitHub Projects board with process verbs
+defined in .github/dojo.toml, so agents never deal with field or option IDs.
+
+Usage:
+  gh dojo [flags]
+  gh dojo [command]
+
+Process verbs (from .github/dojo.toml):
+  note        You want to leave a note without moving the issue
+
+Additional Commands:
+  comment     Comment on an issue without changing its status
+  help        Help about any command
+  list        See what is on the board: one line per open issue, grouped by status
+  new         Create an issue with labels, on the board, in the initial status
+  show        Read issues before working on them: board status, blockers, history, description, comments
+
+Lifecycle (from → to):
+  note        any status → status unchanged
+
+Exit codes:
+  0  everything applied: go on
+  1  bad arguments or config: fix them as the error says
+  2  a process check refused: don't work around it; ask the user
+  3  issue or board not found: check the number with gh dojo list
+  4  network, rate limit or auth: retry later, or gh auth refresh -s project
+  5  partially applied: re-run the same command; it finishes the rest
+
+Flags:
+  -h, --help      help for gh dojo
+  -v, --version   version for gh dojo
+
+Use "gh dojo [command] --help" for more information about a command.
+--- stderr
