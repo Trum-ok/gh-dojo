@@ -75,7 +75,8 @@ type Backend interface {
 	// v, filled as workflow.Issue documents (comments with viewerDidAuthor,
 	// labels, assignees, and the viewer when v assigns @me), with a render
 	// error on failure (render.NotFound for a missing issue; a config error
-	// for a label of v missing in the repo or an assignee who cannot be
+	// for a label of v to add that is missing in the repo, a label spelled
+	// in another case than the repo's, or an assignee who cannot be
 	// assigned). The default repo comes from the app wiring:
 	// board.repos[0], or the git remote of the current directory.
 	ReadIssue(ctx context.Context, v config.Verb, n int) (workflow.Issue, error)
@@ -280,19 +281,21 @@ func reason(err error) string {
 	return strings.TrimSpace(what)
 }
 
-// missing returns the ops whose kind is not among done.
+// missing returns the ops of ops that are not among done, compared by
+// content: a re-plan may hold an op of a kind already done with other
+// values, such as a label to add that the first plan did not have, and
+// that one is still to send.
 func missing(ops, done []workflow.Op) []workflow.Op {
 	var out []workflow.Op
 	for _, op := range ops {
-		if !hasKind(done, op) {
+		if !slices.ContainsFunc(done, func(d workflow.Op) bool { return reflect.DeepEqual(d, op) }) {
 			out = append(out, op)
 		}
 	}
 	return out
 }
 
-// hasKind reports whether ops has an op of the same kind as op (a plan has
-// at most one of each).
+// hasKind reports whether ops has an op of the same kind as op.
 func hasKind(ops []workflow.Op, op workflow.Op) bool {
 	return slices.ContainsFunc(ops, func(o workflow.Op) bool { return reflect.TypeOf(o) == reflect.TypeOf(op) })
 }

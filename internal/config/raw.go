@@ -60,9 +60,9 @@ type rawVerb struct {
 	Comment      *string    `toml:"comment"`
 	Labels       *[]string  `toml:"labels"`
 	Assign       *rawAssign `toml:"assign"`
-	Close        *string    `toml:"close"`
+	Close        *rawOff    `toml:"close"`
 	Reopen       *bool      `toml:"reopen"`
-	Confirm      *string    `toml:"confirm"`
+	Confirm      *rawOff    `toml:"confirm"`
 	Disabled     *bool      `toml:"disabled"`
 }
 
@@ -83,6 +83,27 @@ func (a *rawAssign) UnmarshalTOML(v any) error {
 		a.User = &v
 	default:
 		return fmt.Errorf("wrong type: got %s, want string or boolean", typeName(fmt.Sprintf("%T", v)))
+	}
+	return nil
+}
+
+// rawOff is the value of a verb's close or confirm key: a string, or a
+// boolean, of which only false (off, to turn off a preset's value) is
+// valid; build rejects true with the values it wants.
+type rawOff struct {
+	Bool *bool
+	Str  *string
+}
+
+// UnmarshalTOML accepts a string or a boolean.
+func (o *rawOff) UnmarshalTOML(v any) error {
+	switch v := v.(type) {
+	case bool:
+		o.Bool = &v
+	case string:
+		o.Str = &v
+	default:
+		return fmt.Errorf("wrong type: got %s, want string or false", typeName(fmt.Sprintf("%T", v)))
 	}
 	return nil
 }

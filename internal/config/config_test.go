@@ -164,6 +164,13 @@ reopen = true
 close = "duplicate"
 assign = false
 `},
+		// close = false and confirm = false turn a preset's values off:
+		// done moves to Done and leaves the issue open.
+		{"opt_out", presetOnly + `
+[verbs.done]
+close = false
+confirm = false
+`},
 		{"add_verb", presetOnly + `
 [verbs.review]
 when = "A pull request is open and waits for review"
@@ -267,6 +274,8 @@ func TestLoadErrors(t *testing.T) {
 		{"close_and_reopen", presetOnly + "[verbs.done]\nreopen = true\n"},
 		{"confirm_bad", presetOnly + "[verbs.done]\nconfirm = \"yes\"\n"},
 		{"confirm_not_string", presetOnly + "[verbs.done]\nconfirm = true\n"},
+		{"confirm_wrong_type", presetOnly + "[verbs.done]\nconfirm = 1\n"},
+		{"close_true", presetOnly + "[verbs.done]\nclose = true\n"},
 		{"require_one_of_unused", presetOnly + "[verbs.wait]\ncomment = \"Waiting for {by}.\"\n"},
 		{"require_duplicate", presetOnly + "[verbs.go]\nwhen = \"x\"\ncomment = \"{comment}\"\nrequire = [\"comment\", \"comment\"]\n"},
 		{"require_overlap", presetOnly + "[verbs.wait]\nrequire = [\"comment\"]\n"},

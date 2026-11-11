@@ -201,13 +201,20 @@ func workflowIssue(c *issue.Card) workflow.Issue {
 		Labels:    c.Labels.Nodes,
 		Assignees: c.Assignees.Nodes,
 		Ref:       c,
+		// With Lookup.AllLabels the window is GitHub's own limit per issue.
+		LabelsTruncated: c.Labels.TotalCount > len(c.Labels.Nodes),
 	}
 	if c.Closed() && c.StateReason != "REOPENED" {
 		// COMPLETED, NOT_PLANNED, DUPLICATE: the config's close reasons.
 		is.StateReason = strings.ToLower(c.StateReason)
 	}
-	if c.Found != nil && c.Found.Viewer != nil {
-		is.Viewer = c.Found.Viewer.Login
+	if f := c.Found; f != nil {
+		if f.Viewer != nil {
+			is.Viewer = f.Viewer.Login
+		}
+		if f.User != nil {
+			is.AssignLogin = f.User.Login // as GitHub spells it
+		}
 	}
 	for _, cm := range c.Comments.Nodes {
 		is.Comments = append(is.Comments, workflow.Comment{Body: cm.Body, ViewerDidAuthor: cm.ViewerDidAuthor})

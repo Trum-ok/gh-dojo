@@ -19,10 +19,14 @@ type Lookup struct {
 	User string
 	// Viewer reads the authenticated user, for assign = "@me".
 	Viewer bool
+	// AllLabels reads up to 100 of the issue's labels (GitHub's limit per
+	// issue) instead of the card's 20, for a verb that removes labels: a
+	// label beyond the window would read as absent.
+	AllLabels bool
 }
 
 // Empty reports whether there is nothing to look up.
-func (l Lookup) Empty() bool { return len(l.Labels) == 0 && l.User == "" && !l.Viewer }
+func (l Lookup) Empty() bool { return len(l.Labels) == 0 && l.User == "" && !l.Viewer && !l.AllLabels }
 
 // Found is what a Lookup found. Its IDs are for mutations only; never
 // print them.
@@ -47,6 +51,13 @@ type User struct {
 // read; the login is then matched exactly among them.
 const assignableWindow = 100
 
+// labelsWindow is the labels selection of cardSelection; Lookup.AllLabels
+// widens it to allLabelsWindow.
+const (
+	labelsWindow    = "labels(first: 20)"
+	allLabelsWindow = "labels(first: 100)"
+)
+
 // The parts of cardQuery a Lookup extends.
 const (
 	cardHead = `query IssueCard($owner: String!, $repo: String!, $number: Int!, $comments: Int!, $status: String!`
@@ -62,6 +73,8 @@ func labelAlias(i int) string { return fmt.Sprintf("label%d", i) }
 // lookupQuery is cardQuery with the fields of l: aliased label lookups and
 // the assignable user below the repository, the viewer at the top. It
 // returns the extra variables too. An empty l gives cardQuery itself.
+//
+// AllLabels widens the issue's labels window.
 //
 //	query IssueCard(..., $label0: String!, $user: String!) {
 //	  repository(owner: $owner, name: $repo) {
@@ -92,7 +105,11 @@ func lookupQuery(l Lookup) (string, map[string]any) {
 	if l.Viewer {
 		top = "  viewer { id login }\n"
 	}
-	return cardHead + decls.String() + cardRepo + repo.String() + "\n  }\n" + top + "}\n\n" + cardFragments, vars
+	card := cardRepo
+	if l.AllLabels {
+		card = strings.Replace(card, labelsWindow, allLabelsWindow, 1)
+	}
+	return cardHead + decls.String() + card + repo.String() + "\n  }\n" + top + "}\n\n" + cardFragments, vars
 }
 
 // repoJSON is the repository of a card response: the issue, and the

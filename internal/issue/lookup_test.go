@@ -2,6 +2,7 @@ package issue_test
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -58,5 +59,34 @@ func TestReadAllLookup(t *testing.T) {
 	req.Lookup = issue.Lookup{Viewer: true}
 	if _, err := issue.ReadAll(context.Background(), nil, req, []int{1, 2}); err == nil {
 		t.Error("ReadAll of two issues with a lookup: want an error")
+	}
+}
+
+// queryRecorder is a graph.Querier that keeps the query and fails it.
+type queryRecorder struct{ query string }
+
+func (q *queryRecorder) Query(_ context.Context, query string, _ map[string]any, _ any) error {
+	q.query = query
+	return errors.New("not sent")
+}
+
+// TestReadLookupAllLabels: a verb that removes labels reads up to 100 of
+// the issue's labels, so one beyond the card's 20 is not taken for absent.
+func TestReadLookupAllLabels(t *testing.T) {
+	for _, tt := range []struct {
+		lookup issue.Lookup
+		want   string
+	}{
+		{issue.Lookup{Labels: []string{"blocked"}, AllLabels: true}, "labels(first: 100)"},
+		{issue.Lookup{Labels: []string{"blocked"}}, "labels(first: 20)"},
+	} {
+		q := &queryRecorder{}
+		req := dojoStatus
+		req.Number = 3
+		req.Lookup = tt.lookup
+		_, _ = issue.Read(context.Background(), q, req)
+		if n := strings.Count(q.query, "labels(first: "); n != 1 || !strings.Contains(q.query, tt.want) {
+			t.Errorf("AllLabels=%v: the query has %d label windows, want one %s", tt.lookup.AllLabels, n, tt.want)
+		}
 	}
 }

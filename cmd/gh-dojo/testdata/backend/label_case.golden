@@ -1,0 +1,6 @@
+code: 1
+--- stdout
+--- stderr
+error: .github/dojo.toml: verbs.recase.labels: no label "Dogfood" in Trum-ok/gh-dojo
+allowed: dogfood, bug, documentation, enhancement
+fix: write it as "dogfood" in verbs.recase.labels

@@ -22,6 +22,14 @@ Verbs:
               labels +enhancment
   give        Hand it over
               assigns octo-nobody
+  recase      Labels, one in another case than the repository's
+              labels +enhancement -Dogfood
+  tagcase     Tag it, in another case than the repository's
+              labels +Enhancement
+  untag       Remove a label the repository does not have
+              labels -no-such-label
+  hand        Hand it to the owner, login in lowercase
+              assigns trum-ok
 
 Every verb adds the issue to the board if it is missing and refuses a
 closed issue unless noted. A repeat is safe: an effect already in place
@@ -37,6 +45,10 @@ Lifecycle (from → to):
   revive      any status → Backlog; reopens
   tag         any status → status unchanged
   give        any status → status unchanged
+  recase      any status → status unchanged
+  tagcase     any status → status unchanged
+  untag       any status → status unchanged
+  hand        any status → status unchanged
   Initial:    Backlog (new issues; also an issue with no status or not on the board)
   Final:      Done (gh dojo list hides it unless --all)
   Resolved:   Ready, Done (a blocker in these no longer blocks)

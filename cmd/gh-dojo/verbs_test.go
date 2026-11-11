@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/Trum-ok/gh-dojo/internal/config"
@@ -307,5 +308,23 @@ func TestConfigErrors(t *testing.T) {
 			}
 			testutil.Golden(t, "config/"+tt.name, out)
 		})
+	}
+}
+
+// TestMissing: ops left to send compare by content, not kind. After a
+// stale-ID retry the re-plan may add a label the first attempt did not
+// (+b after +a): it is still sent.
+func TestMissing(t *testing.T) {
+	done := []workflow.Op{workflow.AddLabels{Names: []string{"a"}}, workflow.AddComment{Body: "x", Marker: "m"}}
+	ops := []workflow.Op{
+		workflow.AddLabels{Names: []string{"b"}},
+		workflow.AddLabels{Names: []string{"a"}},
+		workflow.AddComment{Body: "x", Marker: "m"},
+		workflow.SetStatus{From: "Ready", To: "Done"},
+	}
+	got := missing(ops, done)
+	want := []workflow.Op{workflow.AddLabels{Names: []string{"b"}}, workflow.SetStatus{From: "Ready", To: "Done"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("missing = %v, want %v", got, want)
 	}
 }

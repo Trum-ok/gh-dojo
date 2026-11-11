@@ -23,8 +23,9 @@ import (
 // Requests with a warm schema cache: ReadIssue sends one query, Apply one
 // mutation, or two for an issue not on the board whose status is set (see
 // effects.Batches). The label and user IDs of the labels and assign
-// effects come with the card's query (issue.Lookup); only a label or user
-// that does not exist costs one more read, for the error's allowed list.
+// effects come with the card's query (issue.Lookup); only a label to add
+// or a user that does not exist costs one more read, for the error's
+// allowed list.
 type githubBackend struct {
 	app   *App
 	added map[int]string // issue number → board item added in this run
@@ -42,13 +43,25 @@ func (b *githubBackend) ReadIssue(ctx context.Context, v config.Verb, n int) (wo
 	if err := b.checkFound(ctx, v, lookup, card); err != nil {
 		return workflow.Issue{}, err
 	}
-	return workflowIssue(card), nil
+	is := workflowIssue(card)
+	if card.Found != nil {
+		for _, name := range v.RemoveLabels {
+			if card.Found.Labels[name] == "" {
+				is.MissingLabels = append(is.MissingLabels, name)
+			}
+		}
+	}
+	return is, nil
 }
 
 // verbLookup is what the effects of v need looked up with the card: the
-// IDs of its labels, and of the user it assigns.
+// IDs of its labels, and of the user it assigns. A verb that removes
+// labels reads all of the issue's labels, so it can tell one is there.
 func verbLookup(v config.Verb) issue.Lookup {
-	l := issue.Lookup{Labels: append(slices.Clone(v.AddLabels), v.RemoveLabels...)}
+	l := issue.Lookup{
+		Labels:    append(slices.Clone(v.AddLabels), v.RemoveLabels...),
+		AllLabels: len(v.RemoveLabels) > 0,
+	}
 	switch v.Assign {
 	case "":
 	case config.Me:
@@ -59,10 +72,17 @@ func verbLookup(v config.Verb) issue.Lookup {
 	return l
 }
 
-// checkFound refuses a verb whose labels do not exist in the repository,
-// or whose assignee cannot be assigned there: a config error (exit code 1)
-// with the allowed values, which take one more read. None of the verb's
-// effects is applied then.
+// checkFound refuses a verb whose labels to add do not exist in the
+// repository, or whose assignee cannot be assigned there: a config error
+// (exit code 1) with the allowed values, which take one more read. None of
+// the verb's effects is applied then.
+//
+// Labels are looked up by their exact name, while GitHub's names are
+// unique regardless of case. A label to remove that does not exist is in
+// place (workflow.Issue.MissingLabels), unless the issue has it spelled
+// another way: then it is refused too, or it would stay. A name that
+// differs from an existing label only in case gets "write it as" for a
+// fix, since gh label create would fail.
 func (b *githubBackend) checkFound(ctx context.Context, v config.Verb, l issue.Lookup, card *issue.Card) error {
 	if l.Empty() {
 		return nil
@@ -76,9 +96,14 @@ func (b *githubBackend) checkFound(ctx context.Context, v config.Verb, l issue.L
 		f = &issue.Found{}
 	}
 	var missing []string
-	for _, name := range l.Labels {
+	for _, name := range v.AddLabels {
 		if f.Labels[name] == "" {
-			missing = append(missing, strconv.Quote(name))
+			missing = append(missing, name)
+		}
+	}
+	for _, name := range v.RemoveLabels {
+		if f.Labels[name] == "" && spelling(name, card.Labels.Nodes) != "" {
+			missing = append(missing, name)
 		}
 	}
 	key := "verbs." + v.Name + "."
@@ -88,12 +113,20 @@ func (b *githubBackend) checkFound(ctx context.Context, v config.Verb, l issue.L
 		if len(missing) > 1 {
 			noun = "labels"
 		}
-		e := cfg.Errorf("%s: no %s %s in %s", cfg.KeyPath(key+"labels"), noun, strings.Join(missing, ", "), card.Repo).
-			WithFix(fmt.Sprintf("gh label create %s -R %s, or fix %s", missing[0], card.Repo, cfg.KeyPath(key+"labels")))
-		if names, err := repoLabels(ctx, b.app.Client, card.Repo); err == nil {
-			e = e.WithAllowed(closestFirst(names, l.Labels)...)
+		quoted := make([]string, len(missing))
+		for i, name := range missing {
+			quoted[i] = strconv.Quote(name)
 		}
-		return e
+		labelsKey := cfg.KeyPath(key + "labels")
+		e := cfg.Errorf("%s: no %s %s in %s", labelsKey, noun, strings.Join(quoted, ", "), card.Repo)
+		names, err := repoLabels(ctx, b.app.Client, card.Repo)
+		if err == nil {
+			e = e.WithAllowed(closestFirst(names, missing)...)
+		}
+		if spelled := spelling(missing[0], append(slices.Clone(card.Labels.Nodes), names...)); spelled != "" {
+			return e.WithFix(fmt.Sprintf("write it as %q in %s", spelled, labelsKey))
+		}
+		return e.WithFix(fmt.Sprintf("gh label create %s -R %s, or fix %s", quoted[0], card.Repo, labelsKey))
 	case l.User != "" && f.User == nil:
 		e := cfg.Errorf("%s: %s cannot be assigned issues in %s", cfg.KeyPath(key+"assign"), l.User, card.Repo).
 			WithFix(fmt.Sprintf("check the login, or give %s access to %s", l.User, card.Repo))
@@ -132,12 +165,24 @@ func repoLabels(ctx context.Context, q graph.Querier, repo issue.Repo) ([]string
 	return names, nil
 }
 
-// closestFirst moves the names that equal one of wanted but for case to
-// the front, so a label written in the wrong case shows its spelling first.
-func closestFirst(names, wanted []string) []string {
+// spelling returns the name among names that equals name but for case, ""
+// when there is none.
+func spelling(name string, names []string) string {
+	for _, n := range names {
+		if n != name && strings.EqualFold(n, name) {
+			return n
+		}
+	}
+	return ""
+}
+
+// closestFirst moves the names that equal one of missing but for case to
+// the front, so a label written in the wrong case shows its spelling
+// first. Labels that were found stay in place.
+func closestFirst(names, missing []string) []string {
 	var near, rest []string
 	for _, n := range names {
-		if slices.ContainsFunc(wanted, func(w string) bool { return strings.EqualFold(w, n) }) {
+		if slices.ContainsFunc(missing, func(w string) bool { return strings.EqualFold(w, n) }) {
 			near = append(near, n)
 		} else {
 			rest = append(rest, n)

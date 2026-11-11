@@ -43,6 +43,22 @@ labels = ["+enhancment"]
 [verbs.give]
 when = "Hand it over"
 assign = "octo-nobody"
+
+[verbs.recase]
+when = "Labels, one in another case than the repository's"
+labels = ["+enhancement", "-Dogfood"]
+
+[verbs.tagcase]
+when = "Tag it, in another case than the repository's"
+labels = ["+Enhancement"]
+
+[verbs.untag]
+when = "Remove a label the repository does not have"
+labels = ["-no-such-label"]
+
+[verbs.hand]
+when = "Hand it to the owner, login in lowercase"
+assign = "trum-ok"
 `
 
 // withEffectsApp is withWarmVerbApp with effectsDojoConfig.
@@ -137,6 +153,41 @@ func TestVerbUnknownLabelOrUser(t *testing.T) {
 		runs{[]string{"tag", "3"}, render.ExitUsage, 2, "label_unknown"},
 		runs{[]string{"give", "3"}, render.ExitUsage, 2, "assignee_unknown"},
 	)
+}
+
+// TestVerbLabelsBeyondWindow: a verb that removes labels reads up to 100
+// of them, so a label past the card's 20 is removed, not reported in place.
+func TestVerbLabelsBeyondWindow(t *testing.T) {
+	srv, before := withEffectsApp(t, verbFixture("review_many_labels"))
+	checkRuns(t, srv, before,
+		runs{[]string{"review", "3", "--comment", "PR #50", "--dry-run"}, render.ExitOK, 1, "review_many_labels"})
+}
+
+// TestVerbLabelCase: label lookups match case, GitHub's names are unique
+// regardless of it. A label written in another case is refused with its
+// spelling as the fix (gh label create would fail), the near miss first
+// among the allowed values; a label to remove counts too when the issue
+// has it, or it would stay.
+func TestVerbLabelCase(t *testing.T) {
+	srv, before := withEffectsApp(t, verbFixture("label_case"), verbFixture("label_case_add"))
+	checkRuns(t, srv, before,
+		runs{[]string{"recase", "3"}, render.ExitUsage, 2, "label_case"},
+		runs{[]string{"tagcase", "3"}, render.ExitUsage, 2, "label_case_add"},
+	)
+}
+
+// TestVerbRemoveAbsentLabel: a label to remove that the repository does
+// not have is in place, not an error: nothing to remove, nothing written.
+func TestVerbRemoveAbsentLabel(t *testing.T) {
+	srv, before := withEffectsApp(t, verbFixture("label_absent"))
+	checkRuns(t, srv, before, runs{[]string{"untag", "3"}, render.ExitOK, 1, "label_absent"})
+}
+
+// TestVerbAssignLoginCase: the login is assigned and printed as GitHub
+// spells it, whatever the case in the config.
+func TestVerbAssignLoginCase(t *testing.T) {
+	srv, before := withEffectsApp(t, verbFixture("assign_case"))
+	checkRuns(t, srv, before, runs{[]string{"hand", "3"}, render.ExitOK, 2, "assign_case"})
 }
 
 // TestVerbEffectsHelp: the help of a verb says what it does besides the

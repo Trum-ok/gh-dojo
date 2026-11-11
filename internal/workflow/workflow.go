@@ -33,13 +33,23 @@ type Issue struct {
 
 	// Labels and Assignees are the issue's label names and assignee
 	// logins, for the labels and assign effects. They may be windows of
-	// the full lists (20 labels and 10 assignees in a card): see
-	// planLabels for what a label beyond the window does.
-	Labels    []string
-	Assignees []string
+	// the full lists (a card reads 20 labels, 100 for a verb that removes
+	// labels, and 10 assignees). LabelsTruncated reports that the issue
+	// has labels beyond Labels: see planLabels for what that does.
+	Labels          []string
+	LabelsTruncated bool
+	Assignees       []string
+	// MissingLabels are label names of the verb that do not exist in the
+	// repository. A label to remove among them is in place: the issue
+	// cannot have it. The reader refuses a label to add that is missing.
+	MissingLabels []string
 	// Viewer is the login of the authenticated user, which assign = "@me"
 	// (config.Me) stands for; the reader fills it for such a verb.
 	Viewer string
+	// AssignLogin is the login the verb's assign names, as GitHub spells
+	// it; the reader fills it for a verb that assigns a login. "" uses the
+	// config's spelling.
+	AssignLogin string
 
 	// OnBoard reports whether the issue is an item of the configured
 	// project. Status is the item's status option name, "" when the item has
@@ -241,9 +251,14 @@ func join(items []string, conj string) string {
 //  2. a closed issue is refused (exit code 2), unless the verb's target
 //     status is final (Engine.Final), or the verb closes or reopens it;
 //  3. an issue already in the target status gets no status change, and the
-//     from check is skipped, so a repeat is safe;
+//     from check is skipped, so a repeat is safe; so is a closed issue for
+//     a verb without a target that closes it (a board workflow such as
+//     "Item closed" may have moved it since the verb closed it);
 //  4. otherwise the current status must be in from (exit code 2). An issue
 //     not on the board or without a status counts as Engine.Initial.
+//
+// Moving an issue closed as not planned or duplicate to a final status is
+// allowed with a warning: the verb does not change why it was closed.
 //
 // The plan adds the issue to the board when it is not there, reopens it,
 // sets the target status, adds and removes labels, assigns, posts the
@@ -272,12 +287,21 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 	}
 	p := &Plan{Verb: v.Name, Issue: is, Target: v.To}
 	atTarget := v.To != "" && is.Status == v.To
-	if !atTarget {
+	// A verb that only closes, run again on an issue it closed: the
+	// board's "Item closed" workflow may have moved the item since, so its
+	// status says nothing about where the verb started.
+	closedRepeat := v.To == "" && v.Close != "" && is.Closed
+	if !atTarget && !closedRepeat {
 		if err := e.checkFrom(v, is); err != nil {
 			return nil, err
 		}
 	}
 	moves := v.To != "" && !atTarget
+	if is.Closed && moves && slices.Contains(e.Final, v.To) &&
+		(is.StateReason == config.CloseNotPlanned || is.StateReason == config.CloseDuplicate) {
+		p.Warnings = append(p.Warnings, fmt.Sprintf("#%d is closed as %s; moving to %s anyway",
+			is.Number, ReasonText(is.StateReason), v.To))
+	}
 	switch {
 	case !is.OnBoard:
 		p.Ops = append(p.Ops, AddToBoard{})
@@ -301,10 +325,13 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 	p.planLabels(v)
 	if v.Assign != "" {
 		login := v.Assign
-		if login == config.Me {
-			if login = is.Viewer; login == "" {
-				return nil, render.Internal("%s assigns %s, but the authenticated user was not read", v.Name, config.Me)
-			}
+		switch {
+		case login == config.Me && is.Viewer == "":
+			return nil, render.Internal("%s assigns %s, but the authenticated user was not read", v.Name, config.Me)
+		case login == config.Me:
+			login = is.Viewer
+		case is.AssignLogin != "":
+			login = is.AssignLogin // as GitHub spells it
 		}
 		switch {
 		case slices.ContainsFunc(is.Assignees, func(s string) bool { return strings.EqualFold(s, login) }):
@@ -358,13 +385,14 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 
 // planLabels adds the label ops of v: labels to add that the issue lacks,
 // labels to remove that it has. The rest are in place. Names compare
-// without case, as GitHub's do. When the issue has more labels than were
-// read, a label to add that was not seen is added (adding it twice
-// changes nothing), and one to remove that was not seen counts as absent.
+// exactly: the reader looked each one up as the repository spells it, and
+// GitHub's names are unique regardless of case. A label to remove that
+// does not exist in the repository (Issue.MissingLabels) is in place.
+// When the issue has more labels than were read (Issue.LabelsTruncated),
+// a label that was not seen is added or removed all the same: doing
+// either twice changes nothing, and "unchanged" would be a guess.
 func (p *Plan) planLabels(v config.Verb) {
-	has := func(name string) bool {
-		return slices.ContainsFunc(p.Issue.Labels, func(l string) bool { return strings.EqualFold(l, name) })
-	}
+	has := func(name string) bool { return slices.Contains(p.Issue.Labels, name) }
 	var add, addInPlace, remove, removeInPlace []string
 	for _, name := range v.AddLabels {
 		if has(name) {
@@ -374,9 +402,12 @@ func (p *Plan) planLabels(v config.Verb) {
 		}
 	}
 	for _, name := range v.RemoveLabels {
-		if has(name) {
+		switch {
+		case slices.Contains(p.Issue.MissingLabels, name):
+			removeInPlace = append(removeInPlace, name)
+		case has(name), p.Issue.LabelsTruncated:
 			remove = append(remove, name)
-		} else {
+		default:
 			removeInPlace = append(removeInPlace, name)
 		}
 	}

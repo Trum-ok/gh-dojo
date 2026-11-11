@@ -303,6 +303,16 @@ the board yet: the status needs the new board item). Label and user IDs are
 read with the issue, so a verb on an issue on the board costs one read and
 one write.
 
+The board's built-in workflows run after the verb and may change the status
+it set: "Item closed" moves an issue a verb closed (to Done by default),
+"Item reopened" moves one it reopened. Turn them off in the board's
+workflow settings, or point them at the statuses your verbs set. A verb
+that closes the issue and has no `to` skips the `from` check on an issue
+already closed, so its repeat is not refused because a workflow moved the
+issue. A verb that moves an issue closed as not planned or duplicate to a
+final status warns on stderr (`closed as not planned; moving to Done
+anyway`) and keeps the reason.
+
 A verb with `confirm = "user"` is the user's decision: without `--yes` it
 exits with code 2 and asks you to ask the user; re-run it with `--yes` only
 once they agree. A repeat with nothing left to do needs no `--yes`. Other
@@ -359,7 +369,7 @@ created. A partial write (code 5) names what was done and what was not:
 
 ```console
 $ gh dojo review 42
-error: #42 In progress → In review, labels +in-review, comment left; not assigned: GitHub denied access; gh auth refresh -s project, then re-run the same command
+error: #42 labels +in-review, assigned octocat, comment left; status not changed: GitHub token is missing a required scope (project); gh auth refresh -s project, then re-run the same command
 fix: gh auth refresh -s project
 ```
 
@@ -432,6 +442,9 @@ to = "Backlog"
 reopen = true
 
 [verbs.done]
+close = false                # keep the issue open: false turns off the preset's close
+
+[verbs.ready]
 disabled = true              # drop a verb that the preset defines
 ```
 
@@ -501,9 +514,9 @@ Each `[verbs.<name>]` table becomes `gh dojo <name>`.
 | `comment`        | [Comment template](#comment-templates)                                                           |
 | `labels`         | Labels to add (`"+name"`) and remove (`"-name"`): `["+in-review", "-blocked"]`                   |
 | `assign`         | Who to add to the assignees: `true` (`board.assignee`), `"@me"`, a login; `false` turns a preset's off |
-| `close`          | Close the issue with this reason: `completed`, `not_planned` or `duplicate`                      |
+| `close`          | Close the issue with this reason: `completed`, `not_planned` or `duplicate`; `false` turns a preset's off |
 | `reopen`         | `true` reopens a closed issue                                                                    |
-| `confirm`        | `"user"`: the verb is the user's decision and runs only with `--yes`                            |
+| `confirm`        | `"user"`: the verb is the user's decision and runs only with `--yes`; `false` turns a preset's off |
 | `disabled`       | `true` removes a verb the preset defines; it stands alone in its table                           |
 
 A verb needs at least one effect: `to`, `comment`, `labels`, `assign`,
@@ -520,9 +533,13 @@ Effects:
 
 - **labels**: every entry starts with `+` or `-`; a name may not be both
   added and removed. Names must match the repository's labels exactly, case
-  included: a missing one fails before anything is written, with the
-  repository's labels as the allowed values (create it with `gh label
-  create`). Labels the issue already has (or lacks) are skipped.
+  included: a label to add that is missing fails before anything is
+  written, with the repository's labels as the allowed values (create it
+  with `gh label create`; a name that differs only in case gets the
+  spelling to use instead). A label to remove that the repository does not
+  have is in place, unless the issue has it in another case. Labels the
+  issue already has (or lacks) are skipped; a verb that removes labels
+  reads up to 100 of the issue's labels, GitHub's limit per issue.
 - **assign**: adds one user and keeps the other assignees. `"@me"` is the
   authenticated user; a login must be able to be assigned issues in the
   repository, or the verb fails before writing, listing who can be.
@@ -530,9 +547,11 @@ Effects:
   closed is not closed again, even with another reason; the line says
   `already closed as completed`. `duplicate` marks the issue a duplicate
   without linking the original: name it in the comment. A verb that closes
-  or reopens runs on closed issues.
+  or reopens runs on closed issues. `close = false` turns off a preset's
+  close, such as kanban's `done`.
 - **confirm**: `confirm = "user"` is a signal, not a lock: an agent could add
   `--yes` itself, so tell agents (in a skill or AGENTS.md) to ask first.
+  `confirm = false` turns off a preset's.
 
 ### Comment templates
 
@@ -589,6 +608,7 @@ The board's status field must have these options (other options are fine):
 
 `done` also closes the issue as completed: Done means released. An issue a
 pull request already closed stays closed; `done` still moves it to Done.
+To keep issues open in Done, set `close = false` under `[verbs.done]`.
 
 The preset also sets `fields.status = "Status"`, `statuses.initial =
 "Backlog"`, `statuses.final = ["Done"]`, `statuses.resolved = ["Ready",

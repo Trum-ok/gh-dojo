@@ -298,21 +298,33 @@ func (c *Config) buildEffects(name string, r *rawVerb, v *Verb) error {
 			v.Assign = *a.User
 		}
 	}
-	if r.Close != nil {
-		if !slices.Contains(closeReasons, *r.Close) {
-			return c.Errorf("%s: unknown reason %q", c.KeyPath(p+"close"), *r.Close).WithAllowed(closeReasons...)
+	if o := r.Close; o != nil {
+		key := c.KeyPath(p + "close")
+		switch {
+		case o.Bool != nil && *o.Bool:
+			return c.Errorf("%s = true: want a reason, or false to leave the issue open", key).
+				WithAllowed(append(slices.Clone(closeReasons), "false")...)
+		case o.Str != nil && !slices.Contains(closeReasons, *o.Str):
+			return c.Errorf("%s: unknown reason %q", key, *o.Str).WithAllowed(closeReasons...)
+		case o.Str != nil:
+			v.Close = *o.Str
 		}
-		v.Close = *r.Close
 	}
 	v.Reopen = deref(r.Reopen)
 	if v.Close != "" && v.Reopen {
 		return c.Errorf("verbs.%s sets both close and reopen; keep one", name)
 	}
-	if r.Confirm != nil {
-		if *r.Confirm != ConfirmUser {
-			return c.Errorf("%s: unknown value %q", c.KeyPath(p+"confirm"), *r.Confirm).WithAllowed(ConfirmUser)
+	if o := r.Confirm; o != nil {
+		key := c.KeyPath(p + "confirm")
+		switch {
+		case o.Bool != nil && *o.Bool:
+			return c.Errorf("%s = true: want %q, or false to turn it off", key, ConfirmUser).
+				WithAllowed(strconv.Quote(ConfirmUser), "false")
+		case o.Str != nil && *o.Str != ConfirmUser:
+			return c.Errorf("%s: unknown value %q", key, *o.Str).WithAllowed(ConfirmUser)
+		case o.Str != nil:
+			v.Confirm = true
 		}
-		v.Confirm = true
 	}
 	return nil
 }

@@ -67,6 +67,16 @@ when = "A closed issue is needed after all"
 to = "Backlog"
 reopen = true
 comment = "Revived."
+
+# Closes without moving: the board's "Item closed" workflow may move it.
+[verbs.shelve]
+when = "Not now"
+from = ["Backlog"]
+close = "not_planned"
+
+[verbs.give]
+when = "Hand it over"
+assign = "octocat"
 `
 
 func testEngine(t *testing.T) (*Engine, *config.Config) {
@@ -184,7 +194,30 @@ func TestPlan(t *testing.T) {
 		{name: "review_all", verb: "review", hasOps: 4, issue: Issue{Number: 42, Title: "Fix login redirect",
 			OnBoard: true, Status: "In progress", Labels: []string{"bug", "blocked"}, Assignees: []string{"bob"}}},
 		{name: "review_some_in_place", verb: "review", hasOps: 2, issue: Issue{Number: 42, OnBoard: true,
-			Status: "In progress", Labels: []string{"In-Review", "blocked"}, Assignees: []string{"Alice"}}},
+			Status: "In progress", Labels: []string{"in-review", "blocked"}, Assignees: []string{"Alice"}}},
+		// More labels than were read: -blocked may be beyond the window, so
+		// it is removed rather than reported in place.
+		{name: "review_labels_truncated", verb: "review", hasOps: 2, issue: Issue{Number: 42, OnBoard: true,
+			Status: "In progress", Labels: []string{"in-review"}, LabelsTruncated: true, Assignees: []string{"alice"}}},
+		// blocked does not exist in the repository: nothing to remove.
+		{name: "review_label_missing", verb: "review", hasOps: 1, issue: Issue{Number: 42, OnBoard: true,
+			Status: "In progress", Labels: []string{"in-review"}, LabelsTruncated: true, MissingLabels: []string{"blocked"},
+			Assignees: []string{"alice"}}},
+		// The login as GitHub spells it, not as the config writes it.
+		{name: "give_login_spelling", verb: "give", hasOps: 1,
+			issue: Issue{Number: 42, OnBoard: true, Status: "Backlog", AssignLogin: "OctoCat"}},
+		{name: "give_login_spelling_repeat", verb: "give", noOps: true,
+			issue: Issue{Number: 42, OnBoard: true, Status: "Backlog", AssignLogin: "OctoCat", Assignees: []string{"OctoCat"}}},
+		// The board's "Item closed" workflow moved the closed issue to Done:
+		// a repeat of a verb that only closes is not refused by from.
+		{name: "shelve_repeat_after_automation", verb: "shelve", noOps: true,
+			issue: Issue{Number: 42, Closed: true, StateReason: "not_planned", OnBoard: true, Status: "Done"}},
+		{name: "shelve_open_wrong_from", verb: "shelve", code: render.ExitDenied, issue: onBoard("Done")},
+		// done on an issue closed as not planned moves it to Done, with a warning.
+		{name: "done_closed_not_planned", verb: "done", hasOps: 1,
+			issue: Issue{Number: 42, Closed: true, StateReason: "not_planned", OnBoard: true, Status: "Ready"}},
+		{name: "done_closed_duplicate_repeat", verb: "done", noOps: true,
+			issue: Issue{Number: 42, Closed: true, StateReason: "duplicate", OnBoard: true, Status: "Done"}},
 		{name: "review_repeat", verb: "review", noOps: true, issue: Issue{Number: 42, OnBoard: true,
 			Status: "Ready", Labels: []string{"in-review"}, Assignees: []string{"bob", "alice"}}},
 		{name: "take_me", verb: "take", hasOps: 1, issue: Issue{Number: 42, OnBoard: true, Status: "Backlog", Viewer: "carol"}},

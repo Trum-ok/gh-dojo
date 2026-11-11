@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.done.close = true: want a reason, or false to leave the issue open
+allowed: completed, not_planned, duplicate, false

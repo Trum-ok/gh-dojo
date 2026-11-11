@@ -1,1 +1,2 @@
-error: .github/dojo.toml:11: verbs.done.confirm: wrong type: got boolean, want string
+error: .github/dojo.toml: verbs.done.confirm = true: want "user", or false to turn it off
+allowed: "user", false

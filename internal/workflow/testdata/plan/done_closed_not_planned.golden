@@ -1,0 +1,5 @@
+warning: #42 is closed as not planned; moving to Done anyway
+dry run: done #42
+  status: Ready → Done
+  close: already closed as not planned
+confirm: #42 Ready → Done, already closed as not planned

@@ -1,0 +1,6 @@
+code: 1
+--- stdout
+--- stderr
+error: .github/dojo.toml: verbs.tagcase.labels: no label "Enhancement" in Trum-ok/gh-dojo
+allowed: enhancement, bug, dogfood, documentation
+fix: write it as "enhancement" in verbs.tagcase.labels
