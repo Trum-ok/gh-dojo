@@ -273,17 +273,23 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 		vars[config.VarSession] = link
 		noSession = !ok && e.Session.Configured()
 	}
-	if body := config.Render(v.Comment, vars); body != "" {
-		marker := Marker(v.Name, body)
-		if AlreadyPosted(is.Comments, marker) {
-			p.CommentPresent = true
-		} else {
-			p.Ops = append(p.Ops, AddComment{Body: body, Marker: marker})
-			if noSession {
-				p.Warnings = append(p.Warnings, fmt.Sprintf(
-					"no agent session: %s is not set, so the comment has no session link",
-					join(e.Session.Env, "or")))
-			}
+	body := config.Render(v.Comment, vars)
+	switch {
+	case body == "":
+		// The template rendered empty: without a session it said nothing.
+		if noSession {
+			p.Warnings = append(p.Warnings, fmt.Sprintf(
+				"no agent session: %s is not set, so no comment is left",
+				join(e.Session.Env, "or")))
+		}
+	case AlreadyPosted(is.Comments, Marker(v.Name, body)):
+		p.CommentPresent = true
+	default:
+		p.Ops = append(p.Ops, AddComment{Body: body, Marker: Marker(v.Name, body)})
+		if noSession {
+			p.Warnings = append(p.Warnings, fmt.Sprintf(
+				"no agent session: %s is not set, so the comment has no session link",
+				join(e.Session.Env, "or")))
 		}
 	}
 	return p, nil

@@ -1,3 +1,4 @@
+warning: no agent session: DOJO_TEST_SESSION or DOJO_TEST_SESSION_2 is not set, so no comment is left
 dry run: start #42 "Fix login redirect"
   status: Backlog → In progress
 confirm: #42 Backlog → In progress
