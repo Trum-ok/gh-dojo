@@ -22,7 +22,9 @@ gh dojo --help
 `make install` builds into `~/.local/share/gh-dojo/gh-dojo` (override with
 `INSTALL_DIR`, whose last element must be `gh-dojo`) and installs the extension
 from there, so the installed `gh dojo` does not change when you switch
-branches in the working copy. Re-run it to update.
+branches in the working copy. Re-run it to update. A different `gh dojo`
+extension already installed is replaced, and put back if the install fails.
+`gh dojo --version` shows the `git describe` of the installed build.
 
 ## Exit codes
 
@@ -39,5 +41,5 @@ branches in the working copy. Re-run it to update.
 
 ```sh
 make build test vet
-make golden   # rewrite golden files after an intended output change
+make golden   # rewrite golden files after an intended output change (UPDATE_GOLDEN=1)
 ```

@@ -1,7 +1,9 @@
 name: CI
 
+# Pushes to main and pull requests only, so a PR branch is not built twice.
 on:
   push:
+    branches: [main]
   pull_request:
 
 permissions:
@@ -15,6 +17,14 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+      - name: Format
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "gofmt needed on:"; echo "$unformatted"; exit 1
+          fi
+      - name: Tidy
+        run: go mod tidy -diff
       - name: Vet
         run: go vet ./...
       - name: Test
