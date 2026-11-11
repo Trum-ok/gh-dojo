@@ -159,9 +159,12 @@ are counted. At most `--limit` issues are printed (default 50), with the
 total.
 
 `--sprint` needs [`fields.sprint`](#fields) and keeps the issues in one
-iteration: `current` (the one covering today's UTC date), a title, or `none`
-(no sprint). The first line names the iteration with its days; an unknown
-title lists the iterations.
+iteration: `current` (the one covering today in
+[`board.timezone`](#board), UTC by default), a title, or `none` (no
+sprint). The first line names the iteration with its days; an unknown
+title lists the iterations, and a title several iterations share lists
+them with their days. With no iteration for today, a cached board schema
+is read again before that is an error.
 
 ### new
 
@@ -296,7 +299,10 @@ It checks that the config loads, that gh is logged in with a token that has
 the `project` scope (a token from `GH_TOKEN` gets "set GH_TOKEN to …" as
 the fix), that the board exists, is open and has every field and status the
 config names (each mismatch on its own line), that the sprint field (with
-[`fields.sprint`](#fields)) has an iteration for today's UTC date, and that
+[`fields.sprint`](#fields)) has an iteration for today, a date in
+[`board.timezone`](#board) (shown with the zone; a completed iteration
+covers its days, as for verbs, and a cached schema without one is read
+again first), and that
 every repository of
 [`board.repos`](#board), or the current one, is visible with issues
 enabled, and that the labels verbs add or remove exist in the default
@@ -305,7 +311,7 @@ assigned (a missing label to remove is reported too: it never removes
 anything). An organization whose SAML single sign-on or OAuth app
 restrictions block the token gets the same fix as any other command. It
 sends one request, plus one for the board when its schema is not
-cached, plus one for the verbs' labels and assignees when a verb has them. The exit code is 0 when every check is ok, 4 when one failed on auth
+cached (or the cached one has no iteration for today), plus one for the verbs' labels and assignees when a verb has them. The exit code is 0 when every check is ok, 4 when one failed on auth
 or the network, else 1.
 
 ### Process verbs
@@ -439,6 +445,7 @@ owner = "acme"
 project = 3
 repos = ["acme/shop"]        # the first one is the default repo
 assignee = "@me"             # who `assign = true` assigns
+timezone = "Europe/Moscow"   # the sprint's "today"; UTC when not set
 
 [fields]                     # logical name = field name on the board
 status = "Status"            # required (the kanban preset sets "Status")
@@ -526,6 +533,7 @@ disabled = true              # drop a verb that the preset defines
 | `project` | yes      | Project number from its URL, 1 or greater                                     |
 | `repos`   | no       | `owner/name` list; the first is the default repo for issue numbers and `new`. Empty: the current repo (`GH_REPO`, else the git remote) |
 | `assignee` | no      | Who a verb with `assign = true` assigns: `"@me"` (the authenticated user) or a login |
+| `timezone` | no      | An IANA time zone, like `"Europe/Moscow"`; UTC when not set. The [`iteration`](#verbs) effect, `list --sprint current` and `doctor` take today, and the day an issue entered a status, as dates in it |
 
 ### fields
 
@@ -622,23 +630,35 @@ Effects:
   or reopens runs on closed issues. `close = false` turns off a preset's
   close, such as kanban's `done`.
 - **iteration**: sets the [sprint field](#fields) in the same mutation as
-  the status. Dates are UTC: `current` is the iteration covering today's UTC
-  date; `by_status_date:Ready` is the one covering the day the issue last
-  entered Ready, from its status history on the board, or today when the
-  verb itself moves the issue to Ready; `clear` removes the value. A day no
-  iteration covers is an error (exit code 1) listing the iterations, with
-  [`gh dojo doctor`](#doctor) to check today's. An issue that never entered
-  the status, or entered it before the last 20 status changes gh-dojo reads,
-  is refused (exit code 2): ask the user which sprint it belongs to. GitHub
-  keeps a status history only for a board's built-in `Status` field, so
-  `by_status_date` needs `fields.status = "Status"`. An issue already in the
-  target iteration (or without one, for `clear`) is left alone.
+  the status. Dates are in [`board.timezone`](#board) (UTC by default), and
+  a completed iteration still covers its days. `current` is the iteration
+  covering today; `clear` removes the value, and leaves an issue that is
+  not on the board off it when that is the verb's only board effect.
+  `by_status_date:Ready` is the one covering the day the issue last entered
+  Ready, from its status history on the board (changes from before the
+  issue was added to the board belong to an earlier item and are ignored),
+  or today when the verb itself moves the issue to Ready. An issue in Ready
+  with no change read since it was added was added in Ready: that day.
+  When the day is unknown (the history lags behind the status, or the entry
+  is older than the last 20 status changes gh-dojo reads) or the issue
+  never entered Ready (In progress straight to Done), the verb takes
+  today's iteration and warns: `#42 never entered Ready; using today's
+  sprint`. No iteration for today is an error (exit code 1) listing the
+  iterations, with [`gh dojo doctor`](#doctor) to check today's; a cached
+  board schema is read again first. A past day no iteration covers (before
+  the first one, say) is an error too, unless the issue has a sprint
+  already: set the sprint on the board, or use `iteration = "current"`.
+  GitHub keeps a status history only for a board's built-in `Status` field,
+  so `by_status_date` needs `fields.status = "Status"`; the config is
+  refused otherwise. An issue already in the target iteration (or without
+  one, for `clear`) is left alone: `sprint unchanged (Sprint 11)`.
 - **field**: `[verbs.<name>.field]` names board fields, each with a value:
   an option name for a single-select field, a string for a text field, a
   number for a number field, a date (`2026-11-30`, or the string
   `"2026-11-30"`) for a date field. The status and sprint fields are set
   with `to` and `iteration`, not here. Fields already at their value are
-  left alone.
+  left alone. Each field is its own write: a partial report names the
+  fields set and those not set (`Priority not set`).
 - **confirm**: `confirm = "user"` is a signal, not a lock: an agent could add
   `--yes` itself, so tell agents (in a skill or AGENTS.md) to ask first.
   `confirm = false` turns off a preset's.
