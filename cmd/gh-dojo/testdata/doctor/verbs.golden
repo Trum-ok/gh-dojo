@@ -1,0 +1,19 @@
+code: 1
+--- stdout
+ok       version  gh dojo dev
+ok       config   .github/dojo.toml: preset kanban, 13 verbs
+ok       token    github.com as Trum-ok, with the project scope
+ok       board    Trum-ok/5 "gh-dojo": field Status and 6 statuses match
+ok       repo     Trum-ok/gh-dojo (default): visible, issues enabled
+problem  verbs    verbs.tag.labels: no label "enhancment" in Trum-ok/gh-dojo
+                  fix: gh label create "enhancment" -R Trum-ok/gh-dojo, or fix verbs.tag.labels
+problem  verbs    verbs.give.assign: octo-nobody cannot be assigned issues in Trum-ok/gh-dojo
+                  fix: check the login, or give octo-nobody access to Trum-ok/gh-dojo
+problem  verbs    verbs.recase.labels: no label "Dogfood" in Trum-ok/gh-dojo
+                  fix: write it as "dogfood" in verbs.recase.labels
+problem  verbs    verbs.tagcase.labels: no label "Enhancement" in Trum-ok/gh-dojo
+                  fix: write it as "enhancement" in verbs.tagcase.labels
+problem  verbs    verbs.untag.labels: no label "no-such-label" in Trum-ok/gh-dojo, so -no-such-label never removes anything
+                  fix: edit verbs.untag.labels, or gh label create "no-such-label" -R Trum-ok/gh-dojo
+--- stderr
+error: doctor found 5 problems; fix as shown above, then run gh dojo doctor again

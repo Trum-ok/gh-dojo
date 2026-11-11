@@ -50,6 +50,13 @@ from = ["In Progress"]
 		{"repos", strings.Replace(dojoConfig, `repos = ["Trum-ok/gh-dojo"]`,
 			`repos = ["Trum-ok/gh-dojo", "Trum-ok/no-such-repo", "Trum-ok/wiki"]`, 1),
 			[]string{doctorFixtures + "repos.json", boardFixture}, render.ExitUsage, 2},
+		// Verbs' labels and assignees take one more read: each label
+		// missing or spelled in another case and each user who cannot be
+		// assigned is a problem.
+		{"verbs", effectsDojoConfig, []string{doctorFixtures + "ok.json", boardFixture, doctorFixtures + "verbs.json"},
+			render.ExitUsage, 3},
+		{"verbs_ok", doctorVerbsOKConfig, []string{doctorFixtures + "ok.json", boardFixture, doctorFixtures + "verbs_ok.json"},
+			render.ExitOK, 3},
 		// The organization's SAML SSO blocks both the repository and the
 		// board: each gets the SSO fix.
 		{"sso", orgConfig, []string{doctorFixtures + "sso.json", boardFixtures + "org_board_saml.json"}, render.ExitNetwork, 2},
@@ -246,3 +253,17 @@ type noTransport struct{}
 func (noTransport) RoundTrip(*http.Request) (*http.Response, error) {
 	return nil, errors.New("no network in tests")
 }
+
+// doctorVerbsOKConfig has verbs whose labels and assignees all match the
+// gh-dojo repository.
+var doctorVerbsOKConfig = strings.Replace(dojoConfig, "repos = [\"Trum-ok/gh-dojo\"]\n",
+	"repos = [\"Trum-ok/gh-dojo\"]\nassignee = \"@me\"\n", 1) + `
+[verbs.review]
+when = "A pull request waits for review"
+labels = ["+enhancement", "-dogfood"]
+assign = true
+
+[verbs.hand]
+when = "Hand it to the owner"
+assign = "trum-ok"
+`

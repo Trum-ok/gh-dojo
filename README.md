@@ -253,6 +253,7 @@ problem  token    github.com as octocat: the token lacks the project scope (has:
                   fix: gh auth refresh -s project
 ok       board    octocat/3 "Shop": field Status and 5 statuses match
 ok       repo     octocat/shop (default): visible, issues enabled
+ok       verbs    octocat/shop: 2 labels exist, 1 assignee can be assigned
 ```
 
 It checks that the config loads, that gh is logged in with a token that has
@@ -260,10 +261,13 @@ the `project` scope (a token from `GH_TOKEN` gets "set GH_TOKEN to …" as
 the fix), that the board exists, is open and has every field and status the
 config names (each mismatch on its own line), and that every repository of
 [`board.repos`](#board), or the current one, is visible with issues
-enabled. An organization whose SAML single sign-on or OAuth app
+enabled, and that the labels verbs add or remove exist in the default
+repository spelled exactly as there and the users they assign can be
+assigned (a missing label to remove is reported too: it never removes
+anything). An organization whose SAML single sign-on or OAuth app
 restrictions block the token gets the same fix as any other command. It
 sends one request, plus one for the board when its schema is not
-cached. The exit code is 0 when every check is ok, 4 when one failed on auth
+cached, plus one for the verbs' labels and assignees when a verb has them. The exit code is 0 when every check is ok, 4 when one failed on auth
 or the network, else 1.
 
 ### Process verbs
@@ -540,6 +544,7 @@ Effects:
   have is in place, unless the issue has it in another case. Labels the
   issue already has (or lacks) are skipped; a verb that removes labels
   reads up to 100 of the issue's labels, GitHub's limit per issue.
+  [`gh dojo doctor`](#doctor) checks every verb's labels.
 - **assign**: adds one user and keeps the other assignees. `"@me"` is the
   authenticated user; a login must be able to be assigned issues in the
   repository, or the verb fails before writing, listing who can be.

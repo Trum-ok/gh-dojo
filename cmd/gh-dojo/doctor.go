@@ -37,9 +37,12 @@ command that fixes it.
   board    the board exists and has every field and status the config names
   repo     each repository of board.repos (else the current one) is visible
            and has issues enabled
+  verbs    the labels verbs add or remove exist in the default repository,
+           spelled as there, and the users they assign can be assigned
 
-It sends one request for the token and the repositories, and one more for
-the board when its schema is not cached (an hour).
+It sends one request for the token and the repositories, one more for the
+board when its schema is not cached (an hour), and one for the verbs'
+labels and assignees when a verb has them.
 
 Exit codes: 0 when every check is ok; 4 when a check failed on auth or the
 network; else 1.`,
@@ -134,7 +137,8 @@ func (r *doctorReport) err() error {
 }
 
 // runDoctor runs the checks in order. Requests: one Doctor query (token
-// and repositories), plus the board schema when it is not cached.
+// and repositories), plus the board schema when it is not cached, plus
+// one DoctorVerbs query when a verb has labels or assigns someone.
 func runDoctor(ctx context.Context) *doctorReport {
 	r := &doctorReport{}
 	r.ok("version", "gh dojo %s", version)
@@ -149,7 +153,7 @@ func runDoctor(ctx context.Context) *doctorReport {
 
 	a := newApp()
 	repos, repoErr := doctorRepos(a, cfg)
-	reach := checkToken(ctx, r, a, repos)
+	reach, viewer := checkToken(ctx, r, a, repos)
 
 	var schema *board.Schema
 	switch {
@@ -176,6 +180,9 @@ func runDoctor(ctx context.Context) *doctorReport {
 
 	if cfg != nil && schema != nil {
 		checkSprint(r, cfg, schema, doctorClock(a)())
+	}
+	if cfg != nil {
+		checkVerbs(ctx, r, a, cfg, repos, reach, viewer)
 	}
 	return r
 }
@@ -256,12 +263,13 @@ func doctorQuery(repos []*doctorRepo) (string, map[string]any) {
 
 // checkToken sends the Doctor query, checks the token's scopes and fills
 // what it found about repos. It reports whether GitHub answered, so the
-// checks that need it can run.
-func checkToken(ctx context.Context, r *doctorReport, a *App, repos []*doctorRepo) bool {
+// checks that need it can run, and the authenticated user's login ("" when
+// not read).
+func checkToken(ctx context.Context, r *doctorReport, a *App, repos []*doctorRepo) (bool, string) {
 	c, ok := a.Client.(tokenClient)
 	if !ok {
 		r.skip("token", "this GitHub client cannot report token scopes")
-		return true
+		return true, ""
 	}
 	query, vars := doctorQuery(repos)
 	var out map[string]json.RawMessage
@@ -269,7 +277,7 @@ func checkToken(ctx context.Context, r *doctorReport, a *App, repos []*doctorRep
 	failed, partial := repoErrors(err)
 	if err != nil && !partial {
 		r.problem("token", err)
-		return false
+		return false, ""
 	}
 	var viewer struct{ Login string }
 	_ = json.Unmarshal(out["viewer"], &viewer)
@@ -302,7 +310,7 @@ func checkToken(ctx context.Context, r *doctorReport, a *App, repos []*doctorRep
 		}
 		r.problem("token", render.Network("%s: the token lacks the project scope (has: %s)", who, has).WithFix(c.AuthFix()))
 	}
-	return true
+	return true, viewer.Login
 }
 
 // repoErrors reads a GraphQL answer whose errors are all about repository
@@ -391,6 +399,163 @@ func checkRepo(r *doctorReport, cfg *config.Config, rp *doctorRepo) {
 		r.ok("repo", "%s, the current repository: visible, issues enabled", name)
 	default:
 		r.ok("repo", "%s: visible, issues enabled", name)
+	}
+}
+
+// verbsCheck is what checkVerbs asks GitHub about the verbs: label names
+// exactly as written, logins to assign (config.Me as the viewer's).
+type verbsCheck struct {
+	labels []string          // distinct, config order
+	users  []string          // distinct regardless of case
+	alias  map[string]string // label name or lowercase login → alias
+}
+
+func newVerbsCheck(cfg *config.Config, viewer string) *verbsCheck {
+	c := &verbsCheck{alias: map[string]string{}}
+	for _, v := range cfg.Verbs {
+		for _, name := range append(slices.Clone(v.AddLabels), v.RemoveLabels...) {
+			if _, ok := c.alias[name]; !ok {
+				c.alias[name] = fmt.Sprintf("label%d", len(c.labels))
+				c.labels = append(c.labels, name)
+			}
+		}
+		login := v.Assign
+		if login == config.Me {
+			login = viewer
+		}
+		if key := "@" + strings.ToLower(login); login != "" && c.alias[key] == "" {
+			c.alias[key] = fmt.Sprintf("user%d", len(c.users))
+			c.users = append(c.users, login)
+		}
+	}
+	return c
+}
+
+func (c *verbsCheck) empty() bool { return len(c.labels) == 0 && len(c.users) == 0 }
+
+// query is the DoctorVerbs query: the first 100 labels of the repository
+// for their spelling, each label by its exact name, and the assignable
+// users matching each login.
+func (c *verbsCheck) query(repo issue.Repo) (string, map[string]any) {
+	params := []string{"$owner: String!", "$name: String!"}
+	fields := []string{"    labels(first: 100) { nodes { name } }"}
+	vars := map[string]any{"owner": repo.Owner, "name": repo.Name}
+	for _, name := range c.labels {
+		alias := c.alias[name]
+		params = append(params, "$"+alias+": String!")
+		fields = append(fields, fmt.Sprintf("    %s: label(name: $%s) { name }", alias, alias))
+		vars[alias] = name
+	}
+	for _, login := range c.users {
+		alias := c.alias["@"+strings.ToLower(login)]
+		params = append(params, "$"+alias+": String!")
+		fields = append(fields, fmt.Sprintf("    %s: assignableUsers(query: $%s, first: 100) { nodes { login } }", alias, alias))
+		vars[alias] = login
+	}
+	return "query DoctorVerbs(" + strings.Join(params, ", ") + ") {\n  repository(owner: $owner, name: $name) {\n" +
+		strings.Join(fields, "\n") + "\n  }\n}", vars
+}
+
+// checkVerbs checks the labels of every verb against the default
+// repository, exactly as a verb looks them up, and that the users verbs
+// assign can be assigned there: one DoctorVerbs query, sent only when a
+// verb has labels or assigns someone. A label to add that is missing, or
+// any label spelled in another case, fails the verb; a label to remove
+// that is missing never removes anything, likely a typo.
+func checkVerbs(ctx context.Context, r *doctorReport, a *App, cfg *config.Config, repos []*doctorRepo, reach bool, viewer string) {
+	c := newVerbsCheck(cfg, viewer)
+	if c.empty() {
+		return
+	}
+	var repo *doctorRepo
+	for _, rp := range repos {
+		if rp.Default {
+			repo = rp
+		}
+	}
+	switch {
+	case !reach:
+		r.skip("verbs", "needs GitHub access (see token)")
+		return
+	case repo == nil || repo.Err != nil || repo.Found == nil || !repo.Found.HasIssuesEnabled:
+		r.skip("verbs", "needs the default repository (see repo)")
+		return
+	}
+	query, vars := c.query(repo.Repo)
+	var out struct {
+		Repository map[string]json.RawMessage `json:"repository"`
+	}
+	if err := a.Client.Query(ctx, query, vars, &out); err != nil {
+		r.problem("verbs", err)
+		return
+	}
+	var window struct {
+		Nodes []struct{ Name string } `json:"nodes"`
+	}
+	_ = json.Unmarshal(out.Repository["labels"], &window)
+	var names []string
+	for _, l := range window.Nodes {
+		names = append(names, l.Name)
+	}
+	exists := func(name string) bool {
+		var l *struct{ Name string }
+		_ = json.Unmarshal(out.Repository[c.alias[name]], &l)
+		return l != nil && l.Name != ""
+	}
+	assignable := func(login string) bool {
+		var users struct {
+			Nodes []*struct{ Login string } `json:"nodes"`
+		}
+		_ = json.Unmarshal(out.Repository[c.alias["@"+strings.ToLower(login)]], &users)
+		return slices.ContainsFunc(users.Nodes, func(u *struct{ Login string }) bool {
+			return u != nil && strings.EqualFold(u.Login, login)
+		})
+	}
+
+	repoName, problems := repo.Repo.String(), 0
+	problem := func(err error) { r.problem("verbs", err); problems++ }
+	for _, v := range cfg.Verbs {
+		key := cfg.KeyPath("verbs." + v.Name + ".labels")
+		for _, name := range append(slices.Clone(v.AddLabels), v.RemoveLabels...) {
+			if exists(name) {
+				continue
+			}
+			adds := slices.Contains(v.AddLabels, name)
+			e := render.Usage("%s: no label %q in %s", key, name, repoName)
+			switch spelled := spelling(name, names); {
+			case spelled != "":
+				e = e.WithFix(fmt.Sprintf("write it as %q in %s", spelled, key))
+			case adds:
+				e = e.WithFix(fmt.Sprintf("gh label create %q -R %s, or fix %s", name, repoName, key))
+			default:
+				e = render.Usage("%s: no label %q in %s, so -%s never removes anything", key, name, repoName, name).
+					WithFix(fmt.Sprintf("edit %s, or gh label create %q -R %s", key, name, repoName))
+			}
+			problem(e)
+		}
+		switch login := v.Assign; {
+		case login == "":
+		case login == config.Me && viewer == "":
+			// The token check did not read the viewer.
+		case login == config.Me && !assignable(viewer):
+			problem(render.Usage("%s = %q: you (%s) cannot be assigned issues in %s",
+				cfg.KeyPath("verbs."+v.Name+".assign"), config.Me, viewer, repoName).
+				WithFix(fmt.Sprintf("get write access to %s, or change %s", repoName, cfg.KeyPath("verbs."+v.Name+".assign"))))
+		case login != config.Me && !assignable(login):
+			problem(render.Usage("%s: %s cannot be assigned issues in %s",
+				cfg.KeyPath("verbs."+v.Name+".assign"), login, repoName).
+				WithFix(fmt.Sprintf("check the login, or give %s access to %s", login, repoName)))
+		}
+	}
+	if problems == 0 {
+		var found []string
+		if n := len(c.labels); n > 0 {
+			found = append(found, plural(n, "label exists", "labels exist"))
+		}
+		if n := len(c.users); n > 0 {
+			found = append(found, plural(n, "assignee", "assignees")+" can be assigned")
+		}
+		r.ok("verbs", "%s: %s", repoName, strings.Join(found, ", "))
 	}
 }
 

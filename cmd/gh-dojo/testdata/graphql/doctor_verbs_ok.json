@@ -1,0 +1,73 @@
+{
+  "comment": "Hand-crafted: the DoctorVerbs query of gh dojo doctor; the response is the real API's answer for Trum-ok/gh-dojo, saved by hand since doctor's token fixtures cannot be recorded. Verbs whose labels exist and whose assignee (@me, Trum-ok) can be assigned.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "DoctorVerbs",
+      "query": "query DoctorVerbs($owner: String!, $name: String!, $label0: String!, $label1: String!, $user0: String!) {\n  repository(owner: $owner, name: $name) {\n    labels(first: 100) { nodes { name } }\n    label0: label(name: $label0) { name }\n    label1: label(name: $label1) { name }\n    user0: assignableUsers(query: $user0, first: 100) { nodes { login } }\n  }\n}",
+      "variables": {
+        "label0": "enhancement",
+        "label1": "dogfood",
+        "name": "gh-dojo",
+        "owner": "Trum-ok",
+        "user0": "Trum-ok"
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "labels": {
+              "nodes": [
+                {
+                  "name": "accessibility"
+                },
+                {
+                  "name": "bug"
+                },
+                {
+                  "name": "documentation"
+                },
+                {
+                  "name": "duplicate"
+                },
+                {
+                  "name": "enhancement"
+                },
+                {
+                  "name": "good first issue"
+                },
+                {
+                  "name": "help wanted"
+                },
+                {
+                  "name": "invalid"
+                },
+                {
+                  "name": "question"
+                },
+                {
+                  "name": "wontfix"
+                },
+                {
+                  "name": "dogfood"
+                }
+              ]
+            },
+            "label0": {
+              "name": "enhancement"
+            },
+            "label1": {
+              "name": "dogfood"
+            },
+            "user0": {
+              "nodes": [
+                {
+                  "login": "Trum-ok"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}
