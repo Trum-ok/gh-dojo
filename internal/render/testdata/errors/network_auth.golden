@@ -1,0 +1,2 @@
+error: token lacks the project scope
+fix: gh auth refresh -s project

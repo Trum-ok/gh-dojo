@@ -24,8 +24,20 @@ gh dojo --help
 from there, so the installed `gh dojo` does not change when you switch
 branches in the working copy. Re-run it to update.
 
+## Exit codes
+
+| Code | Meaning                         |
+|------|---------------------------------|
+| 0    | Everything applied              |
+| 1    | Bad arguments or config         |
+| 2    | A process check refused         |
+| 3    | Issue or board not found        |
+| 4    | Network, rate limit or auth     |
+| 5    | Partially applied; re-run it    |
+
 ## Development
 
 ```sh
 make build test vet
+make golden   # rewrite golden files after an intended output change
 ```

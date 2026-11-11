@@ -1,0 +1,2 @@
+error: GitHub API: Bad credentials
+fix: gh auth refresh -s project

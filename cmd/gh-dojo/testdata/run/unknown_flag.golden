@@ -1,0 +1,2 @@
+error: unknown flag: --nope
+fix: gh dojo one --help

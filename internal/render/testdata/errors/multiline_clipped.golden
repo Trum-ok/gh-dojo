@@ -1,0 +1,5 @@
+error: line one
+line two
+line three
+allowed: a
+fix: gh dojo --help
