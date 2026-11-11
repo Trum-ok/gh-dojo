@@ -1,0 +1,31 @@
+name: Release
+
+# A pushed v* tag builds gh-dojo for darwin, linux and windows on amd64 and
+# arm64 and publishes the binaries as a GitHub release, which is what
+# `gh extension install Trum-ok/gh-dojo` downloads. A tag with a "-" (for
+# example v0.1.0-rc.1) becomes a prerelease. The tag is stamped into
+# `gh dojo --version` by script/build-release.sh.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Test
+        run: go test ./...
+      - uses: cli/gh-extension-precompile@v2
+        with:
+          go_version_file: go.mod
+          build_script_override: script/build-release.sh

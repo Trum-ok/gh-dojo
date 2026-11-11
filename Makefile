@@ -9,7 +9,7 @@ LDFLAGS := -X main.version=$(VERSION)
 # last path element must be gh-dojo.
 INSTALL_DIR ?= $(HOME)/.local/share/gh-dojo/$(BIN)
 
-.PHONY: build test vet golden install
+.PHONY: build test vet golden dist install
 
 build:
 	go build -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/gh-dojo
@@ -24,6 +24,11 @@ vet:
 # diff before committing. Refused when CI is set.
 golden:
 	UPDATE_GOLDEN=1 go test ./...
+
+# Cross-compile the release binaries into dist/ the way the release workflow
+# does (script/build-release.sh), stamped with VERSION.
+dist:
+	script/build-release.sh $(VERSION)
 
 # The installed gh dojo is a symlink to INSTALL_DIR, not to the working copy,
 # so a broken branch never breaks it.
