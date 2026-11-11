@@ -129,25 +129,14 @@ func (a *App) Repo() (issue.Repo, error) {
 // The status is matched by the status field's ID from the schema, so a
 // field renamed since the schema was cached still reads right.
 func (a *App) Card(ctx context.Context, n, comments int) (*issue.Card, error) {
-	repo, err := a.Repo()
+	res, err := a.Cards(ctx, []int{n}, comments) // one number: issue.Read's request
 	if err != nil {
 		return nil, err
 	}
-	s, err := a.Schema(ctx)
-	if err != nil {
-		return nil, err
+	if res[0].Err != nil {
+		return nil, res[0].Err
 	}
-	cfg, err := a.Config()
-	if err != nil {
-		return nil, err
-	}
-	req := issue.Request{
-		Repo: repo, Number: n, Board: s, StatusField: cfg.StatusField(), Comments: comments,
-	}
-	if f, err := s.Field(req.StatusField); err == nil { // Schema checked it
-		req.StatusFieldID = f.ID
-	}
-	return issue.Read(ctx, a.Client, req)
+	return res[0].Card, nil
 }
 
 // Cards reads issues ns of the default repository like Card: one request

@@ -19,7 +19,16 @@ package issue
 // the reader keeps those of the configured board.
 const cardQuery = `query IssueCard($owner: String!, $repo: String!, $number: Int!, $comments: Int!, $status: String!) {
   repository(owner: $owner, name: $repo) {
-    issueOrPullRequest(number: $number) {
+    issueOrPullRequest(number: $number) ` + cardSelection + `
+  }
+}
+
+` + cardFragments
+
+// cardSelection is what a card reads of an issueOrPullRequest: cardQuery
+// selects it in place and batchQuery (ReadAll) as "fragment card", so both
+// read the same fields.
+const cardSelection = `{
       __typename
       ... on Issue {
         id
@@ -65,11 +74,10 @@ const cardQuery = `query IssueCard($owner: String!, $repo: String!, $number: Int
           }
         }
       }
-    }
-  }
-}
+    }`
 
-fragment link on Issue { number title state repository { nameWithOwner } }
+// cardFragments are the fragments cardSelection spreads.
+const cardFragments = `fragment link on Issue { number title state repository { nameWithOwner } }
 
 fragment value on ProjectV2ItemFieldValue {
   __typename

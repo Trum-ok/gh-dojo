@@ -230,6 +230,12 @@ func (c *Client) describe(err error, mutation bool) *render.Error {
 		}
 		return render.FromError(httpErr)
 	case errors.As(err, &gqlErr) && gqlErr != nil:
+		if unfinished(gqlErr) {
+			if mutation {
+				return mayHaveApplied("GitHub did not finish it")
+			}
+			return render.Network("GitHub did not finish the request (it may have timed out); retry later")
+		}
 		return describeGraphQL(gqlErr)
 	case errors.As(err, &typeErr):
 		return render.Internal("unexpected shape of a GitHub API response")
@@ -289,6 +295,22 @@ func describeGraphQL(err *api.GraphQLError) *render.Error {
 // may have been applied. Test for it with errors.Is; re-read state before
 // sending the write again.
 var ErrUnknownOutcome = errors.New("the write may have been applied")
+
+// unfinished reports a GraphQL error that is GitHub's, not the query's: no
+// type, no extensions.code and no path, or a message about a timeout
+// ("Something went wrong while executing your query. This may be the
+// result of a timeout..."). It is worth retrying, unlike a rejected query.
+func unfinished(err *api.GraphQLError) bool {
+	for _, item := range err.Errors {
+		if item.Type != "" || item.Extensions["code"] != nil {
+			return false
+		}
+		if len(item.Path) > 0 && !strings.Contains(strings.ToLower(item.Message), "timeout") {
+			return false
+		}
+	}
+	return len(err.Errors) > 0
+}
 
 func mayHaveApplied(reason string) *render.Error {
 	return render.Network("GitHub write failed (%s); it may have been applied, re-run the command to check", reason).

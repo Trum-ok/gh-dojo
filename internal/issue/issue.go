@@ -349,8 +349,7 @@ func Read(ctx context.Context, q graph.Querier, req Request) (*Card, error) {
 	case node == nil:
 		return nil, notFound(req)
 	case node.Typename != "Issue":
-		return nil, render.NotFound("#%d in %s is a pull request, not an issue", req.Number, req.Repo).
-			WithFix(fmt.Sprintf("gh pr view %d -R %s", req.Number, req.Repo))
+		return nil, pullRequest(req)
 	}
 	c := node.card(req, hidden)
 	c.Incomplete = len(hidden) > 0

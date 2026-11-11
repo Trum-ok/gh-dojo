@@ -230,6 +230,7 @@ func TestErrors(t *testing.T) {
 		{"graphql_rate_limited", render.ExitNetwork},
 		{"bad_credentials", render.ExitNetwork},
 		{"token_echo", render.ExitUsage},
+		{"graphql_timeout", render.ExitNetwork},
 	}
 	for _, tt := range tests {
 		t.Run(tt.fixture, func(t *testing.T) {

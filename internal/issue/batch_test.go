@@ -52,7 +52,7 @@ func TestReadAllRecorded(t *testing.T) {
 	if res[0].Card.Number != 3 || res[1].Card.Number != 7 || !res[0].Card.OnBoard() {
 		t.Errorf("cards %d, %d", res[0].Card.Number, res[1].Card.Number)
 	}
-	if render.FromError(res[2].Err).Code != render.ExitNotFound {
+	if render.FromError(res[2].Err).Code != render.ExitNotFound || res[2].Cause != issue.CauseMissing {
 		t.Errorf("missing: %v", res[2].Err)
 	}
 }
@@ -68,8 +68,58 @@ func TestReadAllMixed(t *testing.T) {
 	if res[0].Card == nil || !res[0].Card.Incomplete || res[0].Card.OnBoard() || !res[0].Card.BoardUnknown {
 		t.Errorf("partial card %+v", res[0])
 	}
-	if res[1].Err == nil || !strings.Contains(res[1].Err.Error(), "pull request") {
-		t.Errorf("pull request: %v", res[1].Err)
+	if res[1].Err == nil || res[1].Cause != issue.CausePullRequest || !strings.Contains(res[1].Err.Error(), "pull request") {
+		t.Errorf("pull request: %v (cause %q)", res[1].Err, res[1].Cause)
+	}
+}
+
+func numbers(from, to int) []int {
+	var ns []int
+	for n := from; n <= to; n++ {
+		ns = append(ns, n)
+	}
+	return ns
+}
+
+// TestReadAllChunks reads 21 issues in two batches; the second times out
+// as a whole, so its issue is read again on its own.
+func TestReadAllChunks(t *testing.T) {
+	srv := graphtest.New(t, fixture("cards_21_fallback"))
+	res, err := issue.ReadAll(context.Background(), srv.Client(), issue.Request{
+		Repo: dojo, Board: dojoBoard, StatusField: "Status",
+	}, numbers(1, 21))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res) != 21 {
+		t.Fatalf("%d results, want 21", len(res))
+	}
+	for i, r := range res {
+		if r.Err != nil || r.Card == nil || r.Card.Number != i+1 || r.Number != i+1 {
+			t.Errorf("result %d: %+v", i, r)
+		}
+	}
+	if n := srv.Requests(); n != 3 {
+		t.Errorf("requests = %d, want 3: two batches, then #21 alone", n)
+	}
+}
+
+// TestReadAllLaterChunkFails: the second batch and the single read after
+// it fail; the first batch's cards are returned with the error.
+func TestReadAllLaterChunkFails(t *testing.T) {
+	srv := graphtest.New(t, fixture("cards_21_down"))
+	res, err := issue.ReadAll(context.Background(), srv.Client(), issue.Request{
+		Repo: dojo, Board: dojoBoard, StatusField: "Status",
+	}, numbers(1, 21))
+	if e := render.FromError(err); err == nil || e.Code != render.ExitNetwork {
+		t.Fatalf("err = %v, want a network error", err)
+	}
+	if len(res) != 20 || res[19].Card == nil || res[19].Number != 20 {
+		t.Errorf("%d results before the failure, want 20", len(res))
+	}
+	// 1 batch + 3 attempts of the second batch + 3 attempts of #21 alone.
+	if n := srv.Requests(); n != 7 {
+		t.Errorf("requests = %d, want 7", n)
 	}
 }
 

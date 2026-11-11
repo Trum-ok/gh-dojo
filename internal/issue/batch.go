@@ -16,52 +16,90 @@ import (
 // request per MaxBatch issues.
 const MaxBatch = 20
 
+// Cause says why ReadAll did not read one issue.
+type Cause string
+
+const (
+	CauseMissing     Cause = "missing"      // no issue with that number
+	CausePullRequest Cause = "pull request" // the number is a pull request
+)
+
 // Result is one issue read by ReadAll: its card, or why it was not read.
 type Result struct {
 	Number int
 	Card   *Card // nil when Err is set
-	// Err is a *render.Error about this issue alone: a missing issue or a
-	// pull request number (exit code 3).
-	Err error
+	// Err is a *render.Error about this issue alone (exit code 3), and
+	// Cause its kind, so callers can group several.
+	Err   error
+	Cause Cause
 }
 
 // ReadAll reads the cards of several issues of req.Repo (req.Number is
 // ignored) with the same windows as Read: one request per MaxBatch issues,
-// aliasing the card query once per issue. A single number is read with
-// Read, so it sends exactly the request Read sends.
+// with the card selection aliased once per issue. A single number is read
+// with Read, so it sends exactly the request Read sends.
 //
 // It returns one Result per number, in order. A missing issue or a pull
-// request number fails only its own Result. A failure of a whole request
-// (network, auth, a missing repository) is returned as err together with
-// the results of the requests that succeeded before it.
+// request number fails only its own Result. When a batch request fails as
+// a whole (a timeout, say), its issues are read once more one by one;
+// the first of those reads to fail that way is returned as err, together
+// with the results read before it. A missing repository is err at once.
 func ReadAll(ctx context.Context, q graph.Querier, req Request, numbers []int) ([]Result, error) {
 	for _, n := range numbers {
 		if n <= 0 {
 			return nil, render.Usage("invalid issue number %d: want 1 or greater", n)
 		}
 	}
-	if len(numbers) == 1 {
-		req.Number = numbers[0]
-		card, err := Read(ctx, q, req)
-		if err != nil && render.FromError(err).Code != render.ExitNotFound {
-			return nil, err
-		}
-		return []Result{{Number: req.Number, Card: card, Err: err}}, nil
-	}
 	if req.Repo.Owner == "" || req.Repo.Name == "" {
 		return nil, render.Internal("issue.ReadAll: no repository")
+	}
+	if len(numbers) == 1 {
+		return readEach(ctx, q, req, numbers)
 	}
 	out := make([]Result, 0, len(numbers))
 	for start := 0; start < len(numbers); start += MaxBatch {
 		chunk := numbers[start:min(start+MaxBatch, len(numbers))]
 		res, err := readBatch(ctx, q, req, chunk)
+		if errors.Is(err, errRepoMissing) {
+			return out, err
+		}
+		if err != nil {
+			res, err = readEach(ctx, q, req, chunk)
+		}
+		out = append(out, res...)
 		if err != nil {
 			return out, err
 		}
-		out = append(out, res...)
 	}
 	return out, nil
 }
+
+// readEach reads numbers one request each with Read, stopping at the first
+// error that is not about the issue alone.
+func readEach(ctx context.Context, q graph.Querier, req Request, numbers []int) ([]Result, error) {
+	out := make([]Result, 0, len(numbers))
+	for _, n := range numbers {
+		r := req
+		r.Number = n
+		card, err := Read(ctx, q, r)
+		res := Result{Number: n, Card: card, Err: err}
+		if err != nil {
+			switch render.FromError(err).What {
+			case notFound(r).What:
+				res.Cause = CauseMissing
+			case pullRequest(r).What:
+				res.Cause = CausePullRequest
+			default:
+				return out, err
+			}
+		}
+		out = append(out, res)
+	}
+	return out, nil
+}
+
+// errRepoMissing is the cause of the error for a missing repository.
+var errRepoMissing = errors.New("repository not found")
 
 func readBatch(ctx context.Context, q graph.Querier, req Request, numbers []int) ([]Result, error) {
 	vars := map[string]any{
@@ -84,7 +122,7 @@ func readBatch(ctx context.Context, q graph.Querier, req Request, numbers []int)
 		case ok && resp.Repository != nil:
 		case render.FromError(err).Code == render.ExitNotFound && resp.Repository == nil:
 			return nil, render.NotFound("repository %s not found, or the token cannot see it", req.Repo).
-				WithFix("gh repo view " + req.Repo.String()).WithCause(err)
+				WithFix("gh repo view " + req.Repo.String()).WithCause(errors.Join(errRepoMissing, err))
 		default:
 			return nil, err
 		}
@@ -98,16 +136,20 @@ func readBatch(ctx context.Context, q graph.Querier, req Request, numbers []int)
 		out[i].Number = n
 		switch {
 		case node == nil || missing[alias]:
-			out[i].Err = notFound(r)
+			out[i].Err, out[i].Cause = notFound(r), CauseMissing
 		case node.Typename != "Issue":
-			out[i].Err = render.NotFound("#%d in %s is a pull request, not an issue", n, req.Repo).
-				WithFix(fmt.Sprintf("gh pr view %d -R %s", n, req.Repo))
+			out[i].Err, out[i].Cause = pullRequest(r), CausePullRequest
 		default:
 			out[i].Card = node.card(r, hidden[alias])
 			out[i].Card.Incomplete = len(hidden[alias]) > 0
 		}
 	}
 	return out, nil
+}
+
+func pullRequest(req Request) *render.Error {
+	return render.NotFound("#%d in %s is a pull request, not an issue", req.Number, req.Repo).
+		WithFix(fmt.Sprintf("gh pr view %d -R %s", req.Number, req.Repo))
 }
 
 // perIssueErrors sorts the GraphQL errors of a batch by issue alias: a
@@ -157,8 +199,8 @@ func commentsWindow(n int) int {
 
 func batchAlias(i int) string { return fmt.Sprintf("i%d", i) }
 
-// batchQuery reads n issues: cardQuery's selection of issueOrPullRequest
-// as a fragment, aliased once per issue.
+// batchQuery reads n issues: cardSelection as a fragment, aliased once per
+// issue.
 func batchQuery(n int) string {
 	var b strings.Builder
 	b.WriteString("query IssueCards($owner: String!, $repo: String!, $comments: Int!, $status: String!")
@@ -171,37 +213,7 @@ func batchQuery(n int) string {
 	}
 	b.WriteString("  }\n}\n\nfragment card on IssueOrPullRequest ")
 	b.WriteString(cardSelection)
-	b.WriteString("\n")
+	b.WriteString("\n\n")
 	b.WriteString(cardFragments)
 	return b.String()
-}
-
-// cardSelection and cardFragments are cut from cardQuery, so a batch reads
-// exactly what Read does.
-var (
-	cardSelection = selectionAfter(cardQuery, "issueOrPullRequest(number: $number)")
-	cardFragments = cardQuery[strings.Index(cardQuery, "\nfragment ")+1:]
-)
-
-// selectionAfter returns the brace-delimited selection set that follows
-// field in query, braces included.
-func selectionAfter(query, field string) string {
-	start := strings.Index(query, field)
-	if start < 0 {
-		panic("issue: " + field + " not in the card query")
-	}
-	open := start + strings.IndexByte(query[start:], '{')
-	depth := 0
-	for i := open; i < len(query); i++ {
-		switch query[i] {
-		case '{':
-			depth++
-		case '}':
-			depth--
-			if depth == 0 {
-				return query[open : i+1]
-			}
-		}
-	}
-	panic("issue: unbalanced card query")
 }

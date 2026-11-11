@@ -1,0 +1,18 @@
+{
+  "comment": "Hand-crafted: the untyped error GitHub returns with HTTP 200 when a query runs too long (no type, no extensions.code, no path); the wording is GitHub's, the ID is made up.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "Viewer",
+      "query": "query Viewer { viewer { login } }",
+      "response": {
+        "data": null,
+        "errors": [
+          {
+            "message": "Something went wrong while executing your query. This may be the result of a timeout, or it could be a GitHub bug. Please include `C0DE:1234:5678:9ABC:DEF0` when reporting this issue."
+          }
+        ]
+      }
+    }
+  ]
+}

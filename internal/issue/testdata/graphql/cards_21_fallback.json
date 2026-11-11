@@ -1,0 +1,981 @@
+{
+  "comment": "Hand-crafted: 21 issues read in two batches; the second batch (#21) times out (GitHub's untyped error), so #21 is read again on its own and succeeds.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "IssueCards",
+      "query": "query IssueCards($owner: String!, $repo: String!, $comments: Int!, $status: String!, $n0: Int!, $n1: Int!, $n2: Int!, $n3: Int!, $n4: Int!, $n5: Int!, $n6: Int!, $n7: Int!, $n8: Int!, $n9: Int!, $n10: Int!, $n11: Int!, $n12: Int!, $n13: Int!, $n14: Int!, $n15: Int!, $n16: Int!, $n17: Int!, $n18: Int!, $n19: Int!) {\n  repository(owner: $owner, name: $repo) {\n    i0: issueOrPullRequest(number: $n0) { ...card }\n    i1: issueOrPullRequest(number: $n1) { ...card }\n    i2: issueOrPullRequest(number: $n2) { ...card }\n    i3: issueOrPullRequest(number: $n3) { ...card }\n    i4: issueOrPullRequest(number: $n4) { ...card }\n    i5: issueOrPullRequest(number: $n5) { ...card }\n    i6: issueOrPullRequest(number: $n6) { ...card }\n    i7: issueOrPullRequest(number: $n7) { ...card }\n    i8: issueOrPullRequest(number: $n8) { ...card }\n    i9: issueOrPullRequest(number: $n9) { ...card }\n    i10: issueOrPullRequest(number: $n10) { ...card }\n    i11: issueOrPullRequest(number: $n11) { ...card }\n    i12: issueOrPullRequest(number: $n12) { ...card }\n    i13: issueOrPullRequest(number: $n13) { ...card }\n    i14: issueOrPullRequest(number: $n14) { ...card }\n    i15: issueOrPullRequest(number: $n15) { ...card }\n    i16: issueOrPullRequest(number: $n16) { ...card }\n    i17: issueOrPullRequest(number: $n17) { ...card }\n    i18: issueOrPullRequest(number: $n18) { ...card }\n    i19: issueOrPullRequest(number: $n19) { ...card }\n  }\n}\n\nfragment card on IssueOrPullRequest {\n      __typename\n      ... on Issue {\n        id\n        number\n        title\n        state\n        stateReason(enableDuplicate: true)\n        url\n        createdAt\n        closedAt\n        author { login }\n        body\n        labels(first: 20) { totalCount nodes { name } }\n        assignees(first: 10) { totalCount nodes { login } }\n        comments(last: $comments) {\n          totalCount\n          nodes { id author { login } createdAt viewerDidAuthor body }\n        }\n        blockedBy(first: 20) { totalCount nodes { ...link } }\n        blocking(first: 20) { totalCount nodes { ...link } }\n        projectItems(first: 20) {\n          totalCount\n          nodes {\n            id\n            isArchived\n            createdAt\n            project { id }\n            status: fieldValueByName(name: $status) { ...value }\n            fieldValues(first: 100) { totalCount nodes { ...value } }\n          }\n        }\n        timelineItems(last: 20, itemTypes: [PROJECT_V2_ITEM_STATUS_CHANGED_EVENT]) {\n          totalCount\n          nodes {\n            ... on ProjectV2ItemStatusChangedEvent {\n              createdAt\n              previousStatus\n              status\n              wasAutomated\n              actor { login }\n              project { id }\n            }\n          }\n        }\n      }\n    }\nfragment link on Issue { number title state repository { nameWithOwner } }\n\nfragment value on ProjectV2ItemFieldValue {\n  __typename\n  ... on ProjectV2ItemFieldSingleSelectValue { name optionId field { ...field } }\n  ... on ProjectV2ItemFieldIterationValue { title iterationId startDate duration field { ...field } }\n  ... on ProjectV2ItemFieldTextValue { text field { ...field } }\n  ... on ProjectV2ItemFieldNumberValue { number field { ...field } }\n  ... on ProjectV2ItemFieldDateValue { date field { ...field } }\n}\n\nfragment field on ProjectV2FieldCommon { id name dataType }",
+      "variables": {
+        "comments": 20,
+        "owner": "Trum-ok",
+        "repo": "gh-dojo",
+        "status": "Status",
+        "n0": 1,
+        "n1": 2,
+        "n2": 3,
+        "n3": 4,
+        "n4": 5,
+        "n5": 6,
+        "n6": 7,
+        "n7": 8,
+        "n8": 9,
+        "n9": 10,
+        "n10": 11,
+        "n11": 12,
+        "n12": 13,
+        "n13": 14,
+        "n14": 15,
+        "n15": 16,
+        "n16": 17,
+        "n17": 18,
+        "n18": 19,
+        "n19": 20
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "i0": {
+              "__typename": "Issue",
+              "id": "I_kwDOfake0001",
+              "number": 1,
+              "title": "Issue 1",
+              "state": "OPEN",
+              "stateReason": null,
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/1",
+              "createdAt": "2026-11-11T00:00:00Z",
+              "closedAt": null,
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body 1.",
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i1": {
+              "__typename": "Issue",
+              "id": "I_kwDOfake0002",
+              "number": 2,
+              "title": "Issue 2",
+              "state": "OPEN",
+              "stateReason": null,
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/2",
+              "createdAt": "2026-11-11T00:00:00Z",
+              "closedAt": null,
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body 2.",
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i2": {
+              "__typename": "Issue",
+              "id": "I_kwDOfake0003",
+              "number": 3,
+              "title": "Issue 3",
+              "state": "OPEN",
+              "stateReason": null,
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/3",
+              "createdAt": "2026-11-11T00:00:00Z",
+              "closedAt": null,
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body 3.",
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i3": {
+              "__typename": "Issue",
+              "id": "I_kwDOfake0004",
+              "number": 4,
+              "title": "Issue 4",
+              "state": "OPEN",
+              "stateReason": null,
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/4",
+              "createdAt": "2026-11-11T00:00:00Z",
+              "closedAt": null,
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body 4.",
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i4": {
+              "__typename": "Issue",
+              "id": "I_kwDOfake0005",
+              "number": 5,
+              "title": "Issue 5",
+              "state": "OPEN",
+              "stateReason": null,
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/5",
+              "createdAt": "2026-11-11T00:00:00Z",
+              "closedAt": null,
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body 5.",
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i5": {
+              "__typename": "Issue",
+              "id": "I_kwDOfake0006",
+              "number": 6,
+              "title": "Issue 6",
+              "state": "OPEN",
+              "stateReason": null,
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/6",
+              "createdAt": "2026-11-11T00:00:00Z",
+              "closedAt": null,
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body 6.",
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i6": {
+              "__typename": "Issue",
+              "id": "I_kwDOfake0007",
+              "number": 7,
+              "title": "Issue 7",
+              "state": "OPEN",
+              "stateReason": null,
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/7",
+              "createdAt": "2026-11-11T00:00:00Z",
+              "closedAt": null,
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body 7.",
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i7": {
+              "__typename": "Issue",
+              "id": "I_kwDOfake0008",
+              "number": 8,
+              "title": "Issue 8",
+              "state": "OPEN",
+              "stateReason": null,
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/8",
+              "createdAt": "2026-11-11T00:00:00Z",
+              "closedAt": null,
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body 8.",
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i8": {
+              "__typename": "Issue",
+              "id": "I_kwDOfake0009",
+              "number": 9,
+              "title": "Issue 9",
+              "state": "OPEN",
+              "stateReason": null,
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/9",
+              "createdAt": "2026-11-11T00:00:00Z",
+              "closedAt": null,
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body 9.",
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i9": {
+              "__typename": "Issue",
+              "id": "I_kwDOfake0010",
+              "number": 10,
+              "title": "Issue 10",
+              "state": "OPEN",
+              "stateReason": null,
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/10",
+              "createdAt": "2026-11-11T00:00:00Z",
+              "closedAt": null,
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body 10.",
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i10": {
+              "__typename": "Issue",
+              "id": "I_kwDOfake0011",
+              "number": 11,
+              "title": "Issue 11",
+              "state": "OPEN",
+              "stateReason": null,
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/11",
+              "createdAt": "2026-11-11T00:00:00Z",
+              "closedAt": null,
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body 11.",
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i11": {
+              "__typename": "Issue",
+              "id": "I_kwDOfake0012",
+              "number": 12,
+              "title": "Issue 12",
+              "state": "OPEN",
+              "stateReason": null,
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/12",
+              "createdAt": "2026-11-11T00:00:00Z",
+              "closedAt": null,
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body 12.",
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i12": {
+              "__typename": "Issue",
+              "id": "I_kwDOfake0013",
+              "number": 13,
+              "title": "Issue 13",
+              "state": "OPEN",
+              "stateReason": null,
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/13",
+              "createdAt": "2026-11-11T00:00:00Z",
+              "closedAt": null,
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body 13.",
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i13": {
+              "__typename": "Issue",
+              "id": "I_kwDOfake0014",
+              "number": 14,
+              "title": "Issue 14",
+              "state": "OPEN",
+              "stateReason": null,
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/14",
+              "createdAt": "2026-11-11T00:00:00Z",
+              "closedAt": null,
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body 14.",
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i14": {
+              "__typename": "Issue",
+              "id": "I_kwDOfake0015",
+              "number": 15,
+              "title": "Issue 15",
+              "state": "OPEN",
+              "stateReason": null,
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/15",
+              "createdAt": "2026-11-11T00:00:00Z",
+              "closedAt": null,
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body 15.",
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i15": {
+              "__typename": "Issue",
+              "id": "I_kwDOfake0016",
+              "number": 16,
+              "title": "Issue 16",
+              "state": "OPEN",
+              "stateReason": null,
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/16",
+              "createdAt": "2026-11-11T00:00:00Z",
+              "closedAt": null,
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body 16.",
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i16": {
+              "__typename": "Issue",
+              "id": "I_kwDOfake0017",
+              "number": 17,
+              "title": "Issue 17",
+              "state": "OPEN",
+              "stateReason": null,
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/17",
+              "createdAt": "2026-11-11T00:00:00Z",
+              "closedAt": null,
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body 17.",
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i17": {
+              "__typename": "Issue",
+              "id": "I_kwDOfake0018",
+              "number": 18,
+              "title": "Issue 18",
+              "state": "OPEN",
+              "stateReason": null,
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/18",
+              "createdAt": "2026-11-11T00:00:00Z",
+              "closedAt": null,
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body 18.",
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i18": {
+              "__typename": "Issue",
+              "id": "I_kwDOfake0019",
+              "number": 19,
+              "title": "Issue 19",
+              "state": "OPEN",
+              "stateReason": null,
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/19",
+              "createdAt": "2026-11-11T00:00:00Z",
+              "closedAt": null,
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body 19.",
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            },
+            "i19": {
+              "__typename": "Issue",
+              "id": "I_kwDOfake0020",
+              "number": 20,
+              "title": "Issue 20",
+              "state": "OPEN",
+              "stateReason": null,
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/20",
+              "createdAt": "2026-11-11T00:00:00Z",
+              "closedAt": null,
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body 20.",
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "IssueCards",
+      "query": "query IssueCards($owner: String!, $repo: String!, $comments: Int!, $status: String!, $n0: Int!) {\n  repository(owner: $owner, name: $repo) {\n    i0: issueOrPullRequest(number: $n0) { ...card }\n  }\n}\n\nfragment card on IssueOrPullRequest {\n      __typename\n      ... on Issue {\n        id\n        number\n        title\n        state\n        stateReason(enableDuplicate: true)\n        url\n        createdAt\n        closedAt\n        author { login }\n        body\n        labels(first: 20) { totalCount nodes { name } }\n        assignees(first: 10) { totalCount nodes { login } }\n        comments(last: $comments) {\n          totalCount\n          nodes { id author { login } createdAt viewerDidAuthor body }\n        }\n        blockedBy(first: 20) { totalCount nodes { ...link } }\n        blocking(first: 20) { totalCount nodes { ...link } }\n        projectItems(first: 20) {\n          totalCount\n          nodes {\n            id\n            isArchived\n            createdAt\n            project { id }\n            status: fieldValueByName(name: $status) { ...value }\n            fieldValues(first: 100) { totalCount nodes { ...value } }\n          }\n        }\n        timelineItems(last: 20, itemTypes: [PROJECT_V2_ITEM_STATUS_CHANGED_EVENT]) {\n          totalCount\n          nodes {\n            ... on ProjectV2ItemStatusChangedEvent {\n              createdAt\n              previousStatus\n              status\n              wasAutomated\n              actor { login }\n              project { id }\n            }\n          }\n        }\n      }\n    }\nfragment link on Issue { number title state repository { nameWithOwner } }\n\nfragment value on ProjectV2ItemFieldValue {\n  __typename\n  ... on ProjectV2ItemFieldSingleSelectValue { name optionId field { ...field } }\n  ... on ProjectV2ItemFieldIterationValue { title iterationId startDate duration field { ...field } }\n  ... on ProjectV2ItemFieldTextValue { text field { ...field } }\n  ... on ProjectV2ItemFieldNumberValue { number field { ...field } }\n  ... on ProjectV2ItemFieldDateValue { date field { ...field } }\n}\n\nfragment field on ProjectV2FieldCommon { id name dataType }",
+      "variables": {
+        "comments": 20,
+        "owner": "Trum-ok",
+        "repo": "gh-dojo",
+        "status": "Status",
+        "n0": 21
+      },
+      "response": {
+        "data": null,
+        "errors": [
+          {
+            "message": "Something went wrong while executing your query. This may be the result of a timeout, or it could be a GitHub bug. Please include `C0DE:1234` when reporting this issue."
+          }
+        ]
+      }
+    },
+    {
+      "operation": "IssueCard",
+      "query": "query IssueCard($owner: String!, $repo: String!, $number: Int!, $comments: Int!, $status: String!) {\n  repository(owner: $owner, name: $repo) {\n    issueOrPullRequest(number: $number) {\n      __typename\n      ... on Issue {\n        id\n        number\n        title\n        state\n        stateReason(enableDuplicate: true)\n        url\n        createdAt\n        closedAt\n        author { login }\n        body\n        labels(first: 20) { totalCount nodes { name } }\n        assignees(first: 10) { totalCount nodes { login } }\n        comments(last: $comments) {\n          totalCount\n          nodes { id author { login } createdAt viewerDidAuthor body }\n        }\n        blockedBy(first: 20) { totalCount nodes { ...link } }\n        blocking(first: 20) { totalCount nodes { ...link } }\n        projectItems(first: 20) {\n          totalCount\n          nodes {\n            id\n            isArchived\n            createdAt\n            project { id }\n            status: fieldValueByName(name: $status) { ...value }\n            fieldValues(first: 100) { totalCount nodes { ...value } }\n          }\n        }\n        timelineItems(last: 20, itemTypes: [PROJECT_V2_ITEM_STATUS_CHANGED_EVENT]) {\n          totalCount\n          nodes {\n            ... on ProjectV2ItemStatusChangedEvent {\n              createdAt\n              previousStatus\n              status\n              wasAutomated\n              actor { login }\n              project { id }\n            }\n          }\n        }\n      }\n    }\n  }\n}\n\nfragment link on Issue { number title state repository { nameWithOwner } }\n\nfragment value on ProjectV2ItemFieldValue {\n  __typename\n  ... on ProjectV2ItemFieldSingleSelectValue { name optionId field { ...field } }\n  ... on ProjectV2ItemFieldIterationValue { title iterationId startDate duration field { ...field } }\n  ... on ProjectV2ItemFieldTextValue { text field { ...field } }\n  ... on ProjectV2ItemFieldNumberValue { number field { ...field } }\n  ... on ProjectV2ItemFieldDateValue { date field { ...field } }\n}\n\nfragment field on ProjectV2FieldCommon { id name dataType }",
+      "variables": {
+        "comments": 20,
+        "number": 21,
+        "owner": "Trum-ok",
+        "repo": "gh-dojo",
+        "status": "Status"
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "issueOrPullRequest": {
+              "__typename": "Issue",
+              "id": "I_kwDOfake0021",
+              "number": 21,
+              "title": "Issue 21",
+              "state": "OPEN",
+              "stateReason": null,
+              "url": "https://github.com/Trum-ok/gh-dojo/issues/21",
+              "createdAt": "2026-11-11T00:00:00Z",
+              "closedAt": null,
+              "author": {
+                "login": "Trum-ok"
+              },
+              "body": "Body 21.",
+              "labels": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "assignees": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "comments": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blockedBy": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "blocking": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "projectItems": {
+                "totalCount": 0,
+                "nodes": []
+              },
+              "timelineItems": {
+                "totalCount": 0,
+                "nodes": []
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
