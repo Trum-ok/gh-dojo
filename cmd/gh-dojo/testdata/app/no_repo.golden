@@ -1,0 +1,2 @@
+error: .github/dojo.toml: board.repos is empty and the current directory has no GitHub remote
+fix: add repos = ["owner/name"] under [board] in .github/dojo.toml

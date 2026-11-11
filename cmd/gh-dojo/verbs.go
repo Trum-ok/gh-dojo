@@ -77,6 +77,11 @@ type Backend interface {
 }
 
 // newBackend returns the backend for cfg. Tests replace it.
+//
+// The GitHub backend (#12) is built on newApp (app.go): ReadIssue is
+// a.Card(ctx, n, 0) mapped with workflowIssue, whose Ref is the
+// *issue.Card with the node IDs; Apply uses a.Schema for field and option
+// IDs and a.Client.Mutate, and a.ResetSchema once on a stale ID.
 var newBackend = func(cfg *config.Config) (Backend, error) { return pendingBackend{}, nil }
 
 // pendingBackend stands in until the GitHub reader and executor land

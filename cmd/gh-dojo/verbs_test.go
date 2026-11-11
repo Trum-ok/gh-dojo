@@ -28,6 +28,7 @@ func TestMain(m *testing.M) {
 	loadConfig = func() (*config.Config, error) { return config.Load(dir) }
 	newBackend = func(*config.Config) (Backend, error) { return pendingBackend{}, nil }
 	getenv = func(string) string { return "" }
+	newApp = noApp // see withApp
 	code := m.Run()
 	os.RemoveAll(dir)
 	os.Exit(code)
