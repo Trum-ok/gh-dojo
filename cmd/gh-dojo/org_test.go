@@ -17,7 +17,6 @@ import (
 const (
 	orgBoardFixture = "testdata/graphql/org_acme_board.json"
 	orgCard3Fixture = "testdata/graphql/org_card_3.json"
-	boardFixtures   = "../../internal/board/testdata/graphql/"
 )
 
 // orgConfig is organization acme's board with its repository acme/shop.

@@ -16,7 +16,7 @@ import (
 // Recorded board fixtures init reads, relative to cmd/gh-dojo.
 const (
 	boardFixtures          = "../../internal/board/testdata/graphql/"
-	orgBoardFixture        = boardFixtures + "org_board.json"
+	initOrgBoardFixture    = boardFixtures + "org_board.json"
 	boardNotFoundFixture   = boardFixtures + "board_not_found.json"
 	ownerNotFoundFixture   = boardFixtures + "owner_not_found.json"
 	userProjectsFixture    = boardFixtures + "projects_user.json"
@@ -217,7 +217,7 @@ func TestInitMismatch(t *testing.T) {
 		args    []string
 	}{
 		// An organization board with none of the kanban statuses.
-		{"mismatch_org", orgBoardFixture, []string{"--owner", "github", "--project", "4247", "--repo", "acme/shop"}},
+		{"mismatch_org", initOrgBoardFixture, []string{"--owner", "github", "--project", "4247", "--repo", "acme/shop"}},
 		// The gh-dojo board without Waiting.
 		{"mismatch_waiting", editedBoard(t, "no_waiting", func(status map[string]any) {
 			var kept []any
@@ -252,7 +252,7 @@ func TestInitMismatch(t *testing.T) {
 }
 
 func TestInitMismatchDryRun(t *testing.T) {
-	root, _ := withInit(t, "", orgBoardFixture)
+	root, _ := withInit(t, "", initOrgBoardFixture)
 	code, out := runOut("init", "--owner", "github", "--project", "4247", "--dry-run")
 	if code != render.ExitUsage {
 		t.Errorf("code = %d, want 1", code)
