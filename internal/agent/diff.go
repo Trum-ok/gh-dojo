@@ -12,9 +12,10 @@ const maxDiffCells = 4_000_000
 // Diff returns the lines that differ between have and want, at most max of
 // them: a "@@ line N" header (N is the line in have) before each run of
 // changes, then "-" for a line of have that goes and "+" for a line of
-// want that comes. A cut diff ends with "… N more changed lines". Nil when
-// they are equal.
+// want that comes. A cut diff ends with "… N more changed lines". Line
+// endings do not count. Nil when they are equal.
 func Diff(have, want string, max int) []string {
+	have, want = strings.ReplaceAll(have, "\r\n", "\n"), strings.ReplaceAll(want, "\r\n", "\n")
 	if have == want {
 		return nil
 	}

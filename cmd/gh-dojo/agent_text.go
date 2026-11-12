@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/Trum-ok/gh-dojo/internal/agent"
 	"github.com/Trum-ok/gh-dojo/internal/config"
@@ -58,16 +59,27 @@ func newAgentDoc(cfg *config.Config, root *cobra.Command, notes string) *agentDo
 
 // skill is the Claude Code skill: front matter, the generated marker, the
 // instructions with a top-level heading, then the notes.
-func (d *agentDoc) skill() string {
+//
+// Claude Code reads at most maxDescription characters of the description:
+// a longer one, with [agent] description, is an error.
+func (d *agentDoc) skill() (string, error) {
+	desc := d.description()
+	if n := utf8.RuneCountInString(desc); n > maxDescription {
+		return "", render.Usage("%s: agent.description makes the skill's description %d characters, over %d",
+			d.cfg.Display, n, maxDescription).WithFix("shorten description in [agent] of " + d.cfg.Display)
+	}
 	var b strings.Builder
-	b.WriteString("---\nname: gh-dojo\ndescription: " + yamlString(d.description()) + "\n---\n\n")
+	b.WriteString("---\nname: gh-dojo\ndescription: " + yamlString(desc) + "\n---\n\n")
 	b.WriteString(agent.Generated(config.FileName) + "\n\n")
 	b.WriteString(d.body(1))
 	if d.notes != "" {
 		b.WriteString("\n" + d.notes)
 	}
-	return b.String()
+	return b.String(), nil
 }
+
+// maxDescription is the longest skill description Claude Code takes.
+const maxDescription = 1024
 
 // section is the section of a shared file (AGENTS.md): the instructions one
 // heading level down, then the notes; Prepare adds the markers.
@@ -80,7 +92,7 @@ func (d *agentDoc) section() string {
 }
 
 // description tells an agent when to load the skill: whenever it deals
-// with this project's issues.
+// with this project's issues; [agent] description adds to it.
 func (d *agentDoc) description() string {
 	whose := "this repository"
 	if r := d.cfg.Board.Repos; len(r) > 0 {
@@ -90,10 +102,14 @@ func (d *agentDoc) description() string {
 	if names := d.cfg.VerbNames(); len(names) > 0 {
 		verbs = " (" + strings.Join(names, ", ") + ")"
 	}
-	return fmt.Sprintf("How to handle the issues of %s through gh dojo: the GitHub Projects board %s/%d, "+
-		"its statuses and process verbs%s. Load it whenever you take, read, create, comment on, "+
-		"block or move an issue of %s, finish work on one, or look for what to work on next.",
-		whose, d.cfg.Board.Owner, d.cfg.Board.Project, verbs, whoseShort(d.cfg))
+	s := fmt.Sprintf("How to handle the issues of %s through gh dojo: the GitHub Projects board "+
+		"(project %d of %s), its statuses and process verbs%s. Load it whenever you take, read, create, "+
+		"comment on, block or move an issue of %s, finish work on one, or look for what to work on next.",
+		whose, d.cfg.Board.Project, d.cfg.Board.Owner, verbs, whoseShort(d.cfg))
+	if extra := d.cfg.Agent.Description; extra != "" {
+		s += " " + extra
+	}
+	return s
 }
 
 func whoseShort(cfg *config.Config) string {
@@ -163,7 +179,7 @@ func (d *agentDoc) body(level int) string {
 	if cfg.Preset != "" {
 		preset = " (preset " + code(cfg.Preset) + ")"
 	}
-	w.para("This project tracks the issues %s on the GitHub Projects board %s/%d, with the process in %s%s. "+
+	w.para("This project tracks the issues %s on the GitHub Projects board of %s, project %d, with the process in %s%s. "+
 		"Take, move, comment on, block and create issues **only** through `gh dojo`: never change a status, "+
 		"a comment, a blocked-by link or an issue with `gh issue`, `gh project` or the API. For what gh dojo "+
 		"cannot do, such as editing an issue's title, body, labels or assignees, use `gh issue` only when the "+
@@ -173,8 +189,8 @@ func (d *agentDoc) body(level int) string {
 		"has the details of one verb. Read them rather than guess. When the setup is broken (token, board, " +
 		"config), `gh dojo doctor` names each problem with the command that fixes it.")
 
-	d.verbs(w)
 	d.statuses(w)
+	d.verbs(w)
 	d.reading(w)
 	d.writing(w)
 	d.repeats(w)
@@ -268,7 +284,7 @@ func (d *agentDoc) rules(v config.Verb) []string {
 			"into the comment; issues mixed with text are an error (exit code 1); a pull request is named " +
 			"in the comment without a link."
 		if v.To != "" && len(next) > 0 {
-			s += " Once the blocker is resolved, go on with " + codes(next) + "."
+			s += " Once the blocker is resolved, go on with " + strings.Join(quoted(next), " or ") + "."
 		}
 		r = append(r, s)
 	}
@@ -314,8 +330,86 @@ func (d *agentDoc) statuses(w *mdWriter) {
 		items = append(items, "A blocker is resolved, no longer blocking, only when it is closed.")
 	}
 	items = append(items, "A blocker whose status could not be read (`status not read: …`) counts as unresolved.")
-	w.heading(1, "Statuses")
+	w.heading(1, "Lifecycle")
+	if path, verbs, skip := d.lifecycle(); len(path) > 1 {
+		steps := make([]string, len(path))
+		for i, st := range path {
+			steps[i] = code(st)
+			if skip[i] {
+				steps[i] = "(" + steps[i] + ")"
+			}
+		}
+		line := strings.Join(steps, " → ") + ", through " + codes(verbs) + "."
+		if slices.Contains(skip, true) {
+			line += " A status in parentheses may be skipped."
+		}
+		w.para("%s Each verb below says which statuses it moves from and to.", line)
+	}
 	w.list(items)
+}
+
+// maxLifecycleSteps bounds the search for the lifecycle path.
+const maxLifecycleSteps = 100_000
+
+// lifecycle is the longest way through the statuses, as describe's
+// from → to lines draw them: from the initial status, along verbs with a
+// from list and a target, preferably ending in a final status. skip marks
+// the statuses on it that a verb jumps over. Verbs from any status are
+// left out: they lead anywhere. Nil without an initial status.
+func (d *agentDoc) lifecycle() (path, verbs []string, skip []bool) {
+	cfg := d.cfg
+	start := cfg.Statuses.Initial
+	if start == "" {
+		return nil, nil, nil
+	}
+	type edge struct{ to, verb string }
+	next := map[string][]edge{}
+	for _, v := range cfg.Verbs {
+		for _, f := range v.From {
+			if v.To != "" && f != v.To {
+				next[f] = append(next[f], edge{v.To, v.Name})
+			}
+		}
+	}
+	final := func(p []string) bool { return slices.Contains(cfg.Statuses.Final, p[len(p)-1]) }
+	better := func(p []string) bool {
+		switch {
+		case path == nil:
+			return true
+		case final(p) != final(path):
+			return final(p)
+		}
+		return len(p) > len(path)
+	}
+	steps := 0
+	cur, curVerbs := []string{start}, []string{}
+	var walk func()
+	walk = func() {
+		if steps++; steps > maxLifecycleSteps {
+			return
+		}
+		if better(cur) {
+			path, verbs = slices.Clone(cur), slices.Clone(curVerbs)
+		}
+		for _, e := range next[cur[len(cur)-1]] {
+			if slices.Contains(cur, e.to) {
+				continue
+			}
+			cur, curVerbs = append(cur, e.to), append(curVerbs, e.verb)
+			walk()
+			cur, curVerbs = cur[:len(cur)-1], curVerbs[:len(curVerbs)-1]
+		}
+	}
+	walk()
+	skip = make([]bool, len(path))
+	for a := range path { // a verb from path[a] to path[b] skips what is between
+		for _, e := range next[path[a]] {
+			for i := a + 1; i < slices.Index(path, e.to); i++ {
+				skip[i] = true
+			}
+		}
+	}
+	return path, slices.Compact(verbs), skip
 }
 
 func quoted(list []string) []string {

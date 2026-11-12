@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -87,6 +88,7 @@ confirm = "user"
 [agent]
 targets = ["claude", "agents-md", "copilot"]
 notes = "docs/agent-notes.md"
+description = "Also load it before a release."
 `
 
 const agentNotes = "## Our rules\r\n\r\nRun `make test` before `ready`.\r\n\r\n\r\n"
@@ -118,14 +120,19 @@ func TestAgentInstall(t *testing.T) {
 	}
 }
 
-// TestAgentKanban is the skill of the kanban preset with no [agent]: the
-// default target, no notes.
-func TestAgentKanban(t *testing.T) {
-	dir := withRepo(t, dojoConfig, nil)
-	if code, out := runOut("agent", "install"); code != render.ExitOK {
-		t.Fatalf("exit code = %d\n%s", code, out)
+// TestAgentConfigs is the skill of other configs with no [agent]: the
+// default target, no notes. kanban is this repository's preset; custom
+// overrides it; no_preset has no statuses, so no lifecycle path.
+func TestAgentConfigs(t *testing.T) {
+	for name, cfg := range map[string]string{"kanban": dojoConfig, "custom": customConfig, "no_preset": noPresetConfig} {
+		t.Run(name, func(t *testing.T) {
+			dir := withRepo(t, cfg, nil)
+			if code, out := runOut("agent", "install"); code != render.ExitOK {
+				t.Fatalf("exit code = %d\n%s", code, out)
+			}
+			testutil.Golden(t, "agent/skill_"+name, []byte(readRepoFile(t, dir, skillPath)))
+		})
 	}
-	testutil.Golden(t, "agent/skill_kanban", []byte(readRepoFile(t, dir, skillPath)))
 }
 
 // TestAgentCheck changes a verb's when after install: --check fails with
@@ -194,6 +201,7 @@ func TestAgentErrors(t *testing.T) {
 		{"notes_marker", dojoConfig + "[agent]\nnotes = \"notes.md\"\n",
 			map[string]string{"notes.md": "x\n<!-- gh-dojo:end -->\n"}, nil, render.ExitUsage},
 		{"args", dojoConfig, nil, []string{"extra"}, render.ExitUsage},
+		{"description_long", dojoConfig + "[agent]\ndescription = \"" + strings.Repeat("Also now. ", 80) + "\"\n", nil, nil, render.ExitUsage},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -217,6 +225,24 @@ func TestAgentErrors(t *testing.T) {
 	}
 }
 
+// TestAgentNotesOutside refuses notes that link out of the repository.
+func TestAgentNotesOutside(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symbolic links need privileges on Windows")
+	}
+	dir := withRepo(t, dojoConfig+"[agent]\nnotes = \"notes.md\"\n", nil)
+	outside := t.TempDir()
+	writeRepoFile(t, outside, "secret.md", "secret\n")
+	if err := os.Symlink(filepath.Join(outside, "secret.md"), filepath.Join(dir, "notes.md")); err != nil {
+		t.Fatal(err)
+	}
+	code, out := runOut("agent", "install")
+	if code != render.ExitUsage {
+		t.Errorf("exit code = %d, want 1", code)
+	}
+	testutil.Golden(t, "agent/notes_outside", out)
+}
+
 func TestAgentHelp(t *testing.T) {
 	for name, args := range map[string][]string{"help_agent": {"agent"}, "help_install": {"agent", "install", "--help"}} {
 		code, out := runOut(args...)
@@ -227,8 +253,11 @@ func TestAgentHelp(t *testing.T) {
 	}
 }
 
-// TestDoctorAgent runs doctor's agent check alone: no line without [agent]
-// or its files, ok when up to date, a problem with the fix otherwise.
+// TestDoctorAgent runs doctor's agent check alone. A project uses agent
+// install when it sets [agent] or has a file with a gh-dojo marker; others,
+// and targets = [], get no line. Out of date is a warning (the text depends
+// on the gh-dojo version too); a hand-written skill under [agent] is a
+// problem with the same fix as install's.
 func TestDoctorAgent(t *testing.T) {
 	check := func() []doctorCheck {
 		t.Helper()
@@ -242,20 +271,47 @@ func TestDoctorAgent(t *testing.T) {
 		}
 		r := &doctorReport{}
 		checkAgentFiles(r, cfg, root)
+		if err := r.err(); err != nil && r.Checks[0].Result != checkProblem {
+			t.Errorf("a %s is an error: %v", r.Checks[0].Result, err)
+		}
 		return r.Checks
 	}
-	withRepo(t, dojoConfig, nil)
-	if got := check(); len(got) != 0 {
-		t.Errorf("checks without [agent] = %+v, want none", got)
+	none := func(name string) {
+		t.Helper()
+		if got := check(); len(got) != 0 {
+			t.Errorf("%s: checks = %+v, want none", name, got)
+		}
 	}
+	withRepo(t, dojoConfig, nil)
+	none("no [agent], no files")
+	withRepo(t, dojoConfig, map[string]string{skillPath: "# Mine\n", "AGENTS.md": "# Agents\n"})
+	none("no [agent], files without markers")
+	withRepo(t, dojoConfig+"[agent]\ntargets = []\n", map[string]string{skillPath: "# Mine\n"})
+	none("targets = []")
+
 	withRepo(t, dojoConfig+"[agent]\ntargets = [\"claude\", \"agents-md\"]\n", map[string]string{"AGENTS.md": "# Agents\n"})
 	got := check()
-	if len(got) != 1 || got[0].Result != checkProblem || got[0].Fix == nil || *got[0].Fix != "gh dojo agent install" ||
-		got[0].Detail != "not up to date with .github/dojo.toml: .claude/skills/gh-dojo/SKILL.md (missing), AGENTS.md (out of date)" {
+	if len(got) != 1 || got[0].Result != checkWarn || got[0].Fix == nil || *got[0].Fix != "gh dojo agent install" ||
+		got[0].Detail != "not up to date with .github/dojo.toml or this gh-dojo version: "+
+			".claude/skills/gh-dojo/SKILL.md (missing), AGENTS.md (out of date)" {
 		t.Errorf("stale: %+v", got)
 	}
 	runOut("agent", "install")
 	if got := check(); len(got) != 1 || got[0].Result != checkOK || got[0].Detail != ".claude/skills/gh-dojo/SKILL.md, AGENTS.md: up to date" {
 		t.Errorf("up to date: %+v", got)
+	}
+
+	// Without [agent], only the marked file counts: AGENTS.md here.
+	dir := withRepo(t, dojoConfig, map[string]string{skillPath: "# Mine\n"})
+	runOut("agent", "install", "--agent", "agents-md")
+	writeRepoFile(t, dir, "AGENTS.md", strings.Replace(readRepoFile(t, dir, "AGENTS.md"), "Verbs", "Words", 1))
+	if got := check(); len(got) != 1 || got[0].Result != checkWarn || !strings.HasSuffix(got[0].Detail, ": AGENTS.md (out of date)") {
+		t.Errorf("marked AGENTS.md: %+v", got)
+	}
+
+	withRepo(t, dojoConfig+"[agent]\ntargets = [\"claude\"]\n", map[string]string{skillPath: "# Mine\n"})
+	got = check()
+	if len(got) != 1 || got[0].Result != checkProblem || got[0].Fix == nil || !strings.HasPrefix(*got[0].Fix, "move what is worth keeping") {
+		t.Errorf("hand-written: %+v", got)
 	}
 }

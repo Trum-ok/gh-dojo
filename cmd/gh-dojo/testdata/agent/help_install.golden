@@ -11,18 +11,24 @@ The instructions are in English: the lifecycle, each verb with when to use
 it, what it needs, checks and does along the way, blockers, the session
 link, reading and creating issues, exit codes and JSON, and the commands of
 this gh-dojo. The markdown file [agent] notes names is appended as it is,
-for what the config cannot say. Without --agent, the agents of [agent]
-targets are written (by default claude).
+for what the config cannot say, and [agent] description is added to the
+skill's description. Without --agent, the agents of [agent] targets are
+written (by default claude).
 
 The skill is gh-dojo's whole file: one that exists without gh-dojo's
-marker, written by hand, is not overwritten (exit code 1). In AGENTS.md and
-the Copilot file only the text between the gh-dojo:begin and gh-dojo:end
-markers is gh-dojo's, and the rest stays as it is; a file without them gets
-the section at its end.
+marker, written by hand, is not overwritten (exit code 1; --check says
+"hand written"). In AGENTS.md and the Copilot file only the lines from
+gh-dojo:begin to gh-dojo:end are gh-dojo's, and the rest stays byte for
+byte; a file without them gets the section at its end. Marker lines count
+anywhere, code blocks included, so do not quote them in those files. A file
+with CRLF line endings keeps them. A file is written whole through a
+temporary file; a symbolic link is written where it points, which must be
+inside the repository, and so must the notes.
 
 A repeat with the same config changes nothing and says "up to date".
 --check writes nothing and exits 1 when a file is missing or differs from
-what install would write, showing the changed lines: run it in CI. Paths
+what install would write, showing the changed lines: run it in CI with a
+fixed gh-dojo version, since the text depends on the version too. Paths
 are relative to the repository root, the directory that holds .github.
 It never uses the network.
 

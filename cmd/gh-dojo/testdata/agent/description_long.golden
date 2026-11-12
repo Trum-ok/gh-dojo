@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: .github/dojo.toml: agent.description makes the skill's description 1119 characters, over 1024
+fix: shorten description in [agent] of .github/dojo.toml

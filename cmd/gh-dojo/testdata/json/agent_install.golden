@@ -1,4 +1,4 @@
 code: 0
 --- stdout
-{"schema_version":1,"error":null,"check":false,"files":[{"agent":"agents-md","path":"AGENTS.md","state":"updated","diff":[]}]}
+{"schema_version":1,"error":null,"check":false,"files":[{"agent":"agents-md","path":"AGENTS.md","state":"updated","diff":[],"fix":null}]}
 --- stderr

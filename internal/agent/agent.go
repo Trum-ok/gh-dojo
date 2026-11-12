@@ -7,6 +7,9 @@
 // owns only the section between its markers there and keeps the rest of
 // the file byte for byte. What goes into the files is the caller's: this
 // package only places it.
+//
+// Every path goes through an *os.Root of the repository, so a symbolic
+// link never leads a read or a write out of it.
 package agent
 
 import (
@@ -15,7 +18,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/render"
@@ -32,9 +37,9 @@ type Target struct {
 
 // Targets lists every target, in the order of config.AgentTargets.
 var Targets = []Target{
-	{config.AgentClaude, ".claude/skills/gh-dojo/SKILL.md", false},
-	{config.AgentAgentsMD, "AGENTS.md", true},
-	{config.AgentCopilot, ".github/copilot-instructions.md", true},
+	{config.AgentClaude, config.AgentFile(config.AgentClaude), false},
+	{config.AgentAgentsMD, config.AgentFile(config.AgentAgentsMD), true},
+	{config.AgentCopilot, config.AgentFile(config.AgentCopilot), true},
 }
 
 // TargetOf returns the target of an agent.
@@ -49,11 +54,15 @@ func TargetOf(agent string) (Target, bool) {
 
 // Markers. A whole file gets Generated after its front matter; a section
 // sits between a Begin line and an End line. A line is a marker when it
-// starts with one of the prefixes, so the rest of the comment may change.
+// starts with one of the prefixes after its leading spaces and tabs, so the
+// rest of the comment may change. Marker lines count wherever they are,
+// fenced code blocks included.
 const (
 	GeneratedPrefix = "<!-- gh-dojo:generated"
 	BeginPrefix     = "<!-- gh-dojo:begin"
 	EndPrefix       = "<!-- gh-dojo:end"
+	// MarkerPrefix starts every marker.
+	MarkerPrefix = "<!-- gh-dojo:"
 )
 
 // Generated is the marker line of a whole file, naming the config it is
@@ -72,56 +81,88 @@ func Begin(configFile string) string {
 // End is the line that closes a section.
 const End = EndPrefix + " -->"
 
+// IsMarker reports whether line is a marker line starting with prefix.
+func IsMarker(line, prefix string) bool {
+	return strings.HasPrefix(strings.TrimLeft(line, " \t"), prefix)
+}
+
 // States of a file.
 const (
-	StateUpToDate  = "up_to_date"
-	StateCreated   = "created"     // install: the file did not exist
-	StateUpdated   = "updated"     // install: the file was rewritten
-	StateMissing   = "missing"     // check: the file does not exist
-	StateOutOfDate = "out_of_date" // check: the file differs
+	StateUpToDate    = "up_to_date"
+	StateCreated     = "created"      // install: the file did not exist
+	StateUpdated     = "updated"      // install: the file was rewritten
+	StateMissing     = "missing"      // check: the file does not exist
+	StateOutOfDate   = "out_of_date"  // check: the file differs
+	StateHandWritten = "hand_written" // check: a whole file without the generated marker
 )
 
 // File is a target with its content on disk and the content it should have.
 type File struct {
 	Target
 	Exists bool
-	Have   string // on disk, CRLF read as LF; "" when missing
-	Want   string // what install writes
+	Have   string // on disk, as is; "" when missing
+	Want   string // what install writes, in the line endings of Have
+	// Marked says the file has a gh-dojo marker line: agent install wrote
+	// it before.
+	Marked bool
+	// HandWritten says a whole file (the skill) exists without the
+	// generated marker: someone wrote it, and install refuses to
+	// overwrite it.
+	HandWritten bool
 }
 
 // UpToDate reports whether the file already has the wanted content.
-func (f *File) UpToDate() bool { return f.Exists && f.Have == f.Want }
+func (f *File) UpToDate() bool { return f.Exists && !f.HandWritten && f.Have == f.Want }
 
-// Prepare reads target t under root and works out its wanted content from
-// body, the generated text: the whole file for a skill, the section
-// (markers added here) for a shared file. Markers of a shared file that are
-// out of order or repeated are an error (exit code 1): gh-dojo cannot tell
-// which text is its own. So is a whole file that exists but has no
-// Generated marker, unless check is set: install would overwrite text
-// someone wrote by hand.
-func Prepare(root string, t Target, body, configFile string, check bool) (*File, error) {
+// State is the file's state for --check.
+func (f *File) State() string {
+	switch {
+	case f.UpToDate():
+		return StateUpToDate
+	case !f.Exists:
+		return StateMissing
+	case f.HandWritten:
+		return StateHandWritten
+	}
+	return StateOutOfDate
+}
+
+// HandWrittenFix is the fix for a hand-written skill.
+func HandWrittenFix(t Target, configFile string) string {
+	return fmt.Sprintf("move what is worth keeping into a notes file ([agent] notes in %s), "+
+		"delete %s, then run gh dojo agent install", configFile, t.Path)
+}
+
+// Prepare reads target t in root and works out its wanted content from
+// body, the generated text with LF line endings: the whole file for a
+// skill, the section (markers added here) for a shared file. The wanted
+// content keeps the file's line endings: CRLF when the file has them.
+// Markers of a shared file that are out of order or repeated are an error
+// (exit code 1): gh-dojo cannot tell which text is its own.
+func Prepare(root *os.Root, t Target, body, configFile string) (*File, error) {
 	f := &File{Target: t}
-	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(t.Path)))
+	data, err := root.ReadFile(filepath.FromSlash(t.Path))
 	switch {
 	case err == nil:
 		f.Exists = true
-		f.Have = strings.ReplaceAll(string(data), "\r\n", "\n")
+		f.Have = string(data)
 	case errors.Is(err, fs.ErrNotExist):
 	default:
-		return nil, render.Usage("cannot read %s: %v", t.Path, errors.Unwrap(err)).WithCause(err)
+		return nil, readError(t.Path, err)
+	}
+	eol := "\n"
+	if strings.Contains(f.Have, "\r\n") {
+		eol = "\r\n"
 	}
 	if !t.Section {
-		f.Want = body
-		if f.Exists && !check && !hasLine(f.Have, GeneratedPrefix) {
-			return nil, render.Usage("%s exists and was not written by gh dojo agent install; "+
-				"it would be overwritten", t.Path).
-				WithFix(fmt.Sprintf("move what is worth keeping into a notes file ([agent] notes in %s), "+
-					"delete %s, then run gh dojo agent install", configFile, t.Path))
-		}
+		f.Marked = hasMarker(f.Have, GeneratedPrefix)
+		f.HandWritten = f.Exists && !f.Marked
+		f.Want = withEOL(body, eol)
 		return f, nil
 	}
-	section := Begin(configFile) + "\n" + strings.TrimRight(body, "\n") + "\n" + End + "\n"
-	want, err := splice(f.Have, section)
+	f.Marked = hasMarker(f.Have, BeginPrefix) || hasMarker(f.Have, EndPrefix)
+	section := withEOL(Begin(configFile)+"\n"+strings.TrimRight(body, "\n")+"\n"+End+"\n", eol)
+	want, err := splice(f.Have, section, eol)
 	if err != nil {
 		return nil, render.Usage("%s: %v", t.Path, err).
 			WithFix(fmt.Sprintf("keep one %s ... --> line and one %s line after it in %s, "+
@@ -131,43 +172,58 @@ func Prepare(root string, t Target, body, configFile string, check bool) (*File,
 	return f, nil
 }
 
-// Write writes the wanted content, creating the directories it needs.
-func (f *File) Write(root string) error {
-	path := filepath.Join(root, filepath.FromSlash(f.Path))
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return render.Usage("cannot create the directory of %s: %v", f.Path, errors.Unwrap(err)).WithCause(err)
+// ReadError is the error of a file that exists but cannot be read, such
+// as a symbolic link out of the repository.
+func readError(name string, err error) error {
+	var pe *fs.PathError
+	if errors.As(err, &pe) {
+		err = pe.Err
 	}
-	if err := os.WriteFile(path, []byte(f.Want), 0o644); err != nil {
-		return render.Usage("cannot write %s: %v", f.Path, errors.Unwrap(err)).WithCause(err)
-	}
-	return nil
+	return render.Usage("cannot read %s: %v", name, err).WithCause(err)
 }
 
-// hasLine reports whether some line of text starts with prefix.
-func hasLine(text, prefix string) bool {
+// ReadFile reads name, slash-separated, in root, with the errors of
+// Prepare.
+func ReadFile(root *os.Root, name string) ([]byte, error) {
+	data, err := root.ReadFile(filepath.FromSlash(name))
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return nil, readError(name, err)
+	}
+	return data, err
+}
+
+func withEOL(s, eol string) string {
+	if eol == "\n" {
+		return s
+	}
+	return strings.ReplaceAll(s, "\n", eol)
+}
+
+// hasMarker reports whether some line of text is a marker with prefix.
+func hasMarker(text, prefix string) bool {
 	for line := range strings.Lines(text) {
-		if strings.HasPrefix(line, prefix) {
+		if IsMarker(line, prefix) {
 			return true
 		}
 	}
 	return false
 }
 
-// splice puts section, which ends with a newline, in place of the lines
-// from the Begin marker to the End marker of have. A file without markers
-// gets the section appended after a blank line; an empty one is the section
-// alone.
-func splice(have, section string) (string, error) {
+// splice puts section, which ends with a line ending, in place of the
+// lines from the Begin marker to the End marker of have. A file without
+// markers gets the section appended after a blank line, its own bytes
+// kept as they are; an empty one is the section alone.
+func splice(have, section, eol string) (string, error) {
 	lines := strings.SplitAfter(have, "\n")
 	begin, end := -1, -1
 	for i, l := range lines {
 		switch {
-		case strings.HasPrefix(l, BeginPrefix):
+		case IsMarker(l, BeginPrefix):
 			if begin >= 0 {
 				return "", errors.New("two gh-dojo:begin markers")
 			}
 			begin = i
-		case strings.HasPrefix(l, EndPrefix):
+		case IsMarker(l, EndPrefix):
 			if begin < 0 || end >= 0 {
 				return "", errors.New("a gh-dojo:end marker without a gh-dojo:begin before it")
 			}
@@ -178,14 +234,125 @@ func splice(have, section string) (string, error) {
 	case begin >= 0 && end < 0:
 		return "", errors.New("a gh-dojo:begin marker without a gh-dojo:end after it")
 	case begin < 0:
-		if strings.TrimSpace(have) == "" {
+		if have == "" {
 			return section, nil
 		}
-		return strings.TrimRight(have, "\n") + "\n\n" + section, nil
+		out := have
+		if !strings.HasSuffix(out, "\n") {
+			out += eol
+		}
+		if t := strings.TrimSuffix(strings.TrimSuffix(out, "\n"), "\r"); !strings.HasSuffix(t, "\n") {
+			out += eol // a blank line before the section
+		}
+		return out + section, nil
 	}
-	after := strings.Join(lines[end+1:], "")
-	if after != "" && !strings.HasSuffix(section, "\n") {
-		section += "\n"
+	return strings.Join(lines[:begin], "") + section + strings.Join(lines[end+1:], ""), nil
+}
+
+// maxLinks is how many symbolic links Write follows to the file it writes.
+const maxLinks = 16
+
+// Write writes the wanted content into a temporary file next to the
+// target, then renames it over the target, so a reader never sees half a
+// file. A target that is a symbolic link is written where it points,
+// which must be inside root. Missing directories are created; an existing
+// file keeps its permissions.
+func (f *File) Write(root *os.Root) error {
+	name, err := resolveLinks(root, filepath.FromSlash(f.Path))
+	if err != nil {
+		return err
 	}
-	return strings.Join(lines[:begin], "") + section + after, nil
+	perm := fs.FileMode(0o644)
+	if info, err := root.Stat(name); err == nil {
+		perm = info.Mode().Perm()
+	}
+	dir := filepath.Dir(name)
+	if err := root.MkdirAll(dir, 0o755); err != nil {
+		return writeError(f.Path, err)
+	}
+	tmp, w, err := createTemp(root, dir, filepath.Base(name), perm)
+	if err != nil {
+		return writeError(f.Path, err)
+	}
+	_, err = w.WriteString(f.Want)
+	if cerr := w.Close(); err == nil {
+		err = cerr
+	}
+	if err == nil {
+		err = root.Rename(tmp, name)
+	}
+	if err != nil {
+		_ = root.Remove(tmp)
+		return writeError(f.Path, err)
+	}
+	return nil
+}
+
+func writeError(name string, err error) error {
+	var pe *fs.PathError
+	var le *os.LinkError
+	switch {
+	case errors.As(err, &pe):
+		err = pe.Err
+	case errors.As(err, &le):
+		err = le.Err
+	}
+	return render.Usage("cannot write %s: %v", name, err).WithCause(err)
+}
+
+// resolveLinks follows name while it is a symbolic link, returning the
+// path, relative to root, of the file it ends at (which may not exist).
+func resolveLinks(root *os.Root, name string) (string, error) {
+	for range maxLinks {
+		info, err := root.Lstat(name)
+		if err != nil || info.Mode()&fs.ModeSymlink == 0 {
+			return name, nil
+		}
+		link, err := root.Readlink(name)
+		if err != nil {
+			return "", writeError(filepath.ToSlash(name), err)
+		}
+		next := filepath.Join(filepath.Dir(name), link)
+		if filepath.IsAbs(link) {
+			next = relTo(root.Name(), link)
+		}
+		if next == "" || !filepath.IsLocal(next) {
+			return "", render.Usage("cannot write %s: it links to %s, outside the repository",
+				filepath.ToSlash(name), filepath.ToSlash(link))
+		}
+		name = next
+	}
+	return "", render.Usage("cannot write %s: too many symbolic links", filepath.ToSlash(name))
+}
+
+// relTo returns target relative to dir, also when dir is reached through
+// symbolic links; "" when it is not inside.
+func relTo(dir, target string) string {
+	for _, d := range []string{dir, evalSymlinks(dir)} {
+		if rel, err := filepath.Rel(d, target); err == nil && filepath.IsLocal(rel) {
+			return rel
+		}
+	}
+	return ""
+}
+
+func evalSymlinks(dir string) string {
+	if d, err := filepath.EvalSymlinks(dir); err == nil {
+		return d
+	}
+	return dir
+}
+
+// createTemp creates a new file named after base in dir.
+func createTemp(root *os.Root, dir, base string, perm fs.FileMode) (string, *os.File, error) {
+	seed := time.Now().UnixNano()
+	for i := range 100 {
+		name := filepath.Join(dir, "."+base+".gh-dojo-"+strconv.FormatInt(seed+int64(i), 36))
+		w, err := root.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, perm)
+		if errors.Is(err, fs.ErrExist) {
+			continue
+		}
+		return name, w, err
+	}
+	return "", nil, errors.New("cannot create a temporary file")
 }

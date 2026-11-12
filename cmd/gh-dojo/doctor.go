@@ -27,9 +27,9 @@ func newDoctorCmd() (*cobra.Command, error) {
 	return &cobra.Command{
 		Use:   "doctor",
 		Short: "Find what is broken in the setup: config, token scope, board, repositories",
-		Long: `Check the setup and print one line per check: ok, problem, or skip when an
-earlier problem keeps the check from running. Each problem is followed by the
-command that fixes it.
+		Long: `Check the setup and print one line per check: ok, problem, warn, or skip
+when an earlier problem keeps the check from running. Each problem and
+warning is followed by the command that fixes it.
 
   version  the installed gh-dojo version
   config   ` + config.FileName + ` loads
@@ -41,14 +41,14 @@ command that fixes it.
            iteration covers today
   verbs    the labels verbs add or remove exist in the default repository,
            spelled as there, and the users they assign can be assigned
-  agent    with [agent] set or an agent file present: the files agent
-           install writes are up to date with the config
+  agent    with [agent] set or a file agent install wrote: those files are
+           up to date with the config and this gh-dojo (out of date: warn)
 
 It sends one request for the token and the repositories, one more for the
 board when its schema is not cached (an hour), and one for the verbs'
 labels and assignees when a verb has them.
 
-Exit codes: 0 when every check is ok; 4 when a check failed on auth or the
+Exit codes: 0 when every check is ok or warns; 4 when a check failed on auth or the
 network; else 1.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -65,12 +65,13 @@ const (
 	checkOK      = "ok"
 	checkProblem = "problem"
 	checkSkip    = "skip" // an earlier problem keeps the check from running
+	checkWarn    = "warn" // worth fixing, but not a problem: the exit code stays 0
 )
 
 // doctorCheck is one line of doctor's report.
 type doctorCheck struct {
 	Name    string   `json:"name"`
-	Result  string   `json:"result"` // checkOK, checkProblem or checkSkip
+	Result  string   `json:"result"` // checkOK, checkProblem, checkWarn or checkSkip
 	Detail  string   `json:"detail"`
 	Allowed []string `json:"allowed"`
 	Fix     *string  `json:"fix"` // null for none
@@ -80,12 +81,19 @@ type doctorCheck struct {
 
 // doctorReport is what doctor found, and its JSON.
 type doctorReport struct {
-	OK     bool          `json:"ok"` // every check is ok
+	OK     bool          `json:"ok"` // no check is a problem (warnings allowed)
 	Checks []doctorCheck `json:"checks"`
 }
 
 func (r *doctorReport) ok(name, format string, a ...any) {
 	r.Checks = append(r.Checks, doctorCheck{Name: name, Result: checkOK, Detail: fmt.Sprintf(format, a...), Allowed: []string{}})
+}
+
+// warn adds a warning with the command that fixes it.
+func (r *doctorReport) warn(name, fix, format string, a ...any) {
+	r.Checks = append(r.Checks, doctorCheck{
+		Name: name, Result: checkWarn, Detail: fmt.Sprintf(format, a...), Allowed: []string{}, Fix: orNull(fix),
+	})
 }
 
 func (r *doctorReport) skip(name, format string, a ...any) {

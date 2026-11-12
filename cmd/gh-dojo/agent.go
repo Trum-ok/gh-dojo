@@ -40,18 +40,24 @@ The instructions are in English: the lifecycle, each verb with when to use
 it, what it needs, checks and does along the way, blockers, the session
 link, reading and creating issues, exit codes and JSON, and the commands of
 this gh-dojo. The markdown file [agent] notes names is appended as it is,
-for what the config cannot say. Without --agent, the agents of [agent]
-targets are written (by default claude).
+for what the config cannot say, and [agent] description is added to the
+skill's description. Without --agent, the agents of [agent] targets are
+written (by default claude).
 
 The skill is gh-dojo's whole file: one that exists without gh-dojo's
-marker, written by hand, is not overwritten (exit code 1). In AGENTS.md and
-the Copilot file only the text between the gh-dojo:begin and gh-dojo:end
-markers is gh-dojo's, and the rest stays as it is; a file without them gets
-the section at its end.
+marker, written by hand, is not overwritten (exit code 1; --check says
+"hand written"). In AGENTS.md and the Copilot file only the lines from
+gh-dojo:begin to gh-dojo:end are gh-dojo's, and the rest stays byte for
+byte; a file without them gets the section at its end. Marker lines count
+anywhere, code blocks included, so do not quote them in those files. A file
+with CRLF line endings keeps them. A file is written whole through a
+temporary file; a symbolic link is written where it points, which must be
+inside the repository, and so must the notes.
 
 A repeat with the same config changes nothing and says "up to date".
 --check writes nothing and exits 1 when a file is missing or differs from
-what install would write, showing the changed lines: run it in CI. Paths
+what install would write, showing the changed lines: run it in CI with a
+fixed gh-dojo version, since the text depends on the version too. Paths
 are relative to the repository root, the directory that holds .github.
 It never uses the network.`,
 		Example: `  gh dojo agent install
@@ -77,9 +83,11 @@ type agentFileResult struct {
 	Agent string `json:"agent"`
 	Path  string `json:"path"` // relative to the repository root
 	// State is agent.StateUpToDate, StateCreated or StateUpdated; with
-	// --check, StateUpToDate, StateMissing or StateOutOfDate.
+	// --check, StateUpToDate, StateMissing, StateOutOfDate or
+	// StateHandWritten.
 	State string   `json:"state"`
 	Diff  []string `json:"diff"` // --check, out of date: the changed lines (agent.Diff)
+	Fix   *string  `json:"fix"`  // --check, not up to date: what brings it up to date; else null
 }
 
 func (r *agentResult) write(w io.Writer) {
@@ -102,27 +110,41 @@ func runAgentInstall(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
-	root, err := repoRoot(cfg)
+	root, err := openRepoRoot(cfg)
 	if err != nil {
 		return err
 	}
-	files, err := prepareAgentFiles(cfg, cmd.Root(), root, targets, check)
+	defer root.Close()
+	files, err := prepareAgentFiles(cfg, cmd.Root(), root, targets)
 	if err != nil {
 		return err
+	}
+	install := agentInstallFix(agents)
+	if !check {
+		for _, f := range files {
+			if f.HandWritten {
+				return render.Usage("%s exists and was not written by gh dojo agent install; "+
+					"it would be overwritten", f.Path).WithFix(agent.HandWrittenFix(f.Target, config.FileName))
+			}
+		}
 	}
 
 	r := &agentResult{Check: check, Files: []agentFileResult{}}
-	stale, wrote := 0, false
+	stale, wrote, fix := 0, false, install
 	for _, f := range files {
 		res := agentFileResult{Agent: f.Agent, Path: f.Path, State: agent.StateUpToDate, Diff: []string{}}
 		switch {
 		case f.UpToDate():
 		case check:
 			stale++
-			res.State = agent.StateMissing
-			if f.Exists {
-				res.State = agent.StateOutOfDate
+			res.State = f.State()
+			res.Fix = &install
+			switch res.State {
+			case agent.StateOutOfDate:
 				res.Diff = agent.Diff(f.Have, f.Want, maxDiffLines)
+			case agent.StateHandWritten:
+				hw := agent.HandWrittenFix(f.Target, config.FileName)
+				res.Fix, fix = &hw, hw
 			}
 		default:
 			if err := f.Write(root); err != nil {
@@ -140,8 +162,7 @@ func runAgentInstall(cmd *cobra.Command, _ []string) error {
 	var runErr error
 	if stale > 0 {
 		runErr = render.Usage("%d of %s not up to date with %s",
-			stale, plural(len(files), "agent file", "agent files"), config.FileName).
-			WithFix(agentInstallFix(agents))
+			stale, plural(len(files), "agent file", "agent files"), config.FileName).WithFix(fix)
 	}
 	return emitWrite(cmd, r, r.write, runErr, wrote)
 }
@@ -180,30 +201,39 @@ func agentTargets(cfg *config.Config, agents []string) ([]agent.Target, error) {
 	return targets, nil
 }
 
-// repoRoot is the directory that holds the config's .github.
-func repoRoot(cfg *config.Config) (string, error) {
+// openRepoRoot opens the directory that holds the config's .github: every
+// file agent install reads or writes is inside it.
+func openRepoRoot(cfg *config.Config) (*os.Root, error) {
 	if cfg.Path == "" {
-		return "", render.Internal("the config was not loaded from a file")
+		return nil, render.Internal("the config was not loaded from a file")
 	}
-	return filepath.Dir(filepath.Dir(cfg.Path)), nil
+	root, err := os.OpenRoot(filepath.Dir(filepath.Dir(cfg.Path)))
+	if err != nil {
+		return nil, render.Usage("cannot open the repository root: %v", errors.Unwrap(err)).WithCause(err)
+	}
+	return root, nil
 }
 
 // prepareAgentFiles reads the notes and every target, and works out what
 // each should hold, before anything is written: a problem with one file
 // leaves all of them as they are.
-func prepareAgentFiles(cfg *config.Config, cmdRoot *cobra.Command, root string, targets []agent.Target, check bool) ([]*agent.File, error) {
+func prepareAgentFiles(cfg *config.Config, cmdRoot *cobra.Command, root *os.Root, targets []agent.Target) ([]*agent.File, error) {
 	notes, err := readAgentNotes(cfg, root)
 	if err != nil {
 		return nil, err
 	}
 	doc := newAgentDoc(cfg, cmdRoot, notes)
+	skill, err := doc.skill()
+	if err != nil {
+		return nil, err
+	}
 	var files []*agent.File
 	for _, t := range targets {
 		body := doc.section()
 		if !t.Section {
-			body = doc.skill()
+			body = skill
 		}
-		f, err := agent.Prepare(root, t, body, config.FileName, check)
+		f, err := agent.Prepare(root, t, body, config.FileName)
 		if err != nil {
 			return nil, err
 		}
@@ -212,70 +242,91 @@ func prepareAgentFiles(cfg *config.Config, cmdRoot *cobra.Command, root string, 
 	return files, nil
 }
 
-// checkAgentFiles is doctor's agent check: agent install --check on the
-// targets of [agent], without the diff. A project that sets no [agent] and
-// has none of their files gets no line: it does not use agent install.
+// checkAgentFiles is doctor's agent check, agent install --check without
+// the diff, for a project that uses agent install: one that sets [agent]
+// (then its targets count), or has a file of any agent with a gh-dojo
+// marker (then those files count). Others get no line, and neither does
+// targets = [].
+//
+// A file out of date or missing is a warning, not a problem: the text
+// depends on the gh-dojo version too, and the installed one may differ
+// from the one that wrote the file; --check in CI is the strict check. A
+// hand-written skill under [agent], or a file install cannot handle, is a
+// problem.
 func checkAgentFiles(r *doctorReport, cfg *config.Config, cmdRoot *cobra.Command) {
-	root, err := repoRoot(cfg)
-	if err != nil { // a config not read from a file, in tests
+	if cfg.Path == "" || len(cfg.Agent.Targets) == 0 { // not read from a file: in tests
 		return
 	}
-	targets, err := agentTargets(cfg, nil)
+	root, err := openRepoRoot(cfg)
 	if err != nil {
 		r.problem("agent", err)
 		return
 	}
-	if !cfg.Agent.Set && !slices.ContainsFunc(targets, func(t agent.Target) bool {
-		_, err := os.Stat(filepath.Join(root, filepath.FromSlash(t.Path)))
-		return err == nil
-	}) {
+	defer root.Close()
+	targets := agent.Targets // without [agent]: any file agent install wrote
+	if cfg.Agent.Set {
+		if targets, err = agentTargets(cfg, nil); err != nil {
+			r.problem("agent", err)
+			return
+		}
+	}
+	files, err := prepareAgentFiles(cfg, cmdRoot, root, targets)
+	if err != nil {
+		if cfg.Agent.Set {
+			r.problem("agent", err)
+		}
 		return
 	}
-	files, err := prepareAgentFiles(cfg, cmdRoot, root, targets, true)
-	if err != nil {
-		r.problem("agent", err)
-		return
+	if !cfg.Agent.Set {
+		files = slices.DeleteFunc(files, func(f *agent.File) bool { return !f.Marked })
+		if len(files) == 0 {
+			return
+		}
 	}
 	var ok, stale []string
 	for _, f := range files {
-		switch {
-		case f.UpToDate():
+		switch f.State() {
+		case agent.StateUpToDate:
 			ok = append(ok, f.Path)
-		case f.Exists:
-			stale = append(stale, f.Path+" (out of date)")
+		case agent.StateHandWritten:
+			r.problem("agent", render.Usage("%s was not written by gh dojo agent install", f.Path).
+				WithFix(agent.HandWrittenFix(f.Target, config.FileName)))
+			return
 		default:
-			stale = append(stale, f.Path+" (missing)")
+			stale = append(stale, f.Path+" ("+strings.ReplaceAll(f.State(), "_", " ")+")")
 		}
 	}
 	if len(stale) > 0 {
-		r.problem("agent", render.Usage("not up to date with %s: %s", config.FileName, strings.Join(stale, ", ")).
-			WithFix("gh dojo agent install"))
+		r.warn("agent", "gh dojo agent install", "not up to date with %s or this gh-dojo version: %s",
+			config.FileName, strings.Join(stale, ", "))
 		return
 	}
 	r.ok("agent", "%s: up to date", strings.Join(ok, ", "))
 }
 
-// readAgentNotes reads [agent] notes: "" without them, else the text with
-// LF line endings, ending in one newline.
-func readAgentNotes(cfg *config.Config, root string) (string, error) {
+// readAgentNotes reads [agent] notes from root: "" without them, else the
+// text with LF line endings, ending in one newline.
+func readAgentNotes(cfg *config.Config, root *os.Root) (string, error) {
 	name := cfg.Agent.Notes
 	if name == "" {
 		return "", nil
 	}
-	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(name)))
+	data, err := agent.ReadFile(root, name)
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
 		return "", render.Usage("%s: agent.notes: %s does not exist", cfg.Display, name).
 			WithFix(fmt.Sprintf("create %s, or remove notes from [agent] in %s", name, cfg.Display))
 	case err != nil:
-		return "", render.Usage("%s: agent.notes: cannot read %s: %v", cfg.Display, name, errors.Unwrap(err)).WithCause(err)
+		e := render.FromError(err)
+		e.What = cfg.Display + ": agent.notes: " + e.What
+		return "", e
 	}
 	text := strings.TrimRight(strings.ReplaceAll(string(data), "\r\n", "\n"), " \t\n")
 	if text == "" {
 		return "", nil
 	}
 	for line := range strings.Lines(text) {
-		if strings.HasPrefix(line, "<!-- gh-dojo:") {
+		if agent.IsMarker(line, agent.MarkerPrefix) {
 			return "", render.Usage("%s: agent.notes: %s has a gh-dojo marker line: %s",
 				cfg.Display, name, strings.TrimSpace(line)).
 				WithFix("remove the <!-- gh-dojo: ... --> lines from " + name)

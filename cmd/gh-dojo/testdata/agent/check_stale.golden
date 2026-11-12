@@ -1,11 +1,11 @@
 code: 1
 --- stdout
 .claude/skills/gh-dojo/SKILL.md: out of date
-  @@ line 36
+  @@ line 45
   -**When:** The work is done, verified and committed, but not released yet
   +**When:** Merged into main
 AGENTS.md: out of date
-  @@ line 30
+  @@ line 39
   -**When:** The work is done, verified and committed, but not released yet
   +**When:** Merged into main
 --- stderr

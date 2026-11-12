@@ -351,9 +351,10 @@ network; a missing or broken config is an error (exit code 1).
 gh dojo doctor
 ```
 
-Checks the setup and prints one line per check, `ok`, `problem`, or `skip`
-when an earlier problem keeps a check from running; each problem is
-followed by the command that fixes it:
+Checks the setup and prints one line per check, `ok`, `problem`, `warn`
+(worth fixing, but not a problem), or `skip` when an earlier problem keeps
+a check from running; each problem and warning is followed by the command
+that fixes it:
 
 ```console
 $ gh dojo doctor
@@ -376,12 +377,13 @@ ok       verbs    octocat/shop: 2 labels exist, 1 assignee can be assigned
 | `repo` | Each repository of [`board.repos`](#board), or the current one, is visible with issues enabled |
 | `sprint` | With [`fields.sprint`](#fields): an iteration covers today, a date in [`board.timezone`](#board) |
 | `verbs` | When verbs have labels or assignees: the labels exist in the default repository, spelled exactly as there, and the users can be assigned |
-| `agent` | With [`[agent]`](#agent) set, or a file of its targets present: the files [`agent install`](#agent-install) writes are up to date (`agent install --check`, without the diff) |
+| `agent` | With [`[agent]`](#agent) set (and `targets` not empty), or a file with a gh-dojo marker: the files [`agent install`](#agent-install) writes are up to date (`agent install --check`, without the diff). Out of date or missing is `warn`, since the text also depends on the gh-dojo version; a hand-written skill under `[agent]` is a problem |
 
 It sends one request for the token and the repositories, one more for the
 board when its schema is not cached, and one for the verbs' labels and
-assignees when a verb has them. The exit code is 0 when every check is ok, 4
-when one failed on auth or the network, else 1.
+assignees when a verb has them. The exit code is 0 when no check is a
+problem (warnings included), 4 when one failed on auth or the network,
+else 1.
 
 ### agent install
 
@@ -401,33 +403,59 @@ read, so the rules are written once, in the config:
 | `copilot` | A section of `.github/copilot-instructions.md` |
 
 The instructions are in English and say what `describe` says, with what an
-agent should do about it: use only `gh dojo` for issues; each verb with its
-`when`, the statuses it moves between, its arguments, checks and effects,
-and the rules behind them (ask the user before `--yes`, don't work around a
-refused blockers check, what `--by` links, several numbers at once); the
-initial, final and resolved statuses; `show` and `list`; `new`, `comment`,
-`block` and `unblock`; safe repeats; the session link; exit codes; JSON; and
-a table of the commands of the gh-dojo that wrote them, so a command added
-in a later version shows up there by itself. The markdown file
-[`[agent] notes`](#agent) names is appended as it is, in the project's
-language, for what the config cannot say.
+agent should do about it: use only `gh dojo` for issues; the lifecycle, the
+longest way from the initial status to a final one along the verbs (a status
+a verb can jump over in parentheses); the initial, final and resolved
+statuses; each verb with its `when`, the statuses it moves between, its
+arguments, checks and effects, and the rules behind them (ask the user before
+`--yes`, don't work around a refused blockers check, what `--by` links,
+several numbers at once); `show` and `list`; `new`, `comment`, `block` and
+`unblock`; safe repeats; the session link; exit codes; JSON; and a table of
+the commands of the gh-dojo that wrote them, so a command added in a later
+version shows up there by itself. The skill's `description` names the
+repository, the board and the verbs, and [`[agent] description`](#agent)
+adds to it. The markdown file [`[agent] notes`](#agent) names is appended as
+it is, in the project's language, for what the config cannot say.
 
 The skill is gh-dojo's whole file, marked as generated after its front
 matter; a skill without that marker, written by hand, is not overwritten
 (exit code 1): move what is worth keeping into the notes and delete it. In
 `AGENTS.md` and the Copilot file gh-dojo owns only the lines from
-`<!-- gh-dojo:begin ... -->` to `<!-- gh-dojo:end -->`, and the rest of the
-file stays as it is; a file without the markers gets the section at its end.
-Markers out of order are an error, and nothing is written.
+`<!-- gh-dojo:begin ... -->` to `<!-- gh-dojo:end -->` (leading spaces
+allowed), and the rest of the file stays byte for byte; a file without the
+markers gets the section at its end. Marker lines count anywhere, fenced code
+blocks included, so don't quote them in those files. Markers out of order are
+an error, and nothing is written. A file with CRLF line endings keeps them.
+
+Every file is written whole, through a temporary file next to it that is
+renamed over it. Reads and writes stay inside the repository: a symbolic link
+is followed only while it points inside, and the target of a linked file is
+what gets written. `[agent] notes` cannot be under `.git` or be one of the
+files agent install writes.
 
 A repeat with the same config writes nothing and prints `up to date` for
-each file. `--check` writes nothing either: a file that is missing or
-differs from what install would write is `missing` or `out of date`, with up
-to 20 changed lines, and the exit code is 1 with `gh dojo agent install` as
-the fix. The files depend on the config, the notes and the gh-dojo version,
-not on where it runs: run `--check` in CI with the build being tested, as
-this repository does. Paths are relative to the repository root, the
-directory that holds `.github`; agent install never uses the network.
+each file. `--check` writes nothing either: a file that is missing, differs
+from what install would write, or is a hand-written skill is `missing`,
+`out of date` (with up to 20 changed lines) or `hand written`, and the exit
+code is 1 with the fix: `gh dojo agent install`, or for a hand-written skill
+moving it into the notes first. Paths are relative to the repository root,
+the directory that holds `.github`; agent install never uses the network.
+
+The files depend on the config, the notes and the gh-dojo version (its text
+and its command list), not on where it runs. So pin the version that checks
+them in CI, and run `agent install` with that version when you upgrade:
+
+```yaml
+- run: gh extension install Trum-ok/gh-dojo --pin v0.2.0
+  env:
+    GH_TOKEN: ${{ github.token }}
+- run: gh dojo agent install --check
+```
+
+[`doctor`](#doctor) only warns about files out of date: the installed
+gh-dojo may be a different version than the one in CI. In this repository
+CI checks with the build of the branch, so after changing the config, the
+notes, the generator or a command's short help, run `make agent`.
 
 ### Process verbs
 
@@ -541,6 +569,7 @@ link = "claude://claude.ai/epitaxy/{id}"
 [agent]                      # gh dojo agent install
 targets = ["claude", "agents-md"]       # claude (the default), agents-md, copilot
 notes = "docs/agent-notes.md" # appended as is to the generated instructions
+description = "Also load it before a release."  # added to the skill's description
 
 [verbs.start]                # overrides the preset's start key by key
 when = "You begin working on the issue"   # one line; first line of --help
@@ -656,7 +685,8 @@ What [`agent install`](#agent-install) writes. A preset cannot set it.
 | Key       | Meaning |
 |-----------|---------|
 | `targets` | The agents to write for: `claude`, `agents-md`, `copilot`. Default: `["claude"]`; `[]` writes nothing without `--agent` |
-| `notes`   | A markdown file, relative to the repository root and written with `/`, appended as is after the generated instructions: what the config cannot say, in the project's language. Its headings land as written, so in an `AGENTS.md` section start them one level down |
+| `notes`   | A markdown file, relative to the repository root and written with `/`, appended as is after the generated instructions: what the config cannot say, in the project's language. Its headings land as written, so in an `AGENTS.md` section start them one level down. Not under `.git`, not one of the files agent install writes, and not a link out of the repository |
+| `description` | One line added to the end of the skill's generated `description`, which tells Claude Code when to load the skill: say when else to load it. The whole description may be up to 1024 characters |
 
 ### verbs
 
@@ -1093,8 +1123,8 @@ The schemas, by command, after `schema_version` and `error`:
 | `comment` | `number`, `repo`, `posted` (`false`: already the last comment) |
 | `block`, `unblock` | `number`, `repo`, `action`, `changed`, `unchanged`, `missed` |
 | `describe` | `config`, `preset`, `board`, `repos`, `verbs`: `[{name, when, from, to, requires, requires_one_of, optional, batch, checks, effects}]`, `statuses`: `{initial, final, resolved}`, `exit_codes`: `[{code, meaning, next}]` |
-| `doctor` | `ok`, `checks`: `[{name, result, detail, allowed, fix}]` |
-| `agent install` | `check`, `files`: `[{agent, path, state, diff}]`; `state` is `created`, `updated` or `up_to_date`, with `--check` `up_to_date`, `missing` or `out_of_date`; `diff` (`--check`, out of date) the changed lines as printed, else `[]` |
+| `doctor` | `ok` (no check is a problem), `checks`: `[{name, result, detail, allowed, fix}]`, `result` one of `ok`, `problem`, `warn`, `skip` |
+| `agent install` | `check`, `files`: `[{agent, path, state, diff, fix}]`; `state` is `created`, `updated` or `up_to_date`, with `--check` `up_to_date`, `missing`, `out_of_date` or `hand_written`; `diff` (`--check`, out of date) the changed lines as printed, else `[]`; `fix` (`--check`, not up to date) the command or step that brings it up to date, else `null` |
 | `init` | without `--project` (exit code 1, the choice is yours): `owner`, `owner_type`, `projects`: `[{number, title, items, closed}]`, `suggested_project`, `command`; with it: `path`, `written`, `board`, `board_title`, `preset`, `repos`, `matches_board`, `problems`: `[{problem, fix}]`, `content` |
 | `--version`, or `gh dojo --json` | `version` |
 

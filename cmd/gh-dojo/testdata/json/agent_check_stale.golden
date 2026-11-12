@@ -1,6 +1,6 @@
 code: 1
 --- stdout
-{"schema_version":1,"error":{"exit_code":1,"message":"2 of 2 agent files not up to date with .github/dojo.toml","allowed":[],"fix":"gh dojo agent install"},"check":true,"files":[{"agent":"claude","path":".claude/skills/gh-dojo/SKILL.md","state":"out_of_date","diff":["@@ line 36","-**When:** The work is done, verified and committed, but not released yet","+**When:** Merged into main"]},{"agent":"agents-md","path":"AGENTS.md","state":"out_of_date","diff":["@@ line 30","-**When:** The work is done, verified and committed, but not released yet","+**When:** Merged into main"]}]}
+{"schema_version":1,"error":{"exit_code":1,"message":"2 of 2 agent files not up to date with .github/dojo.toml","allowed":[],"fix":"gh dojo agent install"},"check":true,"files":[{"agent":"claude","path":".claude/skills/gh-dojo/SKILL.md","state":"out_of_date","diff":["@@ line 45","-**When:** The work is done, verified and committed, but not released yet","+**When:** Merged into main"],"fix":"gh dojo agent install"},{"agent":"agents-md","path":"AGENTS.md","state":"out_of_date","diff":["@@ line 39","-**When:** The work is done, verified and committed, but not released yet","+**When:** Merged into main"],"fix":"gh dojo agent install"}]}
 --- stderr
 error: 2 of 2 agent files not up to date with .github/dojo.toml
 fix: gh dojo agent install

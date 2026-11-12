@@ -1,0 +1,4 @@
+code: 1
+--- stdout
+--- stderr
+error: .github/dojo.toml: agent.notes: cannot read notes.md: path escapes from parent
