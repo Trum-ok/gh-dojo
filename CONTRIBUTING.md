@@ -78,7 +78,11 @@ make golden   # UPDATE_GOLDEN=1 go test ./...
 Rewriting is refused when `CI` is set, so CI can never pass by accepting its
 own output. `internal/config`'s `TestReadmeExamples` loads every `toml` block
 in `README.md`, and `TestExampleConfigs` every `examples/*.toml`, so README
-examples and example configs must stay valid configs.
+examples and example configs must stay valid configs. `cmd/gh-dojo`'s
+`TestExampleReview` runs `describe`, a dry run of every verb and
+`agent install` on `examples/review.toml`, against the hand-crafted board
+and cards in `review_board.json` and `review_example.json`: a new verb
+there needs a dry run and a card.
 
 ## GraphQL fixtures
 

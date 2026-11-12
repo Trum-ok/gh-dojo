@@ -554,8 +554,10 @@ in each parent up to the repository root (the first directory with `.git`).
 every error names the file and the key.
 
 Complete, commented configs to start from:
-[`examples/kanban.toml`](examples/kanban.toml) and
-[`examples/sprints.toml`](examples/sprints.toml). Every key, in one file:
+[`examples/kanban.toml`](examples/kanban.toml),
+[`examples/sprints.toml`](examples/sprints.toml) and, for a process of
+your own without a preset, [`examples/review.toml`](examples/review.toml)
+(see [Your own process](#your-own-process)). Every key, in one file:
 
 ```toml
 version = 1                  # optional; 1 is the only version
@@ -976,6 +978,50 @@ from = ["Ready"]             # released only after ready
 `ready` and `done` read the status history, which GitHub keeps only for a
 board's built-in `Status` field: with another `fields.status`, the config
 is refused until they set `iteration = "current"`.
+
+### Your own process
+
+The presets are a starting point, not a requirement: a process that is
+neither kanban nor sprints is configured in `.github/dojo.toml` alone,
+without changing gh-dojo. [`examples/review.toml`](examples/review.toml) is
+a code review flow with no preset: an agent writes the change and opens a
+pull request, a person reviews it, and approving or rejecting it is theirs
+to decide.
+
+| Verb              | Moves to          | From                                | Also |
+|-------------------|-------------------|-------------------------------------|------|
+| `start`           | In progress       | Backlog                             | refused while a blocker is unresolved; assigns the author |
+| `hold`            | status unchanged  | In progress, Changes requested      | label `+blocked`; `--by 17` marks it blocked by #17 |
+| `resume`          | status unchanged  | In progress, Changes requested      | label `-blocked`; refused while a blocker is unresolved |
+| `review`          | In review         | In progress, Changes requested      | needs `--comment` (the pull request); labels; assigns the reviewer |
+| `request-changes` | Changes requested | In review                           | needs `--comment`; labels |
+| `approve`         | Approved          | In review                           | the user's decision (`--yes`) |
+| `reject`          | status unchanged  | any but Backlog and Merged          | the user's decision; closes as not planned |
+| `merge`           | Merged            | Approved                            | closes as completed; several issues at once |
+
+To write your own:
+
+1. Put the statuses on the board's status field, and the labels the verbs
+   add in the repository (`gh label create`).
+2. Without `preset`, the file defines everything a preset would:
+   [`fields.status`](#fields), [`[statuses]`](#statuses) and every verb. On
+   top of a preset, set only what differs, add verbs, and drop the preset's
+   with `disabled = true`.
+3. A verb is a `when` line, [checks](#checks) (`from`, `require`,
+   `require_one_of`, `blockers`, `confirm`) and [effects](#effects) (`to`,
+   `labels`, `assign`, `comment`, `close`, `reopen`, `iteration`, `field`,
+   the `blockers` link). A verb without `to` leaves the status alone, like
+   `hold` above; one with `confirm = "user"` waits for a person.
+4. Check it: [`gh dojo doctor`](#doctor) against the board and the
+   repository (statuses, labels, assignees), `gh dojo describe` for the
+   process as an agent reads it, `gh dojo <verb> N --dry-run` for a verb's
+   plan on a real issue. Then [`gh dojo agent install`](#agent-install)
+   writes the agent instructions from the same file.
+
+The config cannot yet name the assignee when a verb runs, so the example's
+reviewer is one login fixed in the file, and `assign` only adds people:
+handing an issue back to its author after `request-changes` is done with
+`gh issue edit`.
 
 ## Output and exit codes
 
