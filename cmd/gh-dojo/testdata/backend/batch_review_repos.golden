@@ -1,0 +1,10 @@
+code: 1
+--- stdout
+dry run: review #3 "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)"
+  status: Ready → In review
+  labels: +enhancement -dogfood
+  assign: Trum-ok
+  comment: "PR #50"
+--- stderr
+error: dry run: 1 of 3 can be applied; acme/api#7, acme/api#8: .github/dojo.toml: verbs.review.labels: no label "enhancement" in acme/api
+fix: gh label create "enhancement" -R acme/api, or fix verbs.review.labels

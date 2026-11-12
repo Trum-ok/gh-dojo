@@ -31,6 +31,31 @@ import (
 type githubBackend struct {
 	app   *App
 	added map[string]string // refKey of an issue → board item added in this run
+	// allowed are the allowed values checkFound read for its errors, by
+	// kind ("labels", "assignable") and repository, so a batch reads them
+	// once per repository, not once per issue.
+	allowed map[string]allowedValues
+}
+
+// allowedValues is one read of allowed values, or why it failed.
+type allowedValues struct {
+	names []string
+	err   error
+}
+
+// allowedOnce returns read's answer for kind in repo, reading it once per
+// run.
+func (b *githubBackend) allowedOnce(kind string, repo issue.Repo, read func() ([]string, error)) ([]string, error) {
+	key := kind + " " + strings.ToLower(repo.String())
+	if v, ok := b.allowed[key]; ok {
+		return v.names, v.err
+	}
+	names, err := read()
+	if b.allowed == nil {
+		b.allowed = map[string]allowedValues{}
+	}
+	b.allowed[key] = allowedValues{names, err}
+	return names, err
 }
 
 func (b *githubBackend) ReadIssue(ctx context.Context, v config.Verb, ref issue.Ref, a workflow.Args) (workflow.Issue, error) {
@@ -329,7 +354,7 @@ func (b *githubBackend) checkFound(ctx context.Context, v config.Verb, l issue.L
 		}
 		labelsKey := cfg.KeyPath(key + "labels")
 		e := cfg.Errorf("%s: no %s %s in %s", labelsKey, noun, strings.Join(quoted, ", "), card.Repo)
-		names, err := repoLabels(ctx, b.app.Client, card.Repo)
+		names, err := b.allowedOnce("labels", card.Repo, func() ([]string, error) { return repoLabels(ctx, b.app.Client, card.Repo) })
 		if err == nil {
 			e = e.WithAllowed(closestFirst(names, missing)...)
 		}
@@ -340,7 +365,9 @@ func (b *githubBackend) checkFound(ctx context.Context, v config.Verb, l issue.L
 	case l.User != "" && f.User == nil:
 		e := cfg.Errorf("%s: %s cannot be assigned issues in %s", cfg.KeyPath(key+"assign"), l.User, card.Repo).
 			WithFix(fmt.Sprintf("check the login, or give %s access to %s", l.User, card.Repo))
-		if logins, err := assignableUsers(ctx, b.app.Client, card.Repo); err == nil {
+		if logins, err := b.allowedOnce("assignable", card.Repo, func() ([]string, error) {
+			return assignableUsers(ctx, b.app.Client, card.Repo)
+		}); err == nil {
 			e = e.WithAllowed(logins...)
 		}
 		return e

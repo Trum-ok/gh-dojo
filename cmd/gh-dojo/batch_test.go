@@ -106,6 +106,22 @@ func TestBatchLookup(t *testing.T) {
 	checkRuns(t, srv, srv.Requests(), runs{[]string{"review", "3", "7", "--comment", "PR #50"}, render.ExitOK, 3, "batch_review"})
 }
 
+// TestBatchLookupRepos: review's labels exist in gh-dojo, not in
+// acme/api. One request reads the three cards with the labels of both
+// repositories; acme/api's issues fail alone with the config error, its
+// allowed labels read once for both; #3 is planned with gh-dojo's labels.
+func TestBatchLookupRepos(t *testing.T) {
+	withConfig(t, strings.Replace(effectsDojoConfig, "labels = [\"+enhancement\", \"-dogfood\"]\n",
+		"labels = [\"+enhancement\", \"-dogfood\"]\nbatch = true\n", 1))
+	withSession(t, "abc")
+	srv := withApp(t, boardFixture, verbFixture("batch_review_repos"))
+	if _, err := newApp().Schema(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	checkRuns(t, srv, srv.Requests(),
+		runs{[]string{"review", "3", "acme/api#7", "acme/api#8", "--comment", "PR #50", "--dry-run"}, render.ExitUsage, 2, "batch_review_repos"})
+}
+
 // TestBatchOutcomes covers the exit code of each mix of outcomes with a
 // fake backend: one read for the batch, one Apply per issue to write.
 func TestBatchOutcomes(t *testing.T) {
