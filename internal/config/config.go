@@ -196,9 +196,21 @@ const (
 
 var agentTargets = []string{AgentClaude, AgentAgentsMD, AgentCopilot}
 
+// agentFiles are the files agent install writes for each agent, relative
+// to the repository root.
+var agentFiles = map[string]string{
+	AgentClaude:   ".claude/skills/gh-dojo/SKILL.md",
+	AgentAgentsMD: "AGENTS.md",
+	AgentCopilot:  ".github/copilot-instructions.md",
+}
+
 // AgentTargets lists the agents [agent] targets and agent install --agent
 // accept.
 func AgentTargets() []string { return slices.Clone(agentTargets) }
+
+// AgentFile is the file agent install writes for agent, relative to the
+// repository root and slash-separated; "" for an unknown agent.
+func AgentFile(agent string) string { return agentFiles[agent] }
 
 // Agent is the [agent] table: what gh dojo agent install writes.
 type Agent struct {
@@ -211,6 +223,9 @@ type Agent struct {
 	// root (the directory holding .github) and slash-separated, appended
 	// as is to the generated instructions; "" for none.
 	Notes string
+	// Description is appended to the generated description of the skill,
+	// which says when an agent loads it; "" for none.
+	Description string
 }
 
 // Labels maps `new` flags to label names.

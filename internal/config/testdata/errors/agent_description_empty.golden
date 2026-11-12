@@ -1,0 +1,2 @@
+error: .github/dojo.toml: agent.description is empty
+fix: write when else to load the skill, or remove it

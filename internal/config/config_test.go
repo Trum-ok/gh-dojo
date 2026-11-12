@@ -122,7 +122,7 @@ func dump(c *Config) string {
 	w("labels: types=%q area_prefix=%q", c.Labels.Types, c.Labels.AreaPrefix)
 	w("session: env=%q link=%q", c.Session.Env, c.Session.Link)
 	if c.Agent.Set { // left out otherwise: the default is always ["claude"]
-		w("agent: targets=%q notes=%q", c.Agent.Targets, c.Agent.Notes)
+		w("agent: targets=%q notes=%q description=%q", c.Agent.Targets, c.Agent.Notes, c.Agent.Description)
 	}
 	for _, v := range c.Verbs {
 		w("verb %s", v.Name)
@@ -184,6 +184,7 @@ iteration = "current"
 `},
 		{"agent", presetOnly + "[agent]\ntargets = [\"agents-md\", \"claude\"]\nnotes = \"docs/agent-notes.md\"\n"},
 		{"agent_no_targets", presetOnly + "[agent]\ntargets = []\n"},
+		{"agent_description", presetOnly + "[agent]\ndescription = \" Also when gh-dojo itself gets in the way. \"\n"},
 		{"blockers_off", presetOnly + "[verbs.wait]\nblockers = false\n"},
 		{"blockers_deny", presetOnly + "[verbs.start]\nblockers = \"deny\"\n[verbs.wait]\nblockers = \"warn\"\n"},
 		{"override_verb_key", presetOnly + `
@@ -414,6 +415,10 @@ func TestLoadErrors(t *testing.T) {
 		{"agent_notes_unclean", presetOnly + "[agent]\nnotes = \"docs/./notes.md\"\n"},
 		{"agent_notes_backslash", presetOnly + "[agent]\nnotes = \"docs\\\\notes.md\"\n"},
 		{"agent_not_table", "agent = \"claude\"\n" + presetOnly},
+		{"agent_notes_git", presetOnly + "[agent]\nnotes = \".git/notes.md\"\n"},
+		{"agent_notes_target", presetOnly + "[agent]\nnotes = \"agents.md\"\n"},
+		{"agent_description_empty", presetOnly + "[agent]\ndescription = \"  \"\n"},
+		{"agent_description_lines", presetOnly + "[agent]\ndescription = \"\"\"\nOne.\nTwo.\"\"\"\n"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

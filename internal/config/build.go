@@ -210,7 +210,7 @@ func (c *Config) buildSession(r rawSession) error {
 // written with slashes, so the generated files are the same on every OS;
 // whether the file exists is checked by agent install, which reads it.
 func (c *Config) buildAgent(r rawAgent) error {
-	c.Agent = Agent{Set: r.Targets != nil || r.Notes != nil, Targets: []string{AgentClaude}}
+	c.Agent = Agent{Set: r.Targets != nil || r.Notes != nil || r.Description != nil, Targets: []string{AgentClaude}}
 	if r.Targets != nil {
 		if err := c.checkList("agent.targets", *r.Targets); err != nil {
 			return err
@@ -232,8 +232,25 @@ func (c *Config) buildAgent(r rawAgent) error {
 			return c.Errorf("agent.notes: %q: separate directories with /", n).WithFix(fix)
 		case !filepath.IsLocal(filepath.FromSlash(n)) || path.Clean(n) != n:
 			return c.Errorf("agent.notes: %q is not a clean path inside the repository", n).WithFix(fix)
+		case strings.EqualFold(strings.Split(n, "/")[0], ".git"):
+			return c.Errorf("agent.notes: %q is inside .git", n).WithFix(fix)
+		}
+		for _, a := range agentTargets {
+			if strings.EqualFold(n, agentFiles[a]) {
+				return c.Errorf("agent.notes: %q is the file agent install writes for %s", n, a).WithFix(fix)
+			}
 		}
 		c.Agent.Notes = n
+	}
+	if r.Description != nil {
+		d := strings.TrimSpace(*r.Description)
+		switch {
+		case d == "":
+			return c.Errorf("agent.description is empty").WithFix("write when else to load the skill, or remove it")
+		case strings.ContainsAny(d, "\r\n"):
+			return c.Errorf("agent.description must be one line")
+		}
+		c.Agent.Description = d
 	}
 	return nil
 }

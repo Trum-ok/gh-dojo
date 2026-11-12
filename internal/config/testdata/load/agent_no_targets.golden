@@ -6,7 +6,7 @@ fields.status: "Status"
 statuses: initial="Backlog" final=["Done"] resolved=["Ready" "Done"]
 labels: types=[] area_prefix="area:"
 session: env=[] link="{id}"
-agent: targets=[] notes=""
+agent: targets=[] notes="" description=""
 verb start
   when: You begin working on the issue
   to: "In progress"

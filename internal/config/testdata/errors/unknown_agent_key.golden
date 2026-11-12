@@ -1,2 +1,2 @@
 error: .github/dojo.toml: unknown key agent.target
-allowed: targets, notes
+allowed: targets, notes, description

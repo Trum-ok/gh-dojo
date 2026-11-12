@@ -54,8 +54,9 @@ type rawSession struct {
 }
 
 type rawAgent struct {
-	Targets *[]string `toml:"targets"`
-	Notes   *string   `toml:"notes"`
+	Targets     *[]string `toml:"targets"`
+	Notes       *string   `toml:"notes"`
+	Description *string   `toml:"description"`
 }
 
 type rawVerb struct {
@@ -164,7 +165,7 @@ var (
 	statusesKeys = []string{"initial", "final", "resolved"}
 	labelsKeys   = []string{"types", "area_prefix"}
 	sessionKeys  = []string{"env", "link"}
-	agentKeys    = []string{"targets", "notes"}
+	agentKeys    = []string{"targets", "notes", "description"}
 	verbKeys     = []string{
 		"when", "to", "from", "require", "require_one_of", "comment",
 		"labels", "assign", "close", "reopen", "confirm", "iteration", "field", "blockers", "batch", "disabled",
