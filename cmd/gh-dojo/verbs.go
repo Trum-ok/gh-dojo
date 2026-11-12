@@ -462,7 +462,7 @@ func readPlanItem(ctx context.Context, be Backend, e *workflow.Engine, v config.
 	if len(reads) != 1 {
 		return nil, render.Internal("read %d issues for %s", len(reads), ref.String(issue.Repo{}))
 	}
-	it := &batchItem{ref: ref}
+	it := &batchItem{ref: reads[0].Ref}
 	if r := reads[0]; r.Err != nil {
 		it.fail(r.Err)
 	} else if p, err := e.Plan(v, r.Issue, args); err != nil {

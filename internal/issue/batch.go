@@ -32,7 +32,7 @@ const (
 
 // Result is one issue read by ReadAll: its card, or why it was not read.
 type Result struct {
-	Repo   Repo
+	Repo   Repo // as GitHub spells it when the card was read
 	Number int
 	Card   *Card // nil when Err is set
 	// Err is a *render.Error about this issue alone (exit code 3), and
@@ -117,6 +117,9 @@ func readEach(ctx context.Context, q graph.Querier, req Request, refs []Ref) ([]
 		r.Repo, r.Number = ref.Repo, ref.Number
 		card, err := Read(ctx, q, r)
 		res := Result{Repo: ref.Repo, Number: ref.Number, Card: card, Err: err}
+		if card != nil {
+			res.Repo = card.Repo // as GitHub spells it
+		}
 		if err != nil {
 			switch render.FromError(err).What {
 			case notFound(r).What:
@@ -215,6 +218,7 @@ func readBatch(ctx context.Context, q graph.Querier, req Request, refs []Ref) ([
 				out[i].Card = node.card(r, errs.hidden[alias])
 				out[i].Card.Incomplete = len(errs.hidden[alias]) > 0
 				out[i].Card.Found = found
+				out[i].Repo = out[i].Card.Repo
 			}
 		}
 	}

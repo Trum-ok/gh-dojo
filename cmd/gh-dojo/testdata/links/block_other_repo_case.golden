@@ -1,0 +1,4 @@
+code: 0
+--- stdout
+{"schema_version":1,"error":null,"number":7,"repo":"acme/api","action":"block","changed":[],"unchanged":["Trum-ok/gh-dojo#3","acme/api#8"],"missed":[]}
+--- stderr

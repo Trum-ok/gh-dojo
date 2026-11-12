@@ -2,6 +2,7 @@ package issue_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -86,6 +87,49 @@ func TestReadRefsRepos(t *testing.T) {
 	}
 	if res[3].Cause != issue.CausePullRequest || res[3].Repo != cli {
 		t.Errorf("pull request: %+v", res[3])
+	}
+}
+
+// cannedQuerier answers every query with data, as GitHub's "data" object.
+type cannedQuerier struct{ data string }
+
+func (q cannedQuerier) Query(_ context.Context, _ string, _ map[string]any, out any) error {
+	return json.Unmarshal([]byte(q.data), out)
+}
+
+// TestReadRefsLookupPerRepo: labels are looked up in each repository of a
+// batch, and each card gets its own repository's: "blocked" exists in
+// gh-dojo and not in acme/api. A repository written in another case is
+// named as GitHub spells it, from the issue's URL.
+func TestReadRefsLookupPerRepo(t *testing.T) {
+	card := func(n int, url string) string {
+		return fmt.Sprintf(`{"__typename": "Issue", "id": "I_%d", "number": %d, "title": "T", "state": "OPEN", "url": %q,
+			"labels": {"totalCount": 0, "nodes": []}, "assignees": {"totalCount": 0, "nodes": []},
+			"comments": {"totalCount": 0, "nodes": []}, "blockedBy": {"totalCount": 0, "nodes": []},
+			"blocking": {"totalCount": 0, "nodes": []}, "projectItems": {"totalCount": 0, "nodes": []},
+			"timelineItems": {"totalCount": 0, "nodes": []}}`, n, n, url)
+	}
+	q := cannedQuerier{`{
+		"repository": {"i0": ` + card(3, "https://github.com/Trum-ok/gh-dojo/issues/3") + `, "label0": {"id": "LA_dojo", "name": "blocked"}},
+		"r1": {"i1": ` + card(7, "https://github.com/acme/api/issues/7") + `, "i2": ` + card(8, "https://github.com/acme/api/issues/8") + `, "label0": null}
+	}`}
+	req := dojoStatus
+	req.Lookup = issue.Lookup{Labels: []string{"blocked"}}
+	res, err := issue.ReadRefs(context.Background(), q, req,
+		[]issue.Ref{{Number: 3}, {Repo: issue.Repo{Owner: "ACME", Name: "Api"}, Number: 7}, {Repo: issue.Repo{Owner: "acme", Name: "API"}, Number: 8}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := res[0].Card.Found.Labels["blocked"]; got != "LA_dojo" {
+		t.Errorf("gh-dojo#3: label blocked = %q, want LA_dojo", got)
+	}
+	for _, r := range res[1:] {
+		if _, ok := r.Card.Found.Labels["blocked"]; ok {
+			t.Errorf("%s: label blocked found, want missing in acme/api", r.Card.Ref().String(dojo))
+		}
+		if r.Card.Repo.String() != "acme/api" || r.Repo.String() != "acme/api" {
+			t.Errorf("repo = %s, result %s; want acme/api as GitHub spells it", r.Card.Repo, r.Repo)
+		}
 	}
 }
 

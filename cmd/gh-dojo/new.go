@@ -511,7 +511,7 @@ func (r *newRun) result() newResult {
 		Number: r.number, Repo: r.repo.String(), Title: singleLine(title), Created: !r.resumed,
 		Labels: orEmpty(r.labels), Status: orNull(r.status), StatusSet: r.statusSet, Unarchived: r.unarchived,
 		Milestone: r.milestone.json(), MilestoneSet: r.milestoneSet,
-		BlockedBy: refList(r.linked), AlreadyBlockedBy: refList(r.linkedFound),
+		BlockedBy: refList(r.linked, r.def), AlreadyBlockedBy: refList(r.linkedFound, r.def),
 	}
 }
 

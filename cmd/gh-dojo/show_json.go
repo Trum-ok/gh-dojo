@@ -274,10 +274,8 @@ func (v cardView) boardJSON(c *issue.Card) showBoard {
 func (v cardView) linksJSON(c *issue.Card, links []issue.Link) []showLink {
 	out := []showLink{}
 	for _, l := range links {
-		repo := l.Repo
-		if repo == (issue.Repo{}) {
-			repo = c.Repo
-		}
+		// The default repository as the config spells it.
+		repo := issue.Ref{Repo: l.Repo, Number: l.Number}.In(c.Repo).In(v.def).Repo
 		out = append(out, showLink{
 			Ref: fullRef(issue.Ref{Repo: repo, Number: l.Number}), Repo: repo.String(), Number: l.Number, Title: singleLine(l.Title),
 			State: strings.ToLower(l.State), OnBoard: l.OnBoard, Status: orNull(l.Status), Archived: l.Archived,

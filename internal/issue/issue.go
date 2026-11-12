@@ -497,9 +497,13 @@ func withheld(hidden [][]any, prefix ...any) bool {
 }
 
 func (n *issueJSON) card(req Request, hidden [][]any) *Card {
+	repo := req.Repo
+	if m := urlRefRE.FindStringSubmatch(n.URL); m != nil {
+		repo = canonical(repo, m[2]) // as GitHub spells it
+	}
 	c := &Card{
 		ID:          n.ID,
-		Repo:        req.Repo,
+		Repo:        repo,
 		Number:      n.Number,
 		Title:       n.Title,
 		State:       n.State,

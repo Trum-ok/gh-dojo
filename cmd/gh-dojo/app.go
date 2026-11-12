@@ -169,7 +169,17 @@ func (a *App) cards(ctx context.Context, refs []issue.Ref, comments int, lookup 
 	if f, err := s.Field(req.StatusField); err == nil { // Schema checked it
 		req.StatusFieldID = f.ID
 	}
-	return issue.ReadRefs(ctx, a.Client, req, refs)
+	res, err := issue.ReadRefs(ctx, a.Client, req, refs)
+	for i := range res {
+		// The default repository as the config spells it, the others as
+		// GitHub does.
+		r := issue.Ref{Repo: res[i].Repo, Number: res[i].Number}.In(repo)
+		res[i].Repo = r.Repo
+		if res[i].Card != nil {
+			res[i].Card.Repo = r.Repo
+		}
+	}
+	return res, err
 }
 
 // workflowIssue is the state workflow plans with. Ref keeps the card, so an

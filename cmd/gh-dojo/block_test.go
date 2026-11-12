@@ -61,6 +61,9 @@ func TestBlockOtherRepo(t *testing.T) {
 		runs{[]string{"block", "acme/api#7", "--by", "3,acme/api#8"}, render.ExitOK, 2, "block_other_repo"},
 		runs{[]string{"block", "https://github.com/acme/api/issues/7", "--by", "Trum-ok/gh-dojo#3", "--by", "acme/api#8", "--json"},
 			render.ExitOK, 1, "block_other_repo_json"},
+		// Written in other cases: named as GitHub and the config spell them.
+		runs{[]string{"block", "ACME/Api#7", "--by", "trum-ok/GH-dojo#3,Acme/API#8", "--json"},
+			render.ExitOK, 1, "block_other_repo_case"},
 	)
 }
 

@@ -163,11 +163,12 @@ func runLinks(cmd *cobra.Command, add bool, ref issue.Ref, bys []string) (*links
 	if len(refs) == 0 {
 		return nil, noBy() // --by "" or --by ","
 	}
-	name := ref.String(repo)
 	target, links, err := issue.ReadLinks(ctx, a.Client, ref.Repo, ref.Number, repo, refs, "--"+byFlag)
 	if err != nil {
 		return nil, err
 	}
+	ref.Repo = issue.Ref{Repo: target.Repo, Number: ref.Number}.In(repo).Repo // as GitHub or the config spells it
+	name := ref.String(repo)
 	var change, same []*issue.Linked
 	for _, l := range links {
 		if l.ID == target.ID {
@@ -188,7 +189,7 @@ func runLinks(cmd *cobra.Command, add bool, ref issue.Ref, bys []string) (*links
 	result := func(done, missed []*issue.Linked, err error) *linksResult {
 		return &linksResult{
 			Number: ref.Number, Repo: ref.Repo.String(), Action: cmd.Name(),
-			Changed: refList(done), Unchanged: refList(same), Missed: refList(missed),
+			Changed: refList(done, repo), Unchanged: refList(same, repo), Missed: refList(missed, repo),
 			line: line(done), err: err,
 		}
 	}
@@ -271,11 +272,12 @@ func (r *linksResult) write(w io.Writer) {
 	}
 }
 
-// refList is the refs of links for the JSON, in full: "owner/name#12".
-func refList(links []*issue.Linked) []string {
+// refList is the refs of links for the JSON, in full: "owner/name#12",
+// the default repository def as the config spells it.
+func refList(links []*issue.Linked, def issue.Repo) []string {
 	out := []string{}
 	for _, l := range links {
-		out = append(out, fullRef(l.Ref))
+		out = append(out, fullRef(l.Ref.In(def)))
 	}
 	return out
 }

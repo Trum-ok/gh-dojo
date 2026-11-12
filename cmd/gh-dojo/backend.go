@@ -96,6 +96,7 @@ func (b *githubBackend) ReadIssues(ctx context.Context, v config.Verb, refs []is
 			r.Err = res.Err
 			continue
 		}
+		r.Ref = res.Card.Ref() // as GitHub or the config spells it
 		is, failed, err := b.workflowIssue(ctx, v, lookup, res.Card, def)
 		if err != nil {
 			return nil, err

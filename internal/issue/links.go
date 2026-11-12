@@ -100,12 +100,22 @@ func (r Ref) String(def Repo) string {
 func (r Ref) Arg(def Repo) string { return strings.TrimPrefix(r.String(def), "#") }
 
 // In returns r with def as its repository when it names none, as a bare
-// number does.
+// number does, or names def in another case: def is spelled as the config
+// spells it.
 func (r Ref) In(def Repo) Ref {
-	if r.Repo == (Repo{}) {
+	if r.Repo == (Repo{}) || sameRepo(r.Repo, def) {
 		r.Repo = def
 	}
 	return r
+}
+
+// canonical is repo as GitHub spells it, "owner/name" from an answer,
+// when that names the same repository; else repo.
+func canonical(repo Repo, spelled string) Repo {
+	if r, err := ParseRepo(spelled); err == nil && sameRepo(r, repo) {
+		return r
+	}
+	return repo
 }
 
 // Same reports whether r and o name the same issue.
@@ -177,12 +187,13 @@ func (ls Links) Decls() string {
 }
 
 // Fields returns the top-level fields that read the links, one per line,
-// indented by two spaces.
+// indented by two spaces. nameWithOwner gives the repository as GitHub
+// spells it, whatever case the ref was written in.
 func (ls Links) Fields() string {
 	var b strings.Builder
 	for i := range ls {
 		a := linkAlias(i)
-		fmt.Fprintf(&b, "  %s: repository(owner: $%sOwner, name: $%sRepo) {\n"+
+		fmt.Fprintf(&b, "  %s: repository(owner: $%sOwner, name: $%sRepo) {\n    nameWithOwner\n"+
 			"    issueOrPullRequest(number: $%sNumber) { __typename ... on Issue { id title state "+
 			"blocking(first: %d) { nodes { id } } blockedBy(first: %d) { nodes { id } } } }\n  }\n",
 			a, a, a, a, BlockingWindow, BlockingWindow)
@@ -199,7 +210,8 @@ func (ls Links) AddVars(vars map[string]any) {
 }
 
 // Decode returns the links read from the "data" object of a response, in
-// order. A link whose field is null or absent is Missing.
+// order, each Ref's repository as GitHub spells it. A link whose field is
+// null or absent is Missing.
 func (ls Links) Decode(data map[string]json.RawMessage) ([]*Linked, error) {
 	out := make([]*Linked, len(ls))
 	for i, r := range ls {
@@ -210,7 +222,8 @@ func (ls Links) Decode(data map[string]json.RawMessage) ([]*Linked, error) {
 			continue
 		}
 		var v *struct {
-			Issue *struct {
+			NameWithOwner string `json:"nameWithOwner"`
+			Issue         *struct {
 				Typename  string  `json:"__typename"`
 				ID        string  `json:"id"`
 				Title     string  `json:"title"`
@@ -221,6 +234,9 @@ func (ls Links) Decode(data map[string]json.RawMessage) ([]*Linked, error) {
 		}
 		if err := json.Unmarshal(raw, &v); err != nil {
 			return nil, err
+		}
+		if v != nil {
+			l.Ref.Repo = canonical(l.Ref.Repo, v.NameWithOwner)
 		}
 		if v == nil || v.Issue == nil {
 			continue
@@ -352,6 +368,7 @@ const (
 	linksHead   = `query IssueLinks($owner: String!, $repo: String!, $number: Int!`
 	linksTarget = `) {
   repository(owner: $owner, name: $repo) {
+    nameWithOwner
     issueOrPullRequest(number: $number) { __typename ... on Issue { id title blockedBy(first: 50) { nodes { id } } } }
   }
 `
@@ -377,7 +394,8 @@ func ReadLinks(ctx context.Context, q graph.Querier, repo Repo, number int, def 
 	err := q.Query(ctx, query, vars, &data)
 	var resp struct {
 		Repository *struct {
-			Issue *struct {
+			NameWithOwner string `json:"nameWithOwner"`
+			Issue         *struct {
 				Typename  string  `json:"__typename"`
 				ID        string  `json:"id"`
 				Title     string  `json:"title"`
@@ -415,7 +433,8 @@ func ReadLinks(ctx context.Context, q graph.Querier, repo Repo, number int, def 
 		return nil, nil, err
 	}
 	is := resp.Repository.Issue
-	t := &Target{Repo: repo, Number: number, ID: is.ID, Title: is.Title, blockedBy: is.BlockedBy.ids()}
+	t := &Target{Repo: canonical(repo, resp.Repository.NameWithOwner), Number: number, ID: is.ID, Title: is.Title,
+		blockedBy: is.BlockedBy.ids()}
 	return t, links, nil
 }
 

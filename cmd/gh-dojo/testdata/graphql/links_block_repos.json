@@ -1,10 +1,10 @@
 {
-  "comment": "Hand-crafted in the shape of links_block.json: issue #7 of acme/api, a repository outside board.repos, blocked by acme/api#8 already; Trum-ok/gh-dojo#3 is read as recorded in links_3.json. Mutations are never sent to GitHub. gh dojo block acme/api#7 --by 3,acme/api#8: one read and one mutation link #3 (of the default repository); the repeat finds both linked.",
+  "comment": "Hand-crafted in the shape of links_block.json: issue #7 of acme/api, a repository outside board.repos, blocked by acme/api#8 already; Trum-ok/gh-dojo#3 is read as recorded in links_3.json. Mutations are never sent to GitHub. gh dojo block acme/api#7 --by 3,acme/api#8: one read and one mutation link #3 (of the default repository); the repeat finds both linked. A third run writes the repositories in other cases (ACME/Api#7 --by trum-ok/GH-dojo#3,Acme/API#8): GitHub answers with nameWithOwner, and the output names them as GitHub and the config spell them.",
   "handcrafted": true,
   "interactions": [
     {
       "operation": "IssueLinks",
-      "query": "query IssueLinks($owner: String!, $repo: String!, $number: Int!, $link0Owner: String!, $link0Repo: String!, $link0Number: Int!, $link1Owner: String!, $link1Repo: String!, $link1Number: Int!) {\n  repository(owner: $owner, name: $repo) {\n    issueOrPullRequest(number: $number) { __typename ... on Issue { id title blockedBy(first: 50) { nodes { id } } } }\n  }\n  link0: repository(owner: $link0Owner, name: $link0Repo) {\n    issueOrPullRequest(number: $link0Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } } }\n  }\n  link1: repository(owner: $link1Owner, name: $link1Repo) {\n    issueOrPullRequest(number: $link1Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } } }\n  }\n}",
+      "query": "query IssueLinks($owner: String!, $repo: String!, $number: Int!, $link0Owner: String!, $link0Repo: String!, $link0Number: Int!, $link1Owner: String!, $link1Repo: String!, $link1Number: Int!) {\n  repository(owner: $owner, name: $repo) {\n    nameWithOwner\n    issueOrPullRequest(number: $number) { __typename ... on Issue { id title blockedBy(first: 50) { nodes { id } } } }\n  }\n  link0: repository(owner: $link0Owner, name: $link0Repo) {\n    nameWithOwner\n    issueOrPullRequest(number: $link0Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } } }\n  }\n  link1: repository(owner: $link1Owner, name: $link1Repo) {\n    nameWithOwner\n    issueOrPullRequest(number: $link1Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } } }\n  }\n}",
       "variables": {
         "owner": "acme",
         "repo": "api",
@@ -19,6 +19,7 @@
       "response": {
         "data": {
           "repository": {
+            "nameWithOwner": "acme/api",
             "issueOrPullRequest": {
               "__typename": "Issue",
               "id": "I_acmeapi0007",
@@ -33,6 +34,7 @@
             }
           },
           "link0": {
+            "nameWithOwner": "Trum-ok/gh-dojo",
             "issueOrPullRequest": {
               "__typename": "Issue",
               "id": "I_kwDOVq9iIs8AAAABeZKr9A",
@@ -51,6 +53,7 @@
             }
           },
           "link1": {
+            "nameWithOwner": "acme/api",
             "issueOrPullRequest": {
               "__typename": "Issue",
               "id": "I_acmeapi0008",
@@ -90,7 +93,7 @@
     },
     {
       "operation": "IssueLinks",
-      "query": "query IssueLinks($owner: String!, $repo: String!, $number: Int!, $link0Owner: String!, $link0Repo: String!, $link0Number: Int!, $link1Owner: String!, $link1Repo: String!, $link1Number: Int!) {\n  repository(owner: $owner, name: $repo) {\n    issueOrPullRequest(number: $number) { __typename ... on Issue { id title blockedBy(first: 50) { nodes { id } } } }\n  }\n  link0: repository(owner: $link0Owner, name: $link0Repo) {\n    issueOrPullRequest(number: $link0Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } } }\n  }\n  link1: repository(owner: $link1Owner, name: $link1Repo) {\n    issueOrPullRequest(number: $link1Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } } }\n  }\n}",
+      "query": "query IssueLinks($owner: String!, $repo: String!, $number: Int!, $link0Owner: String!, $link0Repo: String!, $link0Number: Int!, $link1Owner: String!, $link1Repo: String!, $link1Number: Int!) {\n  repository(owner: $owner, name: $repo) {\n    nameWithOwner\n    issueOrPullRequest(number: $number) { __typename ... on Issue { id title blockedBy(first: 50) { nodes { id } } } }\n  }\n  link0: repository(owner: $link0Owner, name: $link0Repo) {\n    nameWithOwner\n    issueOrPullRequest(number: $link0Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } } }\n  }\n  link1: repository(owner: $link1Owner, name: $link1Repo) {\n    nameWithOwner\n    issueOrPullRequest(number: $link1Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } } }\n  }\n}",
       "variables": {
         "owner": "acme",
         "repo": "api",
@@ -105,6 +108,7 @@
       "response": {
         "data": {
           "repository": {
+            "nameWithOwner": "acme/api",
             "issueOrPullRequest": {
               "__typename": "Issue",
               "id": "I_acmeapi0007",
@@ -122,6 +126,7 @@
             }
           },
           "link0": {
+            "nameWithOwner": "Trum-ok/gh-dojo",
             "issueOrPullRequest": {
               "__typename": "Issue",
               "id": "I_kwDOVq9iIs8AAAABeZKr9A",
@@ -140,6 +145,82 @@
             }
           },
           "link1": {
+            "nameWithOwner": "acme/api",
+            "issueOrPullRequest": {
+              "__typename": "Issue",
+              "id": "I_acmeapi0008",
+              "title": "Export endpoint",
+              "state": "OPEN",
+              "blocking": {
+                "nodes": [
+                  {
+                    "id": "I_acmeapi0007"
+                  }
+                ]
+              },
+              "blockedBy": {
+                "nodes": []
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "IssueLinks",
+      "query": "query IssueLinks($owner: String!, $repo: String!, $number: Int!, $link0Owner: String!, $link0Repo: String!, $link0Number: Int!, $link1Owner: String!, $link1Repo: String!, $link1Number: Int!) {\n  repository(owner: $owner, name: $repo) {\n    nameWithOwner\n    issueOrPullRequest(number: $number) { __typename ... on Issue { id title blockedBy(first: 50) { nodes { id } } } }\n  }\n  link0: repository(owner: $link0Owner, name: $link0Repo) {\n    nameWithOwner\n    issueOrPullRequest(number: $link0Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } } }\n  }\n  link1: repository(owner: $link1Owner, name: $link1Repo) {\n    nameWithOwner\n    issueOrPullRequest(number: $link1Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } } }\n  }\n}",
+      "variables": {
+        "owner": "ACME",
+        "repo": "Api",
+        "number": 7,
+        "link0Owner": "trum-ok",
+        "link0Repo": "GH-dojo",
+        "link0Number": 3,
+        "link1Owner": "Acme",
+        "link1Repo": "API",
+        "link1Number": 8
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "nameWithOwner": "acme/api",
+            "issueOrPullRequest": {
+              "__typename": "Issue",
+              "id": "I_acmeapi0007",
+              "title": "Rate limit the export",
+              "blockedBy": {
+                "nodes": [
+                  {
+                    "id": "I_acmeapi0008"
+                  },
+                  {
+                    "id": "I_kwDOVq9iIs8AAAABeZKr9A"
+                  }
+                ]
+              }
+            }
+          },
+          "link0": {
+            "nameWithOwner": "Trum-ok/gh-dojo",
+            "issueOrPullRequest": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8AAAABeZKr9A",
+              "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)",
+              "state": "OPEN",
+              "blocking": {
+                "nodes": []
+              },
+              "blockedBy": {
+                "nodes": [
+                  {
+                    "id": "I_kwDOVq9iIs8AAAABeZKieQ"
+                  }
+                ]
+              }
+            }
+          },
+          "link1": {
+            "nameWithOwner": "acme/api",
             "issueOrPullRequest": {
               "__typename": "Issue",
               "id": "I_acmeapi0008",

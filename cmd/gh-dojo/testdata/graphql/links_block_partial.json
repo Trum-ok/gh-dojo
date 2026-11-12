@@ -4,7 +4,7 @@
   "interactions": [
     {
       "operation": "IssueLinks",
-      "query": "query IssueLinks($owner: String!, $repo: String!, $number: Int!, $link0Owner: String!, $link0Repo: String!, $link0Number: Int!, $link1Owner: String!, $link1Repo: String!, $link1Number: Int!) {\n  repository(owner: $owner, name: $repo) {\n    issueOrPullRequest(number: $number) { __typename ... on Issue { id title blockedBy(first: 50) { nodes { id } } } }\n  }\n  link0: repository(owner: $link0Owner, name: $link0Repo) {\n    issueOrPullRequest(number: $link0Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } } }\n  }\n  link1: repository(owner: $link1Owner, name: $link1Repo) {\n    issueOrPullRequest(number: $link1Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } } }\n  }\n}",
+      "query": "query IssueLinks($owner: String!, $repo: String!, $number: Int!, $link0Owner: String!, $link0Repo: String!, $link0Number: Int!, $link1Owner: String!, $link1Repo: String!, $link1Number: Int!) {\n  repository(owner: $owner, name: $repo) {\n    nameWithOwner\n    issueOrPullRequest(number: $number) { __typename ... on Issue { id title blockedBy(first: 50) { nodes { id } } } }\n  }\n  link0: repository(owner: $link0Owner, name: $link0Repo) {\n    nameWithOwner\n    issueOrPullRequest(number: $link0Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } } }\n  }\n  link1: repository(owner: $link1Owner, name: $link1Repo) {\n    nameWithOwner\n    issueOrPullRequest(number: $link1Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } } }\n  }\n}",
       "variables": {
         "link0Number": 2,
         "link0Owner": "Trum-ok",
@@ -19,6 +19,7 @@
       "response": {
         "data": {
           "repository": {
+            "nameWithOwner": "Trum-ok/gh-dojo",
             "issueOrPullRequest": {
               "__typename": "Issue",
               "id": "I_kwDOVq9iIs8AAAABeZKr9A",
@@ -29,6 +30,7 @@
             }
           },
           "link0": {
+            "nameWithOwner": "Trum-ok/gh-dojo",
             "issueOrPullRequest": {
               "__typename": "Issue",
               "id": "I_kwDOVq9iIs8AAAABeZKieQ",
@@ -59,6 +61,7 @@
             }
           },
           "link1": {
+            "nameWithOwner": "Trum-ok/gh-dojo",
             "issueOrPullRequest": {
               "__typename": "Issue",
               "id": "I_kwDOVq9iIs8AAAABeb-QYw",
@@ -114,7 +117,7 @@
     },
     {
       "operation": "IssueLinks",
-      "query": "query IssueLinks($owner: String!, $repo: String!, $number: Int!, $link0Owner: String!, $link0Repo: String!, $link0Number: Int!, $link1Owner: String!, $link1Repo: String!, $link1Number: Int!) {\n  repository(owner: $owner, name: $repo) {\n    issueOrPullRequest(number: $number) { __typename ... on Issue { id title blockedBy(first: 50) { nodes { id } } } }\n  }\n  link0: repository(owner: $link0Owner, name: $link0Repo) {\n    issueOrPullRequest(number: $link0Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } } }\n  }\n  link1: repository(owner: $link1Owner, name: $link1Repo) {\n    issueOrPullRequest(number: $link1Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } } }\n  }\n}",
+      "query": "query IssueLinks($owner: String!, $repo: String!, $number: Int!, $link0Owner: String!, $link0Repo: String!, $link0Number: Int!, $link1Owner: String!, $link1Repo: String!, $link1Number: Int!) {\n  repository(owner: $owner, name: $repo) {\n    nameWithOwner\n    issueOrPullRequest(number: $number) { __typename ... on Issue { id title blockedBy(first: 50) { nodes { id } } } }\n  }\n  link0: repository(owner: $link0Owner, name: $link0Repo) {\n    nameWithOwner\n    issueOrPullRequest(number: $link0Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } } }\n  }\n  link1: repository(owner: $link1Owner, name: $link1Repo) {\n    nameWithOwner\n    issueOrPullRequest(number: $link1Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } } }\n  }\n}",
       "variables": {
         "link0Number": 2,
         "link0Owner": "Trum-ok",
@@ -129,6 +132,7 @@
       "response": {
         "data": {
           "repository": {
+            "nameWithOwner": "Trum-ok/gh-dojo",
             "issueOrPullRequest": {
               "__typename": "Issue",
               "id": "I_kwDOVq9iIs8AAAABeZKr9A",
@@ -143,6 +147,7 @@
             }
           },
           "link0": {
+            "nameWithOwner": "Trum-ok/gh-dojo",
             "issueOrPullRequest": {
               "__typename": "Issue",
               "id": "I_kwDOVq9iIs8AAAABeZKieQ",
@@ -176,6 +181,7 @@
             }
           },
           "link1": {
+            "nameWithOwner": "Trum-ok/gh-dojo",
             "issueOrPullRequest": {
               "__typename": "Issue",
               "id": "I_kwDOVq9iIs8AAAABeb-QYw",
