@@ -243,6 +243,38 @@ func TestAgentNotesOutside(t *testing.T) {
 	testutil.Golden(t, "agent/notes_outside", out)
 }
 
+// TestAgentNotesGit refuses notes that lead into .git through a link
+// inside the repository, which the config check cannot see.
+func TestAgentNotesGit(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symbolic links need privileges on Windows")
+	}
+	dir := withRepo(t, dojoConfig+"[agent]\nnotes = \"sub/g/HEAD\"\n", map[string]string{".git/HEAD": "ref\n"})
+	if err := os.MkdirAll(filepath.Join(dir, "sub"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("../.git", filepath.Join(dir, "sub/g")); err != nil {
+		t.Fatal(err)
+	}
+	code, out := runOut("agent", "install")
+	if code != render.ExitUsage {
+		t.Errorf("exit code = %d, want 1", code)
+	}
+	testutil.Golden(t, "agent/notes_git", out)
+}
+
+// TestAgentDescriptionNoSkill: a description too long for the skill is
+// not an error while no skill is written.
+func TestAgentDescriptionNoSkill(t *testing.T) {
+	dir := withRepo(t, dojoConfig+"[agent]\ntargets = [\"agents-md\"]\ndescription = \""+strings.Repeat("Also now. ", 120)+"\"\n", nil)
+	if code, out := runOut("agent", "install"); code != render.ExitOK {
+		t.Fatalf("exit code = %d\n%s", code, out)
+	}
+	if strings.Contains(readRepoFile(t, dir, "AGENTS.md"), "Also now.") {
+		t.Error("the description went into AGENTS.md")
+	}
+}
+
 func TestAgentHelp(t *testing.T) {
 	for name, args := range map[string][]string{"help_agent": {"agent"}, "help_install": {"agent", "install", "--help"}} {
 		code, out := runOut(args...)

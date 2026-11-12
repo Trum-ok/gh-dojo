@@ -51,8 +51,8 @@ gh-dojo:begin to gh-dojo:end are gh-dojo's, and the rest stays byte for
 byte; a file without them gets the section at its end. Marker lines count
 anywhere, code blocks included, so do not quote them in those files. A file
 with CRLF line endings keeps them. A file is written whole through a
-temporary file; a symbolic link is written where it points, which must be
-inside the repository, and so must the notes.
+temporary file; a relative symbolic link is written where it points, which
+must be inside the repository, and so must the notes; absolute links fail.
 
 A repeat with the same config changes nothing and says "up to date".
 --check writes nothing and exits 1 when a file is missing or differs from
@@ -223,15 +223,13 @@ func prepareAgentFiles(cfg *config.Config, cmdRoot *cobra.Command, root *os.Root
 		return nil, err
 	}
 	doc := newAgentDoc(cfg, cmdRoot, notes)
-	skill, err := doc.skill()
-	if err != nil {
-		return nil, err
-	}
 	var files []*agent.File
 	for _, t := range targets {
 		body := doc.section()
-		if !t.Section {
-			body = skill
+		if !t.Section { // only the skill has a description, with its length limit
+			if body, err = doc.skill(); err != nil {
+				return nil, err
+			}
 		}
 		f, err := agent.Prepare(root, t, body, config.FileName)
 		if err != nil {
@@ -311,7 +309,16 @@ func readAgentNotes(cfg *config.Config, root *os.Root) (string, error) {
 	if name == "" {
 		return "", nil
 	}
-	data, err := agent.ReadFile(root, name)
+	// The .git check of the config, again on where links lead.
+	resolved, err := agent.Resolve(root, name)
+	if err != nil {
+		return "", render.Usage("%s: agent.notes: cannot read %s: %v", cfg.Display, name, err).WithCause(err)
+	}
+	if first, _, _ := strings.Cut(resolved, "/"); strings.EqualFold(first, ".git") {
+		return "", render.Usage("%s: agent.notes: %s leads into .git (%s)", cfg.Display, name, resolved).
+			WithFix("point notes at a markdown file of the repository, outside .git")
+	}
+	data, err := agent.ReadFile(root, resolved)
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
 		return "", render.Usage("%s: agent.notes: %s does not exist", cfg.Display, name).

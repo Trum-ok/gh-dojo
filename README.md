@@ -428,10 +428,11 @@ blocks included, so don't quote them in those files. Markers out of order are
 an error, and nothing is written. A file with CRLF line endings keeps them.
 
 Every file is written whole, through a temporary file next to it that is
-renamed over it. Reads and writes stay inside the repository: a symbolic link
-is followed only while it points inside, and the target of a linked file is
-what gets written. `[agent] notes` cannot be under `.git` or be one of the
-files agent install writes.
+renamed over it, with the file's permissions. Reads and writes stay inside
+the repository: only relative symbolic links that point inside it are
+followed (an absolute link is an error), and the target of a linked file is
+what gets written. `[agent] notes` cannot be under `.git`, also through a
+link, or be one of the files agent install writes.
 
 A repeat with the same config writes nothing and prints `up to date` for
 each file. `--check` writes nothing either: a file that is missing, differs

@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: .github/dojo.toml: agent.notes: sub/g/HEAD leads into .git (.git/HEAD)
+fix: point notes at a markdown file of the repository, outside .git

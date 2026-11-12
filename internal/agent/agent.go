@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -249,19 +250,20 @@ func splice(have, section, eol string) (string, error) {
 	return strings.Join(lines[:begin], "") + section + strings.Join(lines[end+1:], ""), nil
 }
 
-// maxLinks is how many symbolic links Write follows to the file it writes.
+// maxLinks is how many symbolic links Resolve follows.
 const maxLinks = 16
 
 // Write writes the wanted content into a temporary file next to the
 // target, then renames it over the target, so a reader never sees half a
-// file. A target that is a symbolic link is written where it points,
-// which must be inside root. Missing directories are created; an existing
+// file. A target reached through relative symbolic links is written where
+// they point (see Resolve). Missing directories are created; an existing
 // file keeps its permissions.
 func (f *File) Write(root *os.Root) error {
-	name, err := resolveLinks(root, filepath.FromSlash(f.Path))
+	resolved, err := Resolve(root, f.Path)
 	if err != nil {
-		return err
+		return render.Usage("cannot write %s: %v", f.Path, err).WithCause(err)
 	}
+	name := filepath.FromSlash(resolved)
 	perm := fs.FileMode(0o644)
 	if info, err := root.Stat(name); err == nil {
 		perm = info.Mode().Perm()
@@ -277,6 +279,9 @@ func (f *File) Write(root *os.Root) error {
 	_, err = w.WriteString(f.Want)
 	if cerr := w.Close(); err == nil {
 		err = cerr
+	}
+	if err == nil { // the umask cut the permissions OpenFile was given
+		err = root.Chmod(tmp, perm)
 	}
 	if err == nil {
 		err = root.Rename(tmp, name)
@@ -300,47 +305,40 @@ func writeError(name string, err error) error {
 	return render.Usage("cannot write %s: %v", name, err).WithCause(err)
 }
 
-// resolveLinks follows name while it is a symbolic link, returning the
-// path, relative to root, of the file it ends at (which may not exist).
-func resolveLinks(root *os.Root, name string) (string, error) {
-	for range maxLinks {
-		info, err := root.Lstat(name)
+// Resolve follows the symbolic links on the slash-separated path name, in
+// every element, and returns the path, relative to root and
+// slash-separated, it leads to (which may not exist). Only relative links
+// that stay inside root are followed: os.Root refuses absolute ones too.
+func Resolve(root *os.Root, name string) (string, error) {
+	parts := strings.Split(path.Clean(name), "/")
+	done, links := ".", 0
+	for len(parts) > 0 {
+		cur := path.Join(done, parts[0])
+		parts = parts[1:]
+		info, err := root.Lstat(filepath.FromSlash(cur))
 		if err != nil || info.Mode()&fs.ModeSymlink == 0 {
-			return name, nil
+			done = cur // a missing element: the rest cannot be a link
+			continue
 		}
-		link, err := root.Readlink(name)
+		if links++; links > maxLinks {
+			return "", errors.New("too many symbolic links")
+		}
+		link, err := root.Readlink(filepath.FromSlash(cur))
 		if err != nil {
-			return "", writeError(filepath.ToSlash(name), err)
+			return "", err
 		}
-		next := filepath.Join(filepath.Dir(name), link)
-		if filepath.IsAbs(link) {
-			next = relTo(root.Name(), link)
+		link = filepath.ToSlash(link)
+		if filepath.IsAbs(link) || path.IsAbs(link) {
+			return "", fmt.Errorf("%s is an absolute symbolic link; only relative ones are followed", cur)
 		}
-		if next == "" || !filepath.IsLocal(next) {
-			return "", render.Usage("cannot write %s: it links to %s, outside the repository",
-				filepath.ToSlash(name), filepath.ToSlash(link))
+		next := path.Join(done, link)
+		if !filepath.IsLocal(filepath.FromSlash(next)) {
+			return "", fmt.Errorf("%s links to %s, outside the repository", cur, link)
 		}
-		name = next
+		parts = append(strings.Split(next, "/"), parts...)
+		done = "."
 	}
-	return "", render.Usage("cannot write %s: too many symbolic links", filepath.ToSlash(name))
-}
-
-// relTo returns target relative to dir, also when dir is reached through
-// symbolic links; "" when it is not inside.
-func relTo(dir, target string) string {
-	for _, d := range []string{dir, evalSymlinks(dir)} {
-		if rel, err := filepath.Rel(d, target); err == nil && filepath.IsLocal(rel) {
-			return rel
-		}
-	}
-	return ""
-}
-
-func evalSymlinks(dir string) string {
-	if d, err := filepath.EvalSymlinks(dir); err == nil {
-		return d
-	}
-	return dir
+	return done, nil
 }
 
 // createTemp creates a new file named after base in dir.

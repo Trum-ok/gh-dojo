@@ -22,8 +22,8 @@ gh-dojo:begin to gh-dojo:end are gh-dojo's, and the rest stays byte for
 byte; a file without them gets the section at its end. Marker lines count
 anywhere, code blocks included, so do not quote them in those files. A file
 with CRLF line endings keeps them. A file is written whole through a
-temporary file; a symbolic link is written where it points, which must be
-inside the repository, and so must the notes.
+temporary file; a relative symbolic link is written where it points, which
+must be inside the repository, and so must the notes; absolute links fail.
 
 A repeat with the same config changes nothing and says "up to date".
 --check writes nothing and exits 1 when a file is missing or differs from

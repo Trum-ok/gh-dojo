@@ -148,11 +148,12 @@ func TestWriteKeepsMode(t *testing.T) {
 	}
 	dir, root := openRoot(t)
 	writeFile(t, dir, "AGENTS.md", "x\n")
-	if err := os.Chmod(filepath.Join(dir, "AGENTS.md"), 0o600); err != nil {
+	// 0664: the umask (022 as a rule) would cut the group's write bit.
+	if err := os.Chmod(filepath.Join(dir, "AGENTS.md"), 0o664); err != nil {
 		t.Fatal(err)
 	}
 	prepareWrite(t, root, config.AgentAgentsMD, "new\n")
-	if info, err := os.Stat(filepath.Join(dir, "AGENTS.md")); err != nil || info.Mode().Perm() != 0o600 {
+	if info, err := os.Stat(filepath.Join(dir, "AGENTS.md")); err != nil || info.Mode().Perm() != 0o664 {
 		t.Errorf("mode after the write: %v %v", info.Mode(), err)
 	}
 }
@@ -196,11 +197,63 @@ func TestSymlinks(t *testing.T) {
 		t.Errorf("read through a link out of the repository: %v", err)
 	}
 	f := &File{Target: skill, Want: "x\n"}
-	if err := f.Write(root); err == nil || !strings.Contains(err.Error(), "outside the repository") {
-		t.Errorf("wrote through a link out of the repository: %v", err)
+	if err := f.Write(root); err == nil || !strings.Contains(err.Error(), "absolute symbolic link") {
+		t.Errorf("wrote through an absolute link: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(outside, "SKILL.md")); err == nil {
 		t.Error("a file was written outside the repository")
+	}
+
+	// An absolute link is refused even when it points inside.
+	copilot, _ := TargetOf(config.AgentCopilot)
+	if err := os.MkdirAll(filepath.Join(dir, ".github"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(dir, "docs/agents.md"), filepath.Join(dir, ".github/copilot-instructions.md")); err != nil {
+		t.Fatal(err)
+	}
+	f = &File{Target: copilot, Want: "x\n"}
+	if err := f.Write(root); err == nil || !strings.Contains(err.Error(), "absolute symbolic link") {
+		t.Errorf("wrote through an absolute link inside: %v", err)
+	}
+
+	// A relative link out of the repository.
+	if err := os.Remove(filepath.Join(dir, "AGENTS.md")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("../elsewhere.md", filepath.Join(dir, "AGENTS.md")); err != nil {
+		t.Fatal(err)
+	}
+	agents, _ := TargetOf(config.AgentAgentsMD)
+	f = &File{Target: agents, Want: "x\n"}
+	if err := f.Write(root); err == nil || !strings.Contains(err.Error(), "outside the repository") {
+		t.Errorf("wrote through a relative link out of the repository: %v", err)
+	}
+}
+
+// TestResolve follows links in every element of a path.
+func TestResolve(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symbolic links need privileges on Windows")
+	}
+	dir, root := openRoot(t)
+	writeFile(t, dir, ".git/HEAD", "ref\n")
+	writeFile(t, dir, "docs/a.md", "a\n")
+	for link, to := range map[string]string{"sub/g": "../.git", "d": "docs", "d2": "d/../d"} {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(dir, link)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(to, filepath.Join(dir, link)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for name, want := range map[string]string{
+		"sub/g/HEAD": ".git/HEAD", "d/a.md": "docs/a.md", "d2/a.md": "docs/a.md",
+		"docs/new.md": "docs/new.md", "missing/x/y": "missing/x/y",
+	} {
+		if got, err := Resolve(root, name); err != nil || got != want {
+			t.Errorf("Resolve(%s) = %q, %v; want %q", name, got, err, want)
+		}
 	}
 }
 
