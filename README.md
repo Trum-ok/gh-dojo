@@ -1,5 +1,11 @@
 # gh-dojo
 
+[![CI](https://github.com/Trum-ok/gh-dojo/actions/workflows/ci.yml/badge.svg)](https://github.com/Trum-ok/gh-dojo/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Trum-ok/gh-dojo)](https://github.com/Trum-ok/gh-dojo/releases/latest)
+[![Go](https://img.shields.io/github/go-mod/go-version/Trum-ok/gh-dojo)](go.mod)
+[![gh extension](https://img.shields.io/badge/gh-extension-2b3137?logo=github)](https://cli.github.com/manual/gh_extension)
+[![AI-native](https://img.shields.io/badge/AI-native-8a2be2)](#agents)
+
 A [GitHub CLI](https://cli.github.com/) extension that gives AI agents process
 verbs over GitHub Projects v2. An agent runs `gh dojo start 42`, and gh-dojo
 knows the board's fields, statuses and rules from the repository's
