@@ -738,6 +738,12 @@ func TestErrorfAndKeyPath(t *testing.T) {
 	if got := c.KeyPath("board.owner"); got != "board.owner" {
 		t.Errorf("board key: %q", got)
 	}
+	if got := c.FromPreset("labels.area_prefix"); got != "kanban" {
+		t.Errorf("FromPreset(labels.area_prefix) = %q, want kanban", got)
+	}
+	if got := mustLoad(t, presetOnly+"[labels]\narea_prefix = \"area:\"\n").FromPreset("labels.area_prefix"); got != "" {
+		t.Errorf("FromPreset of a key the file sets = %q, want none", got)
+	}
 	e := c.Errorf("%s: unknown status %q", c.KeyPath("verbs.wait.to"), "Waiting").WithAllowed("Backlog", "Done")
 	testutil.Golden(t, "errors/board_check_example", []byte(e.Text()+"\n"))
 }

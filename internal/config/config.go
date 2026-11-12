@@ -488,6 +488,10 @@ func (c *Config) StatusRefs() []StatusRef {
 	return refs
 }
 
+// FromPreset returns the name of the preset that set key, "" when the
+// value comes from the file (or is not set).
+func (c *Config) FromPreset(key string) string { return c.origin[key] }
+
 // KeyPath returns key annotated with the preset that set it, if the value
 // comes from the preset and not from the file:
 // "verbs.start.to (from preset kanban)". A key inside a verb's field table

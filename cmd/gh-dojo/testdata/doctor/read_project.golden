@@ -6,7 +6,6 @@ problem  token    github.com as Trum-ok: the token has read:project but not proj
                   fix: gh auth refresh -s project
 ok       board    Trum-ok/5 "gh-dojo": field Status and 5 statuses match
 ok       repo     Trum-ok/gh-dojo (default): visible, issues enabled
-warn     labels   Trum-ok/gh-dojo: no label starts with labels.area_prefix (from preset kanban) "area:", so gh dojo new --area finds nothing
-                  fix: gh label create "area:<name>" -R Trum-ok/gh-dojo, or set labels.area_prefix = "" in .github/dojo.toml
+ok       labels   Trum-ok/gh-dojo: no area labels (area:…) yet: new --area fails until one exists
 --- stderr
 error: doctor found 1 problem; fix as shown above, then run gh dojo doctor again

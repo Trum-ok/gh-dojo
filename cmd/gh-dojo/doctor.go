@@ -41,7 +41,8 @@ warning is followed by the command that fixes it.
   labels   with labels.types or labels.area_prefix set, in each of those
            repositories: every type label exists (missing: problem, since
            new --type fails; in another case: warn), and how many labels
-           start with the area prefix (none: warn, --area finds nothing)
+           start with the area prefix (none: warn when the config sets the
+           prefix, not a preset, since --area finds nothing)
   sprint   with fields.sprint set: the field is an iteration field and an
            iteration covers today
   verbs    the labels verbs add or remove exist in the default repository,
@@ -549,8 +550,9 @@ func (c *labelsCheck) found(answer json.RawMessage) labelsFound {
 // repository the repo check found broken. A missing type label is a
 // problem: new --type fails on it. One in another case is a warning, since
 // new matches labels without case. No label with the area prefix is a
-// warning: new --area finds nothing, but the prefix may be a preset's that
-// the team does not use.
+// warning when the config sets the prefix (new --area finds nothing), and
+// only a note on the ok line when a preset does: many teams never use the
+// preset's areas.
 func checkRepoLabels(r *doctorReport, cfg *config.Config, c *labelsCheck, rp *doctorRepo) {
 	name := rp.Repo.String()
 	if rp.Err != nil || rp.Found == nil || !rp.Found.HasIssuesEnabled {
@@ -584,11 +586,14 @@ func checkRepoLabels(r *doctorReport, cfg *config.Config, c *labelsCheck, rp *do
 			}
 		}
 		switch {
+		case areas == 0 && cfg.FromPreset("labels.area_prefix") != "":
+			// Presets set a prefix for everyone, and many never use
+			// areas: a warning on every run would be noise.
+			found = append(found, fmt.Sprintf("no area labels (%s…) yet: new --area fails until one exists", c.prefix))
 		case areas == 0:
 			r.warn("labels", fmt.Sprintf("gh label create %q -R %s, or set labels.area_prefix = \"\" in %s",
 				c.prefix+"<name>", name, cfg.Display),
-				"%s: no label starts with %s %q, so gh dojo new --area finds nothing", name,
-				cfg.KeyPath("labels.area_prefix"), c.prefix)
+				"%s: no label starts with labels.area_prefix %q, so gh dojo new --area finds nothing", name, c.prefix)
 		case f.complete:
 			found = append(found, fmt.Sprintf("%s (%s…)", plural(areas, "area label", "area labels"), c.prefix))
 		default:

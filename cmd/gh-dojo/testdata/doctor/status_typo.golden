@@ -10,7 +10,6 @@ problem  board    .github/dojo.toml: verbs.wait.from: unknown status "In Progres
                   allowed: Backlog, Ready, In progress, In review, Waiting, Done
                   fix: edit verbs.wait.from in .github/dojo.toml
 ok       repo     Trum-ok/gh-dojo (default): visible, issues enabled
-warn     labels   Trum-ok/gh-dojo: no label starts with labels.area_prefix (from preset kanban) "area:", so gh dojo new --area finds nothing
-                  fix: gh label create "area:<name>" -R Trum-ok/gh-dojo, or set labels.area_prefix = "" in .github/dojo.toml
+ok       labels   Trum-ok/gh-dojo: no area labels (area:…) yet: new --area fails until one exists
 --- stderr
 error: doctor found 2 problems; fix as shown above, then run gh dojo doctor again

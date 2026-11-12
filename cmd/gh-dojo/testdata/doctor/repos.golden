@@ -9,8 +9,7 @@ problem  repo     Trum-ok/no-such-repo is not found or not visible to this token
                   fix: edit board.repos in .github/dojo.toml
 problem  repo     Trum-ok/wiki has issues disabled
                   fix: gh repo edit Trum-ok/wiki --enable-issues
-warn     labels   Trum-ok/gh-dojo: no label starts with labels.area_prefix (from preset kanban) "area:", so gh dojo new --area finds nothing
-                  fix: gh label create "area:<name>" -R Trum-ok/gh-dojo, or set labels.area_prefix = "" in .github/dojo.toml
+ok       labels   Trum-ok/gh-dojo: no area labels (area:…) yet: new --area fails until one exists
 skip     labels   Trum-ok/no-such-repo: needs the repository (see repo)
 skip     labels   Trum-ok/wiki: needs the repository (see repo)
 --- stderr
