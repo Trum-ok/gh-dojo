@@ -632,6 +632,8 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 	case config.BlockersLink:
 		line("Blockers", "--by naming issues (12, #12, owner/repo#12 or URLs, comma-separated) also marks this one "+
 			"blocked by them; a pull request is only named in the comment")
+		line("", "free text in --by goes into the comment as is: on an issue of another repository,")
+		line("", "GitHub links a #N in it to that issue's repository, not to the default one")
 	}
 	if v.Close != "" {
 		line("Close", "closes the issue as %s; an issue already closed stays as it is", workflow.ReasonText(v.Close))

@@ -149,11 +149,11 @@ func TestReadLinkStatus(t *testing.T) {
 			for _, l := range append(card.BlockedBy.Nodes, card.Blocking.Nodes...) {
 				got := want{l.OnBoard, l.Archived, l.Status, l.StatusUnknown}
 				if got != tt.want {
-					t.Errorf("%s: %+v, want %+v", l.Ref(dojo), got, tt.want)
+					t.Errorf("%s: %+v, want %+v", linkRef(l, dojo), got, tt.want)
 				}
 				// Unknown never resolves an open blocker.
 				if tt.want.unknown != "" && !l.Closed() && l.Resolved([]string{"Ready", "Done", "Urgent"}) {
-					t.Errorf("%s with unknown status is resolved", l.Ref(dojo))
+					t.Errorf("%s with unknown status is resolved", linkRef(l, dojo))
 				}
 			}
 		})
@@ -201,7 +201,7 @@ func TestReadLinkWithheldItems(t *testing.T) {
 	for i, l := range card.BlockedBy.Nodes {
 		wantUnknown := i == 0
 		if (l.StatusUnknown != "") != wantUnknown || l.OnBoard {
-			t.Errorf("%s: on board %v, unknown %q; want unknown %v", l.Ref(dojo), l.OnBoard, l.StatusUnknown, wantUnknown)
+			t.Errorf("%s: on board %v, unknown %q; want unknown %v", linkRef(l, dojo), l.OnBoard, l.StatusUnknown, wantUnknown)
 		}
 	}
 }
@@ -592,14 +592,9 @@ func TestParseRepo(t *testing.T) {
 	}
 }
 
-func TestLinkRef(t *testing.T) {
-	l := issue.Link{Repo: dojo, Number: 7}
-	if got := l.Ref(dojo); got != "#7" {
-		t.Errorf("same repo: %q", got)
-	}
-	if got := l.Ref(issue.Repo{Owner: "acme", Name: "shop"}); got != "Trum-ok/gh-dojo#7" {
-		t.Errorf("other repo: %q", got)
-	}
+// linkRef names a linked issue relative to repo, as the dumps do.
+func linkRef(l issue.Link, repo issue.Repo) string {
+	return issue.Ref{Repo: l.Repo, Number: l.Number}.String(repo)
 }
 
 // dump renders a card for golden files, IDs included: the golden file shows
@@ -630,7 +625,7 @@ func dump(c *issue.Card) []byte {
 	}{{"blocked by", c.BlockedBy.Nodes, c.BlockedBy.TotalCount}, {"blocking", c.Blocking.Nodes, c.Blocking.TotalCount}} {
 		p("%s (%d):", pair.name, pair.n)
 		for _, l := range pair.page {
-			p("  %s %s on board=%v archived=%v status=%q unknown=%q %q", l.Ref(c.Repo), l.State, l.OnBoard, l.Archived, l.Status, l.StatusUnknown, l.Title)
+			p("  %s %s on board=%v archived=%v status=%q unknown=%q %q", linkRef(l, c.Repo), l.State, l.OnBoard, l.Archived, l.Status, l.StatusUnknown, l.Title)
 		}
 	}
 	switch {

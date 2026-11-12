@@ -269,14 +269,6 @@ func (l Link) Resolved(resolved []string) bool {
 	return l.Closed() || l.StatusUnknown == "" && l.Status != "" && slices.Contains(resolved, l.Status)
 }
 
-// Ref returns "#N" for an issue in repo, else "owner/name#N".
-func (l Link) Ref(repo Repo) string {
-	if l.Repo == repo || l.Repo == (Repo{}) {
-		return "#" + strconv.Itoa(l.Number)
-	}
-	return l.Repo.String() + "#" + strconv.Itoa(l.Number)
-}
-
 // Item is the issue's item on the configured board.
 type Item struct {
 	// ID is the project item node ID, for updateProjectV2ItemFieldValue.

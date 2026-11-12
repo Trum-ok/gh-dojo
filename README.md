@@ -147,7 +147,10 @@ other: in a verb, a batch, `show`, `comment`, both sides of `block` and
 `board.repos` is accepted too, since the command names it; a verb adds its
 issue to the board like any other. The text names an issue of the default
 repository `#42` and any other `owner/repo#42`; the JSON names every issue
-in full, `owner/repo#42` ([JSON output](#json-output)). Every command
+in full, `owner/repo#42` ([JSON output](#json-output)). A verb's comment
+names issues as GitHub links them from the issue's own repository
+(`acme/shop#12` on an issue of acme/api), but free text in `--by` goes in
+as is, so a `#12` in it links to the issue's repository. Every command
 prints its usage with `--help` and takes `--json`, `--jq` and `--template`
 ([JSON output](#json-output)). Flags go before a `--`: anything after it is
 an argument.
