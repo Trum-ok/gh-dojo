@@ -57,6 +57,7 @@ Run a verb as `gh dojo <verb> N` (`N`, `#N` or `owner/repo#N`); `--dry-run` prin
 `gh dojo done N`: Ready, In progress → Done; optional --comment; also on closed issues; sprint: the iteration of the day it entered Ready; comments "{comment}"; closes as completed.
 
 - It takes several numbers at once, `gh dojo done 12 13 14`: each issue is checked and written on its own, one that fails is skipped, and a summary names each issue not done. Running the same command again touches only what is left.
+- For a release, `gh dojo release <tag> --verb done --dry-run` lists the issues the release includes (those the merged pull requests of its commits close, or its commit messages name after `close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves`, `resolved`), how each was found and its plan; without `--dry-run` it runs `done` on them as one batch. An issue whose status it does not start from is listed as not ready and left out, not failed: a later release picks it up. The start is the previous version tag; the first release needs `--since <tag or commit>`.
 - It comments only when given `--comment`.
 - An issue closed already stays closed as it is.
 
@@ -126,6 +127,7 @@ gh dojo show 42 --jq '.issues[0].blocked_by[] | select(.resolved | not) | .ref'
 | `gh dojo list` | See what is on the board: one line per open issue, grouped by status |
 | `gh dojo new` | Create an issue with labels, on the board, in the initial status |
 | `gh dojo next` | Find issues to take: initial status, no unresolved blockers, in board order |
+| `gh dojo release` | Apply a verb to the issues a release includes, found through pull requests and commits |
 | `gh dojo show` | Read issues before working on them: board status, blockers, history, description, comments |
 | `gh dojo unblock` | Remove blocked-by links of an issue, without changing its status |
 | `gh dojo <verb>` | The verbs above: start, wait, ready, done, drop |

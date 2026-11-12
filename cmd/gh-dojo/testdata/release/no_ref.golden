@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: release needs the release: a tag, branch or commit, like gh dojo release v0.2.0 --verb done
+fix: gh dojo release --help

@@ -1,0 +1,2 @@
+error: --since abc1234 is not in the history of v0.2.0
+fix: pass a commit, tag or branch that v0.2.0 includes

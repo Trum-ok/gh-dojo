@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -654,5 +655,20 @@ func TestExample(t *testing.T) {
 		if got := Example(v, "7"); got != want {
 			t.Errorf("Example(%s) = %q, want %q", verb, got, want)
 		}
+	}
+}
+
+// TestErrFrom: a refusal for the status alone wraps ErrFrom, which
+// gh dojo release reads as "not ready"; other refusals do not.
+func TestErrFrom(t *testing.T) {
+	e, c := testEngine(t)
+	ready, _ := c.Verb("ready")
+	start, _ := c.Verb("start")
+	if _, err := e.Plan(ready, onBoard("Backlog"), Args{}); !errors.Is(err, ErrFrom) {
+		t.Errorf("ready from Backlog: %v, want ErrFrom", err)
+	}
+	closed := Issue{Number: 42, Closed: true, OnBoard: true, Status: "Backlog"}
+	if _, err := e.Plan(start, closed, Args{}); err == nil || errors.Is(err, ErrFrom) {
+		t.Errorf("start on a closed issue: %v, want a refusal other than ErrFrom", err)
 	}
 }

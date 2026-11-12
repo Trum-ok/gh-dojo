@@ -13,7 +13,7 @@ Verbs:
   wait        Work is stuck: waiting for another issue or an outside decision
               needs --by or --comment; --by N also marks it blocked by #N; comments "Waiting for {by}. {comment}"
   done        The change is released
-              several numbers at once (done 12 13 14); optional --comment; also on closed issues; comments "{comment}"; closes as completed
+              several numbers at once (done 12 13 14) or a release's issues (release <tag> --verb done); optional --comment; also on closed issues; comments "{comment}"; closes as completed
   note        Leave a progress note without moving the issue
               needs --comment; comments "Progress: {comment}"
   park        Put the issue back

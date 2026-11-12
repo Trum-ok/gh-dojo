@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: release takes one tag, branch or commit, got 2
+fix: gh dojo release --help

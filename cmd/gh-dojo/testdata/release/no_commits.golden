@@ -1,0 +1,4 @@
+code: 0
+--- stdout
+release v1.0.0: no commits since v0.9.0, no issues
+--- stderr

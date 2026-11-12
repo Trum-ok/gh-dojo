@@ -69,18 +69,42 @@ func runBatch(cmd *cobra.Command, cfg *config.Config, v config.Verb, refs []issu
 	if !v.Batch { // issueArgs let one number in two forms through
 		return notBatch(cmd, cfg, v, len(refs))
 	}
-	ctx := cmd.Context()
+	b := newBatchRun(cmd, be, cfg, v, args, def)
+	items, err := b.run(cmd.Context(), refs, dryRun)
+	if err != nil {
+		return err
+	}
+	// The text was printed issue by issue as it went; JSON comes at the
+	// end, for every issue, also when the summary is an error.
+	return emitWrite(cmd, verbJSON(v.Name, backendRepo(be), dryRun, items), func(io.Writer) {},
+		b.summary(items, dryRun), slices.ContainsFunc(items, (*batchItem).wrote))
+}
+
+// newBatchRun prepares a run of verb v on several issues through be; def
+// is be's default repository.
+func newBatchRun(cmd *cobra.Command, be Backend, cfg *config.Config, v config.Verb, args workflow.Args, def issue.Repo) *batchRun {
 	b := &batchRun{
 		be: be, engine: workflow.New(cfg), v: v, args: args, json: jsonMode(cmd), def: def,
 		stdout: cmd.OutOrStdout(), stderr: cmd.ErrOrStderr(), warned: map[string]bool{},
 	}
 	b.engine.Getenv = getenv
-	reads, err := be.ReadIssues(ctx, v, refs, args)
+	return b
+}
+
+// run reads the issues refs in one request per issue.MaxBatch, drops those
+// keep refuses, plans the rest, and applies them one by one (printing the
+// plans instead for a dry run). err fails the whole run, with nothing
+// written: the issues could not be read.
+func (b *batchRun) run(ctx context.Context, refs []issue.Ref, dryRun bool) ([]*batchItem, error) {
+	reads, err := b.be.ReadIssues(ctx, b.v, refs, b.args)
 	if err != nil && b.retryStale(err, false) {
-		reads, err = be.ReadIssues(ctx, v, refs, args)
+		reads, err = b.be.ReadIssues(ctx, b.v, refs, b.args)
 	}
 	if err != nil {
-		return err
+		return nil, err
+	}
+	if b.keep != nil {
+		reads = slices.DeleteFunc(reads, func(r IssueRead) bool { return !b.keep(r) })
 	}
 	items := make([]*batchItem, len(reads))
 	for i, r := range reads {
@@ -88,6 +112,9 @@ func runBatch(cmd *cobra.Command, cfg *config.Config, v config.Verb, refs []issu
 		b.plan(items[i], r)
 	}
 	b.replanStale(ctx, items)
+	if b.before != nil {
+		items = b.before(items)
+	}
 	if dryRun {
 		for _, it := range items {
 			if it.err == nil && !b.json {
@@ -97,10 +124,7 @@ func runBatch(cmd *cobra.Command, cfg *config.Config, v config.Verb, refs []issu
 	} else {
 		b.applyAll(ctx, items)
 	}
-	// The text was printed issue by issue as it went; JSON comes at the
-	// end, for every issue, also when the summary is an error.
-	return emitWrite(cmd, verbJSON(v.Name, backendRepo(be), dryRun, items), func(io.Writer) {},
-		b.summary(items, dryRun), slices.ContainsFunc(items, (*batchItem).wrote))
+	return items, nil
 }
 
 // batchRun is one run of a verb on several issues.
@@ -115,6 +139,13 @@ type batchRun struct {
 	warned         map[string]bool // warnings printed, each once per run
 	retried        bool            // the stale-schema retry is spent (retryStale)
 	stop           error           // the error that stopped the writes (graph.AffectsAll)
+	// keep, when set, says which issues read to plan: release leaves out
+	// the pull requests a commit message names.
+	keep func(IssueRead) bool
+	// before, when set, is called with the planned issues before the
+	// first one is printed or written, and returns those to go on with:
+	// release leaves out the issues not ready for the verb.
+	before func(items []*batchItem) []*batchItem
 }
 
 // batchItem is one issue of a batch run.

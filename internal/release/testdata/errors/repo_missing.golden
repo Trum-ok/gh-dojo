@@ -1,0 +1,2 @@
+error: repository Trum-ok/gh-dojo not found, or the token cannot see it
+fix: check board.repos in .github/dojo.toml, or gh auth status

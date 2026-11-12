@@ -12,6 +12,7 @@
 package workflow
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"slices"
@@ -794,8 +795,13 @@ func (e *Engine) checkFrom(v config.Verb, is Issue) error {
 	// never with a command that works around the process.
 	return render.Denied("%s cannot %s %s%s; %s %s\n"+
 		"this is a process rule: ask the user how to proceed",
-		v.Name, action, name, from, allowed, join(v.From, "or"))
+		v.Name, action, name, from, allowed, join(v.From, "or")).WithCause(ErrFrom)
 }
+
+// ErrFrom is the cause of a refusal because the issue's status is not one
+// of the verb's from statuses: test for it with errors.Is. gh dojo release
+// reads it as "not ready yet" rather than as a refusal.
+var ErrFrom = errors.New("status not in from")
 
 // runsOnClosed reports whether v may run on a closed issue: its target
 // status is final, or it closes (a repeat is safe) or reopens the issue.

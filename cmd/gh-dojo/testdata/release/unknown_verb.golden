@@ -1,0 +1,6 @@
+code: 1
+--- stdout
+--- stderr
+error: release --verb ship: no such verb in .github/dojo.toml
+allowed: done
+fix: gh dojo describe

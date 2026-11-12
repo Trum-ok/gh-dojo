@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: "v0.2.0 " is not a tag, branch or commit
+fix: gh dojo release --help

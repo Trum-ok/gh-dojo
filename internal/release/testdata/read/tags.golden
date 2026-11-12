@@ -1,0 +1,11 @@
+repo Trum-ok/gh-dojo, head v0.2.0 (a1a1a1a), since v0.1.0 (b2b2b2b), picked true, compared true, 3 commits
+  1111111 "Add the release command" PR #50 closes [#41 cli/cli#2]
+  1212121 "Fix the summary (#51)" PR #51 closes [#7] PR #53 closes [] PR #54 closes []
+  a1a1a1a "Direct commit"
+warning: pull request #50 closes 30 issues; read the first 2
+warning: commit 1212121 belongs to 6 pull requests; read the first 5
+found #41: PR #50, commit 1111111
+found cli/cli#2: PR #50
+found #7: PR #51
+found #9: commit a1a1a1a
+found #10: commit a1a1a1a

@@ -1,0 +1,95 @@
+{
+  "comment": "Recorded from Trum-ok/gh-dojo (gh dojo release ef93eeb --since 4c40894): the history of ef93eeb, read down to 4c40894.",
+  "interactions": [
+    {
+      "operation": "ReleaseSince",
+      "query": "query ReleaseSince($owner: String!, $repo: String!, $head: String!, $since: String!, $sinceRef: String!) {\n  repository(owner: $owner, name: $repo) {\n    head: object(expression: $head) { oid }\n    since: object(expression: $since) { oid }\n    sinceRef: ref(qualifiedName: $sinceRef) { prefix name }\n  }\n}",
+      "variables": {
+        "head": "ef93eeb^{commit}",
+        "owner": "Trum-ok",
+        "repo": "gh-dojo",
+        "since": "4c40894^{commit}",
+        "sinceRef": "4c40894"
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "head": {
+              "oid": "ef93eeb110b32702c5e0ee366103f8f9dc05a84f"
+            },
+            "since": {
+              "oid": "4c408947b924d7e6c895dd88894e60246a8f510b"
+            },
+            "sinceRef": null
+          }
+        }
+      }
+    },
+    {
+      "operation": "ReleaseHistory",
+      "query": "query ReleaseHistory($owner: String!, $repo: String!, $head: GitObjectID!, $cursor: String) {\n  repository(owner: $owner, name: $repo) {\n    object(oid: $head) {\n      ... on Commit {\n        history(first: 100, after: $cursor) {\n          pageInfo { hasNextPage endCursor }\n          nodes { ...releaseCommit }\n        }\n      }\n    }\n  }\n}\n\nfragment releaseCommit on Commit {\n  oid\n  message\n  associatedPullRequests(first: 5) {\n    totalCount\n    nodes {\n      number\n      merged\n      repository { nameWithOwner }\n      closingIssuesReferences(first: 25) {\n        totalCount\n        nodes { number repository { nameWithOwner } }\n      }\n    }\n  }\n}",
+      "variables": {
+        "cursor": null,
+        "head": "ef93eeb110b32702c5e0ee366103f8f9dc05a84f",
+        "owner": "Trum-ok",
+        "repo": "gh-dojo"
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "object": {
+              "history": {
+                "pageInfo": {
+                  "hasNextPage": false,
+                  "endCursor": "ef93eeb110b32702c5e0ee366103f8f9dc05a84f 4"
+                },
+                "nodes": [
+                  {
+                    "oid": "ef93eeb110b32702c5e0ee366103f8f9dc05a84f",
+                    "message": "Make install safe; stamp the version; tighten CI\n\n- make install links where gh actually keeps extensions\n  (XDG_DATA_HOME or ~/.local/share), not GH_DATA_DIR, which gh ignores\n  for extensions.\n- It checks that INSTALL_DIR ends in gh-dojo before touching anything,\n  only replaces an extension that does not already point at\n  INSTALL_DIR, prints what it removed, and parks the old one aside so it\n  is restored if the install fails.\n- build and install stamp `git describe --always --dirty` into the\n  binary.\n- CI runs on pushes to main and on pull requests only, and checks gofmt\n  and go mod tidy -diff.\n\nRefs #1\nRefs #2",
+                    "associatedPullRequests": {
+                      "totalCount": 0,
+                      "nodes": []
+                    }
+                  },
+                  {
+                    "oid": "bfdee7336d23e140814cd01e93fe8b093c52581b",
+                    "message": "Build commands under recover; reject duplicates and unknown subcommands\n\n- run takes the root constructor and builds it under the deferred\n  recover, so a panic in a constructor is a short internal error.\n- register/registerAll take constructors that return an error; a\n  constructor error (e.g. a broken dojo.toml) is printed through render\n  instead of panicking or being dropped.\n- Two commands with the same name or alias (including \"help\") are a\n  usage error instead of one silently shadowing the other.\n- Command groups reject unknown subcommands with a usage error and\n  print their help without RunE; `gh dojo help <unknown>` fails too.\n- `gh dojo --version` prints the version stamped with -ldflags, \"dev\"\n  when unset.\n- Comment that panics in goroutines are not caught.\n\nRefs #1\nRefs #2",
+                    "associatedPullRequests": {
+                      "totalCount": 0,
+                      "nodes": []
+                    }
+                  },
+                  {
+                    "oid": "c56510fec88d325680da0996e07883a1330e7e75",
+                    "message": "Harden render errors, confirmations and golden updates\n\n- Unknown GraphQL error types print \"GitHub API rejected the request\";\n  the raw message stays only in Cause. Messages mentioning node IDs\n  (PVTF_..., legacy base64 IDs) fall back to generic text.\n- All GraphQL errors are checked: rate limit, then scopes/forbidden,\n  then not found.\n- HTTP 403 with Retry-After or a rate limit message is a rate limit\n  (code 4, no auth fix).\n- context.Canceled maps to code 4; typed-nil *Error is an internal error\n  instead of a crash.\n- Text drops blank lines before the 3-line limit, puts each allowed\n  value on one line, clips at grapheme boundaries (uniseg) and never\n  cuts the fix line (a fix over 400 runes is dropped).\n- New Internal constructor: \"internal error (not your arguments)\" with a\n  side-effect-free fix hint.\n- Confirm(subject, title, effects...) shortens only the title; effects\n  are never cut. Transition handles empty statuses.\n- Golden files are rewritten only via UPDATE_GOLDEN, refused when CI is\n  set.\n- go.mod: go 1.27, uniseg as a direct dependency.\n\nRefs #1\nRefs #2",
+                    "associatedPullRequests": {
+                      "totalCount": 0,
+                      "nodes": []
+                    }
+                  },
+                  {
+                    "oid": "4c408947b924d7e6c895dd88894e60246a8f510b",
+                    "message": "Add internal/render: exit codes, short errors, confirmations, truncation\n\nrender.Error carries an exit code (0-5 as in the spec), what is wrong,\nallowed values and a fix command, and prints as at most 5 lines with no\ntraces or raw GraphQL. FromError maps go-gh HTTP/GraphQL and network\nerrors to codes 3/4 and anything else to a one-line usage error.\n\nThe top-level run() recovers panics into the same short error, silences\ncobra's own output and turns flag, Args and unknown-command errors into\nusage errors (code 1) pointing at --help.\n\nAlso add the confirmation-line, warning and \"showing N of M\" helpers, and\ninternal/testutil.Golden for golden-file tests across packages.\n\nRefs #2",
+                    "associatedPullRequests": {
+                      "totalCount": 0,
+                      "nodes": []
+                    }
+                  },
+                  {
+                    "oid": "c720ec9f9224d8c6cdf5991288d7c6fb41603b2e",
+                    "message": "Add Go module skeleton, cobra root and gh extension install\n\nSet up the gh-dojo module with a cobra root command in cmd/gh-dojo and a\nregistration pattern: each command lives in its own file and registers its\nconstructor from init, so new commands never touch root.go.\n\nmake install builds into ~/.local/share/gh-dojo/gh-dojo and installs the\nextension from there, so the installed gh dojo does not depend on the\nbranch checked out in the working copy. CI runs vet, test and build.\n\nRefs #1",
+                    "associatedPullRequests": {
+                      "totalCount": 0,
+                      "nodes": []
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

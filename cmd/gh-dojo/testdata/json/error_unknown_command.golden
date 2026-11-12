@@ -17,6 +17,7 @@ code: 1
       "new",
       "next",
       "ready",
+      "release",
       "show",
       "start",
       "unblock",
@@ -28,5 +29,5 @@ code: 1
 
 --- stderr
 error: unknown command "nosuch"
-allowed: agent, block, comment, describe, doctor, done, init, list, new, next, ready, show, start, unblock, wait
+allowed: agent, block, comment, describe, doctor, done, init, list, new, next, ready, release, show, start, unblock, wait
 fix: gh dojo --help

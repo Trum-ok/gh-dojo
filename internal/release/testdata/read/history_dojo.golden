@@ -1,0 +1,6 @@
+repo Trum-ok/gh-dojo, head ef93eeb (ef93eeb), since 4c40894 (4c40894), picked false, compared false, 3 commits
+  c56510f "Harden render errors, confirmations and golden updates"
+  bfdee73 "Build commands under recover; reject duplicates and unknown subcommands"
+  ef93eeb "Make install safe; stamp the version; tighten CI"
+found #1: commit c56510f, commit bfdee73, commit ef93eeb
+found #2: commit c56510f, commit bfdee73, commit ef93eeb

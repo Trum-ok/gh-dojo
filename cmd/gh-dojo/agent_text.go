@@ -317,6 +317,9 @@ func (d *agentDoc) rules(v config.Verb) []string {
 		r = append(r, fmt.Sprintf("It takes several numbers at once, `gh dojo %s 12 13 14`: each issue is "+
 			"checked and written on its own, one that fails is skipped, and a summary names each issue not done. "+
 			"Running the same command again touches only what is left.", v.Name))
+		if d.hasCommand("release") {
+			r = append(r, d.releaseRule(v))
+		}
 	}
 	if strings.TrimSpace(v.Comment) == "{"+config.ArgComment+"}" && !slices.Contains(v.Require, config.ArgComment) {
 		r = append(r, "It comments only when given `--comment`.")
@@ -325,6 +328,21 @@ func (d *agentDoc) rules(v config.Verb) []string {
 		r = append(r, "An issue closed already stays closed as it is.")
 	}
 	return r
+}
+
+// releaseRule says how gh dojo release applies batch verb v to the
+// issues of a release, with the keywords of the config.
+func (d *agentDoc) releaseRule(v config.Verb) string {
+	found := "the merged pull requests of its commits close"
+	if k := d.cfg.Release.Keywords; len(k) > 0 {
+		found += ", or its commit messages name after " + strings.Join(quoted(k), ", ")
+	}
+	return fmt.Sprintf("For a release, `gh dojo release <tag> --verb %s --dry-run` lists the issues the release "+
+		"includes (those %s), how each was found and its plan; without `--dry-run` it runs `%s` on them as one "+
+		"batch. An issue whose status it does not start from is listed as not ready and left out, not failed: "+
+		"a later release picks it up. The start is the previous version tag; the first release needs "+
+		"`--since <tag or commit>`.",
+		v.Name, found, v.Name)
 }
 
 // verbsFrom lists the verbs that can start from status s.

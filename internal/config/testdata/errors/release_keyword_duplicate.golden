@@ -1,0 +1,1 @@
+error: .github/dojo.toml: release.keywords lists "Fixes" and "fixes": keywords match regardless of case

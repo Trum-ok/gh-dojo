@@ -77,6 +77,7 @@ type Config struct {
 	Session  Session
 	Verbs    []Verb // preset verbs in preset order, then the repo's own in file order
 	Agent    Agent
+	Release  Release
 
 	origin map[string]string // key path → preset name, for values only the preset set
 }
@@ -236,6 +237,25 @@ type Agent struct {
 	// Description is appended to the generated description of the skill,
 	// which says when an agent loads it; "" for none.
 	Description string
+}
+
+// Release is the [release] table: how gh dojo release links a commit to
+// issues besides the pull requests that merged it.
+type Release struct {
+	// Keywords are the words that, followed by issue references in a
+	// commit message ("Fixes #12", "refs: owner/repo#3, #4"), link the
+	// commit to those issues; matched whole and regardless of case.
+	// DefaultKeywords when not set; empty when set to [], which leaves
+	// only the pull requests' closing references.
+	Keywords []string
+}
+
+// DefaultKeywords are GitHub's closing keywords: a commit message that says
+// an issue is done, not one that only mentions it ("Refs #12"), which a
+// project adds to [release] keywords when it commits without pull
+// requests.
+func DefaultKeywords() []string {
+	return []string{"close", "closes", "closed", "fix", "fixes", "fixed", "resolve", "resolves", "resolved"}
 }
 
 // Labels maps `new` flags to label names.

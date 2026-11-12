@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -124,6 +125,9 @@ func dump(c *Config) string {
 	if c.Agent.Set { // left out otherwise: the default is always ["claude"]
 		w("agent: targets=%q notes=%q description=%q", c.Agent.Targets, c.Agent.Notes, c.Agent.Description)
 	}
+	if !slices.Equal(c.Release.Keywords, DefaultKeywords()) { // left out for the default
+		w("release: keywords=%q", c.Release.Keywords)
+	}
 	for _, v := range c.Verbs {
 		w("verb %s", v.Name)
 		w("  when: %s", v.When)
@@ -187,6 +191,8 @@ iteration = "current"
 `},
 		{"agent", presetOnly + "[agent]\ntargets = [\"agents-md\", \"claude\"]\nnotes = \"docs/agent-notes.md\"\n"},
 		{"agent_no_targets", presetOnly + "[agent]\ntargets = []\n"},
+		{"release_keywords", presetOnly + "[release]\nkeywords = [\"Closes\", \"fixes\", \"refs\", \"part of\"]\n"},
+		{"release_no_keywords", presetOnly + "[release]\nkeywords = []\n"},
 		{"agent_description", presetOnly + "[agent]\ndescription = \" Also when gh-dojo itself gets in the way. \"\n"},
 		{"blockers_off", presetOnly + "[verbs.wait]\nblockers = false\n"},
 		{"blockers_deny", presetOnly + "[verbs.start]\nblockers = \"deny\"\n[verbs.wait]\nblockers = \"warn\"\n"},
@@ -465,6 +471,12 @@ func TestLoadErrors(t *testing.T) {
 		{"agent_notes_target", presetOnly + "[agent]\nnotes = \"agents.md\"\n"},
 		{"agent_description_empty", presetOnly + "[agent]\ndescription = \"  \"\n"},
 		{"agent_description_lines", presetOnly + "[agent]\ndescription = \"\"\"\nOne.\nTwo.\"\"\"\n"},
+		{"unknown_release_key", presetOnly + "[release]\npattern = \"Refs\"\n"},
+		{"release_not_table", "release = \"refs\"\n" + presetOnly},
+		{"release_keywords_not_list", presetOnly + "[release]\nkeywords = \"refs\"\n"},
+		{"release_keyword_empty", presetOnly + "[release]\nkeywords = [\"refs\", \"\"]\n"},
+		{"release_keyword_not_word", presetOnly + "[release]\nkeywords = [\"refs:\"]\n"},
+		{"release_keyword_duplicate", presetOnly + "[release]\nkeywords = [\"refs\", \"Fixes\", \"fixes\"]\n"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

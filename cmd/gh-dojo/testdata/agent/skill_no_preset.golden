@@ -79,6 +79,7 @@ gh dojo show 42 --jq '.issues[0].blocked_by[] | select(.resolved | not) | .ref'
 | `gh dojo list` | See what is on the board: one line per open issue, grouped by status |
 | `gh dojo new` | Create an issue with labels, on the board, in the initial status |
 | `gh dojo next` | Find issues to take: initial status, no unresolved blockers, in board order |
+| `gh dojo release` | Apply a verb to the issues a release includes, found through pull requests and commits |
 | `gh dojo show` | Read issues before working on them: board status, blockers, history, description, comments |
 | `gh dojo unblock` | Remove blocked-by links of an issue, without changing its status |
 | `gh dojo <verb>` | The verbs above: go |

@@ -50,6 +50,7 @@ into issues (verb `when` lines and comment templates) come from the config.
 | `internal/graph`    | GraphQL client over go-gh: retries, pagination, error mapping      |
 | `internal/render`   | Errors, exit codes, confirmations, folding with counts             |
 | `internal/agent`    | `agent install`'s files: targets, markers, writing, diffs          |
+| `internal/release`  | `release`: a release's commits, their pull requests and keywords   |
 
 The plan is separate from its execution: the workflow engine returns the
 operations without touching the network, which is what `--dry-run`, the

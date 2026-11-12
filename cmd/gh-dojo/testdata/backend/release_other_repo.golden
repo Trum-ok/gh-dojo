@@ -1,0 +1,9 @@
+code: 0
+--- stdout
+release v0.2.0: 1 commit since v0.1.0, 2 issues
+not ready for done (it starts only from Ready or In progress): cli/cli#2 (not on the board)
+  #3: commit 1111111
+dry run: done #3 "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)"
+  status: Ready → Done
+  close: as completed
+--- stderr

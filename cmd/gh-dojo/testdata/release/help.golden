@@ -1,0 +1,45 @@
+code: 0
+--- stdout
+Use it once a release is tagged: it finds the issues the release includes and
+applies a verb with batch = true to them, as gh dojo <verb> 12 13 14 would.
+
+The release is the commits of <ref> (a tag, branch or commit on GitHub) since
+the previous release: the highest version tag (v1.2.3) below <ref> when <ref>
+is one, else the highest; prereleases (v1.2.3-rc.1) only for a prerelease.
+--since names the start instead; the first release needs it. A tag or branch
+is compared with <ref> on GitHub; from a commit, <ref>'s history is read down
+to it. At most 1000 commits, read without a local checkout.
+
+An issue is in the release when a merged pull request of a commit closes it
+(its closing keywords or linked issues; squash, merge and rebase alike), or
+when a commit message names it after a keyword of [release] keywords, by
+default GitHub's closing ones (closes, fixes, resolves); owner/repo#N names
+an issue of another repository.
+
+An issue whose status the verb's from does not allow (still in progress, say)
+is listed as not ready and left out, not failed; its other checks still apply.
+
+--dry-run lists each issue with how it was found and its plan.
+
+Usage:
+  gh dojo release <ref> --verb <verb> [flags]
+
+Examples:
+  gh dojo release v0.2.0 --verb done --dry-run
+  gh dojo release v0.2.0 --verb done
+  gh dojo release v0.1.0 --since 4c40894 --verb done --comment "Released in v0.1.0."
+
+Flags:
+      --by string        value for {by} in the verb's comment, for every issue
+      --comment string   text for {comment} in the verb's comment, for every issue
+      --dry-run          list the issues, how each was found and its plan, without changing anything
+  -h, --help             help for release
+      --since string     where the release starts, a tag, branch or commit; default: the previous version tag
+      --verb string      the verb to apply to the release's issues: one with batch = true
+      --yes              the user agreed: for a verb that is the user's decision
+
+Global Flags:
+  -q, --jq expression       filter the JSON with a jq expression (implies --json)
+      --json                print the result as JSON (schema_version 1), errors too
+  -t, --template template   format the JSON with a Go template (implies --json)
+--- stderr

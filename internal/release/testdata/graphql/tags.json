@@ -1,0 +1,291 @@
+{
+  "comment": "Hand-crafted (gh-dojo has no tags yet) in the shape of compare_cli.json: gh dojo release v0.2.0 picks v0.1.0, an annotated tag, over v0.2.0-rc.1 and nightly, from two pages of tags; two pages of commits. A commit with 6 pull requests (5 read), a pull request closing 30 issues (2 read), one not merged and one of a fork.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "ReleaseTags",
+      "query": "query ReleaseTags($owner: String!, $repo: String!, $head: String!, $cursor: String) {\n  repository(owner: $owner, name: $repo) {\n    head: object(expression: $head) { oid }\n    refs(refPrefix: \"refs/tags/\", first: 100, after: $cursor, orderBy: {field: TAG_COMMIT_DATE, direction: DESC}) {\n      totalCount\n      pageInfo { hasNextPage endCursor }\n      nodes {\n        name\n        target { __typename oid ... on Tag { target { __typename oid } } }\n      }\n    }\n  }\n}",
+      "variables": {
+        "cursor": null,
+        "head": "v0.2.0^{commit}",
+        "owner": "Trum-ok",
+        "repo": "gh-dojo"
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "head": {
+              "oid": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+            },
+            "refs": {
+              "totalCount": 5,
+              "pageInfo": {
+                "hasNextPage": true,
+                "endCursor": "Mw"
+              },
+              "nodes": [
+                {
+                  "name": "v0.2.0",
+                  "target": {
+                    "__typename": "Commit",
+                    "oid": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+                  }
+                },
+                {
+                  "name": "v0.2.0-rc.1",
+                  "target": {
+                    "__typename": "Commit",
+                    "oid": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3"
+                  }
+                },
+                {
+                  "name": "nightly",
+                  "target": {
+                    "__typename": "Tag",
+                    "oid": "7777777777777777777777777777777777777777",
+                    "target": {
+                      "__typename": "Commit",
+                      "oid": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "ReleaseTags",
+      "query": "query ReleaseTags($owner: String!, $repo: String!, $head: String!, $cursor: String) {\n  repository(owner: $owner, name: $repo) {\n    head: object(expression: $head) { oid }\n    refs(refPrefix: \"refs/tags/\", first: 100, after: $cursor, orderBy: {field: TAG_COMMIT_DATE, direction: DESC}) {\n      totalCount\n      pageInfo { hasNextPage endCursor }\n      nodes {\n        name\n        target { __typename oid ... on Tag { target { __typename oid } } }\n      }\n    }\n  }\n}",
+      "variables": {
+        "cursor": "Mw",
+        "head": "v0.2.0^{commit}",
+        "owner": "Trum-ok",
+        "repo": "gh-dojo"
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "head": {
+              "oid": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+            },
+            "refs": {
+              "totalCount": 5,
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": "end"
+              },
+              "nodes": [
+                {
+                  "name": "v0.1.0",
+                  "target": {
+                    "__typename": "Tag",
+                    "oid": "7777777777777777777777777777777777777777",
+                    "target": {
+                      "__typename": "Commit",
+                      "oid": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
+                    }
+                  }
+                },
+                {
+                  "name": "v0.0.1",
+                  "target": {
+                    "__typename": "Commit",
+                    "oid": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "ReleaseCompare",
+      "query": "query ReleaseCompare($owner: String!, $repo: String!, $base: String!, $head: String!, $cursor: String) {\n  repository(owner: $owner, name: $repo) {\n    ref(qualifiedName: $base) {\n      compare(headRef: $head) {\n        commits(first: 100, after: $cursor) {\n          totalCount\n          pageInfo { hasNextPage endCursor }\n          nodes { ...releaseCommit }\n        }\n      }\n    }\n  }\n}\n\n\n\nfragment releaseCommit on Commit {\n  oid\n  message\n  associatedPullRequests(first: 5) {\n    totalCount\n    nodes {\n      number\n      merged\n      repository { nameWithOwner }\n      closingIssuesReferences(first: 25) {\n        totalCount\n        nodes { number repository { nameWithOwner } }\n      }\n    }\n  }\n}",
+      "variables": {
+        "base": "refs/tags/v0.1.0",
+        "cursor": null,
+        "head": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+        "owner": "Trum-ok",
+        "repo": "gh-dojo"
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "ref": {
+              "compare": {
+                "commits": {
+                  "totalCount": 3,
+                  "pageInfo": {
+                    "hasNextPage": true,
+                    "endCursor": "Mg"
+                  },
+                  "nodes": [
+                    {
+                      "oid": "1111111111111111111111111111111111111111",
+                      "message": "Add the release command\n\nRefs #41",
+                      "associatedPullRequests": {
+                        "totalCount": 1,
+                        "nodes": [
+                          {
+                            "number": 50,
+                            "merged": true,
+                            "repository": {
+                              "nameWithOwner": "Trum-ok/gh-dojo"
+                            },
+                            "closingIssuesReferences": {
+                              "totalCount": 30,
+                              "nodes": [
+                                {
+                                  "number": 41,
+                                  "repository": {
+                                    "nameWithOwner": "Trum-ok/gh-dojo"
+                                  }
+                                },
+                                {
+                                  "number": 2,
+                                  "repository": {
+                                    "nameWithOwner": "cli/cli"
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "oid": "1212121212121212121212121212121212121212",
+                      "message": "Fix the summary (#51)",
+                      "associatedPullRequests": {
+                        "totalCount": 6,
+                        "nodes": [
+                          {
+                            "number": 51,
+                            "merged": true,
+                            "repository": {
+                              "nameWithOwner": "Trum-ok/gh-dojo"
+                            },
+                            "closingIssuesReferences": {
+                              "totalCount": 1,
+                              "nodes": [
+                                {
+                                  "number": 7,
+                                  "repository": {
+                                    "nameWithOwner": "Trum-ok/gh-dojo"
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          {
+                            "number": 52,
+                            "merged": false,
+                            "repository": {
+                              "nameWithOwner": "Trum-ok/gh-dojo"
+                            },
+                            "closingIssuesReferences": {
+                              "totalCount": 1,
+                              "nodes": [
+                                {
+                                  "number": 8,
+                                  "repository": {
+                                    "nameWithOwner": "Trum-ok/gh-dojo"
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          {
+                            "number": 9,
+                            "merged": true,
+                            "repository": {
+                              "nameWithOwner": "fork/gh-dojo"
+                            },
+                            "closingIssuesReferences": {
+                              "totalCount": 1,
+                              "nodes": [
+                                {
+                                  "number": 1,
+                                  "repository": {
+                                    "nameWithOwner": "fork/gh-dojo"
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          {
+                            "number": 53,
+                            "merged": true,
+                            "repository": {
+                              "nameWithOwner": "Trum-ok/gh-dojo"
+                            },
+                            "closingIssuesReferences": {
+                              "totalCount": 0,
+                              "nodes": []
+                            }
+                          },
+                          {
+                            "number": 54,
+                            "merged": true,
+                            "repository": {
+                              "nameWithOwner": "Trum-ok/gh-dojo"
+                            },
+                            "closingIssuesReferences": {
+                              "totalCount": 0,
+                              "nodes": []
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "ReleaseCompare",
+      "query": "query ReleaseCompare($owner: String!, $repo: String!, $base: String!, $head: String!, $cursor: String) {\n  repository(owner: $owner, name: $repo) {\n    ref(qualifiedName: $base) {\n      compare(headRef: $head) {\n        commits(first: 100, after: $cursor) {\n          totalCount\n          pageInfo { hasNextPage endCursor }\n          nodes { ...releaseCommit }\n        }\n      }\n    }\n  }\n}\n\n\n\nfragment releaseCommit on Commit {\n  oid\n  message\n  associatedPullRequests(first: 5) {\n    totalCount\n    nodes {\n      number\n      merged\n      repository { nameWithOwner }\n      closingIssuesReferences(first: 25) {\n        totalCount\n        nodes { number repository { nameWithOwner } }\n      }\n    }\n  }\n}",
+      "variables": {
+        "base": "refs/tags/v0.1.0",
+        "cursor": "Mg",
+        "head": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+        "owner": "Trum-ok",
+        "repo": "gh-dojo"
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "ref": {
+              "compare": {
+                "commits": {
+                  "totalCount": 3,
+                  "pageInfo": {
+                    "hasNextPage": false,
+                    "endCursor": "end"
+                  },
+                  "nodes": [
+                    {
+                      "oid": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+                      "message": "Direct commit\n\nfixes #9 and #10; see #11",
+                      "associatedPullRequests": {
+                        "totalCount": 0,
+                        "nodes": []
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

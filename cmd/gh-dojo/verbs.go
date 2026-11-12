@@ -115,6 +115,8 @@ type IssueRead struct {
 	Ref   issue.Ref
 	Issue workflow.Issue
 	Err   error
+	// PullRequest says Err is because the number is a pull request.
+	PullRequest bool
 }
 
 // newBackend returns the backend for cfg: GitHub through one App per run,

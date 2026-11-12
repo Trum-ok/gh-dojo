@@ -335,7 +335,8 @@ func (p *process) text() string {
 func (v processVerb) facts() string {
 	var parts []string
 	if v.Batch {
-		parts = append(parts, "several numbers at once ("+v.Name+" 12 13 14)")
+		parts = append(parts, "several numbers at once ("+v.Name+" 12 13 14) or a release's issues "+
+			"(release <tag> --verb "+v.Name+")")
 	}
 	if len(v.Requires) > 0 {
 		parts = append(parts, "needs "+strings.Join(v.Requires, " and "))

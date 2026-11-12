@@ -139,6 +139,7 @@ also be authorized for it.
 | [`doctor`](#doctor) | Check config, token, board and repositories, with fixes |
 | [`agent install`](#agent-install) | Write the process into a skill or `AGENTS.md` section for agents |
 | [`<verb>`](#process-verbs) | The project's process verbs, from the config (`start`, `wait`, …) |
+| [`release`](#release) | Apply a verb to the issues a release includes, found through pull requests and commits |
 
 Issues are written `42` or `#42` for the default repository (the first of
 [`board.repos`](#board)), and `owner/repo#42` or the issue's URL for any
@@ -555,7 +556,69 @@ stderr and keeps the reason.
 A verb with `batch = true` (the presets' `done`) takes several numbers:
 `gh dojo done 12 13 14`. Each issue is checked and written on its own; see
 [Several issues at once](#several-issues-at-once) for the summary and the
-exit code.
+exit code. [`release`](#release) runs it on the issues of a release.
+
+### release
+
+```sh
+gh dojo release <ref> --verb <verb> [--since <ref>] [--dry-run] [--yes] [--comment TEXT]
+```
+
+Once a release is tagged, runs a verb with [`batch = true`](#several-issues-at-once)
+on the issues it includes, as `gh dojo done 12 13 14` would: same checks,
+summary and exit codes.
+
+**The range** is the commits of `<ref>` (a tag, branch or commit on GitHub;
+no local checkout) since `--since`, or else since the previous release: the
+highest version tag (`v1.2.3`, `1.2.3`) below `<ref>` when `<ref>` is one,
+else the highest not on `<ref>`'s commit. Prereleases count only for a
+prerelease, so `v0.2.0` starts from `v0.1.0`, past `v0.2.0-rc.1`: an issue
+already done costs no write, a range too short misses issues. The first
+release needs `--since` (exit code 1 without it): taking the whole history
+would apply the verb to every issue any commit ever named. GitHub compares a
+tag or branch with `<ref>` exactly; from a commit (a SHA, `HEAD~10`), which
+the API cannot compare, `<ref>`'s history is read down to it, exact for a
+linear history (with merge commits, a merged branch's commits older than the
+start are missed, but their pull request is found through the merge
+commit). At most 1000 commits; a longer range is exit code 1.
+
+**An issue is in the release** when a merged pull request a commit belongs
+to closes it (its closing keywords or linked issues, `closingIssuesReferences`;
+squash, merge and rebase alike), or a commit message names it after a word
+of [`[release] keywords`](#release-keywords), by default GitHub's closing
+keywords: `Fixes #12`, `closes: acme/api#3`, `Resolves <issue URL>`, any
+case; a list after a keyword counts whole (`Fixes #12, #13 and #14`), a
+mention without one (`see #12`) does not. `Refs #12` says a commit is about
+an issue, which may be done only in part, so `refs` is not a default; a
+project that commits without pull requests adds it, as this one does. A
+number a message names that is a pull request is left out with a warning.
+
+**Not ready.** An issue whose status the verb's `from` does not allow, such as
+one still in progress with a `Refs` commit when `done` starts only from Ready,
+is listed as not ready and left out, not failed: work goes on across
+releases, and a refusal (exit code 2) would end every such release. It is
+picked up by the release that finds it ready. The verb's other checks (a
+closed issue, blockers, `--yes`) still fail the batch.
+
+```console
+$ gh dojo release v0.2.0 --verb done --dry-run
+release v0.2.0: 5 commits since v0.1.0, 4 issues
+not ready for done (it starts only from Ready): #17 (In progress)
+  #3: commit 1111111
+  #7: commit 1212121, commit a1a1a1a
+  #9: PR #50
+dry run: done #3 "Read the config"
+  status: Ready → Done
+  close: as completed
+...
+```
+
+`--dry-run` lists how each issue was found (`PR #N`, `commit <sha>`) and its
+plan. No issues is a line saying where release looked, exit code 0.
+`--comment`, `--by` and `--yes` go to the verb, for every issue. A verb
+without `batch = true` is exit code 1, a `<ref>` or `--since` GitHub does not
+know exit code 3. Requests: one for `<ref>` and the start (one per 100
+tags), one per 100 commits with their pull requests, then the batch's.
 
 ## Configuration
 
@@ -602,6 +665,9 @@ link = "claude://claude.ai/epitaxy/{id}"
 targets = ["claude", "agents-md"]       # claude (the default), agents-md, copilot
 notes = "docs/agent-notes.md" # appended as is to the generated instructions
 description = "Also load it before a release."  # added to the skill's description
+
+[release]                    # gh dojo release
+keywords = ["closes", "fixes", "resolves", "refs"]   # words before #12 in a commit message; default: GitHub's closing keywords
 
 [verbs.start]                # overrides the preset's start key by key
 when = "You begin working on the issue"   # one line; first line of --help
@@ -719,6 +785,15 @@ What [`agent install`](#agent-install) writes. A preset cannot set it.
 | `targets` | The agents to write for: `claude`, `agents-md`, `copilot`. Default: `["claude"]`; `[]` writes nothing without `--agent` |
 | `notes`   | A markdown file, relative to the repository root and written with `/`, appended as is after the generated instructions: what the config cannot say, in the project's language. Its headings land as written, so in an `AGENTS.md` section start them one level down. Not under `.git`, not one of the files agent install writes, and not a link out of the repository |
 | `description` | One line added to the end of the skill's generated `description`, which tells Claude Code when to load the skill: say when else to load it. The whole description may be up to 1024 characters |
+
+### release keywords
+
+`[release]`: how [`gh dojo release`](#release) links a commit to issues besides the pull
+requests it belongs to. A preset cannot set it.
+
+| Key        | Meaning |
+|------------|---------|
+| `keywords` | Words that, followed by issues in a commit message (`Fixes #12`, `refs: #12, acme/api#3`), put those issues in the release; whole words, in any case, letters with single spaces or dashes (`"part of"`). Default: GitHub's closing keywords, `close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves`, `resolved`; a list replaces them. `[]`: only pull requests count |
 
 ### verbs
 
@@ -1250,6 +1325,7 @@ The schemas, by command, after `schema_version` and `error`:
 | `list` | `sprint_filter` (`null` without `--sprint`, `"none"` for issues without a sprint, `"iteration"` for those in `sprint`), `sprint` (the `--sprint` iteration or `null`), `issues`: `[{repo, number, title, state, status, labels, labels_total, assignees, assignees_total}]` in the printed order, cut to `--limit`; `matched` (before `--limit`), `unchecked`, `hidden`, `filtered`, `skipped`: `{draft_issues, pull_requests, unseen}`, `incomplete`, `warnings` |
 | `next` | as `list`, each issue with `unresolved_blockers`: `[{ref, repo, number, on_board, status, archived, status_unknown_reason}]` (empty unless `--all`) and `unread_blockers` (blockers the token cannot read, unresolved); `matched`: issues to show before `--limit` (with `--all`, the blocked ones too); `hidden`: blocked issues left out (0 with `--all`); `incomplete`: GitHub withheld part of an issue to show or hide, or of its blockers |
 | verbs | `verb`, `default_repo` (where a bare number is), `dry_run`, `issues`: `[{number, repo, title, outcome, planned, applied, in_place, needs_yes, warnings, error}]` in argument order (`title` `null` when the issue was not read), `summary`: `{total, done, written, failed, not_attempted}` |
+| `release` | as verbs, with `release`: `{ref, commit, since, since_picked, since_commit, compared, commits}` (`since_picked`: the previous version tag, not `--since`; `compared`: GitHub compared the two, else the history was read down to a `--since` commit; commits are full SHAs), each issue with `found_by`: `[{pull_request, commit}]` (`pull_request` `owner/name#12` that closes it, with its first commit in the release, or `null`: the commit's message names it), `skipped`: `[{ref, reason, status, found_by}]` (`reason` `pull_request`, or `not_ready` with the `status` the verb's `from` does not allow), and `warnings`; `issues` and `summary` count only the issues the verb ran on, the default repository's first |
 | `new` | `number`, `repo`, `title`, `created` (`false`: resumed), `labels`, `status`, `status_set`, `unarchived`, `milestone` (`{title, due_on}` or `null`), `milestone_set`, `blocked_by`, `already_blocked_by` |
 | `comment` | `number`, `repo`, `posted` (`false`: already the last comment) |
 | `block`, `unblock` | `number`, `repo`, `action`, `changed`, `unchanged`, `missed` |

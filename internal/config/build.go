@@ -48,6 +48,9 @@ func (c *Config) build(r *rawFile) error {
 	if err := c.buildAgent(r.Agent); err != nil {
 		return err
 	}
+	if err := c.buildRelease(r.Release); err != nil {
+		return err
+	}
 	for _, name := range r.verbOrder {
 		rv := r.Verbs[name]
 		if rv.Disabled != nil && *rv.Disabled {
@@ -256,6 +259,32 @@ func (c *Config) buildAgent(r rawAgent) error {
 		}
 		c.Agent.Description = d
 	}
+	return nil
+}
+
+// keywordRE is a release keyword: words of letters, separated by single
+// spaces or dashes ("refs", "part of", "closes").
+var keywordRE = regexp.MustCompile(`^\pL+(?:[ -]\pL+)*$`)
+
+// buildRelease validates [release].
+func (c *Config) buildRelease(r rawRelease) error {
+	c.Release = Release{Keywords: DefaultKeywords()}
+	if r.Keywords == nil {
+		return nil
+	}
+	if err := c.checkList("release.keywords", *r.Keywords); err != nil {
+		return err
+	}
+	for i, k := range *r.Keywords {
+		if !keywordRE.MatchString(k) {
+			return c.Errorf("release.keywords: %q is not a word; write words of letters, like \"refs\" or \"part of\"", k).
+				WithFix(`keywords = ["closes", "fixes", "refs"]`)
+		}
+		if j := slices.IndexFunc((*r.Keywords)[:i], func(o string) bool { return strings.EqualFold(o, k) }); j >= 0 {
+			return c.Errorf("release.keywords lists %q and %q: keywords match regardless of case", (*r.Keywords)[j], k)
+		}
+	}
+	c.Release.Keywords = slices.Clone(*r.Keywords)
 	return nil
 }
 

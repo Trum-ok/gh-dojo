@@ -1,0 +1,2 @@
+error: no release before v0.0.1: Trum-ok/gh-dojo has no version tag (v1.2.3) before it
+fix: name where the release starts: gh dojo release v0.0.1 --since <tag, branch or commit> --verb <verb>

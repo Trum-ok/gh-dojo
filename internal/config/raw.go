@@ -25,6 +25,7 @@ type rawFile struct {
 	Session  rawSession          `toml:"session"`
 	Verbs    map[string]*rawVerb `toml:"verbs"`
 	Agent    rawAgent            `toml:"agent"`
+	Release  rawRelease          `toml:"release"`
 
 	verbOrder []string // verb names in file order
 }
@@ -57,6 +58,10 @@ type rawAgent struct {
 	Targets     *[]string `toml:"targets"`
 	Notes       *string   `toml:"notes"`
 	Description *string   `toml:"description"`
+}
+
+type rawRelease struct {
+	Keywords *[]string `toml:"keywords"`
 }
 
 type rawVerb struct {
@@ -160,13 +165,14 @@ func (v *rawVerb) setKeys() []string {
 
 // Allowed keys per table, in documentation order.
 var (
-	topKeys      = []string{"version", "preset", "board", "fields", "statuses", "labels", "session", "verbs", "agent"}
+	topKeys      = []string{"version", "preset", "board", "fields", "statuses", "labels", "session", "verbs", "agent", "release"}
 	presetKeys   = []string{"version", "fields", "statuses", "labels", "session", "verbs"}
 	boardKeys    = []string{"owner", "project", "repos", "assignee", "timezone"}
 	statusesKeys = []string{"initial", "final", "resolved"}
 	labelsKeys   = []string{"types", "area_prefix"}
 	sessionKeys  = []string{"env", "link"}
 	agentKeys    = []string{"targets", "notes", "description"}
+	releaseKeys  = []string{"keywords"}
 	verbKeys     = []string{
 		"when", "to", "from", "require", "require_one_of", "comment",
 		"labels", "assign", "unassign", "close", "reopen", "confirm", "iteration", "field", "blockers", "batch", "disabled",
@@ -378,6 +384,8 @@ func undecodedError(display string, key toml.Key) error {
 			allowed = sessionKeys
 		case "agent":
 			allowed = agentKeys
+		case "release":
+			allowed = releaseKeys
 		default:
 			// A scalar or array where a table was expected; the decoder
 			// reports those itself, so this is only a safety net.

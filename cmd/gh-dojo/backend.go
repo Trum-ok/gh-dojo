@@ -118,7 +118,7 @@ func (b *githubBackend) ReadIssues(ctx context.Context, v config.Verb, refs []is
 			r.Err = render.Internal("%s was not read", r.Ref.String(def))
 			continue
 		case res.Err != nil:
-			r.Err = res.Err
+			r.Err, r.PullRequest = res.Err, res.Cause == issue.CausePullRequest
 			continue
 		}
 		r.Ref = res.Card.Ref() // as GitHub or the config spells it

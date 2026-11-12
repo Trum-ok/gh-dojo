@@ -1,0 +1,2 @@
+error: .github/dojo.toml: release.keywords: "refs:" is not a word; write words of letters, like "refs" or "part of"
+fix: keywords = ["closes", "fixes", "refs"]

@@ -1,0 +1,64 @@
+{
+  "comment": "Hand-crafted like release_shop.json: gh dojo release v1.0.0 --since v0.9.0, no commits since.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "ReleaseSince",
+      "query": "query ReleaseSince($owner: String!, $repo: String!, $head: String!, $since: String!, $sinceRef: String!) {\n  repository(owner: $owner, name: $repo) {\n    head: object(expression: $head) { oid }\n    since: object(expression: $since) { oid }\n    sinceRef: ref(qualifiedName: $sinceRef) { prefix name }\n  }\n}",
+      "variables": {
+        "head": "v1.0.0^{commit}",
+        "owner": "acme",
+        "repo": "shop",
+        "since": "v0.9.0^{commit}",
+        "sinceRef": "v0.9.0"
+      },
+      "repeat": true,
+      "response": {
+        "data": {
+          "repository": {
+            "head": {
+              "oid": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+            },
+            "since": {
+              "oid": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+            },
+            "sinceRef": {
+              "prefix": "refs/tags/",
+              "name": "v0.9.0"
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "ReleaseCompare",
+      "query": "query ReleaseCompare($owner: String!, $repo: String!, $base: String!, $head: String!, $cursor: String) {\n  repository(owner: $owner, name: $repo) {\n    ref(qualifiedName: $base) {\n      compare(headRef: $head) {\n        commits(first: 100, after: $cursor) {\n          totalCount\n          pageInfo { hasNextPage endCursor }\n          nodes { ...releaseCommit }\n        }\n      }\n    }\n  }\n}\n\n\n\nfragment releaseCommit on Commit {\n  oid\n  message\n  associatedPullRequests(first: 5) {\n    totalCount\n    nodes {\n      number\n      merged\n      repository { nameWithOwner }\n      closingIssuesReferences(first: 25) {\n        totalCount\n        nodes { number repository { nameWithOwner } }\n      }\n    }\n  }\n}",
+      "variables": {
+        "base": "refs/tags/v0.9.0",
+        "cursor": null,
+        "head": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+        "owner": "acme",
+        "repo": "shop"
+      },
+      "repeat": true,
+      "response": {
+        "data": {
+          "repository": {
+            "ref": {
+              "compare": {
+                "commits": {
+                  "totalCount": 0,
+                  "pageInfo": {
+                    "hasNextPage": false,
+                    "endCursor": "end"
+                  },
+                  "nodes": []
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

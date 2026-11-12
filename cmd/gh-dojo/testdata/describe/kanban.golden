@@ -14,7 +14,7 @@ Verbs:
   ready       The work is done, verified and committed, but not released yet
               optional --comment; comments "{comment}"
   done        The change is released
-              several numbers at once (done 12 13 14); optional --comment; also on closed issues; comments "{comment}"; closes as completed
+              several numbers at once (done 12 13 14) or a release's issues (release <tag> --verb done); optional --comment; also on closed issues; comments "{comment}"; closes as completed
 
 Every verb adds the issue to the board if it is missing and refuses a
 closed issue unless noted. A repeat is safe: an effect already in place

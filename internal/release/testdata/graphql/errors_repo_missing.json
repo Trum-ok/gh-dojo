@@ -1,0 +1,22 @@
+{
+  "comment": "Hand-crafted: the repository is not found (null) or not visible.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "ReleaseSince",
+      "query": "query ReleaseSince($owner: String!, $repo: String!, $head: String!, $since: String!, $sinceRef: String!) {\n  repository(owner: $owner, name: $repo) {\n    head: object(expression: $head) { oid }\n    since: object(expression: $since) { oid }\n    sinceRef: ref(qualifiedName: $sinceRef) { prefix name }\n  }\n}",
+      "variables": {
+        "head": "v0.2.0^{commit}",
+        "owner": "Trum-ok",
+        "repo": "gh-dojo",
+        "since": "main^{commit}",
+        "sinceRef": "main"
+      },
+      "response": {
+        "data": {
+          "repository": null
+        }
+      }
+    }
+  ]
+}

@@ -1,3 +1,3 @@
 error: .github/dojo.toml: unknown key bord
-allowed: version, preset, board, fields, statuses, labels, session, verbs, agent
+allowed: version, preset, board, fields, statuses, labels, session, verbs, agent, release
 fix: fix the key; if it is right, the config needs a newer gh-dojo: gh extension upgrade dojo (from source: make install)
