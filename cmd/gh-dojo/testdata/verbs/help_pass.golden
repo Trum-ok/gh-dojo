@@ -1,0 +1,26 @@
+code: 0
+--- stdout
+Pass it to someone
+
+  From:      any status
+  To:        the status is not changed
+  Requires:  --assignee
+  Board:     adds the issue if it is not there
+  Assign:    the --assignee user (a login, or @me for you); other assignees stay
+             one who cannot be assigned issues in the repository is exit code 1, with who can
+  Comment:   posted unless it renders empty or is already the latest gh-dojo comment:
+               Over to @{assignee}.
+
+Usage:
+  gh dojo pass <N> [flags]
+
+Flags:
+      --assignee string   the user to assign: a login, or @me for yourself
+      --dry-run           print the plan without changing anything
+  -h, --help              help for pass
+
+Global Flags:
+  -q, --jq expression       filter the JSON with a jq expression (implies --json)
+      --json                print the result as JSON (schema_version 1), errors too
+  -t, --template template   format the JSON with a Go template (implies --json)
+--- stderr

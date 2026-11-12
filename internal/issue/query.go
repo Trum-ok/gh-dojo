@@ -139,6 +139,7 @@ func (r *cardResponse) UnmarshalJSON(b []byte) error {
 }
 
 type login struct {
+	ID    string `json:"id"` // read only for the assignees with Lookup.AssigneeIDs
 	Login string `json:"login"`
 }
 

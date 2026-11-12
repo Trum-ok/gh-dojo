@@ -65,8 +65,8 @@ type verbIssue struct {
 // those of the kind (see MarshalJSON), each always there.
 type jsonOp struct {
 	// Op is add_to_board, unarchive, reopen, set_status, set_iteration,
-	// set_fields, add_labels, remove_labels, assign, add_blocked_by,
-	// add_comment or close.
+	// set_fields, add_labels, remove_labels, assign, unassign,
+	// add_blocked_by, add_comment or close.
 	Op string
 	// From and To are the status (set_status) or iteration title
 	// (set_iteration) before and after; "" (null) for none.
@@ -75,6 +75,7 @@ type jsonOp struct {
 	Fields    []jsonFieldChange // set_fields
 	Labels    []string          // add_labels, remove_labels
 	Login     string            // assign
+	Logins    []string          // unassign; empty in place for unassign = "all" with nobody to remove
 	Issue     string            // add_blocked_by: "owner/name#12", in full
 	Body      string            // add_comment, without the hidden marker; "" (null) when in place
 	Reason    string            // close: completed, not_planned, duplicate
@@ -98,6 +99,8 @@ func (o jsonOp) MarshalJSON() ([]byte, error) {
 		fields = append(fields, kv{"labels", orEmpty(o.Labels)})
 	case "assign":
 		fields = append(fields, kv{"login", o.Login})
+	case "unassign":
+		fields = append(fields, kv{"logins", orEmpty(o.Logins)})
 	case "add_blocked_by":
 		fields = append(fields, kv{"issue", o.Issue})
 	case "add_comment":
@@ -156,6 +159,8 @@ func opJSON(op workflow.Op, def string) jsonOp {
 		return jsonOp{Op: "remove_labels", Labels: op.Names}
 	case workflow.Assign:
 		return jsonOp{Op: "assign", Login: op.Login}
+	case workflow.Unassign:
+		return jsonOp{Op: "unassign", Logins: op.Logins}
 	case workflow.AddBlockedBy:
 		return jsonOp{Op: "add_blocked_by", Issue: fullText(op.Ref, def)}
 	case workflow.AddComment:

@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.start.assign: unknown value "{by}"
+allowed: true, false, "@me", a login, "{assignee}"

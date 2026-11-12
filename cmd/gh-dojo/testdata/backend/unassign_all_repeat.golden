@@ -1,0 +1,4 @@
+code: 0
+--- stdout
+#3 Trum-ok already assigned, no one else assigned
+--- stderr

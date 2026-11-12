@@ -505,8 +505,8 @@ and, in one command:
    the user's go-ahead (`confirm`) and the issue's blockers (`blockers`);
 2. adds the issue to the board if it is not there;
 3. applies its [effects](#effects): reopens it, sets the status and the
-   sprint, sets other board fields, adds and removes labels, assigns a user,
-   marks it blocked by the `--by` issues, posts the rendered
+   sprint, sets other board fields, adds and removes labels, assigns and
+   unassigns users, marks it blocked by the `--by` issues, posts the rendered
    [comment template](#comment-templates) and closes it.
 
 Each effect already in place is skipped: a status already set, labels
@@ -609,7 +609,7 @@ when = "A pull request is open and waits for review"
 to = "In review"             # target status
 from = ["In progress"]       # allowed current statuses; empty = any
 labels = ["+in-review", "-blocked"]       # + adds a label, - removes it
-assign = true                # board.assignee; or "@me", or a login
+assign = true                # board.assignee; or "@me", a login, or "{assignee}" (--assignee)
 require_one_of = ["by", "comment"]  # --by or --comment must be given
 comment = """
 Review by {by}.
@@ -727,7 +727,7 @@ commands (`show`, `list`, `new`, `comment`, `describe`, `init`, `doctor`,
 |------------------|--------|---------|
 | `when`           | —      | Required. One line saying when to use the verb; the first line of its `--help` |
 | `from`           | check  | Statuses the verb may start from; empty or missing means any |
-| `require`        | check  | Arguments that must all be given: `comment`, `by` |
+| `require`        | check  | Arguments that must all be given: `comment`, `by`, `assignee` |
 | `require_one_of` | check  | Arguments of which at least one must be given |
 | `blockers`       | check or effect | `"warn"` or `"deny"`: check the issue's unresolved blockers; `"link"`: `--by N` also marks it blocked by #N |
 | `confirm`        | check  | `"user"`: the verb is the user's decision and runs only with `--yes` |
@@ -736,14 +736,15 @@ commands (`show`, `list`, `new`, `comment`, `describe`, `init`, `doctor`,
 | `iteration`      | effect | Set the sprint field: `"current"`, `"by_status_date:<status>"` or `"clear"`; needs `fields.sprint` |
 | `field`          | effect | A table of other board fields to set: `[verbs.<name>.field]` with `Priority = "P1"`, `Estimate = 3` |
 | `labels`         | effect | Labels to add (`"+name"`) and remove (`"-name"`): `["+in-review", "-blocked"]` |
-| `assign`         | effect | Who to add to the assignees: `true` (`board.assignee`), `"@me"`, a login |
+| `assign`         | effect | Who to add to the assignees: `true` (`board.assignee`), `"@me"`, a login, or `"{assignee}"`: the user `--assignee` names when the verb runs |
+| `unassign`       | effect | Who to remove from the assignees: `true` (`board.assignee`), `"@me"`, a login, or `"all"`: everyone but the user the verb assigns |
 | `comment`        | effect | [Comment template](#comment-templates) |
 | `close`          | effect | Close the issue with this reason: `completed`, `not_planned` or `duplicate` |
 | `reopen`         | effect | `true` reopens a closed issue |
 | `disabled`       | —      | `true` removes a verb the preset defines; it stands alone in its table |
 
 A verb needs at least one effect: `to`, `comment`, `labels`, `assign`,
-`close`, `reopen`, `iteration` or `field`. Every argument in `require` and
+`unassign`, `close`, `reopen`, `iteration` or `field`. Every argument in `require` and
 `require_one_of` must appear in the verb's comment template; a verb that
 requires `comment` and has no template posts the `--comment` text as is.
 Keys from the design that are not implemented yet (`pre`, `post`) are
@@ -787,7 +788,24 @@ rejected with "not supported in this version".
   [`gh dojo doctor`](#doctor) checks every verb's labels.
 - **assign**: adds one user and keeps the other assignees. `"@me"` is the
   authenticated user; a login must be able to be assigned issues in the
-  repository, or the verb fails before writing, listing who can be.
+  repository, or the verb fails before writing (exit code 1), listing who
+  can be. `assign = "{assignee}"` takes the user from `--assignee` when the
+  verb runs, for a user that changes from issue to issue, such as a
+  reviewer: `gh dojo review 24 --assignee octocat` (or `--assignee @me`).
+  The flag is then required, checked the same way, and `{assignee}` in the
+  comment template is the login as GitHub spells it. It is a flag of its
+  own rather than `--by`, which names what an issue waits for; only a verb
+  with `assign = "{assignee}"` takes it.
+- **unassign**: removes users and keeps the others, in the same mutation:
+  `"@me"` or a login removes that user (one not assigned is in place:
+  `octocat already unassigned`), and `"all"` removes everyone but the user
+  the verb assigns, so `assign = true` with `unassign = "all"` hands the
+  issue back to its author alone. A verb never removes the user it assigns,
+  and cannot name one user in both keys. Who to remove is always in the
+  config: a verb cannot take it from the command line (`"all"` covers
+  removing a reviewer named at run time), and a user named `all` cannot be
+  named. [`gh dojo doctor`](#doctor) checks a login of `unassign` like one
+  of `assign`: one who cannot be assigned can never be removed either.
 - **close**, **reopen**: a verb sets at most one of them. An issue already
   closed is not closed again, even with another reason; the line says
   `already closed as completed`. A verb that closes and has no `to` refuses
@@ -835,6 +853,7 @@ off a key the preset sets:
 | `blockers` | `blockers = false` (no check, no link) |
 | `confirm` | `confirm = false` |
 | `assign` | `assign = false` |
+| `unassign` | `unassign = false` |
 | `reopen` | `reopen = false` |
 | `batch` | `batch = false` |
 | `iteration` | `iteration = ""` |
@@ -844,14 +863,15 @@ off a key the preset sets:
 
 ### Comment templates
 
-Templates may use `{session}`, `{comment}` (the `--comment` text) and `{by}`
-(the `--by` value). A line whose placeholders all come out empty is dropped,
-so `"Waiting for {by}."` disappears when `--by` is not given; runs of blank
-template lines collapse, trailing spaces and leading and trailing blank lines
-are cut, and indentation stays. A template that renders to nothing posts no
-comment. There is no escape for a literal `{comment}`; other braces such as
-`{}` are plain text. A verb whose template does not use `{comment}` or `{by}`
-rejects `--comment` or `--by`.
+Templates may use `{session}`, `{comment}` (the `--comment` text), `{by}`
+(the `--by` value) and, in a verb with `assign = "{assignee}"`, `{assignee}`
+(the login it assigns). A line whose placeholders all come out empty is
+dropped, so `"Waiting for {by}."` disappears when `--by` is not given; runs
+of blank template lines collapse, trailing spaces and leading and trailing
+blank lines are cut, and indentation stays. A template that renders to
+nothing posts no comment. There is no escape for a literal `{comment}`;
+other braces such as `{}` are plain text. A verb whose template does not use
+`{comment}` or `{by}` rejects `--comment` or `--by`.
 
 Comments go to the issue as written, so write templates and `when` lines in
 your project's language; the CLI itself speaks English.
@@ -1001,9 +1021,9 @@ to decide.
 | `start`           | In progress       | Backlog                             | refused while a blocker is unresolved; assigns the author |
 | `hold`            | status unchanged  | In progress, Changes requested      | label `+blocked`; `--by 17` marks it blocked by #17 |
 | `resume`          | status unchanged  | In progress, Changes requested      | label `-blocked`; refused while a blocker is unresolved |
-| `review`          | In review         | In progress, Changes requested      | needs `--comment` (the pull request); labels; assigns the reviewer |
-| `request-changes` | Changes requested | In review                           | needs `--comment`; labels |
-| `approve`         | Approved          | In review                           | the user's decision (`--yes`) |
+| `review`          | In review         | In progress, Changes requested      | needs `--comment` (the pull request) and `--assignee` (the reviewer); labels; assigns the reviewer |
+| `request-changes` | Changes requested | In review                           | needs `--comment`; labels; back to the author alone: the reviewer is unassigned |
+| `approve`         | Approved          | In review                           | the user's decision (`--yes`); back to the author alone |
 | `reject`          | status unchanged  | In progress, In review, Changes requested, Approved | the user's decision; closes as not planned |
 | `merged`          | Merged            | Approved                            | closes as completed; several issues at once |
 
@@ -1024,12 +1044,14 @@ To write your own:
    differs, add verbs, and drop the preset's with `disabled = true`.
 3. A verb is a `when` line, [checks](#checks) (`from`, `require`,
    `require_one_of`, `blockers`, `confirm`) and [effects](#effects) (`to`,
-   `labels`, `assign`, `comment`, `close`, `reopen`, `iteration`, `field`,
-   the `blockers` link). A verb without `to` leaves the status alone, like
-   `hold` above; one with `confirm = "user"` waits for a person.
+   `labels`, `assign`, `unassign`, `comment`, `close`, `reopen`,
+   `iteration`, `field`, the `blockers` link). A verb without `to` leaves
+   the status alone, like `hold` above; one with `confirm = "user"` waits
+   for a person.
 4. Check it: [`gh dojo doctor`](#doctor) against the board and the
    repositories (statuses, the labels verbs add and remove, the users they
-   assign, the type and area labels), `gh dojo describe` for the process
+   assign and unassign by login, the type and area labels), `gh dojo
+   describe` for the process
    as an agent reads it, `gh dojo <verb> N --dry-run` for a verb's plan on a
    real issue. Then [`gh dojo agent install`](#agent-install) writes the
    agent instructions from the same file.
@@ -1041,9 +1063,10 @@ What the config cannot say yet, and the example works around:
   `reject` and `merged` remove the label.
 - `confirm = "user"` is the person the agent works for saying yes, not the
   reviewer: gh-dojo does not check that the pull request was approved.
-- The reviewer is one login fixed in the file: a verb cannot name the
-  assignee when it runs. And `assign` only adds people, so removing the
-  reviewer after the review is done with `gh issue edit`.
+- `request-changes` and `approve` hand the issue back by removing everyone
+  but the author (`unassign = "all"`), not the reviewer by name: gh-dojo
+  does not remember who `review` assigned, so someone else assigned by hand
+  is removed too.
 
 ## Output and exit codes
 
@@ -1243,6 +1266,7 @@ error object alone. `planned`, `applied` and `in_place` are lists of ops:
 | `set_fields` | `fields`: `[{field, from, to}]` |
 | `add_labels`, `remove_labels` | `labels` |
 | `assign` | `login` |
+| `unassign` | `logins` (in `in_place`: the users not assigned; empty for `unassign = "all"` with nobody to remove) |
 | `add_blocked_by` | `issue` (`owner/name#12`) |
 | `add_comment` | `body` (`null` in `in_place`: the comment was posted before) |
 | `close` | `reason` (`completed`, `not_planned`, `duplicate`) |

@@ -40,6 +40,7 @@ const (
 	AliasAddLabels    = "addLabels"
 	AliasRemoveLabels = "removeLabels"
 	AliasAssign       = "assign"
+	AliasUnassign     = "unassign"
 	AliasComment      = "comment"
 	AliasClose        = "close"
 	AliasIteration    = "sprint"
@@ -65,8 +66,8 @@ type IDs struct {
 	StatusField  string
 	StatusOption string
 	// Labels maps label names to label node IDs, Users logins to user node
-	// IDs; AddLabels, RemoveLabels and Assign look their names up here,
-	// ignoring case.
+	// IDs; AddLabels, RemoveLabels, Assign and Unassign look their names
+	// up here, ignoring case.
 	Labels map[string]string
 	Users  map[string]string
 	// SprintField is the ID of the sprint field and Iteration the ID of
@@ -217,6 +218,12 @@ func Build(ops []workflow.Op, ids IDs) (*Mutation, error) {
 			users, err = lookupAll("user", ids.Users, []string{op.Login})
 			err = firstErr(err, declare("issue", "ID!", ids.Issue), declare("assignees", "[ID!]!", users))
 			field = "addAssigneesToAssignable(input: {assignableId: $issue, assigneeIds: $assignees}) { clientMutationId }"
+		case workflow.Unassign:
+			alias = AliasUnassign
+			var users []string
+			users, err = lookupAll("user", ids.Users, op.Logins)
+			err = firstErr(err, declare("issue", "ID!", ids.Issue), declare("unassignees", "[ID!]!", users))
+			field = "removeAssigneesFromAssignable(input: {assignableId: $issue, assigneeIds: $unassignees}) { clientMutationId }"
 		case workflow.AddBlockedBy:
 			alias = BlockedByAlias(blockers)
 			v := fmt.Sprintf("blocker%d", blockers)
@@ -423,7 +430,7 @@ func isNull(v json.RawMessage) bool {
 // Missed says that op did not take effect, for a partial report:
 // "not added to the board", "not unarchived", "not reopened", "status not
 // changed", "labels not added", "labels not removed", "not assigned",
-// "not blocked by #12", "comment not posted", "not closed", "sprint not
+// "not unassigned", "not blocked by #12", "comment not posted", "not closed", "sprint not
 // set", "sprint not cleared", "Priority not set", "Priority and Estimate
 // not set".
 func Missed(op workflow.Op) string {
@@ -442,6 +449,8 @@ func Missed(op workflow.Op) string {
 		return "labels not removed"
 	case workflow.Assign:
 		return "not assigned"
+	case workflow.Unassign:
+		return "not unassigned"
 	case workflow.AddBlockedBy:
 		return "not blocked by " + op.Ref
 	case workflow.AddComment:

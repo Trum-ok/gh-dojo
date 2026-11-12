@@ -18,7 +18,7 @@ Verbs:
 
 Every verb adds the issue to the board if it is missing and refuses a
 closed issue unless noted. A repeat is safe: an effect already in place
-(status, comment, labels, assignee, blocked-by link, closed or open) is
+(status, comment, labels, assignees, blocked-by link, closed or open) is
 skipped.
 
 Lifecycle (from → to):

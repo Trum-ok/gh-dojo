@@ -117,6 +117,10 @@ func (c *Config) loadTimezone(name string) (*time.Location, error) {
 	return loc, nil
 }
 
+// IsLogin reports whether s is spelled as a GitHub login: letters,
+// digits and dashes, not starting with a dash, at most 39 long.
+func IsLogin(s string) bool { return loginRE.MatchString(s) }
+
 // checkAssignee accepts Me or a GitHub login.
 func (c *Config) checkAssignee(key, s string) error {
 	switch {
@@ -293,9 +297,9 @@ func (c *Config) buildVerb(name string, r *rawVerb) (Verb, error) {
 	if err := c.buildEffects(name, r, &v); err != nil {
 		return Verb{}, err
 	}
-	if v.To == "" && v.Comment == "" && len(v.AddLabels)+len(v.RemoveLabels) == 0 && v.Assign == "" &&
+	if v.To == "" && v.Comment == "" && len(v.AddLabels)+len(v.RemoveLabels) == 0 && !v.Assigns() && v.Unassign == "" &&
 		v.Close == "" && !v.Reopen && v.Iteration == "" && len(v.Fields) == 0 {
-		return Verb{}, c.Errorf("verbs.%s has no effect: set to, comment, labels, assign, close, reopen, iteration or field", name)
+		return Verb{}, c.Errorf("verbs.%s has no effect: set to, comment, labels, assign, unassign, close, reopen, iteration or field", name)
 	}
 	for _, list := range []struct {
 		key  string
@@ -316,11 +320,23 @@ func (c *Config) buildVerb(name string, r *rawVerb) (Verb, error) {
 			if list.key == "require_one_of" && slices.Contains(v.Require, arg) {
 				return Verb{}, c.Errorf("%s: %q is also in %s", key, arg, c.KeyPath(p+"require"))
 			}
-			if !v.Uses(arg) {
+			switch {
+			case arg == ArgAssignee && list.key == "require_one_of" && v.AssignArg:
+				return Verb{}, c.Errorf("%s names %q, which %s = %q always requires", key, arg, c.KeyPath(p+"assign"), AssignFromArg).
+					WithFix(fmt.Sprintf("remove %q from %s", arg, key))
+			case arg == ArgAssignee && !v.AssignArg:
+				return Verb{}, c.Errorf("%s names %q, but %s is not %q", key, arg, c.KeyPath(p+"assign"), AssignFromArg).
+					WithFix(fmt.Sprintf(`set assign = %q to assign the user --%s names, or remove %q from %s`,
+						AssignFromArg, ArgAssignee, arg, key))
+			case !v.Takes(arg):
 				return Verb{}, c.Errorf("%s names %q, but %s does not use {%s}", key, arg, c.KeyPath(p+"comment"), arg)
 			}
 		}
 		*list.dest = *list.src
+	}
+	if v.AssignArg && !slices.Contains(v.Require, ArgAssignee) {
+		// Nothing else names the user to assign.
+		v.Require = append(slices.Clone(v.Require), ArgAssignee)
 	}
 	return v, nil
 }
@@ -335,7 +351,7 @@ func requires(r *rawVerb, arg string) bool {
 	return false
 }
 
-// buildEffects validates labels, assign, close, reopen, confirm, blockers,
+// buildEffects validates labels, assign, unassign, close, reopen, confirm, blockers,
 // iteration and field.
 func (c *Config) buildEffects(name string, r *rawVerb, v *Verb) error {
 	p := "verbs." + name + "."
@@ -365,20 +381,8 @@ func (c *Config) buildEffects(name string, r *rawVerb, v *Verb) error {
 			}
 		}
 	}
-	if a := r.Assign; a != nil {
-		key := c.KeyPath(p + "assign")
-		switch {
-		case a.Bool != nil && *a.Bool && c.Board.Assignee == "":
-			return c.Errorf("%s = true assigns board.assignee, which is not set", key).
-				WithFix(fmt.Sprintf(`add assignee = %q under [board] in %s, or set assign = %q`, Me, c.Display, Me))
-		case a.Bool != nil && *a.Bool:
-			v.Assign = c.Board.Assignee
-		case a.User != nil:
-			if err := c.checkAssignee(p+"assign", *a.User); err != nil {
-				return err
-			}
-			v.Assign = *a.User
-		}
+	if err := c.buildAssign(name, r, v); err != nil {
+		return err
 	}
 	if o := r.Close; o != nil {
 		key := c.KeyPath(p + "close")
@@ -416,6 +420,64 @@ func (c *Config) buildEffects(name string, r *rawVerb, v *Verb) error {
 		return err
 	}
 	return c.buildFieldValues(name, r.Field, v)
+}
+
+// buildAssign validates assign and unassign. assign is true
+// (board.assignee), false, a login ("@me" or a user) or "{assignee}", the
+// --assignee user; unassign the same but "{assignee}", or "all". The two
+// cannot name the same user: the verb never removes whom it assigns.
+func (c *Config) buildAssign(name string, r *rawVerb, v *Verb) error {
+	p := "verbs." + name + "."
+	user := func(k string, a *rawAssign) (string, error) {
+		key := c.KeyPath(p + k)
+		switch {
+		case a == nil || a.Bool != nil && !*a.Bool:
+			return "", nil
+		case a.Bool != nil && c.Board.Assignee == "":
+			return "", c.Errorf("%s = true %ss board.assignee, which is not set", key, k).
+				WithFix(fmt.Sprintf(`add assignee = %q under [board] in %s, or set %s = %q`, Me, c.Display, k, Me))
+		case a.Bool != nil:
+			return c.Board.Assignee, nil
+		case k == "assign" && *a.User == AssignFromArg, k == "unassign" && *a.User == UnassignAll:
+			return *a.User, nil
+		case k == "unassign" && *a.User == AssignFromArg:
+			return "", c.Errorf("%s = %q: a verb removes only users the config names", key, *a.User).
+				WithAllowed("true", "false", strconv.Quote(Me), "a login", strconv.Quote(UnassignAll))
+		case strings.HasPrefix(*a.User, "{"):
+			allowed := []string{"true", "false", strconv.Quote(Me), "a login"}
+			if k == "assign" {
+				allowed = append(allowed, strconv.Quote(AssignFromArg))
+			} else {
+				allowed = append(allowed, strconv.Quote(UnassignAll))
+			}
+			return "", c.Errorf("%s: unknown value %q", key, *a.User).WithAllowed(allowed...)
+		}
+		if err := c.checkAssignee(p+k, *a.User); err != nil {
+			return "", err
+		}
+		return *a.User, nil
+	}
+	assign, err := user("assign", r.Assign)
+	if err != nil {
+		return err
+	}
+	if assign == AssignFromArg {
+		v.AssignArg = true
+	} else {
+		v.Assign = assign
+	}
+	if v.Unassign, err = user("unassign", r.Unassign); err != nil {
+		return err
+	}
+	if v.Assign != "" && strings.EqualFold(v.Assign, v.Unassign) {
+		return c.Errorf("verbs.%s assigns and unassigns %s; keep one", name, v.Assign)
+	}
+	if !v.AssignArg && v.Uses(VarAssignee) {
+		return c.Errorf("%s uses {%s}, the --%s user, but %s is not %q",
+			c.KeyPath(p+"comment"), VarAssignee, ArgAssignee, c.KeyPath(p+"assign"), AssignFromArg).
+			WithFix(fmt.Sprintf(`set assign = %q to assign the user --%s names, or drop {%s}`, AssignFromArg, ArgAssignee, VarAssignee))
+	}
+	return nil
 }
 
 // buildBlockers validates the blockers key: "warn" or "deny" (checks),

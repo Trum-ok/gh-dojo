@@ -38,15 +38,17 @@ var ErrNoConfig = errors.New("no " + FileName + " found")
 const Version = 1
 
 // Verb arguments that require and require_one_of may name. Each is a CLI
-// flag of the verb (--comment, --by) and a placeholder in its comment
-// template.
+// flag of the verb (--comment, --by, --assignee) and a placeholder in its
+// comment template. --assignee is the login a verb with assign =
+// "{assignee}" assigns (see Verb.AssignArg); only such a verb takes it.
 const (
-	ArgComment = "comment"
-	ArgBy      = "by"
+	ArgComment  = "comment"
+	ArgBy       = "by"
+	ArgAssignee = "assignee"
 )
 
 var (
-	args     = []string{ArgComment, ArgBy}
+	args     = []string{ArgComment, ArgBy, ArgAssignee}
 	builtins = []string{
 		"agent", "block", "comment", "describe", "doctor", "help", "init",
 		"list", "new", "next", "release", "show", "unblock",
@@ -114,6 +116,14 @@ func (b Board) Zone() string {
 
 // Me is the assignee that stands for the authenticated user.
 const Me = "@me"
+
+// AssignFromArg is the value of a verb's assign key that takes the user
+// to assign from --assignee when the verb runs (Verb.AssignArg).
+const AssignFromArg = "{" + ArgAssignee + "}"
+
+// UnassignAll is the value of a verb's unassign key that removes every
+// assignee but the one the verb assigns.
+const UnassignAll = "all"
 
 // Close reasons of the close effect, as written in the config.
 const (
@@ -244,7 +254,7 @@ type Verb struct {
 	When         string   // one line: when to use the verb; first line of its --help
 	To           string   // target status; "" leaves the status alone
 	From         []string // statuses the verb may start from; empty means any
-	Require      []string // arguments (ArgComment, ArgBy) that must all be given
+	Require      []string // arguments (ArgComment, ArgBy, ArgAssignee) that must all be given
 	RequireOneOf []string // arguments of which at least one must be given
 	Comment      string   // comment template (see Render); "" posts no comment
 
@@ -252,9 +262,19 @@ type Verb struct {
 	// labels) and removes ("-name"), in config order.
 	AddLabels    []string
 	RemoveLabels []string
-	// Assign is who the verb assigns: Me or a login; "" assigns nobody.
-	// assign = true is resolved to board.assignee at load.
+	// Assign is who the verb assigns: Me or a login; "" assigns nobody,
+	// or the --assignee user when AssignArg is set. assign = true is
+	// resolved to board.assignee at load.
 	Assign string
+	// AssignArg says the verb assigns the user --assignee names (assign =
+	// "{assignee}"): Me or a login, given when the verb runs, which makes
+	// --assignee required.
+	AssignArg bool
+	// Unassign is who the verb removes from the assignees: Me, a login,
+	// or UnassignAll for every assignee but the one the verb assigns; ""
+	// removes nobody. unassign = true is resolved to board.assignee at
+	// load. The user the verb assigns is never removed.
+	Unassign string
 	// Close is the reason the verb closes the issue with (CloseCompleted,
 	// CloseNotPlanned, CloseDuplicate); "" leaves it open. Reopen reopens
 	// a closed issue. A verb never sets both.
@@ -306,8 +326,7 @@ func (v Verb) IterationRule() string {
 }
 
 // Uses reports whether the verb's comment template uses the placeholder
-// {arg}. Every argument in Require and RequireOneOf is used; a verb should
-// reject --comment or --by when its template does not use them.
+// {arg}. Every argument in Require and RequireOneOf is taken (see Takes).
 func (v Verb) Uses(arg string) bool {
 	for _, m := range placeholderRE.FindAllStringSubmatch(v.Comment, -1) {
 		if m[1] == arg {
@@ -315,6 +334,18 @@ func (v Verb) Uses(arg string) bool {
 		}
 	}
 	return false
+}
+
+// Assigns reports whether the verb assigns someone: a user of the config
+// or the --assignee user.
+func (v Verb) Assigns() bool { return v.Assign != "" || v.AssignArg }
+
+// Takes reports whether the verb takes the argument arg on the command
+// line: its comment template uses {arg}, or, for ArgAssignee, its assign
+// effect assigns the --assignee user. A verb rejects the arguments it
+// does not take.
+func (v Verb) Takes(arg string) bool {
+	return v.Uses(arg) || arg == ArgAssignee && v.AssignArg
 }
 
 // StatusRef is a status name the config refers to, with the key path that

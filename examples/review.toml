@@ -1,8 +1,8 @@
 # .github/dojo.toml for a code review flow, written without a preset: every
 # status and verb is defined here. An agent writes the change and opens a
 # pull request; a person reviews it, and approving or rejecting the change is
-# theirs to decide. Copy it to .github/dojo.toml, set [board] and the
-# reviewer, and rename statuses, labels and verbs to your team's.
+# theirs to decide. Copy it to .github/dojo.toml, set [board], and rename
+# statuses, labels and verbs to your team's.
 # `gh dojo doctor` checks the result against the board.
 #
 # Board: a GitHub Projects v2 board whose Status field has the options
@@ -15,8 +15,8 @@
 #   - the verbs': blocked, needs-review, changes-requested.
 # gh dojo doctor checks them and prints a gh label create for each one
 # missing; of the areas, it warns when none exists (area_prefix is set here,
-# not by a preset). The reviewer must be able to be assigned issues in the
-# repository.
+# not by a preset). The reviewer, named with review --assignee, must be able
+# to be assigned issues in the repository.
 #
 # Reference: https://github.com/Trum-ok/gh-dojo#configuration
 
@@ -86,8 +86,8 @@ from = ["In progress", "Changes requested"]
 blockers = "deny"            # nothing goes to review on top of an unmerged change
 require = ["comment"]        # the pull request
 labels = ["+needs-review", "-changes-requested"]
-assign = "octocat"           # the reviewer, one login fixed here; added next to the author
-comment = "Ready for review: {comment}"
+assign = "{assignee}"        # the reviewer: review 24 --assignee octocat; added next to the author
+comment = "Ready for review by @{assignee}: {comment}"
 
 [verbs.request-changes]
 when = "The reviewer asked for changes; the author makes them and runs review again"
@@ -95,6 +95,8 @@ to = "Changes requested"
 from = ["In review"]
 require = ["comment"]        # what to change, in the reviewer's words
 labels = ["-needs-review", "+changes-requested"]
+assign = true                # back to the author (board.assignee)...
+unassign = "all"             # ...alone: the reviewer is removed
 comment = "Changes requested: {comment}"
 
 # The user's decisions: exit code 2 until the agent asks the person it works
@@ -106,6 +108,8 @@ when = "The user approved the pull request after reviewing it"
 to = "Approved"
 from = ["In review"]
 labels = ["-needs-review"]
+assign = true                # the author merges it...
+unassign = "all"             # ...and the reviewer is done
 confirm = "user"
 comment = """
 Approved.

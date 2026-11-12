@@ -138,13 +138,29 @@ var (
 			return "labels " + strings.Join(signs, " ")
 		},
 		func(_ *config.Config, v config.Verb) string {
-			switch v.Assign {
-			case "":
+			switch {
+			case v.AssignArg:
+				return "assigns the --" + config.ArgAssignee + " user"
+			case v.Assign == "":
 				return ""
-			case config.Me:
+			case v.Assign == config.Me:
 				return "assigns you"
 			}
 			return "assigns " + v.Assign
+		},
+		func(_ *config.Config, v config.Verb) string {
+			switch v.Unassign {
+			case "":
+				return ""
+			case config.UnassignAll:
+				if v.Assigns() {
+					return "unassigns everyone else"
+				}
+				return "unassigns everyone"
+			case config.Me:
+				return "unassigns you"
+			}
+			return "unassigns " + v.Unassign
 		},
 		func(_ *config.Config, v config.Verb) string {
 			if v.Blockers == config.BlockersLink {
@@ -212,7 +228,7 @@ func describeProcess(cfg *config.Config) *process {
 			switch {
 			case slices.Contains(v.Require, arg):
 				pv.Requires = append(pv.Requires, "--"+arg)
-			case !slices.Contains(v.RequireOneOf, arg) && v.Uses(arg):
+			case !slices.Contains(v.RequireOneOf, arg) && v.Takes(arg):
 				pv.Optional = append(pv.Optional, "--"+arg)
 			}
 		}
@@ -299,7 +315,7 @@ func (p *process) text() string {
 		if p.fields {
 			effects = append(effects, "fields")
 		}
-		effects = append(effects, "comment", "labels", "assignee", "blocked-by link", "closed or open")
+		effects = append(effects, "comment", "labels", "assignees", "blocked-by link", "closed or open")
 		sections = append(sections, b.String(), wrapText("Every verb adds the issue to the board if it is missing and refuses a "+
 			"closed issue unless noted. A repeat is safe: an effect already in place ("+
 			strings.Join(effects, ", ")+") is skipped.", 72))

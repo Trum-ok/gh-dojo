@@ -1,0 +1,23 @@
+code: 0
+--- stdout
+Back to the author alone
+
+  From:      any status
+  To:        the status is not changed
+  Requires:  nothing besides the issue number
+  Board:     adds the issue if it is not there
+  Assign:    you (the authenticated user)
+  Unassign:  everyone else: the user it assigns stays the only assignee
+
+Usage:
+  gh dojo hand-back <N> [flags]
+
+Flags:
+      --dry-run   print the plan without changing anything
+  -h, --help      help for hand-back
+
+Global Flags:
+  -q, --jq expression       filter the JSON with a jq expression (implies --json)
+      --json                print the result as JSON (schema_version 1), errors too
+  -t, --template template   format the JSON with a Go template (implies --json)
+--- stderr

@@ -1,0 +1,3 @@
+dry run: clear #42
+  unassign: alice, bob
+confirm: #42 unassigned alice and bob

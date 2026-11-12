@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.start.unassign = true unassigns board.assignee, which is not set
+fix: add assignee = "@me" under [board] in .github/dojo.toml, or set unassign = "@me"

@@ -1,0 +1,5 @@
+dry run: send-back #42
+  status: In progress (unchanged)
+  assign: alice already assigned
+  unassign: no one else assigned
+confirm: #42 In progress (unchanged), alice already assigned, no one else assigned

@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.start.comment uses {assignee}, the --assignee user, but verbs.start.assign is not "{assignee}"
+fix: set assign = "{assignee}" to assign the user --assignee names, or drop {assignee}

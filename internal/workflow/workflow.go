@@ -43,10 +43,11 @@ type Issue struct {
 	StateReason string
 
 	// Labels and Assignees are the issue's label names and assignee
-	// logins, for the labels and assign effects. They may be windows of
-	// the full lists (a card reads 20 labels, 100 for a verb that removes
-	// labels, and 10 assignees). LabelsTruncated reports that the issue
-	// has labels beyond Labels: see planLabels for what that does.
+	// logins, for the labels, assign and unassign effects. Labels may be a
+	// window of the full list (a card reads 20 labels, 100 for a verb that
+	// removes labels); Assignees has them all: a card reads 10, GitHub's
+	// limit per issue. LabelsTruncated reports that the issue has labels
+	// beyond Labels: see planLabels for what that does.
 	Labels          []string
 	LabelsTruncated bool
 	Assignees       []string
@@ -54,12 +55,13 @@ type Issue struct {
 	// repository. A label to remove among them is in place: the issue
 	// cannot have it. The reader refuses a label to add that is missing.
 	MissingLabels []string
-	// Viewer is the login of the authenticated user, which assign = "@me"
-	// (config.Me) stands for; the reader fills it for such a verb.
+	// Viewer is the login of the authenticated user, which "@me"
+	// (config.Me) stands for; the reader fills it for a verb that assigns
+	// or unassigns "@me", in the config or in --assignee.
 	Viewer string
-	// AssignLogin is the login the verb's assign names, as GitHub spells
-	// it; the reader fills it for a verb that assigns a login. "" uses the
-	// config's spelling.
+	// AssignLogin is the login the verb assigns (from the config or
+	// --assignee), as GitHub spells it; the reader fills it for a verb that
+	// assigns a login. "" uses the spelling given.
 	AssignLogin string
 
 	// OnBoard reports whether the issue is an item of the configured
@@ -195,6 +197,10 @@ type Args struct {
 	HasComment bool // --comment was given, even if blank
 	By         string
 	HasBy      bool // --by was given, even if blank
+	// Assignee is --assignee, the user a verb with assign = "{assignee}"
+	// assigns: config.Me or a login.
+	Assignee    string
+	HasAssignee bool // --assignee was given, even if blank
 	// Yes is --yes: the user agreed to a verb with confirm = "user".
 	Yes bool
 }
@@ -205,6 +211,8 @@ func (a Args) given(arg string) bool {
 		return a.HasComment
 	case config.ArgBy:
 		return a.HasBy
+	case config.ArgAssignee:
+		return a.HasAssignee
 	}
 	return false
 }
@@ -215,6 +223,8 @@ func (a Args) value(arg string) string {
 		return strings.TrimSpace(a.Comment)
 	case config.ArgBy:
 		return strings.TrimSpace(a.By)
+	case config.ArgAssignee:
+		return strings.TrimSpace(a.Assignee)
 	}
 	return ""
 }
@@ -261,20 +271,23 @@ func NormalizeBy(s string) string {
 // example command of the error. It needs no issue state,
 // so callers run it before reading the issue. Errors have exit code 1:
 //
-//   - --comment or --by given while the verb's comment template does not use it;
+//   - --comment or --by given while the verb's comment template does not use
+//     it, --assignee given to a verb without assign = "{assignee}";
 //   - --yes given to a verb without confirm = "user";
-//   - an argument of require, or all of require_one_of, missing or blank.
+//   - an argument of require, or all of require_one_of, missing or blank;
+//   - --assignee that is neither "@me" nor a GitHub login. Whether the user
+//     can be assigned is the reader's to check.
 //
 // A missing --yes is not an argument error: Plan sets Plan.NeedsYes.
 func CheckArgs(v config.Verb, a Args, issues ...string) error {
 	var accepted []string
 	for _, arg := range config.Args() {
-		if v.Uses(arg) {
+		if v.Takes(arg) {
 			accepted = append(accepted, flag(arg))
 		}
 	}
 	for _, arg := range config.Args() {
-		if !a.given(arg) || v.Uses(arg) {
+		if !a.given(arg) || v.Takes(arg) {
 			continue
 		}
 		if len(accepted) == 0 {
@@ -312,12 +325,27 @@ func CheckArgs(v config.Verb, a Args, issues ...string) error {
 			what = fmt.Sprintf("%s needs at least one of %s", v.Name, join(names, "or"))
 		}
 	default:
-		return nil
+		return checkAssignee(v, a, issues)
 	}
 	if blank {
 		what += " (blank values do not count)"
 	}
 	return render.Usage("%s", what).WithFix(Example(v, issues...))
+}
+
+// checkAssignee refuses an --assignee that is neither config.Me nor a
+// GitHub login, as the config refuses one in assign.
+func checkAssignee(v config.Verb, a Args, issues []string) error {
+	login := a.value(config.ArgAssignee)
+	switch {
+	case !v.AssignArg || login == "" || login == config.Me || config.IsLogin(login):
+		return nil
+	case strings.HasPrefix(login, "@"):
+		return render.Usage("--%s %q: write the login without @, or %s for yourself", config.ArgAssignee, login, config.Me).
+			WithFix(Example(v, issues...))
+	}
+	return render.Usage("--%s %q is not a GitHub login; pass a login, or %s for yourself", config.ArgAssignee, login, config.Me).
+		WithFix(Example(v, issues...))
 }
 
 // Example returns a command that runs v on the issues, given as
@@ -338,8 +366,11 @@ func Example(v config.Verb, issues ...string) string {
 }
 
 func placeholder(arg string) string {
-	if arg == config.ArgBy {
+	switch arg {
+	case config.ArgBy:
 		return `"<#N or name>"`
+	case config.ArgAssignee:
+		return "<login>"
 	}
 	return `"<text>"`
 }
@@ -381,10 +412,10 @@ func join(items []string, conj string) string {
 // none of), reopens it,
 // sets the target status, sets the sprint (see planIteration; a day
 // without an iteration is exit code 1) and the fields of the field effect,
-// adds and removes labels, assigns, marks the issue blocked by each of
-// Issue.ByIssues (blockers = "link"; a pull request among them is only
-// named in the comment, with a warning), posts the
-// rendered comment unless it renders empty or the same comment is already
+// adds and removes labels, assigns and unassigns (see planAssign), marks
+// the issue blocked by each of Issue.ByIssues (blockers = "link"; a pull
+// request among them is only named in the comment, with a warning), posts
+// the rendered comment unless it renders empty or the same comment is already
 // the verb's latest (see AlreadyPosted), and closes it. Each effect
 // already in place is left out of Ops (StatusUnchanged, CommentPresent,
 // InPlace): a closed issue is not closed again, whatever its reason. An
@@ -455,24 +486,9 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 	}
 	p.planFields(v)
 	p.planLabels(v)
-	if v.Assign != "" {
-		login := v.Assign
-		switch {
-		case login == config.Me && is.Viewer == "":
-			return nil, render.Internal("%s assigns %s, but the authenticated user was not read", v.Name, config.Me)
-		case login == config.Me:
-			login = is.Viewer
-		case is.AssignLogin != "":
-			login = is.AssignLogin // as GitHub spells it
-		}
-		switch {
-		case slices.ContainsFunc(is.Assignees, func(s string) bool { return strings.EqualFold(s, login) }):
-			p.InPlace = append(p.InPlace, Assign{Login: login})
-		default:
-			// Not among the assignees read: assign, even if the list was
-			// truncated; assigning someone twice changes nothing.
-			p.Ops = append(p.Ops, Assign{Login: login})
-		}
+	assigned, err := p.planAssign(v, a)
+	if err != nil {
+		return nil, err
 	}
 
 	by := NormalizeBy(a.By)
@@ -499,8 +515,9 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 	}
 
 	vars := map[string]string{
-		config.VarComment: a.value(config.ArgComment),
-		config.VarBy:      by,
+		config.VarComment:  a.value(config.ArgComment),
+		config.VarBy:       by,
+		config.VarAssignee: assigned,
 	}
 	noSession := false
 	if v.Uses(config.VarSession) {
@@ -536,6 +553,86 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 	}
 	p.NeedsYes = v.Confirm && !a.Yes && !p.Empty()
 	return p, nil
+}
+
+// planAssign adds the assign and unassign ops of v and returns the login
+// it assigns, "" for none. The user to assign is the config's, or
+// --assignee for assign = "{assignee}"; "@me" (config.Me) is the viewer.
+// One already among the assignees is in place. unassign removes the user
+// it names (in place when not assigned) or, with "all", every assignee
+// but the one the verb assigns: the verb never removes whom it assigns.
+// GitHub allows 10 assignees per issue and the reader reads as many, so
+// Issue.Assignees are all of them.
+func (p *Plan) planAssign(v config.Verb, a Args) (string, error) {
+	is := p.Issue
+	viewer := func(does string) (string, error) {
+		if is.Viewer == "" {
+			return "", render.Internal("%s %s %s, but the authenticated user was not read", v.Name, does, config.Me)
+		}
+		return is.Viewer, nil
+	}
+	// assignee returns the issue's assignee login, as GitHub spells it.
+	assignee := func(login string) (string, bool) {
+		i := slices.IndexFunc(is.Assignees, func(s string) bool { return strings.EqualFold(s, login) })
+		if i < 0 {
+			return login, false
+		}
+		return is.Assignees[i], true
+	}
+	login := v.Assign
+	if v.AssignArg {
+		login = a.value(config.ArgAssignee)
+	}
+	switch {
+	case login == config.Me:
+		var err error
+		if login, err = viewer("assigns"); err != nil {
+			return "", err
+		}
+	case login != "" && is.AssignLogin != "":
+		login = is.AssignLogin // as GitHub spells it
+	}
+	if login != "" {
+		if _, ok := assignee(login); ok {
+			p.InPlace = append(p.InPlace, Assign{Login: login})
+		} else {
+			p.Ops = append(p.Ops, Assign{Login: login})
+		}
+	}
+
+	keep := func(s string) bool { return login != "" && strings.EqualFold(s, login) }
+	switch u := v.Unassign; u {
+	case "":
+	case config.UnassignAll:
+		var remove []string
+		for _, s := range is.Assignees {
+			if !keep(s) {
+				remove = append(remove, s)
+			}
+		}
+		if len(remove) > 0 {
+			p.Ops = append(p.Ops, Unassign{Logins: remove, All: true})
+		} else {
+			p.InPlace = append(p.InPlace, Unassign{All: true})
+		}
+	default:
+		if u == config.Me {
+			var err error
+			if u, err = viewer("unassigns"); err != nil {
+				return "", err
+			}
+		}
+		switch spelled, ok := assignee(u); {
+		case keep(u):
+			// The verb assigns this user too (--assignee, or "@me" and the
+			// same person's login): assigning wins.
+		case ok:
+			p.Ops = append(p.Ops, Unassign{Logins: []string{spelled}})
+		default:
+			p.InPlace = append(p.InPlace, Unassign{Logins: []string{u}})
+		}
+	}
+	return login, nil
 }
 
 // planLabels adds the label ops of v: labels to add that the issue lacks,

@@ -26,7 +26,7 @@ var reviewDryRuns = map[string][]string{
 	"start":           {"start", "21"},
 	"hold":            {"hold", "22", "--by", "17"},
 	"resume":          {"resume", "23"},
-	"review":          {"review", "24", "--comment", "acme/payments#30"},
+	"review":          {"review", "24", "--comment", "acme/payments#30", "--assignee", "octocat"},
 	"request-changes": {"request-changes", "25", "--comment", "Round the refund to the currency's minor unit."},
 	"approve":         {"approve", "26"},
 	"reject":          {"reject", "27", "--comment", "Cheques are out of scope."},

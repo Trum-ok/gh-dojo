@@ -1,0 +1,3 @@
+dry run: unpair #42
+  unassign: Bob
+confirm: #42 unassigned Bob

@@ -4,5 +4,5 @@ dry run: review #24 "Refund receipts"
   status: Changes requested → In review
   labels: +needs-review -changes-requested
   assign: octocat
-  comment: "Ready for review: acme/payments#30"
+  comment: "Ready for review by @octocat: acme/payments#30"
 --- stderr

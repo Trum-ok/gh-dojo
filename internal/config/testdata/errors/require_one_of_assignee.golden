@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.wait.require_one_of names "assignee", which verbs.wait.assign = "{assignee}" always requires
+fix: remove "assignee" from verbs.wait.require_one_of

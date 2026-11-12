@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: pass needs --assignee
+fix: gh dojo pass 3 --assignee <login>

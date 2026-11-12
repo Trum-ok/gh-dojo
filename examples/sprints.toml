@@ -55,7 +55,7 @@ comment = "Moved out of the sprint: {comment}"
 when = "A pull request is open and waits for review"
 from = ["In progress"]
 labels = ["+needs-review"]   # the label must exist in acme/api; gh dojo doctor checks
-assign = "octocat"           # the reviewer; "@me" assigns the authenticated user
+assign = "{assignee}"        # the reviewer, named when it runs: review 12 --assignee octocat
 comment = "{comment}"
 
 # A verb can set other board fields to fixed values. The fields and options

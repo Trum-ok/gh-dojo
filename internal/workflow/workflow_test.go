@@ -92,6 +92,38 @@ when = "Remind whoever has it"
 from = ["In progress", "Waiting"]
 labels = ["+nudged"]
 
+# assign = "{assignee}" and unassign.
+[verbs.ask]
+when = "Ask someone to review"
+to = "Ready"
+from = ["In progress"]
+assign = "{assignee}"
+comment = "Review, please, @{assignee}."
+
+[verbs.send-back]
+when = "Back to the author alone"
+to = "In progress"
+assign = true
+unassign = "all"
+
+[verbs.clear]
+when = "Nobody works on it"
+unassign = "all"
+
+[verbs.let-go]
+when = "Let the issue go"
+unassign = "@me"
+comment = "{comment}"
+
+[verbs.unpair]
+when = "Bob leaves"
+unassign = "bob"
+
+[verbs.swap]
+when = "Hand it over and leave"
+assign = "{assignee}"
+unassign = "@me"
+
 # The blockers check: begin warns, claim and check refuse.
 [verbs.begin]
 when = "Begin, even if blocked"
@@ -331,6 +363,48 @@ func TestPlan(t *testing.T) {
 		{name: "take_me_repeat", verb: "take", noOps: true,
 			issue: Issue{Number: 42, OnBoard: true, Status: "Backlog", Viewer: "carol", Assignees: []string{"carol"}}},
 		{name: "take_me_unknown_viewer", verb: "take", issue: onBoard("Backlog"), code: render.ExitUsage},
+		// ask: assign = "{assignee}", required; {assignee} is the login as
+		// GitHub spells it.
+		{name: "ask_assignee", verb: "ask", hasOps: 3, args: Args{Assignee: " bob ", HasAssignee: true},
+			issue: Issue{Number: 42, OnBoard: true, Status: "In progress", AssignLogin: "Bob", Assignees: []string{"alice"}}},
+		{name: "ask_assignee_repeat", verb: "ask", noOps: true, args: Args{Assignee: "bob", HasAssignee: true},
+			issue: Issue{Number: 42, OnBoard: true, Status: "Ready", AssignLogin: "Bob", Assignees: []string{"Bob"},
+				Comments: []Comment{posted("ask", "Review, please, @Bob.")}}},
+		{name: "ask_me", verb: "ask", hasOps: 3, args: Args{Assignee: "@me", HasAssignee: true},
+			issue: Issue{Number: 42, OnBoard: true, Status: "In progress", Viewer: "carol"}},
+		{name: "ask_missing_assignee", verb: "ask", code: render.ExitUsage, issue: onBoard("In progress")},
+		{name: "ask_blank_assignee", verb: "ask", code: render.ExitUsage, args: Args{Assignee: " ", HasAssignee: true},
+			issue: onBoard("In progress")},
+		{name: "ask_at_login", verb: "ask", code: render.ExitUsage, args: Args{Assignee: "@bob", HasAssignee: true},
+			issue: onBoard("In progress")},
+		{name: "ask_bad_login", verb: "ask", code: render.ExitUsage, args: Args{Assignee: "bob smith", HasAssignee: true},
+			issue: onBoard("In progress")},
+		{name: "take_assignee_not_taken", verb: "take", code: render.ExitUsage, args: Args{Assignee: "bob", HasAssignee: true},
+			issue: onBoard("Backlog")},
+		// send-back: assign = true (alice), unassign = "all": alice alone.
+		{name: "send_back_all", verb: "send-back", hasOps: 2,
+			issue: Issue{Number: 42, OnBoard: true, Status: "Ready", Assignees: []string{"Alice", "bob", "carol"}}},
+		{name: "send_back_alone_already", verb: "send-back", noOps: true,
+			issue: Issue{Number: 42, OnBoard: true, Status: "In progress", Assignees: []string{"alice"}}},
+		{name: "send_back_assigns_author", verb: "send-back", hasOps: 3,
+			issue: Issue{Number: 42, OnBoard: true, Status: "Ready", Assignees: []string{"bob"}}},
+		{name: "clear_all", verb: "clear", hasOps: 1,
+			issue: Issue{Number: 42, OnBoard: true, Status: "Backlog", Assignees: []string{"alice", "bob"}}},
+		{name: "clear_none", verb: "clear", noOps: true, issue: onBoard("Backlog")},
+		// let-go: unassign = "@me", the viewer.
+		{name: "let_go", verb: "let-go", hasOps: 1,
+			issue: Issue{Number: 42, OnBoard: true, Status: "In progress", Viewer: "carol", Assignees: []string{"bob", "Carol"}}},
+		{name: "let_go_not_assigned", verb: "let-go", noOps: true,
+			issue: Issue{Number: 42, OnBoard: true, Status: "In progress", Viewer: "carol", Assignees: []string{"bob"}}},
+		{name: "let_go_unknown_viewer", verb: "let-go", code: render.ExitUsage, issue: onBoard("In progress")},
+		{name: "unpair", verb: "unpair", hasOps: 1,
+			issue: Issue{Number: 42, OnBoard: true, Status: "In progress", Assignees: []string{"alice", "Bob"}}},
+		// --assignee @me on a verb that unassigns @me: assigning wins.
+		{name: "swap_to_self", verb: "swap", hasOps: 1, args: Args{Assignee: "@me", HasAssignee: true},
+			issue: Issue{Number: 42, OnBoard: true, Status: "In progress", Viewer: "carol"}},
+		{name: "swap", verb: "swap", hasOps: 2, args: Args{Assignee: "bob", HasAssignee: true},
+			issue: Issue{Number: 42, OnBoard: true, Status: "In progress", Viewer: "carol", AssignLogin: "bob",
+				Assignees: []string{"carol"}}},
 		// revive: reopen = true, to = "Backlog".
 		{name: "revive_closed", verb: "revive", hasOps: 3,
 			issue: Issue{Number: 42, Closed: true, StateReason: "not_planned", OnBoard: true, Status: "Done"}},

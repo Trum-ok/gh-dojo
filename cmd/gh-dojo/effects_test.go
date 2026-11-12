@@ -61,6 +61,28 @@ when = "Hand it to the owner, login in lowercase"
 assign = "trum-ok"
 `
 
+// assignDojoConfig is effectsDojoConfig with pass (assign =
+// "{assignee}") and hand-back (back to "@me" alone, unassign = "all").
+var assignDojoConfig = effectsDojoConfig + `
+[verbs.pass]
+when = "Pass it to someone"
+assign = "{assignee}"
+comment = "Over to @{assignee}."
+
+[verbs.hand-back]
+when = "Back to the author alone"
+assign = true
+unassign = "all"
+`
+
+// withAssignApp is withEffectsApp with assignDojoConfig.
+func withAssignApp(t *testing.T, fixtures ...string) (*graphtest.Server, int) {
+	t.Helper()
+	srv, before := withEffectsApp(t, fixtures...)
+	withConfig(t, assignDojoConfig)
+	return srv, before
+}
+
 // withEffectsApp is withWarmVerbApp with effectsDojoConfig.
 func withEffectsApp(t *testing.T, fixtures ...string) (*graphtest.Server, int) {
 	t.Helper()
@@ -188,6 +210,35 @@ func TestVerbRemoveAbsentLabel(t *testing.T) {
 func TestVerbAssignLoginCase(t *testing.T) {
 	srv, before := withEffectsApp(t, verbFixture("assign_case"))
 	checkRuns(t, srv, before, runs{[]string{"hand", "3"}, render.ExitOK, 2, "assign_case"})
+}
+
+// TestVerbAssigneeFlag: assign = "{assignee}" takes the user from
+// --assignee, required, looked up with the card like a login of the config:
+// assigned and named in the comment as GitHub spells the login. One who
+// cannot be assigned is exit code 1 with who can (one more read); a
+// missing or malformed one is refused before any read.
+func TestVerbAssigneeFlag(t *testing.T) {
+	srv, before := withAssignApp(t, verbFixture("assignee_flag"), verbFixture("assignee_unknown"))
+	checkRuns(t, srv, before,
+		runs{[]string{"pass", "3", "--assignee", "trum-ok"}, render.ExitOK, 2, "assignee_flag"},
+		runs{[]string{"pass", "3", "--assignee", "octo-nobody"}, render.ExitUsage, 2, "assignee_flag_unknown"},
+		runs{[]string{"pass", "3"}, render.ExitUsage, 0, "assignee_flag_missing"},
+		runs{[]string{"pass", "3", "--assignee", "@trum-ok"}, render.ExitUsage, 0, "assignee_flag_at"},
+		runs{[]string{"hand", "3", "--assignee", "trum-ok"}, render.ExitUsage, 0, "assignee_flag_not_taken"},
+	)
+}
+
+// TestVerbUnassignAll: unassign = "all" with assign = true leaves the
+// author ("@me") the only assignee: the card reads the viewer and the
+// assignees' IDs, and the removal is one mutation. The dry run's JSON
+// names the logins; the repeat writes nothing.
+func TestVerbUnassignAll(t *testing.T) {
+	srv, before := withAssignApp(t, verbFixture("unassign_all"))
+	checkRuns(t, srv, before,
+		runs{[]string{"hand-back", "3", "--dry-run", "--json"}, render.ExitOK, 1, "unassign_all_dry_run"},
+		runs{[]string{"hand-back", "3"}, render.ExitOK, 2, "unassign_all"},
+		runs{[]string{"hand-back", "3"}, render.ExitOK, 1, "unassign_all_repeat"},
+	)
 }
 
 // TestVerbEffectsHelp: the help of a verb says what it does besides the

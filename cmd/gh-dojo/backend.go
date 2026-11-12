@@ -22,10 +22,10 @@ import (
 //
 // Requests with a warm schema cache: ReadIssue sends one query, Apply one
 // mutation, or two for an issue not on the board whose status is set (see
-// effects.Batches). The label and user IDs of the labels and assign
-// effects, and the issue --by names for blockers = "link", come with the
-// card's query (issue.Lookup); only a label to add or a user that does not
-// exist costs one more read, for the error's allowed list. ReadIssues
+// effects.Batches). The label and user IDs of the labels, assign and
+// unassign effects, and the issue --by names for blockers = "link", come
+// with the card's query (issue.Lookup); only a label to add or a user
+// that does not exist costs one more read, for the error's allowed list. ReadIssues
 // sends one query per issue.MaxBatch issues, with the lookups once in
 // each.
 type githubBackend struct {
@@ -74,7 +74,7 @@ func (b *githubBackend) ReadIssues(ctx context.Context, v config.Verb, refs []is
 	if err != nil {
 		return nil, err
 	}
-	lookup := verbLookup(v)
+	lookup := verbLookup(v, a)
 	var bys []issue.Ref // the issues --by names, for blockers = "link"
 	if v.Blockers == config.BlockersLink && a.HasBy {
 		if bys, err = byRefs(v, a.By, def, issue.Ref{}); err != nil {
@@ -286,23 +286,31 @@ func unresolvedBlockers(c *issue.Card, resolved []string, def issue.Repo) ([]wor
 	return out, max(0, c.BlockedBy.TotalCount-len(c.BlockedBy.Nodes))
 }
 
-// verbLookup is what the effects of v need looked up with the card: the
-// IDs of its labels, and of the user it assigns. A verb that removes
-// labels reads all of the issue's labels, so it can tell one is there; a
-// verb that checks blockers reads all of its blockers (GitHub allows 50),
-// so a resolved one is not counted as unread.
-func verbLookup(v config.Verb) issue.Lookup {
+// verbLookup is what the effects of v, run with a, need looked up with
+// the card: the IDs of its labels, and of the user it assigns (from the
+// config or --assignee). A verb that removes labels reads all of the
+// issue's labels, so it can tell one is there; a verb that unassigns reads
+// the IDs of the issue's assignees, and the viewer for "@me"; a verb that
+// checks blockers reads all of its blockers (GitHub allows 50), so a
+// resolved one is not counted as unread.
+func verbLookup(v config.Verb, a workflow.Args) issue.Lookup {
 	l := issue.Lookup{
 		Labels:      append(slices.Clone(v.AddLabels), v.RemoveLabels...),
 		AllLabels:   len(v.RemoveLabels) > 0,
+		AssigneeIDs: v.Unassign != "",
 		AllBlockers: v.ChecksBlockers(),
+		Viewer:      v.Unassign == config.Me,
 	}
-	switch v.Assign {
+	login := v.Assign
+	if v.AssignArg {
+		login = strings.TrimSpace(a.Assignee)
+	}
+	switch login {
 	case "":
 	case config.Me:
 		l.Viewer = true
 	default:
-		l.User = v.Assign
+		l.User = login
 	}
 	return l
 }
@@ -365,6 +373,10 @@ func (b *githubBackend) checkFound(ctx context.Context, v config.Verb, l issue.L
 	case l.User != "" && f.User == nil:
 		e := cfg.Errorf("%s: %s cannot be assigned issues in %s", cfg.KeyPath(key+"assign"), l.User, card.Repo).
 			WithFix(fmt.Sprintf("check the login, or give %s access to %s", l.User, card.Repo))
+		if v.AssignArg {
+			e = render.Usage("--%s: %s cannot be assigned issues in %s", config.ArgAssignee, l.User, card.Repo).
+				WithFix(fmt.Sprintf("check the login, or give %s access to %s", l.User, card.Repo))
+		}
 		if logins, err := b.allowedOnce("assignable", card.Repo, func() ([]string, error) {
 			return assignableUsers(ctx, b.app.Client, card.Repo)
 		}); err == nil {
@@ -372,7 +384,7 @@ func (b *githubBackend) checkFound(ctx context.Context, v config.Verb, l issue.L
 		}
 		return e
 	case l.Viewer && f.Viewer == nil:
-		return render.Network("GitHub did not return the authenticated user for %s = %q", cfg.KeyPath(key+"assign"), config.Me).
+		return render.Network("GitHub did not return the authenticated user for %s", config.Me).
 			WithFix(render.AuthFix)
 	}
 	return nil
@@ -587,6 +599,9 @@ func (b *githubBackend) ids(ctx context.Context, p *workflow.Plan, card *issue.C
 			if u != nil {
 				ids.Users[u.Login] = u.ID
 			}
+		}
+		for login, id := range card.AssigneeIDs { // to unassign
+			ids.Users[login] = id
 		}
 	}
 	for _, op := range p.Ops {

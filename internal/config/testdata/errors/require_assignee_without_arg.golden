@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.start.require names "assignee", but verbs.start.assign is not "{assignee}"
+fix: set assign = "{assignee}" to assign the user --assignee names, or remove "assignee" from verbs.start.require

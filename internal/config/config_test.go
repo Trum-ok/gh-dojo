@@ -145,6 +145,9 @@ func dump(c *Config) string {
 		if v.Blockers != "" {
 			w("  blockers: %q", v.Blockers)
 		}
+		if v.AssignArg || v.Unassign != "" {
+			w("  assign_arg: %v unassign: %q", v.AssignArg, v.Unassign)
+		}
 	}
 	w("status refs:")
 	for _, r := range c.StatusRefs() {
@@ -219,6 +222,35 @@ reopen = true
 [verbs.done]
 close = "duplicate"
 assign = false
+`},
+		// assign = "{assignee}" requires --assignee; unassign removes a
+		// user, or everyone but the one the verb assigns.
+		{"assign_unassign", strings.Replace(presetOnly, "project = 1\n", "project = 1\nassignee = \"@me\"\n", 1) + `
+[verbs.review]
+when = "A pull request is open and waits for review"
+to = "In review"
+assign = "{assignee}"
+comment = "Review, please, @{assignee}: {comment}"
+
+[verbs.request-changes]
+when = "The reviewer asked for changes"
+assign = true
+unassign = "all"
+
+[verbs.drop]
+when = "The issue is not needed"
+close = "not_planned"
+unassign = "@me"
+
+[verbs.leave]
+when = "Hand the issue back"
+unassign = "octocat"
+
+[verbs.hand-over]
+when = "Pass the issue on"
+assign = "{assignee}"
+require = ["assignee"]
+unassign = true
 `},
 		// close = false and confirm = false turn a preset's values off:
 		// done moves to Done and leaves the issue open.
@@ -365,6 +397,15 @@ func TestLoadErrors(t *testing.T) {
 		{"assign_at_login", presetOnly + "[verbs.start]\nassign = \"@alice\"\n"},
 		{"assign_bad_login", presetOnly + "[verbs.start]\nassign = \"alice smith\"\n"},
 		{"assign_wrong_type", presetOnly + "[verbs.start]\nassign = 1\n"},
+		{"assign_unknown_placeholder", presetOnly + "[verbs.start]\nassign = \"{by}\"\n"},
+		{"unassign_from_arg", presetOnly + "[verbs.start]\nunassign = \"{assignee}\"\n"},
+		{"unassign_true_without_board", presetOnly + "[verbs.start]\nunassign = true\n"},
+		{"unassign_bad_login", presetOnly + "[verbs.start]\nunassign = \"@octocat\"\n"},
+		{"unassign_wrong_type", presetOnly + "[verbs.start]\nunassign = [\"octocat\"]\n"},
+		{"assign_and_unassign", presetOnly + "[verbs.start]\nassign = \"Octocat\"\nunassign = \"octocat\"\n"},
+		{"assignee_placeholder_without_arg", presetOnly + "[verbs.start]\ncomment = \"Review: {assignee}\"\n"},
+		{"require_assignee_without_arg", presetOnly + "[verbs.start]\nrequire = [\"assignee\"]\n"},
+		{"require_one_of_assignee", presetOnly + "[verbs.wait]\nassign = \"{assignee}\"\nrequire_one_of = [\"assignee\", \"comment\"]\n"},
 		{"board_assignee_bad", "preset = \"kanban\"\n" + board + "assignee = \"me@x\"\n"},
 		{"board_assignee_at", "preset = \"kanban\"\n" + board + "assignee = \"@Me\"\n"},
 		{"close_bad_reason", presetOnly + "[verbs.done]\nclose = \"done\"\n"},

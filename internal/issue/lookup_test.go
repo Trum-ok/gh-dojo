@@ -93,13 +93,14 @@ func TestReadAllLookup(t *testing.T) {
 }
 
 // TestReadAllLookupQuery: the batch query reads the lookups once, below
-// the aliased issues, and widens the labels and blockers windows.
+// the aliased issues, widens the labels and blockers windows, and reads
+// the assignees' IDs.
 func TestReadAllLookupQuery(t *testing.T) {
 	q := &firstQuery{}
 	req := dojoStatus
-	req.Lookup = issue.Lookup{Labels: []string{"blocked"}, AllLabels: true, AllBlockers: true, Viewer: true}
+	req.Lookup = issue.Lookup{Labels: []string{"blocked"}, AllLabels: true, AllBlockers: true, Viewer: true, AssigneeIDs: true}
 	_, _ = issue.ReadAll(context.Background(), q, req, []int{1, 2})
-	for _, want := range []string{"i1: issueOrPullRequest(number: $n1)", "label0: label(name: $label0)", "viewer { id login }", "labels(first: 100)", "blockedBy(first: 50)"} {
+	for _, want := range []string{"i1: issueOrPullRequest(number: $n1)", "label0: label(name: $label0)", "viewer { id login }", "labels(first: 100)", "blockedBy(first: 50)", "assignees(first: 10) { totalCount nodes { id login } }"} {
 		if strings.Count(q.query, want) != 1 {
 			t.Errorf("query has %d of %q, want 1:\n%s", strings.Count(q.query, want), want, q.query)
 		}

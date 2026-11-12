@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -22,8 +23,8 @@ type Plan struct {
 	// Ops are the operations to apply, in this order, each at most once
 	// (AddBlockedBy once per blocking issue): AddToBoard or Unarchive,
 	// Reopen, SetStatus, SetIteration, SetFields, AddLabels, RemoveLabels,
-	// Assign, AddBlockedBy, AddComment, Close. Empty when there is nothing
-	// to do.
+	// Assign, Unassign, AddBlockedBy, AddComment, Close. Empty when there
+	// is nothing to do.
 	Ops []Op
 
 	StatusUnchanged bool // the issue is already in Target; no SetStatus
@@ -31,8 +32,9 @@ type Plan struct {
 	// InPlace are the verb's effects found already in place, as the ops
 	// that would have applied them: Reopen, SetIteration (From = To),
 	// SetFields (the fields already set), AddLabels, RemoveLabels,
-	// Assign, AddBlockedBy, and Close with the reason the issue was closed with ("" when
-	// unknown). They are never applied; they give the "already" wording of
+	// Assign, Unassign (the users not assigned; none for "all" with nobody
+	// to remove), AddBlockedBy, and Close with the reason the issue was
+	// closed with ("" when unknown). They are never applied; they give the "already" wording of
 	// the dry run and the confirmation line.
 	InPlace []Op
 
@@ -46,8 +48,8 @@ type Plan struct {
 }
 
 // Op is one operation of a plan: AddToBoard, Unarchive, Reopen, SetStatus,
-// SetIteration, SetFields, AddLabels, RemoveLabels, Assign, AddBlockedBy,
-// AddComment or Close. Each kind has its
+// SetIteration, SetFields, AddLabels, RemoveLabels, Assign, Unassign,
+// AddBlockedBy, AddComment or Close. Each kind has its
 // own type, its own field in the mutation (see package effects) and its
 // own words in the dry run, the confirmation line and a partial report.
 type Op interface {
@@ -88,6 +90,14 @@ type RemoveLabels struct {
 // Assign adds Login to the issue's assignees; the others stay.
 type Assign struct {
 	Login string
+}
+
+// Unassign removes Logins from the issue's assignees; the others stay.
+// All says the verb removes every assignee but the one it assigns
+// (unassign = "all").
+type Unassign struct {
+	Logins []string
+	All    bool
 }
 
 // AddBlockedBy marks the issue blocked by the issue Ref ("#12" or
@@ -155,6 +165,9 @@ func (RemoveLabels) op()                {}
 func (a Assign) Describe() string       { return "assign: " + a.Login }
 func (a Assign) Effect() string         { return "assigned " + a.Login }
 func (Assign) op()                      {}
+func (u Unassign) Describe() string     { return "unassign: " + strings.Join(u.Logins, ", ") }
+func (u Unassign) Effect() string       { return "unassigned " + join(u.Logins, "and") }
+func (Unassign) op()                    {}
 func (b AddBlockedBy) Describe() string { return "blocked by: " + b.Ref }
 func (b AddBlockedBy) Effect() string   { return "blocked by " + b.Ref }
 func (AddBlockedBy) op()                {}
@@ -259,8 +272,8 @@ func (p *Plan) Unconfirmed() error {
 }
 
 // lines returns one entry per effect, in a fixed order: board, reopen,
-// status, sprint, fields (one entry per field), labels, assignee,
-// blocked-by link, comment, close. dry picks the dry-run wording
+// status, sprint, fields (one entry per field), labels, assignees (who is
+// assigned, then who is removed), blocked-by link, comment, close. dry picks the dry-run wording
 // (Describe), otherwise the confirmation wording (Effect). Effects already
 // in place are included. The status change of an issue not on the board
 // reads "not on the board → In progress"; in the confirmation that line
@@ -272,7 +285,7 @@ func (p *Plan) lines(dry bool) []string {
 	if dry {
 		pick = Op.Describe
 	}
-	var board, unarchive, reopen, status, sprint, fields, assign, blocked, comment, closing []string
+	var board, unarchive, reopen, status, sprint, fields, assign, unassign, blocked, comment, closing []string
 	var blockers, blockersInPlace []string // refs of AddBlockedBy, joined in one line each
 	var labels, labelsInPlace []string     // +name and -name
 	change := FieldChange.effect
@@ -302,6 +315,8 @@ func (p *Plan) lines(dry bool) []string {
 			labels = append(labels, op.signs()...)
 		case Assign:
 			assign = append(assign, pick(op))
+		case Unassign:
+			unassign = append(unassign, pick(op))
 		case AddBlockedBy:
 			blockers = append(blockers, op.Ref)
 		case AddComment:
@@ -340,6 +355,15 @@ func (p *Plan) lines(dry bool) []string {
 			labelsInPlace = append(labelsInPlace, op.signs()...)
 		case Assign:
 			assign = append(assign, key("assign", op.Login+" already assigned"))
+		case Unassign:
+			text := join(op.Logins, "and") + " already unassigned"
+			if op.All {
+				text = "no assignees"
+				if slices.ContainsFunc(append(slices.Clone(p.Ops), p.InPlace...), func(o Op) bool { _, ok := o.(Assign); return ok }) {
+					text = "no one else assigned"
+				}
+			}
+			unassign = append(unassign, key("unassign", text))
 		case AddBlockedBy:
 			blockersInPlace = append(blockersInPlace, op.Ref)
 		case Close:
@@ -375,7 +399,7 @@ func (p *Plan) lines(dry bool) []string {
 	}
 	board = append(board, unarchive...)
 	var out []string
-	for _, group := range [][]string{board, reopen, status, sprint, fields, label, assign, blocked, comment, closing} {
+	for _, group := range [][]string{board, reopen, status, sprint, fields, label, assign, unassign, blocked, comment, closing} {
 		out = append(out, group...)
 	}
 	return out

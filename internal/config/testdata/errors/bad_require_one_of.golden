@@ -1,2 +1,2 @@
 error: .github/dojo.toml: verbs.wait.require_one_of: unknown argument "why"
-allowed: comment, by
+allowed: comment, by, assignee

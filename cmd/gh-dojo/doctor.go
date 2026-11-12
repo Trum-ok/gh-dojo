@@ -711,16 +711,34 @@ func newVerbsCheck(cfg *config.Config, viewer string) *verbsCheck {
 				c.labels = append(c.labels, name)
 			}
 		}
-		login := v.Assign
-		if login == config.Me {
-			login = viewer
-		}
-		if key := "@" + strings.ToLower(login); login != "" && c.alias[key] == "" {
-			c.alias[key] = fmt.Sprintf("user%d", len(c.users))
-			c.users = append(c.users, login)
+		for _, login := range verbUsers(v) {
+			if login.name == config.Me {
+				login.name = viewer
+			}
+			if key := "@" + strings.ToLower(login.name); login.name != "" && c.alias[key] == "" {
+				c.alias[key] = fmt.Sprintf("user%d", len(c.users))
+				c.users = append(c.users, login.name)
+			}
 		}
 	}
 	return c
+}
+
+// verbUser is a user a verb's config names, with its key: "assign" or
+// "unassign".
+type verbUser struct{ key, name string }
+
+// verbUsers are the users v assigns and unassigns by login or "@me";
+// --assignee and unassign = "all" name nobody to check.
+func verbUsers(v config.Verb) []verbUser {
+	var out []verbUser
+	if v.Assign != "" {
+		out = append(out, verbUser{"assign", v.Assign})
+	}
+	if v.Unassign != "" && v.Unassign != config.UnassignAll {
+		out = append(out, verbUser{"unassign", v.Unassign})
+	}
+	return out
 }
 
 func (c *verbsCheck) empty() bool { return len(c.labels) == 0 && len(c.users) == 0 }
@@ -825,18 +843,23 @@ func checkVerbs(ctx context.Context, r *doctorReport, a *App, cfg *config.Config
 			}
 			problem(e)
 		}
-		switch login := v.Assign; {
-		case login == "":
-		case login == config.Me && viewer == "":
-			// The token check did not read the viewer.
-		case login == config.Me && !assignable(viewer):
-			problem(render.Usage("%s = %q: you (%s) cannot be assigned issues in %s",
-				cfg.KeyPath("verbs."+v.Name+".assign"), config.Me, viewer, repoName).
-				WithFix(fmt.Sprintf("get write access to %s, or change %s", repoName, cfg.KeyPath("verbs."+v.Name+".assign"))))
-		case login != config.Me && !assignable(login):
-			problem(render.Usage("%s: %s cannot be assigned issues in %s",
-				cfg.KeyPath("verbs."+v.Name+".assign"), login, repoName).
-				WithFix(fmt.Sprintf("check the login, or give %s access to %s", login, repoName)))
+		for _, u := range verbUsers(v) {
+			key := cfg.KeyPath("verbs." + v.Name + "." + u.key)
+			never := ""
+			if u.key == "unassign" {
+				never = ", so unassign never removes anyone"
+			}
+			switch login := u.name; {
+			case login == config.Me && viewer == "":
+				// The token check did not read the viewer.
+			case login == config.Me && !assignable(viewer):
+				problem(render.Usage("%s = %q: you (%s) cannot be assigned issues in %s%s",
+					key, config.Me, viewer, repoName, never).
+					WithFix(fmt.Sprintf("get write access to %s, or change %s", repoName, key)))
+			case login != config.Me && !assignable(login):
+				problem(render.Usage("%s: %s cannot be assigned issues in %s%s", key, login, repoName, never).
+					WithFix(fmt.Sprintf("check the login, or give %s access to %s", login, repoName)))
+			}
 		}
 	}
 	if problems == 0 {

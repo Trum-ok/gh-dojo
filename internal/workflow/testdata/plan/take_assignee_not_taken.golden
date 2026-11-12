@@ -1,0 +1,3 @@
+code: 1
+error: take does not use --assignee; it takes no arguments besides the issue number
+fix: gh dojo take 42

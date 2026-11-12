@@ -1,0 +1,3 @@
+code: 1
+error: ask needs --assignee (blank values do not count)
+fix: gh dojo ask 42 --assignee <login>

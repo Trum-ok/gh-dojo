@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: hand does not use --assignee; it takes no arguments besides the issue number
+fix: gh dojo hand 3

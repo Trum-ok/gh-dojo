@@ -12,10 +12,13 @@ const (
 	VarSession = "session" // agent session link, see Session.Resolve
 	VarComment = ArgComment
 	VarBy      = ArgBy
+	// VarAssignee is the login of the user --assignee names, as GitHub
+	// spells it; only a verb with assign = "{assignee}" may use it.
+	VarAssignee = ArgAssignee
 )
 
 var (
-	commentVars = []string{VarSession, VarComment, VarBy}
+	commentVars = []string{VarSession, VarComment, VarBy, VarAssignee}
 	linkVars    = []string{"id"}
 
 	// placeholderRE matches {name}. Other braces, such as "{}" or "{ x }",

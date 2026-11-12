@@ -1,0 +1,24 @@
+mutation Verb($project: ID!, $item: ID!, $field: ID!, $option: String!, $issue: ID!, $assignees: [ID!]!, $unassignees: [ID!]!, $body: String!) {
+  status: updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field, value: {singleSelectOptionId: $option}}) { projectV2Item { id } }
+  assign: addAssigneesToAssignable(input: {assignableId: $issue, assigneeIds: $assignees}) { clientMutationId }
+  unassign: removeAssigneesFromAssignable(input: {assignableId: $issue, assigneeIds: $unassignees}) { clientMutationId }
+  comment: addComment(input: {subjectId: $issue, body: $body}) { commentEdge { node { id } } }
+}
+--- vars
+{
+  "assignees": [
+    "U_1"
+  ],
+  "body": "Started.\n\n<!-- gh-dojo:start:995a443b -->",
+  "field": "PVTSSF_1",
+  "issue": "I_1",
+  "item": "PVTI_1",
+  "option": "47fc9ee4",
+  "project": "PVT_1",
+  "unassignees": [
+    "U_2",
+    "U_3"
+  ]
+}
+--- steps
+status, assign, unassign, comment

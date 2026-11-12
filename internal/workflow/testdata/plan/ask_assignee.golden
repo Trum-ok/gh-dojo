@@ -1,0 +1,6 @@
+dry run: ask #42
+  status: In progress → Ready
+  assign: Bob
+  comment: "Review, please, @Bob."
+confirm: #42 In progress → Ready, assigned Bob, comment left
+post: "Review, please, @Bob.\n\n<!-- gh-dojo:ask:eab82919 -->"

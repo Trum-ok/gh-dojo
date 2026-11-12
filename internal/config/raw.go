@@ -68,6 +68,7 @@ type rawVerb struct {
 	Comment      *string    `toml:"comment"`
 	Labels       *[]string  `toml:"labels"`
 	Assign       *rawAssign `toml:"assign"`
+	Unassign     *rawAssign `toml:"unassign"`
 	Close        *rawOff    `toml:"close"`
 	Reopen       *bool      `toml:"reopen"`
 	Confirm      *rawOff    `toml:"confirm"`
@@ -94,9 +95,9 @@ func (f *rawFields) UnmarshalTOML(v any) error {
 	return nil
 }
 
-// rawAssign is the value of a verb's assign key: true (board.assignee),
-// false (nobody, to turn off a preset's assign) or a login ("@me" or a
-// user).
+// rawAssign is the value of a verb's assign or unassign key: true
+// (board.assignee), false (nobody, to turn off a preset's) or a string: a
+// login ("@me" or a user), "{assignee}" (assign) or "all" (unassign).
 type rawAssign struct {
 	Bool *bool
 	User *string
@@ -146,7 +147,7 @@ func (v *rawVerb) setKeys() []string {
 		{"when", v.When != nil}, {"to", v.To != nil}, {"from", v.From != nil},
 		{"require", v.Require != nil}, {"require_one_of", v.RequireOneOf != nil},
 		{"comment", v.Comment != nil}, {"labels", v.Labels != nil}, {"assign", v.Assign != nil},
-		{"close", v.Close != nil}, {"reopen", v.Reopen != nil}, {"confirm", v.Confirm != nil},
+		{"unassign", v.Unassign != nil}, {"close", v.Close != nil}, {"reopen", v.Reopen != nil}, {"confirm", v.Confirm != nil},
 		{"iteration", v.Iteration != nil}, {"field", v.Field != nil},
 		{"blockers", v.Blockers != nil}, {"batch", v.Batch != nil},
 	} {
@@ -168,7 +169,7 @@ var (
 	agentKeys    = []string{"targets", "notes", "description"}
 	verbKeys     = []string{
 		"when", "to", "from", "require", "require_one_of", "comment",
-		"labels", "assign", "close", "reopen", "confirm", "iteration", "field", "blockers", "batch", "disabled",
+		"labels", "assign", "unassign", "close", "reopen", "confirm", "iteration", "field", "blockers", "batch", "disabled",
 	}
 
 	// unsupportedVerbKeys are verb keys from the spec that this version
@@ -451,6 +452,7 @@ func mergeVerb(m merger, name string, base, over *rawVerb) *rawVerb {
 		Comment:      pick(m, p+"comment", base.Comment, over.Comment),
 		Labels:       pick(m, p+"labels", base.Labels, over.Labels),
 		Assign:       pick(m, p+"assign", base.Assign, over.Assign),
+		Unassign:     pick(m, p+"unassign", base.Unassign, over.Unassign),
 		Close:        pick(m, p+"close", base.Close, over.Close),
 		Reopen:       pick(m, p+"reopen", base.Reopen, over.Reopen),
 		Confirm:      pick(m, p+"confirm", base.Confirm, over.Confirm),

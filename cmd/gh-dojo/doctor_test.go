@@ -407,3 +407,30 @@ assign = true
 when = "Hand it to the owner"
 assign = "trum-ok"
 `
+
+// TestVerbsCheckUsers: doctor checks the users verbs assign and unassign
+// by login or "@me" (the viewer), each once regardless of case; --assignee
+// and unassign = "all" name nobody to check.
+func TestVerbsCheckUsers(t *testing.T) {
+	cfg, err := config.Parse([]byte(verbDojoConfig+`
+[verbs.pass]
+when = "Pass it on"
+assign = "{assignee}"
+unassign = "@me"
+
+[verbs.hand-back]
+when = "Back to the author alone"
+assign = "Octocat"
+unassign = "all"
+
+[verbs.leave]
+when = "Octocat leaves"
+unassign = "octocat"
+`), ".github/dojo.toml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := newVerbsCheck(cfg, "Trum-ok").users; !slices.Equal(got, []string{"Trum-ok", "Octocat"}) {
+		t.Errorf("users = %q, want Trum-ok (@me) and Octocat", got)
+	}
+}

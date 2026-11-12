@@ -23,6 +23,10 @@ type Lookup struct {
 	// issue) instead of the card's 20, for a verb that removes labels: a
 	// label beyond the window would read as absent.
 	AllLabels bool
+	// AssigneeIDs reads the node IDs of the issue's assignees too
+	// (Card.AssigneeIDs), for a verb that unassigns: removing an assignee
+	// takes its ID.
+	AssigneeIDs bool
 	// AllBlockers reads up to 50 of the issue's blockers (GitHub's limit
 	// per issue) instead of the card's 20, for a verb that checks them
 	// (blockers = "warn" or "deny"): a resolved blocker beyond the window
@@ -35,7 +39,8 @@ type Lookup struct {
 
 // Empty reports whether there is nothing to look up.
 func (l Lookup) Empty() bool {
-	return len(l.Labels) == 0 && l.User == "" && !l.Viewer && !l.AllLabels && !l.AllBlockers && len(l.Links) == 0
+	return len(l.Labels) == 0 && l.User == "" && !l.Viewer && !l.AllLabels && !l.AssigneeIDs && !l.AllBlockers &&
+		len(l.Links) == 0
 }
 
 // Found is what a Lookup found. Its IDs are for mutations only; never
@@ -65,11 +70,15 @@ type User struct {
 const assignableWindow = 100
 
 // labelsWindow is the labels selection of cardSelection; Lookup.AllLabels
-// widens it to allLabelsWindow. blockersWindow is its blockers selection;
-// Lookup.AllBlockers widens it to allBlockersWindow.
+// widens it to allLabelsWindow. assigneesWindow is its assignees
+// selection; Lookup.AssigneeIDs adds their IDs (assigneeIDsWindow).
+// blockersWindow is its blockers selection; Lookup.AllBlockers widens it
+// to allBlockersWindow.
 const (
 	labelsWindow      = "labels(first: 20)"
 	allLabelsWindow   = "labels(first: 100)"
+	assigneesWindow   = "assignees(first: 10) { totalCount nodes { login } }"
+	assigneeIDsWindow = "assignees(first: 10) { totalCount nodes { id login } }"
 	blockersWindow    = "blockedBy(first: 20)"
 	allBlockersWindow = "blockedBy(first: 50)"
 )
@@ -92,7 +101,7 @@ func labelAlias(i int) string { return fmt.Sprintf("label%d", i) }
 // itself.
 //
 // AllLabels widens the issue's labels window, AllBlockers its blockers
-// window.
+// window; AssigneeIDs reads the assignees' IDs.
 //
 //	query IssueCard(..., $label0: String!, $user: String!) {
 //	  repository(owner: $owner, name: $repo) {
@@ -146,10 +155,14 @@ func (l Lookup) parts() lookupParts {
 }
 
 // widen widens the issue's windows of a card selection: labels for
-// Lookup.AllLabels, blockers for Lookup.AllBlockers.
+// Lookup.AllLabels, assignees with their IDs for Lookup.AssigneeIDs,
+// blockers for Lookup.AllBlockers.
 func (l Lookup) widen(s string) string {
 	if l.AllLabels {
 		s = strings.Replace(s, labelsWindow, allLabelsWindow, 1)
+	}
+	if l.AssigneeIDs {
+		s = strings.Replace(s, assigneesWindow, assigneeIDsWindow, 1)
 	}
 	if l.AllBlockers {
 		s = strings.Replace(s, blockersWindow, allBlockersWindow, 1)

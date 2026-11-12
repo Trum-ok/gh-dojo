@@ -22,6 +22,7 @@ var (
 	addLabels = workflow.AddLabels{Names: []string{"in-review", "Needs QA"}}
 	rmLabels  = workflow.RemoveLabels{Names: []string{"blocked"}}
 	assign    = workflow.Assign{Login: "Trum-ok"}
+	unassign  = workflow.Unassign{Logins: []string{"octocat", "Hubot"}, All: true}
 	closing   = workflow.Close{Reason: "not_planned"}
 	sprint    = workflow.SetIteration{From: "Sprint 11", To: "Sprint 12", Start: "2026-11-09"}
 	unsprint  = workflow.SetIteration{From: "Sprint 12"}
@@ -35,7 +36,7 @@ var (
 var ids = effects.IDs{
 	Project: "PVT_1", Issue: "I_1", Item: "PVTI_1", StatusField: "PVTSSF_1", StatusOption: "47fc9ee4",
 	Labels:      map[string]string{"in-review": "LA_1", "needs qa": "LA_2", "blocked": "LA_3"},
-	Users:       map[string]string{"trum-ok": "U_1"},
+	Users:       map[string]string{"trum-ok": "U_1", "octocat": "U_2", "hubot": "U_3"},
 	SprintField: "PVTIF_1", Iteration: "it12",
 	Fields: map[string]effects.FieldInput{
 		"Estimate": {ID: "PVTF_est", Value: map[string]any{"number": 3.0}},
@@ -63,6 +64,7 @@ func TestBuild(t *testing.T) {
 		{"close_duplicate", []workflow.Op{workflow.Close{Reason: "duplicate"}}, ids},
 		{"reopen_status", []workflow.Op{reopen, status}, ids},
 		{"labels_assign", []workflow.Op{addLabels, rmLabels, assign}, ids},
+		{"status_assign_unassign_comment", []workflow.Op{status, assign, unassign, comment}, ids},
 		{"all", []workflow.Op{unarchive, reopen, status, addLabels, rmLabels, assign, comment}, ids},
 		{"board_labels_close", []workflow.Op{toBoard, addLabels, comment, closing}, notOnBoard},
 		{"status_sprint_close", []workflow.Op{status, sprint, closing}, ids},
@@ -103,6 +105,7 @@ func TestBuildDeclaresWhatItUses(t *testing.T) {
 	for _, ops := range [][]workflow.Op{
 		{status, comment}, {status}, {comment}, {toBoard}, {toBoard, comment}, {unarchive, status},
 		{closing}, {reopen}, {addLabels}, {rmLabels}, {assign}, {reopen, status, addLabels, rmLabels, assign, comment},
+		{unassign}, {assign, unassign, comment},
 		{comment, closing}, {sprint}, {unsprint}, {setFields}, {status, sprint, setFields, comment}, {blockedBy}, {status, blockedBy, comment}, {blockedBy, blocked2},
 	} {
 		m, err := effects.Build(ops, ids)
@@ -153,6 +156,7 @@ func TestBuildErrors(t *testing.T) {
 		"label_id":     {[]workflow.Op{workflow.AddLabels{Names: []string{"nope"}}}, ids},
 		"remove_id":    {[]workflow.Op{workflow.RemoveLabels{Names: []string{"nope"}}}, ids},
 		"user_id":      {[]workflow.Op{workflow.Assign{Login: "nobody"}}, ids},
+		"unassign_id":  {[]workflow.Op{workflow.Unassign{Logins: []string{"octocat", "nobody"}}}, ids},
 		"no_labels":    {[]workflow.Op{workflow.AddLabels{}}, ids},
 		"close_twice":  {[]workflow.Op{closing, closing}, ids},
 		"sprint_item":  {[]workflow.Op{sprint}, noItem},

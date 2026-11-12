@@ -72,7 +72,7 @@ var getenv = os.Getenv
 // behind it; after a partial failure the agent re-runs the command.
 type Backend interface {
 	// ReadIssue returns the state of issue ref for verb v, filled as workflow.Issue documents (comments with viewerDidAuthor,
-	// labels, assignees, and the viewer when v assigns @me), with a render
+	// labels, assignees, and the viewer when v assigns or unassigns @me), with a render
 	// error on failure (render.NotFound for a missing issue; a config error
 	// for a label of v to add that is missing in the repo, a label spelled
 	// in another case than the repo's, or an assignee who cannot be
@@ -151,6 +151,7 @@ func newVerbCmd(cfg *config.Config, v config.Verb) *cobra.Command {
 		RunE: func(cmd *cobra.Command, posArgs []string) error {
 			args.HasComment = cmd.Flags().Changed(config.ArgComment)
 			args.HasBy = cmd.Flags().Changed(config.ArgBy)
+			args.HasAssignee = cmd.Flags().Changed(config.ArgAssignee)
 			refs := argRefs(posArgs, issue.Repo{}) // validated by issueArgs
 			if len(refs) == 1 {
 				return runVerb(cmd, cfg, v, refs[0], args, dryRun)
@@ -165,12 +166,13 @@ func newVerbCmd(cfg *config.Config, v config.Verb) *cobra.Command {
 		byUsage = "value for {by} in the comment: issues (12, #12, owner/repo#12 or URLs, comma-separated), also marked as blocking this one, or free text"
 	}
 	f.StringVar(&args.By, config.ArgBy, "", byUsage)
+	f.StringVar(&args.Assignee, config.ArgAssignee, "", "the user to assign: a login, or @me for yourself")
 	f.BoolVar(&dryRun, "dry-run", false, "print the plan without changing anything")
 	f.BoolVar(&args.Yes, "yes", false, "the user agreed: run a verb that is the user's decision")
-	// Flags the comment template does not use stay registered but hidden, so
-	// passing one gets workflow's precise error instead of "unknown flag".
+	// Flags the verb does not take stay registered but hidden, so passing
+	// one gets workflow's precise error instead of "unknown flag".
 	for _, arg := range config.Args() {
-		if !v.Uses(arg) {
+		if !v.Takes(arg) {
 			_ = f.MarkHidden(arg)
 		}
 	}
@@ -572,7 +574,7 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 		case slices.Contains(v.Require, arg):
 			required = append(required, "--"+arg)
 		case slices.Contains(v.RequireOneOf, arg):
-		case v.Uses(arg):
+		case v.Takes(arg):
 			optional = append(optional, "--"+arg)
 		}
 	}
@@ -617,12 +619,31 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 		}
 		line("Labels", "%s (+ adds, - removes)", strings.Join(signs, " "))
 	}
-	switch v.Assign {
+	stay := "; other assignees stay"
+	if v.Unassign != "" {
+		stay = "" // see the Unassign line
+	}
+	switch {
+	case v.AssignArg:
+		line("Assign", "the --%s user (a login, or @me for you)%s", config.ArgAssignee, stay)
+		line("", "one who cannot be assigned issues in the repository is exit code 1, with who can")
+	case v.Assign == config.Me:
+		line("Assign", "you (the authenticated user)%s", stay)
+	case v.Assign != "":
+		line("Assign", "%s%s", v.Assign, stay)
+	}
+	switch v.Unassign {
 	case "":
+	case config.UnassignAll:
+		if v.Assigns() {
+			line("Unassign", "everyone else: the user it assigns stays the only assignee")
+		} else {
+			line("Unassign", "everyone: the issue is left with no assignees")
+		}
 	case config.Me:
-		line("Assign", "you (the authenticated user); other assignees stay")
+		line("Unassign", "you (the authenticated user); other assignees stay")
 	default:
-		line("Assign", "%s; other assignees stay", v.Assign)
+		line("Unassign", "%s; other assignees stay", v.Unassign)
 	}
 	switch v.Blockers {
 	case config.BlockersWarn:

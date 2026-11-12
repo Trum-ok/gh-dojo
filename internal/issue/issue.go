@@ -115,6 +115,9 @@ type Card struct {
 
 	Labels    graph.Page[string] // label names
 	Assignees graph.Page[string] // logins
+	// AssigneeIDs maps each login of Assignees to its user node ID, read
+	// with Lookup.AssigneeIDs; nil without it. Never print them.
+	AssigneeIDs map[string]string
 	// Comments are the latest ones, oldest first; TotalCount counts all.
 	Comments graph.Page[Comment]
 	// BlockedBy are the issues blocking this one, Blocking those it blocks,
@@ -516,6 +519,12 @@ func (n *issueJSON) card(req Request, hidden [][]any) *Card {
 	c.Assignees.TotalCount = n.Assignees.TotalCount
 	for _, a := range n.Assignees.Nodes {
 		c.Assignees.Nodes = append(c.Assignees.Nodes, a.Login)
+		if a.ID != "" {
+			if c.AssigneeIDs == nil {
+				c.AssigneeIDs = map[string]string{}
+			}
+			c.AssigneeIDs[a.Login] = a.ID
+		}
 	}
 	c.Comments.TotalCount = n.Comments.TotalCount
 	for _, cm := range n.Comments.Nodes {

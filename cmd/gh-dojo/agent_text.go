@@ -261,7 +261,7 @@ func (d *agentDoc) confirmExample() string {
 		if v.To != "" && len(v.From) > 0 && v.From[0] != v.To {
 			ex := "#42 " + v.From[0] + " → " + v.To
 			// A template with text of its own comments every time.
-			if strings.TrimSpace(strings.NewReplacer("{comment}", "", "{by}", "", "{session}", "").Replace(v.Comment)) != "" {
+			if strings.TrimSpace(strings.NewReplacer("{comment}", "", "{by}", "", "{session}", "", "{assignee}", "").Replace(v.Comment)) != "" {
 				ex += ", comment left"
 			}
 			return ex
@@ -307,6 +307,11 @@ func (d *agentDoc) rules(v config.Verb) []string {
 			s += " Once the blocker is resolved, go on with " + strings.Join(quoted(next), " or ") + "."
 		}
 		r = append(r, s)
+	}
+	if v.AssignArg {
+		r = append(r, fmt.Sprintf("`--%s <login>` names the user to assign (`--%s @me` is you); one who cannot "+
+			"be assigned issues in the repository is exit code 1, with the list of who can. Ask the user "+
+			"whom to assign if you do not know.", config.ArgAssignee, config.ArgAssignee))
 	}
 	if v.Batch {
 		r = append(r, fmt.Sprintf("It takes several numbers at once, `gh dojo %s 12 13 14`: each issue is "+

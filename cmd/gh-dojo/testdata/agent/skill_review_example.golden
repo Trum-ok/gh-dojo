@@ -55,21 +55,22 @@ Run a verb as `gh dojo <verb> N` (`N`, `#N` or `owner/repo#N`); `--dry-run` prin
 
 **When:** The pull request is open and ready for review
 
-`gh dojo review N`: In progress, Changes requested → In review; needs --comment; labels +needs-review -changes-requested; assigns octocat; comments "Ready for review: {comment}".
+`gh dojo review N`: In progress, Changes requested → In review; needs --comment and --assignee; labels +needs-review -changes-requested; assigns the --assignee user; comments "Ready for review by @{assignee}: {comment}".
 
 - It is refused (exit code 2) while a blocker is unresolved: `gh dojo show N` lists them. Never move the status another way.
+- `--assignee <login>` names the user to assign (`--assignee @me` is you); one who cannot be assigned issues in the repository is exit code 1, with the list of who can. Ask the user whom to assign if you do not know.
 
 ### `request-changes`
 
 **When:** The reviewer asked for changes; the author makes them and runs review again
 
-`gh dojo request-changes N`: In review → Changes requested; needs --comment; labels +changes-requested -needs-review; comments "Changes requested: {comment}".
+`gh dojo request-changes N`: In review → Changes requested; needs --comment; labels +changes-requested -needs-review; assigns you; unassigns everyone else; comments "Changes requested: {comment}".
 
 ### `approve`
 
 **When:** The user approved the pull request after reviewing it
 
-`gh dojo approve N`: In review → Approved; optional --comment; labels -needs-review; comments "Approved. {comment}".
+`gh dojo approve N`: In review → Approved; optional --comment; labels -needs-review; assigns you; unassigns everyone else; comments "Approved. {comment}".
 
 - It is the user's decision: without `--yes` it exits with code 2. Ask the user, and run it again with `--yes` only if they agree; never add `--yes` on your own.
 

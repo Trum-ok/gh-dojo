@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.start.unassign = "{assignee}": a verb removes only users the config names
+allowed: true, false, "@me", a login, "all"

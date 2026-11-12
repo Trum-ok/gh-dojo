@@ -1,0 +1,5 @@
+dry run: send-back #42
+  status: Ready → In progress
+  assign: alice already assigned
+  unassign: bob, carol
+confirm: #42 Ready → In progress, alice already assigned, unassigned bob and carol
