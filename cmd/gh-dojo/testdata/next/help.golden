@@ -1,0 +1,35 @@
+code: 0
+--- stdout
+Use it to choose what to work on next: one line per open issue in the initial
+status (statuses.initial) or without a status, in board order, leaving out
+those with an unresolved blocker: open and not in a resolved status
+(statuses.resolved), the rule of show and start. A blocker that is not on the
+board, or that could not be read, counts as unresolved.
+
+The blocked issues are counted; --all shows them too, with their blockers.
+Filters combine with AND; the issues they leave out are counted. Only
+issues are listed. gh dojo list shows the rest of the board.
+
+Usage:
+  gh dojo next [flags]
+
+Examples:
+  gh dojo next
+  gh dojo next --mine --limit 1
+  gh dojo next --label bug
+  gh dojo next --sprint current
+  gh dojo next --all
+
+Flags:
+      --all                 also show issues with unresolved blockers, naming them
+  -h, --help                help for next
+      --label stringArray   only issues with this label; repeat to require several
+      --limit int           print at most this many issues (default 5)
+      --mine                only issues assigned to you
+      --sprint string       only issues in this sprint (fields.sprint): "current" (today, in board.timezone), a title, or "none"
+
+Global Flags:
+  -q, --jq expression       filter the JSON with a jq expression (implies --json)
+      --json                print the result as JSON (schema_version 1), errors too
+  -t, --template template   format the JSON with a Go template (implies --json)
+--- stderr

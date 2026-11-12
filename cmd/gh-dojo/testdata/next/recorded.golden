@@ -1,0 +1,5 @@
+code: 0
+--- stdout
+#34 e2e обоих пресетов на доске-песочнице в CI [enhancement]
+hidden: 2 blocked, use --all
+--- stderr

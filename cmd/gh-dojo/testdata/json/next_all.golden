@@ -1,0 +1,84 @@
+code: 0
+--- stdout
+{
+  "schema_version": 1,
+  "error": null,
+  "sprint_filter": null,
+  "sprint": null,
+  "issues": [
+    {
+      "repo": "Trum-ok/gh-dojo",
+      "number": 34,
+      "title": "e2e обоих пресетов на доске-песочнице в CI",
+      "state": "open",
+      "status": "Backlog",
+      "labels": [
+        "enhancement"
+      ],
+      "labels_total": 1,
+      "assignees": [],
+      "assignees_total": 0,
+      "unresolved_blockers": [],
+      "unread_blockers": 0
+    },
+    {
+      "repo": "Trum-ok/gh-dojo",
+      "number": 41,
+      "title": "Команда release: задачи релиза через PR и коммиты",
+      "state": "open",
+      "status": "Backlog",
+      "labels": [
+        "enhancement"
+      ],
+      "labels_total": 1,
+      "assignees": [],
+      "assignees_total": 0,
+      "unresolved_blockers": [
+        {
+          "ref": "#38",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 38,
+          "on_board": true,
+          "status": "In progress"
+        }
+      ],
+      "unread_blockers": 0
+    },
+    {
+      "repo": "Trum-ok/gh-dojo",
+      "number": 42,
+      "title": "Рубеж v0.2: пример своего флоу только конфигом",
+      "state": "open",
+      "status": "Backlog",
+      "labels": [
+        "documentation"
+      ],
+      "labels_total": 1,
+      "assignees": [],
+      "assignees_total": 0,
+      "unresolved_blockers": [
+        {
+          "ref": "#40",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 40,
+          "on_board": true,
+          "status": "In progress"
+        }
+      ],
+      "unread_blockers": 0
+    }
+  ],
+  "matched": 3,
+  "unchecked": 0,
+  "hidden": 0,
+  "filtered": 0,
+  "skipped": {
+    "draft_issues": 0,
+    "pull_requests": 0,
+    "unseen": 0
+  },
+  "incomplete": false,
+  "warnings": []
+}
+
+--- stderr

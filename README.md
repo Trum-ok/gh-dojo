@@ -115,6 +115,7 @@ also be authorized for it.
 4. Work:
 
    ```sh
+   gh dojo next            # issues to take: Backlog or no status, not blocked
    gh dojo list            # open issues on the board, grouped by status
    gh dojo show 42         # read an issue before working on it
    gh dojo start 42        # Backlog → In progress, with a comment
@@ -129,6 +130,7 @@ also be authorized for it.
 |---------|--------------|
 | [`show`](#show) | Read issues: board status, sprint, blockers, history, description, comments |
 | [`list`](#list) | One line per open issue on the board, grouped by status |
+| [`next`](#next) | Issues to take: initial status, no unresolved blockers, in board order |
 | [`new`](#new) | Create an issue with labels, milestone and blockers, on the board, in the initial status |
 | [`comment`](#comment) | Comment without changing the status |
 | [`block`, `unblock`](#block-unblock) | Add or remove blocked-by links without changing the status |
@@ -188,6 +190,40 @@ total.
 iteration: `current` (the one covering today in [`board.timezone`](#board)),
 a title, or `none` (no sprint). The first line names the iteration with its
 days; an unknown title lists the iterations.
+
+### next
+
+```sh
+gh dojo next [--label L]... [--mine] [--sprint current|TITLE|none] [--all] [--limit N]
+```
+
+What to work on next: one line per open issue in the initial status
+([`statuses.initial`](#statuses)) or without a status, in board order, as
+`list` prints it, leaving out the issues with an unresolved blocker. A
+blocker is resolved when it is closed or on the board in a
+[`statuses.resolved`](#statuses) status, the rule of `show` and the
+`blockers` check; a blocker not on the board (or archived there) or that the
+token cannot read counts as unresolved. The blocked issues are counted
+(`hidden: 2 blocked, use --all`); `--all` shows them too, each with its
+blockers:
+
+```text
+$ gh dojo next
+#34 Run the e2e tests on a sandbox board [enhancement]
+hidden: 2 blocked, use --all
+$ gh dojo next --all
+#34 Run the e2e tests on a sandbox board [enhancement]
+#41 Add the release command [enhancement] — blocked by #38 (In progress)
+#42 Configure another flow without code [documentation] — blocked by #40 (In progress)
+```
+
+`--label`, `--mine` and `--sprint` filter as in [`list`](#list), and the
+issues they leave out are counted. At most `--limit` issues are printed
+(default 5), with the total. Closed issues and issues in other statuses are
+not candidates; draft issues, pull requests and items the token cannot see in
+the initial status or without one are counted as skipped. Blockers are read
+with the board's items, so `next` takes as many requests as `list`. It needs
+`statuses.initial`: without it, it is a config error (exit code 1).
 
 ### new
 
@@ -299,7 +335,8 @@ agent's context: when to use each verb, the arguments it needs or takes, what
 it checks and does along the way (comment, sprint, labels, assignee, closing
 or reopening, blocked-by links, the blockers check, closed issues, the
 user's go-ahead), then the lifecycle (from → to), the initial, final and
-resolved statuses, and the exit codes. It reads only the config, never the
+resolved statuses, and the exit codes; with an initial status it points at
+[`next`](#next) to find an issue. It reads only the config, never the
 network; a missing or broken config is an error (exit code 1).
 `gh dojo <verb> --help` has the details of one verb.
 
@@ -513,7 +550,7 @@ disabled = true              # drop a verb that the preset defines
 | `project`  | yes      | Project number from its URL, 1 or greater |
 | `repos`    | no       | `owner/name` list; the first is the default repo for issue numbers and `new`. Empty: the current repo (`GH_REPO`, else the git remote) |
 | `assignee` | no       | Who a verb with `assign = true` assigns: `"@me"` (the authenticated user) or a login |
-| `timezone` | no       | An IANA time zone, like `"Europe/Moscow"`; UTC when not set. The [`iteration`](#effects) effect, `list --sprint current` and `doctor` take today, and the day an issue entered a status, as dates in it |
+| `timezone` | no       | An IANA time zone, like `"Europe/Moscow"`; UTC when not set. The [`iteration`](#effects) effect, `list --sprint current`, `next --sprint current` and `doctor` take today, and the day an issue entered a status, as dates in it |
 
 ### fields
 
@@ -522,7 +559,7 @@ Logical name = field name on the board.
 | Key      | Required | Meaning |
 |----------|----------|---------|
 | `status` | yes      | The status field: a single-select field |
-| `sprint` | no       | The sprint field: an iteration field. The [`iteration`](#effects) effect, `list --sprint`, the sprint line of `show` and `doctor` use it |
+| `sprint` | no       | The sprint field: an iteration field. The [`iteration`](#effects) effect, `list --sprint`, `next --sprint`, the sprint line of `show` and `doctor` use it |
 
 Other logical names are rejected; a verb sets any other board field by its
 own name with the [`field`](#effects) effect. Logical names are lowercase:
@@ -532,9 +569,9 @@ own name with the [`field`](#effects) effect. Logical names are lowercase:
 
 | Key        | Meaning |
 |------------|---------|
-| `initial`  | Set by `new`; issues without a status or not on the board count as this one for `from` |
+| `initial`  | Set by `new`; issues without a status or not on the board count as this one for `from`. `next` shows the issues in it, or without a status |
 | `final`    | Statuses `list` hides, with a counter |
-| `resolved` | Statuses in which an open blocker no longer blocks: its work is done though the issue stays open (kanban: Ready, Done). A closed blocker is always resolved |
+| `resolved` | Statuses in which an open blocker no longer blocks (`show`, the `blockers` check, `next`): its work is done though the issue stays open (kanban: Ready, Done). A closed blocker is always resolved |
 
 ### labels
 
@@ -985,6 +1022,7 @@ The schemas, by command, after `schema_version` and `error`:
 | `show` | `brief` (`--brief`: every card's `history` and `comments` are `[]`, `body` `null`), `issues`: cards; `failed`: `[{number, error}]` for numbers not shown; `warnings` |
 | card | `number`, `repo`, `url`, `title`, `state` (`open`/`closed`), `state_reason` (`completed`, `not_planned`, `duplicate`, `reopened` or `null`), `author`, `created_at`, `closed_at`, `incomplete` (GitHub withheld part of it); `board`: `{on_board, unknown_reason, status, status_unknown, archived, fields: [{name, value}], fields_truncated}`; `sprint`: `null` without `fields.sprint`, else `{field, iteration: {title, start_date, end_date, duration_days} or null, unknown_reason}`; `milestone`: `{title, due_on}` or `null`; `labels`, `assignees` with `labels_total`, `assignees_total`; `blocked_by`, `blocking`: `[{ref, repo, number, title, state, on_board, status, archived, status_unknown_reason, resolved}]` with `blocked_by_total`, `blocking_total`, `unresolved_blockers`; `history`: `[{at, from, to, actor, automated}]` with `history_truncated`, `history_untracked`; `body`: `{text, cut, length}`; `comments`: `[{author, created_at, text, cut, length}]` with `comments_total` |
 | `list` | `sprint_filter` (`null` without `--sprint`, `"none"` for issues without a sprint, `"iteration"` for those in `sprint`), `sprint` (the `--sprint` iteration or `null`), `issues`: `[{repo, number, title, state, status, labels, labels_total, assignees, assignees_total}]` in the printed order, cut to `--limit`; `matched` (before `--limit`), `unchecked`, `hidden`, `filtered`, `skipped`: `{draft_issues, pull_requests, unseen}`, `incomplete`, `warnings` |
+| `next` | as `list`, each issue with `unresolved_blockers`: `[{ref, repo, number, on_board, status}]` (empty unless `--all`) and `unread_blockers` (blockers the token cannot read, unresolved); `matched` counts the issues to show with `--all`'s blocked ones, `hidden` the blocked ones left out |
 | verbs | `verb`, `repo`, `dry_run`, `issues`: `[{number, title, outcome, planned, applied, in_place, needs_yes, warnings, error}]` in argument order (`title` `null` when the issue was not read), `summary`: `{total, done, written, failed, not_attempted}` |
 | `new` | `number`, `repo`, `title`, `created` (`false`: resumed), `labels`, `status`, `status_set`, `unarchived`, `milestone` (`{title, due_on}` or `null`), `milestone_set`, `blocked_by`, `already_blocked_by` |
 | `comment` | `number`, `repo`, `posted` (`false`: already the last comment) |
@@ -1027,6 +1065,8 @@ one place, the config:
   and do, the lifecycle and the exit codes in a few lines: the one command to
   read at the start of a session. `gh dojo <verb> --help` has the details of
   one verb, and the first line of each is its `when`.
+- **`gh dojo next`** answers "what do I take now" in a few lines: open
+  issues in the initial status, not blocked, in board order.
 - **Errors say what to do next**, and the [exit codes](#exit-codes) map to
   one action each: fix the arguments (1), ask a human (2), check the number
   (3), retry later (4), re-run the same command (5).

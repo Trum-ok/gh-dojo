@@ -255,9 +255,14 @@ func (p *process) text() string {
 	if len(p.Repos) > 0 {
 		issues = strings.Join(p.Repos, ", ")
 	}
-	sections := []string{fmt.Sprintf("%s: board %s, issues in %s.\n"+
+	take := ""
+	if p.Statuses.Initial != nil {
+		take = "Find an issue to take with gh dojo next (" + *p.Statuses.Initial +
+			" or no status, no unresolved blockers);\nread it with gh dojo show <N>.\n"
+	}
+	sections := []string{fmt.Sprintf("%s: board %s, issues in %s.\n%s"+
 		"Run a verb as gh dojo <verb> <N>; --dry-run shows its plan first.\n"+
-		"Every command takes --json (schema_version 1), --jq and --template, as gh does.", head, p.Board, issues)}
+		"Every command takes --json (schema_version 1), --jq and --template, as gh does.", head, p.Board, issues, take)}
 
 	if len(p.Verbs) == 0 {
 		sections = append(sections, "No verbs: add them under [verbs] in "+p.Config+".")

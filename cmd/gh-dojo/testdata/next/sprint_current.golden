@@ -1,0 +1,8 @@
+code: 0
+--- stdout
+sprint: Sprint 12 (2026-11-09 to 2026-11-22)
+#45 Cache the catalog
+#49 Untriaged in this sprint
+hidden: 1 blocked, use --all
+filtered out: 2 issues not matching --sprint
+--- stderr

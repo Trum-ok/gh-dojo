@@ -1,0 +1,15 @@
+code: 0
+--- stdout
+#50 Triage me [bug]
+#51 Blocked by work in progress — blocked by #52 (In progress)
+#53 Blockers resolved
+#57 Blocked outside the board — blocked by acme/api#7 (not on the board)
+#58 Blocker withheld — blocked by 1 not read
+Trum-ok/other#5 Other repo issue [area:cli] @Trum-ok
+#60 Blocked four ways — blocked by #50 (on the board, no status), #52 (In progress), #57 (Backlog), 1 more
+#61 Write the docs [documentation]
+#62 Polish the help [documentation, bug] @Trum-ok
+#63 Untriaged idea
+skipped: 1 draft issue, 1 pull request, 1 item the token cannot see (next shows issues only)
+--- stderr
+warning: GitHub withheld parts of some board items from this token; their lines may be incomplete

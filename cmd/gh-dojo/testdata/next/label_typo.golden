@@ -1,0 +1,4 @@
+code: 1
+--- stdout
+--- stderr
+error: no issue on the board has label "documentaton"; did you mean "documentation"?

@@ -1,0 +1,4 @@
+code: 0
+--- stdout
+no issues to take: no open issue is in Waiting or without a status; gh dojo list shows the board
+--- stderr

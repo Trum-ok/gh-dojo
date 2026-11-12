@@ -1,0 +1,104 @@
+code: 0
+--- stdout
+{
+  "schema_version": 1,
+  "error": null,
+  "sprint_filter": null,
+  "sprint": null,
+  "issues": [
+    {
+      "repo": "Trum-ok/gh-dojo",
+      "number": 50,
+      "title": "Triage me",
+      "state": "open",
+      "status": null,
+      "labels": [
+        "bug"
+      ],
+      "labels_total": 1,
+      "assignees": [],
+      "assignees_total": 0,
+      "unresolved_blockers": [],
+      "unread_blockers": 0
+    },
+    {
+      "repo": "Trum-ok/gh-dojo",
+      "number": 53,
+      "title": "Blockers resolved",
+      "state": "open",
+      "status": "Backlog",
+      "labels": [],
+      "labels_total": 0,
+      "assignees": [],
+      "assignees_total": 0,
+      "unresolved_blockers": [],
+      "unread_blockers": 0
+    },
+    {
+      "repo": "Trum-ok/other",
+      "number": 5,
+      "title": "Other repo issue",
+      "state": "open",
+      "status": "Backlog",
+      "labels": [
+        "area:cli"
+      ],
+      "labels_total": 1,
+      "assignees": [
+        "Trum-ok"
+      ],
+      "assignees_total": 1,
+      "unresolved_blockers": [],
+      "unread_blockers": 0
+    },
+    {
+      "repo": "Trum-ok/gh-dojo",
+      "number": 61,
+      "title": "Write the docs",
+      "state": "open",
+      "status": "Backlog",
+      "labels": [
+        "documentation"
+      ],
+      "labels_total": 1,
+      "assignees": [],
+      "assignees_total": 0,
+      "unresolved_blockers": [],
+      "unread_blockers": 0
+    },
+    {
+      "repo": "Trum-ok/gh-dojo",
+      "number": 62,
+      "title": "Polish the help",
+      "state": "open",
+      "status": "Backlog",
+      "labels": [
+        "documentation",
+        "bug"
+      ],
+      "labels_total": 2,
+      "assignees": [
+        "Trum-ok"
+      ],
+      "assignees_total": 1,
+      "unresolved_blockers": [],
+      "unread_blockers": 0
+    }
+  ],
+  "matched": 6,
+  "unchecked": 0,
+  "hidden": 4,
+  "filtered": 0,
+  "skipped": {
+    "draft_issues": 1,
+    "pull_requests": 1,
+    "unseen": 1
+  },
+  "incomplete": true,
+  "warnings": [
+    "GitHub withheld parts of some board items from this token; their lines may be incomplete"
+  ]
+}
+
+--- stderr
+warning: GitHub withheld parts of some board items from this token; their lines may be incomplete

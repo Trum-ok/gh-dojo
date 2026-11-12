@@ -1,0 +1,6 @@
+code: 0
+--- stdout
+#34 e2e обоих пресетов на доске-песочнице в CI [enhancement]
+#41 Команда release: задачи релиза через PR и коммиты [enhancement] — blocked by #38 (In progress)
+#42 Рубеж v0.2: пример своего флоу только конфигом [documentation] — blocked by #40 (In progress)
+--- stderr

@@ -16,6 +16,7 @@ Available Commands:
   init        Write .github/dojo.toml for a board and check it against the board
   list        See what is on the board: one line per open issue, grouped by status
   new         Create an issue with labels, on the board, in the initial status
+  next        Find issues to take: initial status, no unresolved blockers, in board order
   show        Read issues before working on them: board status, blockers, history, description, comments
   unblock     Remove blocked-by links of an issue, without changing its status
 

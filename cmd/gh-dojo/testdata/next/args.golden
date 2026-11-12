@@ -1,0 +1,4 @@
+code: 1
+--- stdout
+--- stderr
+error: next takes no arguments; to see one issue: gh dojo show 42

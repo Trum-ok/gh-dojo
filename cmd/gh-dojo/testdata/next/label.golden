@@ -1,0 +1,8 @@
+code: 0
+--- stdout
+#61 Write the docs [documentation]
+#62 Polish the help [documentation, bug] @Trum-ok
+filtered out: 8 issues not matching --label
+skipped: 1 draft issue, 1 pull request, 1 item the token cannot see (next shows issues only)
+--- stderr
+warning: GitHub withheld parts of some board items from this token; their lines may be incomplete

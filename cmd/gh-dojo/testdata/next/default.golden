@@ -1,0 +1,12 @@
+code: 0
+--- stdout
+#50 Triage me [bug]
+#53 Blockers resolved
+Trum-ok/other#5 Other repo issue [area:cli] @Trum-ok
+#61 Write the docs [documentation]
+#62 Polish the help [documentation, bug] @Trum-ok
+showing 5 of 6, use --limit 6
+hidden: 4 blocked, use --all
+skipped: 1 draft issue, 1 pull request, 1 item the token cannot see (next shows issues only)
+--- stderr
+warning: GitHub withheld parts of some board items from this token; their lines may be incomplete

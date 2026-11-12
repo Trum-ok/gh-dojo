@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: .github/dojo.toml: next needs statuses.initial, the status of issues not yet taken
+fix: add initial = "<status>" under [statuses] in .github/dojo.toml
