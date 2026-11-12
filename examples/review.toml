@@ -8,8 +8,13 @@
 # Board: a GitHub Projects v2 board whose Status field has the options
 # Backlog, In progress, In review, Changes requested, Approved and Merged
 # (other options are fine).
-# Repository: the labels blocked, needs-review and changes-requested
-# (gh label create needs-review), and the reviewer can be assigned issues.
+# Repository labels (gh label create needs-review; GitHub's defaults have
+# only bug of them):
+#   - types, for new --type: bug, feature, chore;
+#   - areas, for new --area billing: service:billing and the like;
+#   - the verbs': blocked, needs-review, changes-requested.
+# gh dojo doctor checks the verbs' labels, not the types and areas. The
+# reviewer must be able to be assigned issues in the repository.
 #
 # Reference: https://github.com/Trum-ok/gh-dojo#configuration
 
@@ -50,6 +55,10 @@ Started. Session: {session}
 
 {comment}"""
 
+# On hold is a label, not a status, and no verb checks it: review, approve
+# and merged still run on an issue on hold. resume, reject and merged
+# remove the label.
+
 [verbs.hold]
 when = "Work is stuck: waiting for another issue or an outside decision"
 from = ["In progress", "Changes requested"]   # no `to`: the status stays
@@ -86,7 +95,9 @@ require = ["comment"]        # what to change, in the reviewer's words
 labels = ["-needs-review", "+changes-requested"]
 comment = "Changes requested: {comment}"
 
-# The reviewer's decisions: exit code 2 until the user says yes (--yes).
+# The user's decisions: exit code 2 until the agent asks the person it works
+# for and runs the verb again with --yes. gh-dojo does not check that the
+# pull request was approved on GitHub.
 
 [verbs.approve]
 when = "The user approved the pull request after reviewing it"
@@ -101,18 +112,19 @@ Approved.
 
 [verbs.reject]
 when = "The user decided the change is not wanted"
-from = ["In progress", "In review", "Changes requested", "Approved"]
+from = ["In progress", "In review", "Changes requested", "Approved"]   # not checked on a closed issue
 close = "not_planned"        # the status stays: closed issues leave list anyway
-labels = ["-needs-review", "-changes-requested"]
+labels = ["-needs-review", "-changes-requested", "-blocked"]
 require = ["comment"]        # the reason; with no template, --comment is the comment
 confirm = "user"
 
-# After the merge.
+# After the merge. The verb records it; it does not merge the pull request.
 
-[verbs.merge]
-when = "The approved pull request is merged into main"
+[verbs.merged]
+when = "The approved pull request has been merged into main"
 to = "Merged"
 from = ["Approved"]
 close = "completed"          # an issue the pull request closed stays closed
-batch = true                 # gh dojo merge 12 13 14
+labels = ["-blocked"]
+batch = true                 # gh dojo merged 12 13 14
 comment = "{comment}"

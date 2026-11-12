@@ -1,7 +1,7 @@
 code: 0
 --- stdout
 dry run: reject #27 "Refund by cheque"
-  labels: -needs-review (-changes-requested already in place)
+  labels: -needs-review (-changes-requested -blocked already in place)
   comment: "Cheques are out of scope."
   close: as not planned
   needs --yes: this is the user's decision, ask the user first

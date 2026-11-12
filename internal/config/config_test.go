@@ -678,9 +678,16 @@ func TestReadmeExamples(t *testing.T) {
 	}
 }
 
+// examplesWithoutPreset are the examples that define every verb themselves,
+// each with the cmd/gh-dojo test that runs a dry run of all of them.
+var examplesWithoutPreset = map[string]string{
+	"review.toml": "TestExampleReview",
+}
+
 // TestExampleConfigs keeps every examples/*.toml loadable, and checks that
-// one built on a preset still has the preset's verbs. review.toml has no
-// preset; cmd/gh-dojo's TestExampleReview runs its verbs.
+// one built on a preset still has the preset's verbs, and that one without
+// a preset is in examplesWithoutPreset: its verbs are not the presets'
+// tested ones, so a cmd/gh-dojo test must run them.
 func TestExampleConfigs(t *testing.T) {
 	paths, err := filepath.Glob(filepath.Join("..", "..", "examples", "*.toml"))
 	if err != nil {
@@ -701,8 +708,9 @@ func TestExampleConfigs(t *testing.T) {
 				t.Fatal(err)
 			}
 			if c.Preset == "" {
-				if len(c.VerbNames()) == 0 {
-					t.Errorf("%s sets no preset and no verbs", name)
+				if _, ok := examplesWithoutPreset[filepath.Base(path)]; !ok {
+					t.Errorf("%s sets no preset: add a dry run of its verbs to cmd/gh-dojo, as TestExampleReview, "+
+						"and list it in examplesWithoutPreset", name)
 				}
 				return
 			}

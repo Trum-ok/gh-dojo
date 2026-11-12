@@ -20,9 +20,9 @@ Verbs:
   approve         The user approved the pull request after reviewing it
                   optional --comment; the user's decision: ask first, then --yes; labels -needs-review; comments "Approved. {comment}"
   reject          The user decided the change is not wanted
-                  needs --comment; also on closed issues; the user's decision: ask first, then --yes; labels -needs-review -changes-requested; comments "{comment}"; closes as not planned
-  merge           The approved pull request is merged into main
-                  several numbers at once (merge 12 13 14); optional --comment; also on closed issues; comments "{comment}"; closes as completed
+                  needs --comment; also on closed issues; the user's decision: ask first, then --yes; labels -needs-review -changes-requested -blocked; comments "{comment}"; closes as not planned
+  merged          The approved pull request has been merged into main
+                  several numbers at once (merged 12 13 14); optional --comment; also on closed issues; labels -blocked; comments "{comment}"; closes as completed
 
 Every verb adds the issue to the board if it is missing and refuses a
 closed issue unless noted. A repeat is safe: an effect already in place
@@ -37,7 +37,7 @@ Lifecycle (from → to):
   request-changes In review → Changes requested
   approve         In review → Approved; asks the user first (--yes)
   reject          In progress, In review, Changes requested, Approved → status unchanged; closes as not planned, asks the user first (--yes)
-  merge           Approved → Merged; closes as completed
+  merged          Approved → Merged; closes as completed
   Initial:        Backlog (new issues; also an issue with no status or not on the board)
   Final:          Merged (gh dojo list hides it unless --all)
   Resolved:       Merged (a blocker in these no longer blocks)

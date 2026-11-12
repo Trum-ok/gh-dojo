@@ -30,7 +30,7 @@ var reviewDryRuns = map[string][]string{
 	"request-changes": {"request-changes", "25", "--comment", "Round the refund to the currency's minor unit."},
 	"approve":         {"approve", "26"},
 	"reject":          {"reject", "27", "--comment", "Cheques are out of scope."},
-	"merge":           {"merge", "28"},
+	"merged":          {"merged", "28"},
 }
 
 // TestExampleReview: the example loads, describe explains it, a dry run of
