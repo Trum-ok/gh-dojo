@@ -36,3 +36,10 @@ when = "сделано, проверено и закоммичено в main"
 
 [verbs.done]
 when = "изменение вошло в релиз"
+
+# gh dojo agent install: skill для Claude Code из этого конфига плюс наши
+# заметки (русский текст про процесс, «Чего нет в gh-dojo», версия).
+[agent]
+targets = ["claude"]
+notes = ".github/dojo-notes.md"
+description = "Also load it when you notice an inconvenience in gh-dojo itself: it becomes a dogfood issue right away."

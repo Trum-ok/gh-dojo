@@ -37,6 +37,10 @@ jobs:
         run: |
           script/build-release.sh v0.0.0-ci
           dist/gh-dojo_v0.0.0-ci_linux-amd64 --version | grep -Fx "gh dojo version v0.0.0-ci"
+      # The agent skill is generated from .github/dojo.toml by this branch's
+      # build: a config or command change without `make agent` fails here.
+      - name: Agent instructions
+        run: dist/gh-dojo_v0.0.0-ci_linux-amd64 agent install --check
 
   test:
     strategy:
