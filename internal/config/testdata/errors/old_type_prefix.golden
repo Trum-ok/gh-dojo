@@ -1,2 +1,3 @@
 error: .github/dojo.toml: unknown key labels.type_prefix
 allowed: types, area_prefix
+fix: fix the key; if it is right, the config needs a newer gh-dojo: gh extension upgrade dojo (from source: make install)

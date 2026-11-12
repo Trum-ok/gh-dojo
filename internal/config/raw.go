@@ -385,8 +385,14 @@ func undecodedError(display string, key toml.Key) error {
 	default:
 		path, allowed = key.String(), topKeys
 	}
-	return render.Usage("%s: unknown key %s", display, path).WithAllowed(allowed...)
+	return render.Usage("%s: unknown key %s", display, path).WithAllowed(allowed...).WithFix(NewerFix)
 }
+
+// NewerFix is the fix of an unknown config key: a typo, or a key of a
+// newer gh-dojo than the one running, which an old installed build cannot
+// know.
+const NewerFix = "fix the key; if it is right, the config needs a newer gh-dojo: " +
+	"gh extension upgrade dojo (from source: make install)"
 
 // merge applies repo over preset: scalar and list keys override one by one,
 // verbs merge key by key (disabled comes from the repo only; build drops
