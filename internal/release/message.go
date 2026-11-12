@@ -18,7 +18,7 @@ var refRE = regexp.MustCompile(refPattern)
 // ([release] keywords): "Fixes #12", "refs: #12, #13 and acme/api#4",
 // "Part of https://github.com/acme/api/issues/4". A keyword is matched
 // whole, regardless of case, followed by an optional colon and a list of
-// references separated by commas, "and" or spaces; a reference that does
+// references separated by commas, "and" or spaces, on the same line; a reference that does
 // not follow a keyword ("see #12") does not count. GitHub closes only the
 // first issue of "Fixes #12, #13"; a list is taken whole here, as a
 // person reading it would.
@@ -33,10 +33,12 @@ func NewMatcher(keywords []string) *Matcher {
 	}
 	alts := make([]string, len(keywords))
 	for i, k := range keywords {
-		alts[i] = strings.Join(strings.Fields(regexp.QuoteMeta(k)), `\s+`) // "part of" matches "Part\nof"
+		alts[i] = strings.Join(strings.Fields(regexp.QuoteMeta(k)), `[ \t]+`)
 	}
-	list := refPattern + `(?:(?:\s*,\s*|\s+)(?:and\s+)?` + refPattern + `)*`
-	return &Matcher{re: regexp.MustCompile(`(?i)(?:^|[^\pL\pN_])(?:` + strings.Join(alts, "|") + `)(?:\s*:\s*|\s+)(` + list + `)`)}
+	// Spaces and tabs only: a keyword and its list stay on one line, so
+	// "Refs #3" does not take the "#4" that starts the next one.
+	list := refPattern + `(?:(?:[ \t]*,[ \t]*|[ \t]+)(?:and[ \t]+)?` + refPattern + `)*`
+	return &Matcher{re: regexp.MustCompile(`(?i)(?:^|[^\pL\pN_])(?:` + strings.Join(alts, "|") + `)(?:[ \t]*:[ \t]*|[ \t]+)(` + list + `)`)}
 }
 
 // Refs returns the issues message links, in order, each once, a bare #12

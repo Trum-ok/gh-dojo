@@ -52,8 +52,9 @@ func newReleaseCmd() (*cobra.Command, error) {
 			"when a commit message names it after a keyword of [release] keywords, by\n" +
 			"default GitHub's closing ones (closes, fixes, resolves); owner/repo#N names\n" +
 			"an issue of another repository.\n\n" +
-			"An issue whose status the verb's from does not allow (still in progress, say)\n" +
-			"is listed as not ready and left out, not failed; its other checks still apply.\n\n" +
+			"An open issue whose status the verb's from does not allow (still in progress,\n" +
+			"say) is listed as not ready and left out, not failed; only a later release\n" +
+			"whose commits name it again picks it up. A closed one is refused (exit code 2).\n\n" +
 			"--dry-run lists each issue with how it was found and its plan.",
 		Example: `  gh dojo release v0.2.0 --verb done --dry-run
   gh dojo release v0.2.0 --verb done
@@ -158,7 +159,7 @@ func runRelease(cmd *cobra.Command, ref string, o *releaseOpts) error {
 	// names are left out (keep), and so are the issues not ready.
 	b.before = func(items []*batchItem) []*batchItem {
 		n := len(items)
-		items = res.ready(items)
+		items = res.ready(v, items)
 		if !b.json {
 			fmt.Fprintln(out, res.head(n))
 			if line := res.notReadyLine(v); line != "" {
@@ -239,36 +240,70 @@ type releaseSkipped struct {
 	status string // not ready: where the issue stands ("In progress", "no status", "not on the board")
 }
 
-// ready leaves out of items, with their reason, the issues the verb
+// ready leaves out of items, with their reason, the open issues verb v
 // refused only for their status (workflow.ErrFrom): work a commit is
 // about but not done in the process yet, such as an issue still in
 // progress with a "Refs #12" commit. They are listed, not failed: a
 // release that refused them would end with exit code 2 on every release
-// made while work goes on. The verb's other refusals (a closed issue, a
-// blocker, the user's go-ahead) still fail the batch.
-func (r *releaseRun) ready(items []*batchItem) []*batchItem {
+// made while work goes on. Only a later release whose commits name such
+// an issue again picks it up, so the line says so.
+//
+// A closed issue so refused stays a refusal (exit code 2): it was closed
+// ("Fixes #12" in a commit, by hand) out of the process, and no later
+// release would move it; the user decides. The verb's other refusals (a
+// blocker, the user's go-ahead) fail the batch as well.
+func (r *releaseRun) ready(v config.Verb, items []*batchItem) []*batchItem {
 	var out []*batchItem
 	for _, it := range items {
 		if it.err == nil || it.read == nil || !errors.Is(it.err, workflow.ErrFrom) {
 			out = append(out, it)
 			continue
 		}
-		status := it.read.Status
-		switch {
-		case !it.read.OnBoard:
-			status = "not on the board"
-		case status == "":
-			status = "no status"
+		where := placeOf(*it.read)
+		if it.read.Closed {
+			in := "in " + where
+			if !it.read.OnBoard || it.read.Status == "" {
+				in = where
+			}
+			it.fail(render.Denied("%s is closed but %s; %s\nthis is a process rule: ask the user how to proceed",
+				it.ref.String(r.def), in, fromRule(v)).WithCause(it.err))
+			out = append(out, it)
+			continue
 		}
-		r.skipped = append(r.skipped, releaseSkipped{found: r.foundOf(it.ref), reason: skipNotReady, status: status})
+		r.skipped = append(r.skipped, releaseSkipped{found: r.foundOf(it.ref), reason: skipNotReady, status: where})
 	}
 	return out
+}
+
+// placeOf is where is stands on the board: its status, "no status" or
+// "not on the board".
+func placeOf(is workflow.Issue) string {
+	switch {
+	case !is.OnBoard:
+		return "not on the board"
+	case is.Status == "":
+		return "no status"
+	}
+	return is.Status
+}
+
+// fromRule says where verb v runs: "done starts only from Ready or In
+// progress", "hold runs only in In review", as its refusal does.
+func fromRule(v config.Verb) string {
+	from := strings.Join(v.From, ", ")
+	if n := len(v.From); n > 1 {
+		from = strings.Join(v.From[:n-1], ", ") + " or " + v.From[n-1]
+	}
+	if v.To == "" {
+		return v.Name + " runs only in " + from
+	}
+	return v.Name + " starts only from " + from
 }
 
 // notReadyLine names the issues not ready for verb v, with their
 // statuses; "" for none:
 //
-//	not ready for done (it starts only from Ready): #41 (In progress), #44 (Backlog)
+//	not ready (done starts only from Ready): #41 (In progress), #44 (Backlog)
 func (r *releaseRun) notReadyLine(v config.Verb) string {
 	var names []string
 	for _, s := range r.skipped {
@@ -282,11 +317,7 @@ func (r *releaseRun) notReadyLine(v config.Verb) string {
 	if len(names) > maxErrorRefs {
 		names = append(names[:maxErrorRefs], fmt.Sprintf("and %d more", len(names)-maxErrorRefs))
 	}
-	from := strings.Join(v.From, ", ")
-	if n := len(v.From); n > 1 {
-		from = strings.Join(v.From[:n-1], ", ") + " or " + v.From[n-1]
-	}
-	return fmt.Sprintf("not ready for %s (it starts only from %s): %s", v.Name, from, strings.Join(names, ", "))
+	return fmt.Sprintf("not ready (%s): %s", fromRule(v), strings.Join(names, ", "))
 }
 
 // foundOf is how ref was found.
@@ -423,6 +454,8 @@ type releaseSource struct {
 }
 
 type releaseSkip struct {
+	Number int    `json:"number"`
+	Repo   string `json:"repo"`
 	Ref    string `json:"ref"`
 	Reason string `json:"reason"` // pull_request or not_ready
 	// Status is where an issue not ready stands: a status, "no status" or
@@ -445,7 +478,7 @@ func (r *releaseRun) json(verb, repo string, dry bool, items []*batchItem, warni
 		out.Issues = append(out.Issues, releaseIssue{verbIssue: v.Issues[i], FoundBy: sourcesJSON(r.foundOf(it.ref))})
 	}
 	for _, s := range r.skipped {
-		out.Skipped = append(out.Skipped, releaseSkip{Ref: fullRef(s.found.Ref), Reason: s.reason, Status: orNull(s.status),
+		out.Skipped = append(out.Skipped, releaseSkip{Number: s.found.Ref.Number, Repo: s.found.Ref.Repo.String(), Ref: fullRef(s.found.Ref), Reason: s.reason, Status: orNull(s.status),
 			FoundBy: sourcesJSON(s.found)})
 	}
 	return out

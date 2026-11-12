@@ -1,7 +1,7 @@
 code: 0
 --- stdout
 release HEAD: 4 commits since abc1234, 2 issues
-not ready for done (it starts only from Waiting): #42 (Ready)
+not ready (done starts only from Waiting): #42 (Ready)
 #43 Done (unchanged), already closed
 1 of 1 done (0 written)
 --- stderr

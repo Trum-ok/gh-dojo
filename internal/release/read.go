@@ -131,8 +131,8 @@ const tagsQuery = `query ReleaseTags($owner: String!, $repo: String!, $head: Str
 
 const sinceQuery = `query ReleaseSince($owner: String!, $repo: String!, $head: String!, $since: String!, $sinceRef: String!) {
   repository(owner: $owner, name: $repo) {
-    head: object(expression: $head) { oid }
-    since: object(expression: $since) { oid }
+    head: object(expression: $head) { oid ... on Commit { committedDate } }
+    since: object(expression: $since) { oid ... on Commit { committedDate } }
     sinceRef: ref(qualifiedName: $sinceRef) { prefix name }
   }
 }`
@@ -141,6 +141,9 @@ var compareQuery = `query ReleaseCompare($owner: String!, $repo: String!, $base:
   repository(owner: $owner, name: $repo) {
     ref(qualifiedName: $base) {
       compare(headRef: $head) {
+        status
+        aheadBy
+        behindBy
         commits(first: 100, after: $cursor) {
           totalCount
           pageInfo { hasNextPage endCursor }
@@ -170,6 +173,8 @@ var historyQuery = `query ReleaseHistory($owner: String!, $repo: String!, $head:
 
 type objectJSON struct {
 	OID string `json:"oid"`
+	// CommittedDate is RFC 3339; "" when not read.
+	CommittedDate string `json:"committedDate"`
 }
 
 // commitOf is the expression of ref's commit: a tag peeled to the commit
@@ -198,14 +203,14 @@ func Read(ctx context.Context, q graph.Querier, repo issue.Repo, head, since str
 	vars := map[string]any{"owner": repo.Owner, "repo": repo.Name, "head": commitOf(head)}
 	base := "" // the qualified ref to compare with; "" walks the history
 	if since == "" {
-		tags, headCommit, err := readTags(ctx, q, vars, r)
+		tags, headCommit, total, err := readTags(ctx, q, vars, r)
 		if err != nil {
 			return nil, err
 		}
 		r.HeadCommit = headCommit
 		prev, ok := Previous(tags, head, headCommit)
 		if !ok {
-			return nil, noPrevious(r)
+			return nil, noPrevious(r, len(tags), total)
 		}
 		r.Since, r.SinceCommit, r.Picked, base = prev.Name, prev.Commit, true, "refs/tags/"+prev.Name
 	} else {
@@ -233,6 +238,12 @@ func Read(ctx context.Context, q graph.Querier, repo issue.Repo, head, since str
 			return nil, refMissing(repo, since, "--since ")
 		}
 		r.HeadCommit, r.SinceCommit = rp.Head.OID, rp.Since.OID
+		// A start newer than the head would walk 1000 commits for nothing:
+		// the dates tell at once. GitHub's committer dates are RFC 3339 in
+		// UTC, so they compare as strings.
+		if r.HeadCommit != r.SinceCommit && rp.Since.CommittedDate > rp.Head.CommittedDate && rp.Head.CommittedDate != "" {
+			return nil, notInHistory(r, "is newer than")
+		}
 		if rp.SinceRef != nil {
 			base = rp.SinceRef.Prefix + rp.SinceRef.Name
 		}
@@ -265,8 +276,12 @@ type objectType struct {
 	OID      string `json:"oid"`
 }
 
-// readTags reads up to MaxTags tags, the newest first, and head's commit.
-func readTags(ctx context.Context, q graph.Querier, vars map[string]any, r *Range) ([]Tag, string, error) {
+// readTags reads up to MaxTags tags, the newest first, head's commit and
+// how many tags there are. The tags are read in the order of their
+// commits' dates, which need not be their versions' order (a backport
+// tagged after a newer release), so all of them are read, not only until
+// a previous release turns up.
+func readTags(ctx context.Context, q graph.Querier, vars map[string]any, r *Range) ([]Tag, string, int, error) {
 	type resp struct {
 		Repository *struct {
 			Head *objectJSON                `json:"head"`
@@ -288,10 +303,10 @@ func readTags(ctx context.Context, q graph.Querier, vars map[string]any, r *Rang
 		return &x.Repository.Refs
 	})
 	if missing != nil {
-		return nil, "", missing
+		return nil, "", 0, missing
 	}
 	if err != nil {
-		return nil, "", err
+		return nil, "", 0, err
 	}
 	var tags []Tag
 	for _, n := range page.Nodes {
@@ -307,11 +322,7 @@ func readTags(ctx context.Context, q graph.Querier, vars map[string]any, r *Rang
 		}
 		tags = append(tags, t)
 	}
-	if page.Truncated() {
-		r.Warnings = append(r.Warnings, fmt.Sprintf("read the %d newest of %d tags for the previous release; "+
-			"pass --since if it is older", len(page.Nodes), page.TotalCount))
-	}
-	return tags, headCommit, nil
+	return tags, headCommit, page.TotalCount, nil
 }
 
 // compare reads the commits of r.HeadCommit that base, a qualified ref,
@@ -324,6 +335,7 @@ func (r *Range) compare(ctx context.Context, q graph.Querier, base string) error
 			Repository *struct {
 				Ref *struct {
 					Compare *struct {
+						Status  string                        `json:"status"`
 						Commits graph.Connection[*commitJSON] `json:"commits"`
 					} `json:"compare"`
 				} `json:"ref"`
@@ -338,6 +350,16 @@ func (r *Range) compare(ctx context.Context, q graph.Querier, base string) error
 			return repoMissing(r.Repo)
 		case rp.Ref == nil || rp.Ref.Compare == nil:
 			return refMissing(r.Repo, r.Since, sinceFlag(r))
+		}
+		// BEHIND: the start has commits the head lacks, all of the head's
+		// included; DIVERGED: each has its own. Either way the start is not
+		// in the head's history, and the commits "since" it would be a
+		// guess (none, for BEHIND).
+		switch rp.Ref.Compare.Status {
+		case "BEHIND":
+			return notInHistory(r, "is newer than")
+		case "DIVERGED":
+			return notInHistory(r, "is not in the history of")
 		}
 		c := rp.Ref.Compare.Commits
 		if c.TotalCount > MaxCommits {
@@ -394,8 +416,7 @@ func (r *Range) walk(ctx context.Context, q graph.Querier) error {
 		}
 		next := h.PageInfo.EndCursor
 		if !h.PageInfo.HasNextPage || next == "" || next == vars["cursor"] {
-			return render.Usage("--since %s is not in the history of %s", r.Since, r.Head).
-				WithFix("pass a commit, tag or branch that " + r.Head + " includes")
+			return notInHistory(r, "is not in the history of")
 		}
 		vars["cursor"] = next
 	}
@@ -473,15 +494,36 @@ func refMissing(repo issue.Repo, ref, flag string) error {
 		WithFix(fmt.Sprintf("pass a tag, a branch or a commit of %s (push it first)", repo))
 }
 
-// noPrevious is the error of a first release: no version tag before it.
-// The whole history is not taken instead: on a project that starts using
-// gh-dojo it would apply the verb to every issue a commit ever named.
-func noPrevious(r *Range) error {
-	return render.Usage("no release before %s: %s has no version tag (v1.2.3) before it", r.Head, r.Repo).
+// noPrevious is the error of a first release: no version tag before it
+// among the read ones of total tags. The whole history is not taken
+// instead: on a project that starts using gh-dojo it would apply the verb
+// to every issue a commit ever named.
+func noPrevious(r *Range, read, total int) error {
+	more := ""
+	if read < total {
+		more = fmt.Sprintf(" among its %d newest tags of %d", read, total)
+	}
+	return render.Usage("no release before %s: %s has no version tag (v1.2.3) before it%s", r.Head, r.Repo, more).
 		WithFix("name where the release starts: gh dojo release " + r.Head + " --since <tag, branch or commit> --verb <verb>")
 }
 
 func tooMany(r *Range, n string) error {
-	return render.Usage("%s..%s has %s, more than gh dojo release reads (%d)", r.Since, r.Head, n, MaxCommits).
+	or := ""
+	if !r.Compared {
+		or = ", or --since is not in its history"
+	}
+	return render.Usage("%s..%s has %s, more than gh dojo release reads (%d)%s", r.Since, r.Head, n, MaxCommits, or).
 		WithFix("pass a later --since, a tag, branch or commit closer to " + r.Head)
+}
+
+// notInHistory is the error for a start of the range that how relates to
+// the head: "is newer than", "is not in the history of". A start picked
+// from the tags is named as such.
+func notInHistory(r *Range, how string) error {
+	start := "--since " + r.Since
+	if r.Picked {
+		start = "the previous release " + r.Since + " (the highest version tag)"
+	}
+	return render.Usage("%s %s %s", start, how, r.Head).
+		WithFix("pass --since, a tag, branch or commit that " + r.Head + " includes")
 }

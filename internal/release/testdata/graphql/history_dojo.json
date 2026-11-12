@@ -3,7 +3,7 @@
   "interactions": [
     {
       "operation": "ReleaseSince",
-      "query": "query ReleaseSince($owner: String!, $repo: String!, $head: String!, $since: String!, $sinceRef: String!) {\n  repository(owner: $owner, name: $repo) {\n    head: object(expression: $head) { oid }\n    since: object(expression: $since) { oid }\n    sinceRef: ref(qualifiedName: $sinceRef) { prefix name }\n  }\n}",
+      "query": "query ReleaseSince($owner: String!, $repo: String!, $head: String!, $since: String!, $sinceRef: String!) {\n  repository(owner: $owner, name: $repo) {\n    head: object(expression: $head) { oid ... on Commit { committedDate } }\n    since: object(expression: $since) { oid ... on Commit { committedDate } }\n    sinceRef: ref(qualifiedName: $sinceRef) { prefix name }\n  }\n}",
       "variables": {
         "head": "ef93eeb^{commit}",
         "owner": "Trum-ok",
@@ -15,10 +15,12 @@
         "data": {
           "repository": {
             "head": {
-              "oid": "ef93eeb110b32702c5e0ee366103f8f9dc05a84f"
+              "oid": "ef93eeb110b32702c5e0ee366103f8f9dc05a84f",
+              "committedDate": "2026-11-11T18:56:21Z"
             },
             "since": {
-              "oid": "4c408947b924d7e6c895dd88894e60246a8f510b"
+              "oid": "4c408947b924d7e6c895dd88894e60246a8f510b",
+              "committedDate": "2026-11-11T18:41:09Z"
             },
             "sinceRef": null
           }

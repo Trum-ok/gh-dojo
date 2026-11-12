@@ -1,5 +1,5 @@
 {
-  "comment": "Hand-crafted: v0.0.1 is the only version tag, and the head: no release before it.",
+  "comment": "Hand-crafted: v0.0.1 is the only version tag read, and the head: no release before it; GitHub counts 1500 tags.",
   "handcrafted": true,
   "interactions": [
     {
@@ -18,7 +18,7 @@
               "oid": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5"
             },
             "refs": {
-              "totalCount": 2,
+              "totalCount": 1500,
               "pageInfo": {
                 "hasNextPage": false,
                 "endCursor": "end"

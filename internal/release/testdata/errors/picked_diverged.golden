@@ -1,0 +1,2 @@
+error: the previous release v0.2.0 (the highest version tag) is not in the history of HEAD
+fix: pass --since, a tag, branch or commit that HEAD includes

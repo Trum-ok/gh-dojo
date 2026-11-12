@@ -16,8 +16,9 @@ when a commit message names it after a keyword of [release] keywords, by
 default GitHub's closing ones (closes, fixes, resolves); owner/repo#N names
 an issue of another repository.
 
-An issue whose status the verb's from does not allow (still in progress, say)
-is listed as not ready and left out, not failed; its other checks still apply.
+An open issue whose status the verb's from does not allow (still in progress,
+say) is listed as not ready and left out, not failed; only a later release
+whose commits name it again picks it up. A closed one is refused (exit code 2).
 
 --dry-run lists each issue with how it was found and its plan.
 

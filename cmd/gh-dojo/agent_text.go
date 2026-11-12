@@ -339,10 +339,11 @@ func (d *agentDoc) releaseRule(v config.Verb) string {
 	}
 	return fmt.Sprintf("For a release, `gh dojo release <tag> --verb %s --dry-run` lists the issues the release "+
 		"includes (those %s), how each was found and its plan; without `--dry-run` it runs `%s` on them as one "+
-		"batch. An issue whose status it does not start from is listed as not ready and left out, not failed: "+
-		"a later release picks it up. The start is the previous version tag; the first release needs "+
-		"`--since <tag or commit>`.",
-		v.Name, found, v.Name)
+		"batch. An open issue whose status it does not start from is listed as not ready and left out, not "+
+		"failed; only a later release whose commits name it again picks it up, so once it is ready run `gh dojo "+
+		"%s N` on it. A closed issue it does not start from is refused (exit code 2): ask the user. The start is "+
+		"the previous version tag; the first release needs `--since <tag or commit>`.",
+		v.Name, found, v.Name, v.Name)
 }
 
 // verbsFrom lists the verbs that can start from status s.

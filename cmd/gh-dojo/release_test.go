@@ -35,14 +35,15 @@ func TestReleaseNotReady(t *testing.T) {
 // TestReleaseOtherRepo: --since a tag is compared; cli/cli#2 is found
 // through the closing references of merged pull request #50, #3 through
 // its message, and both are read in one request (TestBatchOtherRepo).
-// cli/cli#2 is not on the board, so not ready for done.
+// cli/cli#2 is closed but not on the board: not "not ready", since no
+// later release would move it, but refused (exit code 2).
 func TestReleaseOtherRepo(t *testing.T) {
 	srv, before := withWarmVerbApp(t, verbFixture("release_repos"), verbFixture("batch_done_repos"))
 	withConfig(t, verbDojoConfig+releaseKeywords)
 	args := []string{"release", "v0.2.0", "--since", "v0.1.0", "--verb", "done", "--dry-run"}
 	checkRuns(t, srv, before,
-		runs{args, render.ExitOK, 3, "release_other_repo"},
-		runs{append(args, "--json"), render.ExitOK, 3, "release_other_repo_json"},
+		runs{args, render.ExitDenied, 3, "release_other_repo"},
+		runs{append(args, "--json"), render.ExitDenied, 3, "release_other_repo_json"},
 	)
 }
 
@@ -65,26 +66,38 @@ func TestReleaseFake(t *testing.T) {
 		args    []string
 		code    render.Code
 		applied int
+		change  func(map[int]workflow.Issue) // changes the issues of acme/shop
 	}{
-		{"fake_dry_run", verbsConfig, []string{"--dry-run"}, render.ExitOK, 0},
-		{"fake", verbsConfig, nil, render.ExitOK, 1},
-		{"fake_json", verbsConfig, []string{"--json"}, render.ExitOK, 1},
-		{"fake_comment", verbsConfig, []string{"--comment", "Released in v1.0.0."}, render.ExitOK, 2},
+		{"fake_dry_run", verbsConfig, []string{"--dry-run"}, render.ExitOK, 0, nil},
+		{"fake", verbsConfig, nil, render.ExitOK, 1, nil},
+		{"fake_json", verbsConfig, []string{"--json"}, render.ExitOK, 1, nil},
+		{"fake_comment", verbsConfig, []string{"--comment", "Released in v1.0.0."}, render.ExitOK, 2, nil},
 		// No keywords: only pull requests count, and there are none.
-		{"fake_no_keywords", verbsConfig + "[release]\nkeywords = []\n", nil, render.ExitOK, 0},
-		{"fake_no_keywords_json", verbsConfig + "[release]\nkeywords = []\n", []string{"--json"}, render.ExitOK, 0},
+		{"fake_no_keywords", verbsConfig + "[release]\nkeywords = []\n", nil, render.ExitOK, 0, nil},
+		{"fake_no_keywords_json", verbsConfig + "[release]\nkeywords = []\n", []string{"--json"}, render.ExitOK, 0, nil},
 		// A refusal other than from still fails the batch: the user's
 		// go-ahead. #43 is in place and needs none.
-		{"fake_confirm", verbsConfig + "[verbs.done]\nconfirm = \"user\"\n", nil, render.ExitDenied, 0},
+		{"fake_confirm", verbsConfig + "[verbs.done]\nconfirm = \"user\"\n", nil, render.ExitDenied, 0, nil},
 		// #42 in Ready is not ready for a done from Waiting: listed, exit 0.
-		{"fake_not_ready", verbsConfig + "[verbs.done]\nfrom = [\"Waiting\"]\n", nil, render.ExitOK, 0},
-		{"fake_not_ready_json", verbsConfig + "[verbs.done]\nfrom = [\"Waiting\"]\n", []string{"--json"}, render.ExitOK, 0},
+		{"fake_not_ready", verbsConfig + "[verbs.done]\nfrom = [\"Waiting\"]\n", nil, render.ExitOK, 0, nil},
+		{"fake_not_ready_json", verbsConfig + "[verbs.done]\nfrom = [\"Waiting\"]\n", []string{"--json"}, render.ExitOK, 0, nil},
+		// #43, closed by "fixes #43" while in progress: done from Ready
+		// refuses it, and so does release (exit code 2), since no later
+		// release would move it. #42 is applied.
+		{"fake_closed_in_progress", verbsConfig + "[verbs.done]\nfrom = [\"Ready\"]\n", nil, render.ExitDenied, 1,
+			func(m map[int]workflow.Issue) {
+				m[43] = workflow.Issue{Number: 43, Title: "Speed up checkout", OnBoard: true, Status: "In progress", Closed: true,
+					StateReason: "completed"}
+			}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			withConfig(t, tt.config)
 			withApp(t, verbFixture("release_shop"))
 			f := shop()
+			if tt.change != nil {
+				tt.change(f.issues)
+			}
 			withBackend(t, f)
 			code, out := runOut(append([]string{"release", "HEAD", "--since", "abc1234", "--verb", "done"}, tt.args...)...)
 			if code != tt.code {

@@ -571,7 +571,9 @@ summary and exit codes.
 **The range** is the commits of `<ref>` (a tag, branch or commit on GitHub;
 no local checkout) since `--since`, or else since the previous release: the
 highest version tag (`v1.2.3`, `1.2.3`) below `<ref>` when `<ref>` is one,
-else the highest not on `<ref>`'s commit. Prereleases count only for a
+else the highest not on `<ref>`'s commit; one that is not in `<ref>`'s
+history, like a `--since` newer than `<ref>`, is exit code 1, not an empty
+release. Prereleases count only for a
 prerelease, so `v0.2.0` starts from `v0.1.0`, past `v0.2.0-rc.1`: an issue
 already done costs no write, a range too short misses issues. The first
 release needs `--since` (exit code 1 without it): taking the whole history
@@ -587,23 +589,26 @@ to closes it (its closing keywords or linked issues, `closingIssuesReferences`;
 squash, merge and rebase alike), or a commit message names it after a word
 of [`[release] keywords`](#release-keywords), by default GitHub's closing
 keywords: `Fixes #12`, `closes: acme/api#3`, `Resolves <issue URL>`, any
-case; a list after a keyword counts whole (`Fixes #12, #13 and #14`), a
-mention without one (`see #12`) does not. `Refs #12` says a commit is about
+case; a list after a keyword counts whole up to the end of its line (`Fixes
+#12, #13 and #14`), a mention without one (`see #12`) does not. `Refs #12` says a commit is about
 an issue, which may be done only in part, so `refs` is not a default; a
 project that commits without pull requests adds it, as this one does. A
 number a message names that is a pull request is left out with a warning.
 
-**Not ready.** An issue whose status the verb's `from` does not allow, such as
-one still in progress with a `Refs` commit when `done` starts only from Ready,
-is listed as not ready and left out, not failed: work goes on across
-releases, and a refusal (exit code 2) would end every such release. It is
-picked up by the release that finds it ready. The verb's other checks (a
-closed issue, blockers, `--yes`) still fail the batch.
+**Not ready.** An open issue whose status the verb's `from` does not allow,
+such as one still in progress with a `Refs` commit when `done` starts only
+from Ready, is listed as not ready and left out, not failed: work goes on
+across releases, and a refusal (exit code 2) would end every such release.
+Only a later release whose commits name it again picks it up; otherwise run
+the verb on it (`gh dojo done 12`) once it is ready. A closed issue refused
+by `from` (closed by a `Fixes #12` while in progress, say) is a refusal
+(exit code 2): no release would move it. The verb's other checks (blockers,
+`--yes`) fail the batch as well.
 
 ```console
 $ gh dojo release v0.2.0 --verb done --dry-run
 release v0.2.0: 5 commits since v0.1.0, 4 issues
-not ready for done (it starts only from Ready): #17 (In progress)
+not ready (done starts only from Ready): #17 (In progress)
   #3: commit 1111111
   #7: commit 1212121, commit a1a1a1a
   #9: PR #50
@@ -793,7 +798,7 @@ requests it belongs to. A preset cannot set it.
 
 | Key        | Meaning |
 |------------|---------|
-| `keywords` | Words that, followed by issues in a commit message (`Fixes #12`, `refs: #12, acme/api#3`), put those issues in the release; whole words, in any case, letters with single spaces or dashes (`"part of"`). Default: GitHub's closing keywords, `close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves`, `resolved`; a list replaces them. `[]`: only pull requests count |
+| `keywords` | Words that, followed by issues on the same line of a commit message (`Fixes #12`, `refs: #12, acme/api#3`), put those issues in the release; whole words, in any case, letters with single spaces or dashes (`"part of"`). Default: GitHub's closing keywords, `close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves`, `resolved`; a list replaces them. `[]`: only pull requests count. With `refs`, keep the verb's `from` to Ready (the presets' `done` also starts from In progress): a `Refs` commit may be partial work, which is then [not ready](#release) rather than released |
 
 ### verbs
 
@@ -1325,7 +1330,7 @@ The schemas, by command, after `schema_version` and `error`:
 | `list` | `sprint_filter` (`null` without `--sprint`, `"none"` for issues without a sprint, `"iteration"` for those in `sprint`), `sprint` (the `--sprint` iteration or `null`), `issues`: `[{repo, number, title, state, status, labels, labels_total, assignees, assignees_total}]` in the printed order, cut to `--limit`; `matched` (before `--limit`), `unchecked`, `hidden`, `filtered`, `skipped`: `{draft_issues, pull_requests, unseen}`, `incomplete`, `warnings` |
 | `next` | as `list`, each issue with `unresolved_blockers`: `[{ref, repo, number, on_board, status, archived, status_unknown_reason}]` (empty unless `--all`) and `unread_blockers` (blockers the token cannot read, unresolved); `matched`: issues to show before `--limit` (with `--all`, the blocked ones too); `hidden`: blocked issues left out (0 with `--all`); `incomplete`: GitHub withheld part of an issue to show or hide, or of its blockers |
 | verbs | `verb`, `default_repo` (where a bare number is), `dry_run`, `issues`: `[{number, repo, title, outcome, planned, applied, in_place, needs_yes, warnings, error}]` in argument order (`title` `null` when the issue was not read), `summary`: `{total, done, written, failed, not_attempted}` |
-| `release` | as verbs, with `release`: `{ref, commit, since, since_picked, since_commit, compared, commits}` (`since_picked`: the previous version tag, not `--since`; `compared`: GitHub compared the two, else the history was read down to a `--since` commit; commits are full SHAs), each issue with `found_by`: `[{pull_request, commit}]` (`pull_request` `owner/name#12` that closes it, with its first commit in the release, or `null`: the commit's message names it), `skipped`: `[{ref, reason, status, found_by}]` (`reason` `pull_request`, or `not_ready` with the `status` the verb's `from` does not allow), and `warnings`; `issues` and `summary` count only the issues the verb ran on, the default repository's first |
+| `release` | as verbs, with `release`: `{ref, commit, since, since_picked, since_commit, compared, commits}` (`since_picked`: the previous version tag, not `--since`; `compared`: GitHub compared the two, else the history was read down to a `--since` commit; commits are full SHAs), each issue with `found_by`: `[{pull_request, commit}]` (`pull_request` `owner/name#12` that closes it, with its first commit in the release, or `null`: the commit's message names it), `skipped`: `[{number, repo, ref, reason, status, found_by}]` (`reason` `pull_request`, or `not_ready` with the `status` the verb's `from` does not allow), and `warnings`; `issues` and `summary` count only the issues the verb ran on, the default repository's first |
 | `new` | `number`, `repo`, `title`, `created` (`false`: resumed), `labels`, `status`, `status_set`, `unarchived`, `milestone` (`{title, due_on}` or `null`), `milestone_set`, `blocked_by`, `already_blocked_by` |
 | `comment` | `number`, `repo`, `posted` (`false`: already the last comment) |
 | `block`, `unblock` | `number`, `repo`, `action`, `changed`, `unchanged`, `missed` |

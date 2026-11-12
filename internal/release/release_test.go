@@ -87,7 +87,10 @@ func TestMatcher(t *testing.T) {
 		{"fixes #3, #4 and acme/api#5; see #6", "#3 #4 acme/api#5"},
 		{"Fixes: #7\nCloses #7\nREFS #8", "#7 #8"},
 		{"Part of https://github.com/acme/api/issues/9", "acme/api#9"},
-		{"Part\nof #10", "#10"},
+		{"Part\nof #10", ""},                         // a keyword on one line
+		{"Refs #21\n#22 is next\nFixes\n#23", "#21"}, // a list ends with its line
+		{"Refs #24,\n#25", "#24"},
+		{"Fixes\t#26 and\t#27", "#26 #27"},
 		{"Prefs #11, fixesx #12, refs#13, refs 14", ""},         // whole words, then a reference
 		{"Refs https://github.com/Trum-ok/gh-dojo/pull/15", ""}, // a pull request's URL
 		{"Merge pull request #16 from x/y", ""},
@@ -243,6 +246,12 @@ func TestReadErrors(t *testing.T) {
 		{"too_many", "v0.2.0", "v0.0.1", render.ExitUsage, 2},
 		{"not_ancestor", "v0.2.0", "abc1234", render.ExitUsage, 2},
 		{"repo_missing", "v0.2.0", "main", render.ExitNotFound, 1},
+		// A start newer than the head: by the commits' dates, before any
+		// history is read; by GitHub's comparison for a ref.
+		{"since_newer", "v0.2.0", "abc1234", render.ExitUsage, 1},
+		{"since_behind", "v0.2.0", "main", render.ExitUsage, 2},
+		// The highest version tag of another branch: not "no issues".
+		{"picked_diverged", "HEAD", "", render.ExitUsage, 2},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -1,10 +1,10 @@
 {
-  "comment": "Recorded read-only from cli/cli (gh dojo release v2.39.2 --since v2.39.1), then edited by hand: each commit message cut to its first line, so cli/cli's commit bodies are not copied here. Squash merges #8229 and #8359, the merge commit of #8384 with its branch's commits, and #8345 that closes nothing.",
+  "comment": "Recorded read-only from cli/cli (gh dojo release v2.39.2 --since v2.39.1), then edited by hand: commit messages replaced with neutral ones, so none of cli/cli's text is copied here; the numbers, oids, dates and links are as recorded. Squash merges #8229 and #8359, the merge commit of #8384 with its branch's commits, and #8345 that closes nothing.",
   "handcrafted": true,
   "interactions": [
     {
       "operation": "ReleaseSince",
-      "query": "query ReleaseSince($owner: String!, $repo: String!, $head: String!, $since: String!, $sinceRef: String!) {\n  repository(owner: $owner, name: $repo) {\n    head: object(expression: $head) { oid }\n    since: object(expression: $since) { oid }\n    sinceRef: ref(qualifiedName: $sinceRef) { prefix name }\n  }\n}",
+      "query": "query ReleaseSince($owner: String!, $repo: String!, $head: String!, $since: String!, $sinceRef: String!) {\n  repository(owner: $owner, name: $repo) {\n    head: object(expression: $head) { oid ... on Commit { committedDate } }\n    since: object(expression: $since) { oid ... on Commit { committedDate } }\n    sinceRef: ref(qualifiedName: $sinceRef) { prefix name }\n  }\n}",
       "variables": {
         "head": "v2.39.2^{commit}",
         "owner": "cli",
@@ -16,10 +16,12 @@
         "data": {
           "repository": {
             "head": {
-              "oid": "63094461621f8e91217d9b89f513f53e21670bd9"
+              "oid": "63094461621f8e91217d9b89f513f53e21670bd9",
+              "committedDate": "2023-11-27T17:50:31Z"
             },
             "since": {
-              "oid": "3f37d7e372857c17141f290aeac404babc0282cc"
+              "oid": "3f37d7e372857c17141f290aeac404babc0282cc",
+              "committedDate": "2023-11-14T16:27:50Z"
             },
             "sinceRef": {
               "prefix": "refs/tags/",
@@ -31,7 +33,7 @@
     },
     {
       "operation": "ReleaseCompare",
-      "query": "query ReleaseCompare($owner: String!, $repo: String!, $base: String!, $head: String!, $cursor: String) {\n  repository(owner: $owner, name: $repo) {\n    ref(qualifiedName: $base) {\n      compare(headRef: $head) {\n        commits(first: 100, after: $cursor) {\n          totalCount\n          pageInfo { hasNextPage endCursor }\n          nodes { ...releaseCommit }\n        }\n      }\n    }\n  }\n}\n\nfragment releaseCommit on Commit {\n  oid\n  message\n  associatedPullRequests(first: 5) {\n    totalCount\n    nodes {\n      number\n      merged\n      repository { nameWithOwner }\n      closingIssuesReferences(first: 25) {\n        totalCount\n        nodes { number repository { nameWithOwner } }\n      }\n    }\n  }\n}",
+      "query": "query ReleaseCompare($owner: String!, $repo: String!, $base: String!, $head: String!, $cursor: String) {\n  repository(owner: $owner, name: $repo) {\n    ref(qualifiedName: $base) {\n      compare(headRef: $head) {\n        status\n        aheadBy\n        behindBy\n        commits(first: 100, after: $cursor) {\n          totalCount\n          pageInfo { hasNextPage endCursor }\n          nodes { ...releaseCommit }\n        }\n      }\n    }\n  }\n}\n\n\n\nfragment releaseCommit on Commit {\n  oid\n  message\n  associatedPullRequests(first: 5) {\n    totalCount\n    nodes {\n      number\n      merged\n      repository { nameWithOwner }\n      closingIssuesReferences(first: 25) {\n        totalCount\n        nodes { number repository { nameWithOwner } }\n      }\n    }\n  }\n}",
       "variables": {
         "base": "refs/tags/v2.39.1",
         "cursor": null,
@@ -44,6 +46,9 @@
           "repository": {
             "ref": {
               "compare": {
+                "status": "AHEAD",
+                "aheadBy": 9,
+                "behindBy": 0,
                 "commits": {
                   "totalCount": 9,
                   "pageInfo": {
@@ -53,7 +58,7 @@
                   "nodes": [
                     {
                       "oid": "a74a71e0481a12047fd3b7d1a977ea1d4fcba272",
-                      "message": "build(deps): bump github.com/creack/pty from 1.1.20 to 1.1.21 (#8345)",
+                      "message": "Bump a dependency (#8345)",
                       "associatedPullRequests": {
                         "totalCount": 1,
                         "nodes": [
@@ -73,7 +78,7 @@
                     },
                     {
                       "oid": "14a8e03bc3c8d7666940a23581d6ca674229f355",
-                      "message": "`gh repo sync` should be able to sync a local branch with an upstream remote (#8229)",
+                      "message": "Squash merge of a pull request (#8229)",
                       "associatedPullRequests": {
                         "totalCount": 1,
                         "nodes": [
@@ -100,7 +105,7 @@
                     },
                     {
                       "oid": "06e438b4b4a63ce1ad7486fb7e93091e35906451",
-                      "message": "Update to latest go-gh (#8359)",
+                      "message": "Squash merge of another pull request (#8359)",
                       "associatedPullRequests": {
                         "totalCount": 1,
                         "nodes": [
@@ -127,7 +132,7 @@
                     },
                     {
                       "oid": "b96a8e3c0168a3ee300c25d91879d32dc30169b6",
-                      "message": "Add PR Finder test to cover projectItems",
+                      "message": "Branch commit 1",
                       "associatedPullRequests": {
                         "totalCount": 1,
                         "nodes": [
@@ -154,7 +159,7 @@
                     },
                     {
                       "oid": "65d63e1bc9aafbd1e98f8bb905521576f4918961",
-                      "message": "Add test for ProjectV2Item query Status column",
+                      "message": "Branch commit 2",
                       "associatedPullRequests": {
                         "totalCount": 1,
                         "nodes": [
@@ -181,7 +186,7 @@
                     },
                     {
                       "oid": "e843349a13fe28b89d758191e49baffe6e875a35",
-                      "message": "Extract Project Status into fragment to fix unmarshal error",
+                      "message": "Branch commit 3",
                       "associatedPullRequests": {
                         "totalCount": 1,
                         "nodes": [
@@ -208,7 +213,7 @@
                     },
                     {
                       "oid": "7aeccdb7a08525bca2ee4d27c150d156f8e13e21",
-                      "message": "Update pkg/cmd/pr/shared/finder_test.go",
+                      "message": "Branch commit 4",
                       "associatedPullRequests": {
                         "totalCount": 1,
                         "nodes": [
@@ -235,7 +240,7 @@
                     },
                     {
                       "oid": "e775bc64b8cf4314d9e42e832e1c48e2d0cb8a02",
-                      "message": "Fix PR and Issue list",
+                      "message": "Branch commit 5",
                       "associatedPullRequests": {
                         "totalCount": 1,
                         "nodes": [
@@ -262,7 +267,7 @@
                     },
                     {
                       "oid": "63094461621f8e91217d9b89f513f53e21670bd9",
-                      "message": "Merge pull request #8384 from cli/wm/fix-project-unmarshaling",
+                      "message": "Merge pull request #8384 from cli/branch",
                       "associatedPullRequests": {
                         "totalCount": 1,
                         "nodes": [

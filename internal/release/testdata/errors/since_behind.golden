@@ -1,0 +1,2 @@
+error: --since main is newer than v0.2.0
+fix: pass --since, a tag, branch or commit that v0.2.0 includes

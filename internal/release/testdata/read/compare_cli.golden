@@ -1,13 +1,13 @@
 repo cli/cli, head v2.39.2 (6309446), since v2.39.1 (3f37d7e), picked false, compared true, 9 commits
-  a74a71e "build(deps): bump github.com/creack/pty from 1.1.20 to 1.1.21 (#8345)" PR #8345 closes []
-  14a8e03 "`gh repo sync` should be able to sync a local branch with an upstream remote (#8229)" PR #8229 closes [#8100]
-  06e438b "Update to latest go-gh (#8359)" PR #8359 closes [#8336]
-  b96a8e3 "Add PR Finder test to cover projectItems" PR #8384 closes [#8358]
-  65d63e1 "Add test for ProjectV2Item query Status column" PR #8384 closes [#8358]
-  e843349 "Extract Project Status into fragment to fix unmarshal error" PR #8384 closes [#8358]
-  7aeccdb "Update pkg/cmd/pr/shared/finder_test.go" PR #8384 closes [#8358]
-  e775bc6 "Fix PR and Issue list" PR #8384 closes [#8358]
-  6309446 "Merge pull request #8384 from cli/wm/fix-project-unmarshaling" PR #8384 closes [#8358]
+  a74a71e "Bump a dependency (#8345)" PR #8345 closes []
+  14a8e03 "Squash merge of a pull request (#8229)" PR #8229 closes [#8100]
+  06e438b "Squash merge of another pull request (#8359)" PR #8359 closes [#8336]
+  b96a8e3 "Branch commit 1" PR #8384 closes [#8358]
+  65d63e1 "Branch commit 2" PR #8384 closes [#8358]
+  e843349 "Branch commit 3" PR #8384 closes [#8358]
+  7aeccdb "Branch commit 4" PR #8384 closes [#8358]
+  e775bc6 "Branch commit 5" PR #8384 closes [#8358]
+  6309446 "Merge pull request #8384 from cli/branch" PR #8384 closes [#8358]
 found #8100: PR #8229
 found #8336: PR #8359
 found #8358: PR #8384

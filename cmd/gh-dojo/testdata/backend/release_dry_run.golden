@@ -1,7 +1,7 @@
 code: 0
 --- stdout
 release v0.2.0: 5 commits since v0.1.0, 4 issues
-not ready for done (it starts only from Ready or In progress): #17 (Backlog)
+not ready (done starts only from Ready or In progress): #17 (Backlog)
   #3: commit 1111111
   #7: commit 1212121, commit a1a1a1a
   #9: commit 1212121
