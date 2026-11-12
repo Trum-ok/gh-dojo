@@ -177,7 +177,27 @@ func readBoard(cmd *cobra.Command, a *App, cfg *config.Config, o *listOpts, bloc
 	if err := checkLabels(items, o.labels); err != nil {
 		return nil, err
 	}
+	if def, err := a.Repo(); err == nil { // only the spelling; list works without it
+		spellDefault(items, def.String())
+	}
 	return &boardRead{schema: s, field: field, items: items}, nil
+}
+
+// spellDefault names the default repository def as the config spells it
+// in the items and their blockers, as show and the verbs do; GitHub's
+// spelling may differ in case (gh dojo doctor warns then).
+func spellDefault(items *board.Items, def string) {
+	for i := range items.Items {
+		it := &items.Items[i]
+		if strings.EqualFold(it.Repo, def) {
+			it.Repo = def
+		}
+		for j := range it.BlockedBy.Nodes {
+			if b := &it.BlockedBy.Nodes[j]; strings.EqualFold(b.Repo, def) {
+				b.Repo = def
+			}
+		}
+	}
 }
 
 // boardRead is the board as readBoard read it.

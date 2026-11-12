@@ -36,7 +36,8 @@ warning is followed by the command that fixes it.
   token    gh is logged in and the token has the project scope
   board    the board exists and has every field and status the config names
   repo     each repository of board.repos (else the current one) is visible
-           and has issues enabled
+           and has issues enabled; warns when board.repos spells one otherwise
+           than GitHub does
   sprint   with fields.sprint set: the field is an iteration field and an
            iteration covers today
   verbs    the labels verbs add or remove exist in the default repository,
@@ -423,6 +424,11 @@ func checkRepo(r *doctorReport, cfg *config.Config, rp *doctorRepo) {
 			WithFix("gh repo edit "+rp.Found.NameWithOwner+" --enable-issues"))
 	case rp.Current:
 		r.ok("repo", "%s, the current repository: visible, issues enabled", name)
+	case rp.Found.NameWithOwner != "" && rp.Found.NameWithOwner != rp.Repo.String():
+		// GitHub matches names without case, so it works; output names
+		// the default repository as the config spells it.
+		r.warn("repo", fmt.Sprintf("write it as %q in board.repos in %s", rp.Found.NameWithOwner, cfg.Display),
+			"%s: visible, issues enabled; GitHub spells it %s", name, rp.Found.NameWithOwner)
 	default:
 		r.ok("repo", "%s: visible, issues enabled", name)
 	}

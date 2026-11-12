@@ -1,0 +1,13 @@
+code: 0
+--- stdout
+No status (1)
+  #21 Triage me [bug]
+Backlog (1)
+  #22 Add --json to list [enhancement, area:cli]
+In progress (2)
+  #23 Fix login redirect [bug] @Trum-ok @alice
+showing 3 of 6, use --limit 6; not shown: In progress 1, Waiting 1, Icebox 1
+hidden: 3 closed or Done, use --all
+skipped: 1 draft issue, 1 pull request, 2 items the token cannot see (list shows issues only)
+--- stderr
+warning: GitHub withheld parts of some board items from this token; their lines may be incomplete

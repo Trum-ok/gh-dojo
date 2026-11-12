@@ -1,0 +1,5 @@
+code: 0
+--- stdout
+["acme/shop","trum-ok/GH-Dojo"]
+--- stderr
+warning: GitHub withheld parts of some board items from this token; their lines may be incomplete

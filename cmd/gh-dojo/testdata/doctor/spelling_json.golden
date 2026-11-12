@@ -1,0 +1,4 @@
+code: 0
+--- stdout
+{"allowed":[],"detail":"trum-ok/GH-Dojo (default): visible, issues enabled; GitHub spells it Trum-ok/gh-dojo","fix":"write it as \"Trum-ok/gh-dojo\" in board.repos in .github/dojo.toml","name":"repo","result":"warn"}
+--- stderr

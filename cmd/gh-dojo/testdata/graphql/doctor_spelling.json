@@ -1,0 +1,28 @@
+{
+  "comment": "Hand-crafted from doctor_ok.json: board.repos spells the default repository trum-ok/GH-Dojo; GitHub finds it and answers with its own spelling, Trum-ok/gh-dojo.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "Doctor",
+      "query": "query Doctor($owner0: String!, $name0: String!) {\n  viewer { login }\n  repo0: repository(owner: $owner0, name: $name0) { nameWithOwner hasIssuesEnabled }\n}",
+      "variables": {
+        "owner0": "trum-ok",
+        "name0": "GH-Dojo"
+      },
+      "headers": {
+        "X-OAuth-Scopes": "gist, project, read:org, repo"
+      },
+      "response": {
+        "data": {
+          "viewer": {
+            "login": "Trum-ok"
+          },
+          "repo0": {
+            "nameWithOwner": "Trum-ok/gh-dojo",
+            "hasIssuesEnabled": true
+          }
+        }
+      }
+    }
+  ]
+}

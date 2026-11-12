@@ -1,5 +1,5 @@
 {
-  "comment": "Hand-crafted from internal/issue/testdata/graphql/cards_repos.json (recorded): Trum-ok/gh-dojo#3 and cli/cli#2 read by a verb in one batched request, one repository field each.",
+  "comment": "Hand-crafted from internal/issue/testdata/graphql/cards_repos.json (itself hand-crafted from a recorded request, cli/cli's content replaced): Trum-ok/gh-dojo#3 and cli/cli#2 read by a verb in one batched request, one repository field each.",
   "handcrafted": true,
   "interactions": [
     {

@@ -1,0 +1,9 @@
+code: 0
+--- stdout
+ok       version  gh dojo dev
+ok       config   .github/dojo.toml: preset kanban, 4 verbs
+ok       token    github.com as Trum-ok, with the project scope
+ok       board    Trum-ok/5 "gh-dojo": field Status and 5 statuses match
+warn     repo     trum-ok/GH-Dojo (default): visible, issues enabled; GitHub spells it Trum-ok/gh-dojo
+                  fix: write it as "Trum-ok/gh-dojo" in board.repos in .github/dojo.toml
+--- stderr

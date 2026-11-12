@@ -392,7 +392,7 @@ ok       verbs    octocat/shop: 2 labels exist, 1 assignee can be assigned
 | `config` | `.github/dojo.toml` loads |
 | `token` | gh is logged in, and the token has the `project` scope (from `GH_TOKEN`: "set GH_TOKEN to …") |
 | `board` | The board exists, is open, and has every field and status the config names, each mismatch on its own line |
-| `repo` | Each repository of [`board.repos`](#board), or the current one, is visible with issues enabled |
+| `repo` | Each repository of [`board.repos`](#board), or the current one, is visible with issues enabled; a warning when `board.repos` spells one otherwise than GitHub does |
 | `sprint` | With [`fields.sprint`](#fields): an iteration covers today, a date in [`board.timezone`](#board) |
 | `verbs` | When verbs have labels or assignees: the labels exist in the default repository, spelled exactly as there, and the users can be assigned |
 | `agent` | With [`[agent]`](#agent) set (and `targets` not empty), or a file with a gh-dojo marker: the files [`agent install`](#agent-install) writes are up to date (`agent install --check`, without the diff). Out of date or missing is `warn`, since the text also depends on the gh-dojo version; a hand-written skill under `[agent]` is a problem |
@@ -1127,8 +1127,9 @@ due date, no fix) is `null`, never `""`. Times are RFC 3339 in UTC, dates
 `YYYY-MM-DD`. GitHub node IDs never appear. A reference to an issue is
 always in full, `owner/name#12` (`ref`, `changed`, `unchanged`, `missed`,
 `blocked_by`, `already_blocked_by`, the `issue` of `add_blocked_by`), and
-every issue has its `repo`, as GitHub spells it: the short `#12` of the
-text is only for reading. New fields may be added;
+every issue has its `repo`: the default repository as the config spells it,
+others as GitHub does (also in the text). The short `#12` of the text is
+only for reading. New fields may be added;
 renaming or removing one, or changing its meaning, is a breaking change and
 comes only with a new `schema_version` in a major release.
 
