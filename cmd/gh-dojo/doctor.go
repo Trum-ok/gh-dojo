@@ -37,6 +37,8 @@ command that fixes it.
   board    the board exists and has every field and status the config names
   repo     each repository of board.repos (else the current one) is visible
            and has issues enabled
+  sprint   with fields.sprint set: the field is an iteration field and an
+           iteration covers today
   verbs    the labels verbs add or remove exist in the default repository,
            spelled as there, and the users they assign can be assigned
 
