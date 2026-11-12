@@ -46,7 +46,7 @@ code: 3
       "assignees_total": 0,
       "blocked_by": [
         {
-          "ref": "#2",
+          "ref": "Trum-ok/gh-dojo#2",
           "repo": "Trum-ok/gh-dojo",
           "number": 2,
           "title": "Коды выхода и короткие ошибки (internal/render)",
@@ -58,7 +58,7 @@ code: 3
           "resolved": true
         },
         {
-          "ref": "#1",
+          "ref": "Trum-ok/gh-dojo#1",
           "repo": "Trum-ok/gh-dojo",
           "number": 1,
           "title": "Каркас: Go-модуль, cobra и установка как расширение gh",
@@ -74,7 +74,7 @@ code: 3
       "unresolved_blockers": 0,
       "blocking": [
         {
-          "ref": "#11",
+          "ref": "Trum-ok/gh-dojo#11",
           "repo": "Trum-ok/gh-dojo",
           "number": 11,
           "title": "Глаголы из конфига: проверки и план эффектов (internal/workflow)",
@@ -86,7 +86,7 @@ code: 3
           "resolved": true
         },
         {
-          "ref": "#8",
+          "ref": "Trum-ok/gh-dojo#8",
           "repo": "Trum-ok/gh-dojo",
           "number": 8,
           "title": "Команда list",
@@ -98,7 +98,7 @@ code: 3
           "resolved": true
         },
         {
-          "ref": "#7",
+          "ref": "Trum-ok/gh-dojo#7",
           "repo": "Trum-ok/gh-dojo",
           "number": 7,
           "title": "Команда show <N>…",
@@ -110,7 +110,7 @@ code: 3
           "resolved": true
         },
         {
-          "ref": "#6",
+          "ref": "Trum-ok/gh-dojo#6",
           "repo": "Trum-ok/gh-dojo",
           "number": 6,
           "title": "Сверка конфига с доской",
@@ -122,7 +122,7 @@ code: 3
           "resolved": true
         },
         {
-          "ref": "#4",
+          "ref": "Trum-ok/gh-dojo#4",
           "repo": "Trum-ok/gh-dojo",
           "number": 4,
           "title": "Пресет kanban через embed.FS",
@@ -178,7 +178,7 @@ code: 3
       "assignees_total": 0,
       "blocked_by": [
         {
-          "ref": "#3",
+          "ref": "Trum-ok/gh-dojo#3",
           "repo": "Trum-ok/gh-dojo",
           "number": 3,
           "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)",
@@ -190,7 +190,7 @@ code: 3
           "resolved": true
         },
         {
-          "ref": "#2",
+          "ref": "Trum-ok/gh-dojo#2",
           "repo": "Trum-ok/gh-dojo",
           "number": 2,
           "title": "Коды выхода и короткие ошибки (internal/render)",
@@ -202,7 +202,7 @@ code: 3
           "resolved": true
         },
         {
-          "ref": "#5",
+          "ref": "Trum-ok/gh-dojo#5",
           "repo": "Trum-ok/gh-dojo",
           "number": 5,
           "title": "GraphQL-клиент и схема доски с кэшем (internal/graph, internal/board)",
@@ -218,7 +218,7 @@ code: 3
       "unresolved_blockers": 0,
       "blocking": [
         {
-          "ref": "#14",
+          "ref": "Trum-ok/gh-dojo#14",
           "repo": "Trum-ok/gh-dojo",
           "number": 14,
           "title": "Skill для агентов и переход на gh dojo (рубеж v0.0)",

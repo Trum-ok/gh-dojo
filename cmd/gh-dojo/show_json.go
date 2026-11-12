@@ -120,7 +120,7 @@ type jsonMilestone struct {
 }
 
 type showLink struct {
-	Ref    string `json:"ref"` // "#12", or "owner/name#12" outside the default repository
+	Ref    string `json:"ref"` // "owner/name#12", always in full
 	Repo   string `json:"repo"`
 	Number int    `json:"number"`
 	Title  string `json:"title"`
@@ -279,7 +279,7 @@ func (v cardView) linksJSON(c *issue.Card, links []issue.Link) []showLink {
 			repo = c.Repo
 		}
 		out = append(out, showLink{
-			Ref: linkRef(c, l, v.def), Repo: repo.String(), Number: l.Number, Title: singleLine(l.Title),
+			Ref: fullRef(issue.Ref{Repo: repo, Number: l.Number}), Repo: repo.String(), Number: l.Number, Title: singleLine(l.Title),
 			State: strings.ToLower(l.State), OnBoard: l.OnBoard, Status: orNull(l.Status), Archived: l.Archived,
 			StatusUnknownReason: orNull(l.StatusUnknown), Resolved: l.Resolved(v.resolved),
 		})

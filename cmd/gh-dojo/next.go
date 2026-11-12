@@ -379,7 +379,7 @@ type nextIssueJSON struct {
 }
 
 type nextBlockerJSON struct {
-	Ref      string  `json:"ref"` // #12, or owner/name#12 in another repository
+	Ref      string  `json:"ref"` // owner/name#12, always in full
 	Repo     string  `json:"repo"`
 	Number   int     `json:"number"`
 	OnBoard  bool    `json:"on_board"`
@@ -408,7 +408,7 @@ func (n *next) result(o *listOpts, repo string) nextResult {
 		j := nextIssueJSON{listIssue: listIssueOf(ni.Item), UnresolvedBlockers: []nextBlockerJSON{}, UnreadBlockers: ni.unread}
 		for _, b := range ni.blockers {
 			j.UnresolvedBlockers = append(j.UnresolvedBlockers, nextBlockerJSON{
-				Ref: b.ref(repo), Repo: b.Repo, Number: b.Number, OnBoard: b.onBoard, Status: orNull(b.status),
+				Ref: b.Repo + "#" + strconv.Itoa(b.Number), Repo: b.Repo, Number: b.Number, OnBoard: b.onBoard, Status: orNull(b.status),
 				Archived: b.archived, StatusUnknownReason: orNull(b.unknown),
 			})
 		}

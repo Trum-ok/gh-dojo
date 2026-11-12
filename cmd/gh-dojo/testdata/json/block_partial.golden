@@ -12,11 +12,11 @@ code: 5
   "repo": "Trum-ok/gh-dojo",
   "action": "block",
   "changed": [
-    "#2"
+    "Trum-ok/gh-dojo#2"
   ],
   "unchanged": [],
   "missed": [
-    "#26"
+    "Trum-ok/gh-dojo#26"
   ]
 }
 

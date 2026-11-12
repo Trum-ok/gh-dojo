@@ -41,7 +41,7 @@ code: 0
       "assignees_total": 0,
       "blocked_by": [
         {
-          "ref": "#6",
+          "ref": "Trum-ok/gh-dojo#6",
           "repo": "Trum-ok/gh-dojo",
           "number": 6,
           "title": "Сверка конфига с доской",
@@ -53,7 +53,7 @@ code: 0
           "resolved": true
         },
         {
-          "ref": "#4",
+          "ref": "Trum-ok/gh-dojo#4",
           "repo": "Trum-ok/gh-dojo",
           "number": 4,
           "title": "Пресет kanban через embed.FS",
@@ -69,7 +69,7 @@ code: 0
       "unresolved_blockers": 0,
       "blocking": [
         {
-          "ref": "#14",
+          "ref": "Trum-ok/gh-dojo#14",
           "repo": "Trum-ok/gh-dojo",
           "number": 14,
           "title": "Skill для агентов и переход на gh dojo (рубеж v0.0)",

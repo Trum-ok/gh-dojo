@@ -188,7 +188,7 @@ func runLinks(cmd *cobra.Command, add bool, ref issue.Ref, bys []string) (*links
 	result := func(done, missed []*issue.Linked, err error) *linksResult {
 		return &linksResult{
 			Number: ref.Number, Repo: ref.Repo.String(), Action: cmd.Name(),
-			Changed: refList(done, repo), Unchanged: refList(same, repo), Missed: refList(missed, repo),
+			Changed: refList(done), Unchanged: refList(same), Missed: refList(missed),
 			line: line(done), err: err,
 		}
 	}
@@ -254,8 +254,7 @@ type linksResult struct {
 	Action string `json:"action"` // block or unblock
 	// Changed are the blockers linked (block) or unlinked (unblock) now,
 	// Unchanged those already as asked, Missed those a partial write left
-	// as they were (see the top-level "error"); "#12" in the default
-	// repository, else "owner/name#12".
+	// as they were (see the top-level "error"), each as owner/name#12.
 	Changed   []string `json:"changed"`
 	Unchanged []string `json:"unchanged"`
 	Missed    []string `json:"missed"`
@@ -272,11 +271,11 @@ func (r *linksResult) write(w io.Writer) {
 	}
 }
 
-// refList is the refs of links, "#12" in repo or "owner/name#12".
-func refList(links []*issue.Linked, repo issue.Repo) []string {
+// refList is the refs of links for the JSON, in full: "owner/name#12".
+func refList(links []*issue.Linked) []string {
 	out := []string{}
 	for _, l := range links {
-		out = append(out, l.Ref.String(repo))
+		out = append(out, fullRef(l.Ref))
 	}
 	return out
 }

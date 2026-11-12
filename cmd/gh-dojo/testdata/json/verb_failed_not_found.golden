@@ -9,7 +9,7 @@ code: 3
     "fix": null
   },
   "verb": "done",
-  "repo": "acme/shop",
+  "default_repo": "acme/shop",
   "dry_run": false,
   "issues": [
     {

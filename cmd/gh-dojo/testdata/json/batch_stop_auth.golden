@@ -9,7 +9,7 @@ code: 4
     "fix": "gh auth refresh -s project"
   },
   "verb": "done",
-  "repo": "acme/shop",
+  "default_repo": "acme/shop",
   "dry_run": false,
   "issues": [
     {

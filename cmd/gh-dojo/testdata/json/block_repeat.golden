@@ -8,8 +8,8 @@ code: 0
   "action": "block",
   "changed": [],
   "unchanged": [
-    "#2",
-    "#26"
+    "Trum-ok/gh-dojo#2",
+    "Trum-ok/gh-dojo#26"
   ],
   "missed": []
 }

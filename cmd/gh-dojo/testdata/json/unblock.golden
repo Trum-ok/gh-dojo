@@ -7,10 +7,10 @@ code: 0
   "repo": "Trum-ok/gh-dojo",
   "action": "unblock",
   "changed": [
-    "#2"
+    "Trum-ok/gh-dojo#2"
   ],
   "unchanged": [
-    "#26"
+    "Trum-ok/gh-dojo#26"
   ],
   "missed": []
 }

@@ -41,7 +41,7 @@ code: 0
       "assignees_total": 0,
       "blocked_by": [
         {
-          "ref": "#2",
+          "ref": "Trum-ok/gh-dojo#2",
           "repo": "Trum-ok/gh-dojo",
           "number": 2,
           "title": "Коды выхода и короткие ошибки (internal/render)",
@@ -53,7 +53,7 @@ code: 0
           "resolved": true
         },
         {
-          "ref": "#1",
+          "ref": "Trum-ok/gh-dojo#1",
           "repo": "Trum-ok/gh-dojo",
           "number": 1,
           "title": "Каркас: Go-модуль, cobra и установка как расширение gh",
@@ -69,7 +69,7 @@ code: 0
       "unresolved_blockers": 0,
       "blocking": [
         {
-          "ref": "#11",
+          "ref": "Trum-ok/gh-dojo#11",
           "repo": "Trum-ok/gh-dojo",
           "number": 11,
           "title": "Глаголы из конфига: проверки и план эффектов (internal/workflow)",
@@ -81,7 +81,7 @@ code: 0
           "resolved": true
         },
         {
-          "ref": "#8",
+          "ref": "Trum-ok/gh-dojo#8",
           "repo": "Trum-ok/gh-dojo",
           "number": 8,
           "title": "Команда list",
@@ -93,7 +93,7 @@ code: 0
           "resolved": true
         },
         {
-          "ref": "#7",
+          "ref": "Trum-ok/gh-dojo#7",
           "repo": "Trum-ok/gh-dojo",
           "number": 7,
           "title": "Команда show <N>…",
@@ -105,7 +105,7 @@ code: 0
           "resolved": true
         },
         {
-          "ref": "#6",
+          "ref": "Trum-ok/gh-dojo#6",
           "repo": "Trum-ok/gh-dojo",
           "number": 6,
           "title": "Сверка конфига с доской",
@@ -117,7 +117,7 @@ code: 0
           "resolved": true
         },
         {
-          "ref": "#4",
+          "ref": "Trum-ok/gh-dojo#4",
           "repo": "Trum-ok/gh-dojo",
           "number": 4,
           "title": "Пресет kanban через embed.FS",

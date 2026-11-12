@@ -4,7 +4,7 @@ code: 0
   "schema_version": 1,
   "error": null,
   "verb": "start",
-  "repo": "Trum-ok/gh-dojo",
+  "default_repo": "Trum-ok/gh-dojo",
   "dry_run": false,
   "issues": [
     {

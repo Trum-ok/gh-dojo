@@ -41,7 +41,7 @@ code: 0
       "assignees_total": 0,
       "blocked_by": [
         {
-          "ref": "#2",
+          "ref": "Trum-ok/gh-dojo#2",
           "repo": "Trum-ok/gh-dojo",
           "number": 2,
           "title": "Коды выхода и короткие ошибки (internal/render)",
@@ -53,7 +53,7 @@ code: 0
           "resolved": true
         },
         {
-          "ref": "#1",
+          "ref": "Trum-ok/gh-dojo#1",
           "repo": "Trum-ok/gh-dojo",
           "number": 1,
           "title": "Каркас: Go-модуль, cobra и установка как расширение gh",
@@ -65,7 +65,7 @@ code: 0
           "resolved": false
         },
         {
-          "ref": "#5",
+          "ref": "Trum-ok/gh-dojo#5",
           "repo": "Trum-ok/gh-dojo",
           "number": 5,
           "title": "GraphQL-клиент и схема доски с кэшем (internal/graph, internal/board)",
@@ -77,7 +77,7 @@ code: 0
           "resolved": true
         },
         {
-          "ref": "#9",
+          "ref": "Trum-ok/gh-dojo#9",
           "repo": "Trum-ok/gh-dojo",
           "number": 9,
           "title": "Записать ответы GraphQL для тестов",
@@ -101,7 +101,7 @@ code: 0
           "resolved": false
         },
         {
-          "ref": "#12",
+          "ref": "Trum-ok/gh-dojo#12",
           "repo": "Trum-ok/gh-dojo",
           "number": 12,
           "title": "Документация: README и skill",
@@ -113,7 +113,7 @@ code: 0
           "resolved": false
         },
         {
-          "ref": "#10",
+          "ref": "Trum-ok/gh-dojo#10",
           "repo": "Trum-ok/gh-dojo",
           "number": 10,
           "title": "Общая библиотека для команд",
@@ -129,7 +129,7 @@ code: 0
       "unresolved_blockers": 5,
       "blocking": [
         {
-          "ref": "#11",
+          "ref": "Trum-ok/gh-dojo#11",
           "repo": "Trum-ok/gh-dojo",
           "number": 11,
           "title": "Глаголы из конфига: проверки и план эффектов (internal/workflow)",
@@ -141,7 +141,7 @@ code: 0
           "resolved": false
         },
         {
-          "ref": "#8",
+          "ref": "Trum-ok/gh-dojo#8",
           "repo": "Trum-ok/gh-dojo",
           "number": 8,
           "title": "Команда list",

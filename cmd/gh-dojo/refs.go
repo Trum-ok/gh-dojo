@@ -137,6 +137,18 @@ func refNames(refs []issue.Ref, def issue.Repo) string {
 	return s
 }
 
+// fullRef names an issue in full, "owner/name#12", as the JSON does.
+func fullRef(r issue.Ref) string { return r.Repo.String() + "#" + strconv.Itoa(r.Number) }
+
+// fullText makes a ref of the text, "#12" of def (owner/name) or
+// "owner/name#12", a full one for the JSON.
+func fullText(ref, def string) string {
+	if strings.HasPrefix(ref, "#") && def != "" {
+		return def + ref
+	}
+	return ref
+}
+
 // linkRef names a linked issue of card c as output does: relative to the
 // default repository def, not to the card's.
 func linkRef(c *issue.Card, l issue.Link, def issue.Repo) string {

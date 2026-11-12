@@ -145,10 +145,9 @@ Issues are written `42` or `#42` for the default repository (the first of
 other: in a verb, a batch, `show`, `comment`, both sides of `block` and
 `unblock`, `wait --by` and `new --blocked-by`. A repository outside
 `board.repos` is accepted too, since the command names it; a verb adds its
-issue to the board like any other. Output names an issue of the default
-repository `#42` and any other `owner/repo#42`, in the text and in the
-JSON's references alike (`ref`, `changed`, `blocked_by`, the `issue` of
-`add_blocked_by`); every issue in the JSON also has its `repo`. Every command
+issue to the board like any other. The text names an issue of the default
+repository `#42` and any other `owner/repo#42`; the JSON names every issue
+in full, `owner/repo#42` ([JSON output](#json-output)). Every command
 prints its usage with `--help` and takes `--json`, `--jq` and `--template`
 ([JSON output](#json-output)). Flags go before a `--`: anything after it is
 an argument.
@@ -1079,7 +1078,7 @@ $ gh dojo list --jq '.issues[].number'
 $ gh dojo show 42 --jq '.issues[0].board.status'
 In progress
 $ gh dojo show 42 --jq '.issues[0].blocked_by[] | select(.resolved | not) | .ref'
-#17
+acme/shop#17
 $ gh dojo start 42 --dry-run --jq '.issues[0].planned[].op'
 set_status
 add_comment
@@ -1122,7 +1121,11 @@ also printed as the usual short block on stderr, and warnings stay on stderr
 second. Field names are snake_case. Every key is always there: lists are
 `[]` when empty, never `null`; an absent value (no status, no milestone, no
 due date, no fix) is `null`, never `""`. Times are RFC 3339 in UTC, dates
-`YYYY-MM-DD`. GitHub node IDs never appear. New fields may be added;
+`YYYY-MM-DD`. GitHub node IDs never appear. A reference to an issue is
+always in full, `owner/name#12` (`ref`, `changed`, `unchanged`, `missed`,
+`blocked_by`, `already_blocked_by`, the `issue` of `add_blocked_by`), and
+every issue has its `repo`, as GitHub spells it: the short `#12` of the
+text is only for reading. New fields may be added;
 renaming or removing one, or changing its meaning, is a breaking change and
 comes only with a new `schema_version` in a major release.
 
@@ -1138,7 +1141,7 @@ The schemas, by command, after `schema_version` and `error`:
 | card | `number`, `repo`, `url`, `title`, `state` (`open`/`closed`), `state_reason` (`completed`, `not_planned`, `duplicate`, `reopened` or `null`), `author`, `created_at`, `closed_at`, `incomplete` (GitHub withheld part of it); `board`: `{on_board, unknown_reason, status, status_unknown, archived, fields: [{name, value}], fields_truncated}`; `sprint`: `null` without `fields.sprint`, else `{field, iteration: {title, start_date, end_date, duration_days} or null, unknown_reason}`; `milestone`: `{title, due_on}` or `null`; `labels`, `assignees` with `labels_total`, `assignees_total`; `blocked_by`, `blocking`: `[{ref, repo, number, title, state, on_board, status, archived, status_unknown_reason, resolved}]` with `blocked_by_total`, `blocking_total`, `unresolved_blockers`; `history`: `[{at, from, to, actor, automated}]` with `history_truncated`, `history_untracked`; `body`: `{text, cut, length}`; `comments`: `[{author, created_at, text, cut, length}]` with `comments_total` |
 | `list` | `sprint_filter` (`null` without `--sprint`, `"none"` for issues without a sprint, `"iteration"` for those in `sprint`), `sprint` (the `--sprint` iteration or `null`), `issues`: `[{repo, number, title, state, status, labels, labels_total, assignees, assignees_total}]` in the printed order, cut to `--limit`; `matched` (before `--limit`), `unchecked`, `hidden`, `filtered`, `skipped`: `{draft_issues, pull_requests, unseen}`, `incomplete`, `warnings` |
 | `next` | as `list`, each issue with `unresolved_blockers`: `[{ref, repo, number, on_board, status, archived, status_unknown_reason}]` (empty unless `--all`) and `unread_blockers` (blockers the token cannot read, unresolved); `matched`: issues to show before `--limit` (with `--all`, the blocked ones too); `hidden`: blocked issues left out (0 with `--all`); `incomplete`: GitHub withheld part of an issue to show or hide, or of its blockers |
-| verbs | `verb`, `repo` (the default repository), `dry_run`, `issues`: `[{number, repo, title, outcome, planned, applied, in_place, needs_yes, warnings, error}]` in argument order (`title` `null` when the issue was not read), `summary`: `{total, done, written, failed, not_attempted}` |
+| verbs | `verb`, `default_repo` (where a bare number is), `dry_run`, `issues`: `[{number, repo, title, outcome, planned, applied, in_place, needs_yes, warnings, error}]` in argument order (`title` `null` when the issue was not read), `summary`: `{total, done, written, failed, not_attempted}` |
 | `new` | `number`, `repo`, `title`, `created` (`false`: resumed), `labels`, `status`, `status_set`, `unarchived`, `milestone` (`{title, due_on}` or `null`), `milestone_set`, `blocked_by`, `already_blocked_by` |
 | `comment` | `number`, `repo`, `posted` (`false`: already the last comment) |
 | `block`, `unblock` | `number`, `repo`, `action`, `changed`, `unchanged`, `missed` |
@@ -1168,7 +1171,7 @@ error object alone. `planned`, `applied` and `in_place` are lists of ops:
 | `set_fields` | `fields`: `[{field, from, to}]` |
 | `add_labels`, `remove_labels` | `labels` |
 | `assign` | `login` |
-| `add_blocked_by` | `issue` (`#12` or `owner/name#12`) |
+| `add_blocked_by` | `issue` (`owner/name#12`) |
 | `add_comment` | `body` (`null` in `in_place`: the comment was posted before) |
 | `close` | `reason` (`completed`, `not_planned`, `duplicate`) |
 

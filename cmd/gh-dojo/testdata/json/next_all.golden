@@ -35,7 +35,7 @@ code: 0
       "assignees_total": 0,
       "unresolved_blockers": [
         {
-          "ref": "#38",
+          "ref": "Trum-ok/gh-dojo#38",
           "repo": "Trum-ok/gh-dojo",
           "number": 38,
           "on_board": true,
@@ -60,7 +60,7 @@ code: 0
       "assignees_total": 0,
       "unresolved_blockers": [
         {
-          "ref": "#40",
+          "ref": "Trum-ok/gh-dojo#40",
           "repo": "Trum-ok/gh-dojo",
           "number": 40,
           "on_board": true,
