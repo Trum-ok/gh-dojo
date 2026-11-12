@@ -1,5 +1,5 @@
 code: 1
 --- stdout
 --- stderr
-error: done needs one or more issue numbers, like 42, "#42" or owner/repo#42
+error: done needs one or more issue numbers, like 42, "#42", owner/repo#42 or the issue's URL
 fix: gh dojo done --help

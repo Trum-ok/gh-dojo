@@ -51,7 +51,7 @@ func TestShow(t *testing.T) {
 		{"repo_not_found", issueFixtures + "cards_repo_not_found.json", []string{"1", "2"}, render.ExitNotFound},
 		// Three repositories in one request (cards_repos.json); the missing one and
 		// the pull request fail alone, after the cards.
-		{"repos", issueFixtures + "cards_repos.json", []string{"3", "cli/cli#2", "Trum-ok/no-such-repo-xyz#1", "https://github.com/cli/cli/issues/1"}, render.ExitNotFound},
+		{"repos", issueFixtures + "cards_repos.json", []string{"3", "https://github.com/cli/cli/issues/2#issuecomment-1", "Trum-ok/no-such-repo-xyz#1", "https://github.com/cli/cli/issues/1?q=1"}, render.ExitNotFound},
 		{"repos_brief", issueFixtures + "cards_repos.json", []string{"Trum-ok/gh-dojo#3", "cli/cli#2", "Trum-ok/no-such-repo-xyz#1", "cli/cli#1", "--brief"}, render.ExitNotFound},
 	}
 	for _, tt := range tests {

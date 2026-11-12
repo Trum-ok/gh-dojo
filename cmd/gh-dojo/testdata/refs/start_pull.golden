@@ -1,0 +1,5 @@
+code: 3
+--- stdout
+--- stderr
+error: https://github.com/cli/cli/pull/1#discussion_r1 is a pull request; gh dojo works with issues only
+fix: gh dojo list

@@ -21,45 +21,69 @@ import (
 type Ref struct {
 	Repo   Repo
 	Number int
+	// Host is the host of a URL ("github.com"); "" for 12, #12 and
+	// owner/name#12, which are on the host gh dojo talks to. See CheckHost.
+	Host string
+	// Pull says the URL names a pull request (.../pull/12).
+	Pull bool
 }
 
-// refRE matches "12", "#12" and "owner/name#12"; urlRefRE an issue's URL,
-// "https://github.com/owner/name/issues/12" (any host: GitHub Enterprise
-// Server URLs name issues the same way).
+// refRE matches "12", "#12" and "owner/name#12"; urlRefRE an issue's or
+// pull request's URL, "https://github.com/owner/name/issues/12", maybe
+// with a query or a fragment ("#issuecomment-1"). Any host: GitHub
+// Enterprise Server URLs name issues the same way, and CheckHost compares
+// it with the client's.
 var (
 	refRE    = regexp.MustCompile(`^(?:([A-Za-z0-9][A-Za-z0-9_-]*/[A-Za-z0-9._-]+)#|#)?([1-9][0-9]*)$`)
-	urlRefRE = regexp.MustCompile(`^https?://[^/\s]+/([A-Za-z0-9][A-Za-z0-9_-]*/[A-Za-z0-9._-]+)/issues/([1-9][0-9]*)/?$`)
+	urlRefRE = regexp.MustCompile(`^https?://([^/\s?#]+)/([A-Za-z0-9][A-Za-z0-9_-]*/[A-Za-z0-9._-]+)/(issues|pull)/([1-9][0-9]*)/?(?:[?#]\S*)?$`)
 )
 
 // RefExamples shows how to write an issue reference.
 const RefExamples = `12, "#12", owner/repo#12 or the issue's URL`
 
 // ParseRef parses an issue reference, "12", "#12", "owner/name#12" or the
-// issue's URL ("https://github.com/owner/name/issues/12"), ignoring
-// surrounding spaces; a bare number is in def. ok is false for anything
-// else, such as free text or a pull request's URL.
+// issue's URL ("https://github.com/owner/name/issues/12", a query or
+// fragment ignored), ignoring surrounding spaces; a bare number is in def.
+// A pull request's URL parses too, with Pull set. ok is false for anything
+// else, such as free text.
 func ParseRef(s string, def Repo) (Ref, bool) {
 	s = strings.TrimSpace(s)
-	m := refRE.FindStringSubmatch(s)
-	if m == nil {
-		m = urlRefRE.FindStringSubmatch(s)
-	}
-	if m == nil {
+	var host, repo, kind, num string
+	if m := refRE.FindStringSubmatch(s); m != nil {
+		repo, num = m[1], m[2]
+	} else if m := urlRefRE.FindStringSubmatch(s); m != nil {
+		host, repo, kind, num = m[1], m[2], m[3], m[4]
+	} else {
 		return Ref{}, false
 	}
-	n, err := strconv.ParseInt(m[2], 10, 32)
+	n, err := strconv.ParseInt(num, 10, 32)
 	if err != nil {
 		return Ref{}, false
 	}
-	r := Ref{Repo: def, Number: int(n)}
-	if m[1] != "" {
-		repo, err := ParseRepo(m[1])
+	r := Ref{Repo: def, Number: int(n), Host: strings.ToLower(host), Pull: kind == "pull"}
+	if repo != "" {
+		parsed, err := ParseRepo(repo)
 		if err != nil {
 			return Ref{}, false
 		}
-		r.Repo = repo
+		r.Repo = parsed
 	}
 	return r, true
+}
+
+// CheckHost refuses a URL on another host than host, the one gh dojo
+// talks to: exit code 1, since its number would name another issue there.
+// arg is the reference as given. "www.github.com" is github.com.
+func (r Ref) CheckHost(host, arg string) error {
+	if r.Host == "" || host == "" {
+		return nil
+	}
+	norm := func(h string) string { return strings.TrimPrefix(strings.ToLower(h), "www.") }
+	if norm(r.Host) == norm(host) {
+		return nil
+	}
+	return render.Usage("%s: the URL is on %s, gh dojo talks to %s", arg, r.Host, host).
+		WithFix("pass an issue of " + host + " (gh's default host: GH_HOST or gh auth login)")
 }
 
 // String returns "#12" for an issue in def, else "owner/name#12". Repos

@@ -153,8 +153,8 @@ func showArgs(cmd *cobra.Command, args []string) error {
 		return render.Usage("%s needs an issue number, like %s", cmd.Name(), issueExamples).WithFix(help)
 	}
 	for _, a := range args {
-		if _, ok := parseRef(a); !ok {
-			return render.Usage("%q is not an issue number; pass issues like %s", a, issueExamples).WithFix(help)
+		if err := checkArg(cmd, a, "issues"); err != nil {
+			return err
 		}
 	}
 	return nil

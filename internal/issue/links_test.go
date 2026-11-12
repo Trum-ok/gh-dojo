@@ -10,6 +10,28 @@ import (
 	"github.com/Trum-ok/gh-dojo/internal/render"
 )
 
+func TestCheckHost(t *testing.T) {
+	for _, tt := range []struct {
+		in, host string
+		ok       bool
+	}{
+		{"https://github.com/acme/shop/issues/7", "github.com", true},
+		{"https://WWW.GitHub.com/acme/shop/issues/7", "github.com", true},
+		{"acme/shop#7", "ghe.example.com", true},
+		{"https://gitlab.com/acme/shop/issues/7", "github.com", false},
+		{"https://ghe.example.com/acme/shop/issues/7", "github.com", false},
+	} {
+		r, _ := issue.ParseRef(tt.in, issue.Repo{})
+		err := r.CheckHost(tt.host, tt.in)
+		if (err == nil) != tt.ok {
+			t.Errorf("CheckHost(%q, %q) = %v, want ok %v", tt.in, tt.host, err, tt.ok)
+		}
+		if err != nil && render.FromError(err).Code != render.ExitUsage {
+			t.Errorf("%q: code %d, want 1", tt.in, render.FromError(err).Code)
+		}
+	}
+}
+
 func TestParseRef(t *testing.T) {
 	def := issue.Repo{Owner: "Trum-ok", Name: "gh-dojo"}
 	tests := []struct {
@@ -30,8 +52,12 @@ func TestParseRef(t *testing.T) {
 		{"https://github.com/Trum-ok/gh-dojo/issues/26", true, "#26"},
 		{" https://github.com/acme/shop/issues/7/ ", true, "acme/shop#7"},
 		{"https://ghe.example.com/acme/shop/issues/7", true, "acme/shop#7"},
-		{"https://github.com/acme/shop/pull/7", false, ""},
-		{"https://github.com/acme/shop/issues/7#issuecomment-1", false, ""},
+		{"https://github.com/acme/shop/pull/7", true, "acme/shop#7"}, // Pull set
+		{"https://github.com/acme/shop/issues/7#issuecomment-1", true, "acme/shop#7"},
+		{"https://github.com/acme/shop/issues/7?q=1#top", true, "acme/shop#7"},
+		{"https://github.com/acme/shop/issues/7/#issuecomment-1", true, "acme/shop#7"},
+		{"https://github.com/acme/shop/issues/7x", false, ""},
+		{"https://github.com/acme/shop/issues/7 more", false, ""},
 		{"github.com/acme/shop/issues/7", false, ""},
 		{"", false, ""},
 	}
@@ -40,6 +66,12 @@ func TestParseRef(t *testing.T) {
 		if ok != tt.ok || ok && r.String(def) != tt.want {
 			t.Errorf("ParseRef(%q) = %q, %v; want %q, %v", tt.in, r.String(def), ok, tt.want, tt.ok)
 		}
+	}
+	if r, _ := issue.ParseRef("https://github.com/acme/shop/pull/7", def); !r.Pull || r.Host != "github.com" {
+		t.Errorf("pull URL: %+v", r)
+	}
+	if r, _ := issue.ParseRef("acme/shop#7", def); r.Pull || r.Host != "" {
+		t.Errorf("ref: %+v", r)
 	}
 	a, _ := issue.ParseRef("12", def)
 	b, _ := issue.ParseRef("trum-ok/gh-dojo#12", def)

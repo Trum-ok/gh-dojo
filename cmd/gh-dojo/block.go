@@ -84,7 +84,10 @@ written (exit code 3).`
 // into the issue references (see issue.ParseRef), duplicates dropped, and
 // the parts that are not one, trimmed. Empty parts, as in "12,", are
 // skipped.
-func splitRefs(values []string, def issue.Repo) (refs []issue.Ref, text []string) {
+//
+// A URL on another host than the client's is an error (see
+// issue.Ref.CheckHost): its number would name another issue here.
+func splitRefs(values []string, def issue.Repo) (refs []issue.Ref, text []string, err error) {
 	for _, v := range values {
 		for _, s := range strings.Split(v, ",") {
 			s = strings.TrimSpace(s)
@@ -92,6 +95,11 @@ func splitRefs(values []string, def issue.Repo) (refs []issue.Ref, text []string
 				continue
 			}
 			ref, ok := issue.ParseRef(s, def)
+			if ok {
+				if err := ref.CheckHost(clientHost(), s); err != nil {
+					return nil, nil, err
+				}
+			}
 			switch {
 			case !ok:
 				text = append(text, s)
@@ -100,7 +108,7 @@ func splitRefs(values []string, def issue.Repo) (refs []issue.Ref, text []string
 			}
 		}
 	}
-	return refs, text
+	return refs, text, nil
 }
 
 // parseBlockers parses the values of a flag (--by, --blocked-by) naming
@@ -109,7 +117,10 @@ func splitRefs(values []string, def issue.Repo) (refs []issue.Ref, text []string
 // zero target skips that check). Errors are exit code 1 with help as the
 // fix; none means no issue was named.
 func parseBlockers(values []string, flag string, def issue.Repo, target issue.Ref, help string) ([]issue.Ref, error) {
-	refs, text := splitRefs(values, def)
+	refs, text, err := splitRefs(values, def)
+	if err != nil {
+		return nil, err
+	}
 	if len(text) > 0 {
 		return nil, render.Usage("--%s %q is not an issue: pass %s", flag, text[0], issue.RefExamples).
 			WithFix(help)

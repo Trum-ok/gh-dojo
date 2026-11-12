@@ -31,6 +31,7 @@ func TestMain(m *testing.M) {
 	loadConfig = func() (*config.Config, error) { return config.Load(dir) }
 	getenv = func(string) string { return "" }
 	newApp = noApp // see withApp
+	clientHost = func() string { return "github.com" }
 	code := m.Run()
 	if stray := strayAppFailures(); len(stray) > 0 {
 		for _, line := range stray {

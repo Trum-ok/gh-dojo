@@ -1,5 +1,5 @@
 code: 1
 --- stdout
 --- stderr
-error: "abc" is not an issue number; pass issues like 42, "#42" or owner/repo#42
+error: "abc" is not an issue number; pass issues like 42, "#42", owner/repo#42 or the issue's URL
 fix: gh dojo show --help

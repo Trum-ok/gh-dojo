@@ -166,7 +166,10 @@ func lookupMissing(v config.Verb, l issue.Lookup, f *issue.Found) bool {
 // 1: linking some and not others would be a guess. target is zero for a
 // batch, which checks each issue against the refs itself.
 func byRefs(v config.Verb, by string, def issue.Repo, target issue.Ref) ([]issue.Ref, error) {
-	refs, text := splitRefs([]string{by}, def)
+	refs, text, err := splitRefs([]string{by}, def)
+	if err != nil {
+		return nil, err
+	}
 	switch {
 	case len(refs) == 0:
 		return nil, nil

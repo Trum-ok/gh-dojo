@@ -485,14 +485,13 @@ func issueArg(cmd *cobra.Command, args []string) error {
 		return render.Usage("%s takes one issue number, got %d; several at once are not supported yet",
 			cmd.Name(), len(args)).WithFix(help)
 	}
-	if _, ok := parseRef(args[0]); !ok {
-		return render.Usage("%q is not an issue number; pass one like %s", args[0], issueExamples).WithFix(help)
-	}
-	return nil
+	return checkArg(cmd, args[0], "one")
 }
 
 // issueArgs accepts the issue numbers of verb v: one, or with batch =
-// true one or more. A number repeated counts once.
+// true one or more. A number repeated counts once. Without batch, refs of
+// one number in different forms (38 and owner/repo#38) may be one issue
+// of the default repository, which is not known yet: runBatch tells.
 func issueArgs(cfg *config.Config, v config.Verb) cobra.PositionalArgs {
 	return func(cmd *cobra.Command, args []string) error {
 		help := cmd.CommandPath() + " --help"
@@ -503,17 +502,27 @@ func issueArgs(cfg *config.Config, v config.Verb) cobra.PositionalArgs {
 			return render.Usage("%s needs an issue number, like %s", cmd.Name(), issueExamples).WithFix(help)
 		}
 		for _, a := range args {
-			if _, ok := parseRef(a); !ok {
-				return render.Usage("%q is not an issue number; pass one like %s", a, issueExamples).WithFix(help)
+			if err := checkArg(cmd, a, "one"); err != nil {
+				return err
 			}
 		}
-		if n := len(argRefs(args, issue.Repo{})); n > 1 && !v.Batch {
-			return render.Usage("%s takes one issue number, got %d; several at once need batch = true in verbs.%s%s",
-				cmd.Name(), n, v.Name, batchVerbsNote(cfg)).
-				WithFix(fmt.Sprintf("run %s once per issue", cmd.CommandPath()))
+		refs := argRefs(args, issue.Repo{})
+		numbers := map[int]bool{}
+		for _, r := range refs {
+			numbers[r.Number] = true
+		}
+		if len(numbers) > 1 && !v.Batch {
+			return notBatch(cmd, cfg, v, len(refs))
 		}
 		return nil
 	}
+}
+
+// notBatch is the error for n issues given to verb v without batch = true.
+func notBatch(cmd *cobra.Command, cfg *config.Config, v config.Verb, n int) error {
+	return render.Usage("%s takes one issue number, got %d; several at once need batch = true in verbs.%s%s",
+		cmd.Name(), n, v.Name, batchVerbsNote(cfg)).
+		WithFix(fmt.Sprintf("run %s once per issue", cmd.CommandPath()))
 }
 
 // batchVerbsNote names the verbs that take several numbers, for the error

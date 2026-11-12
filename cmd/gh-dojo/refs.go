@@ -7,7 +7,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cli/go-gh/v2/pkg/auth"
+	"github.com/spf13/cobra"
+
 	"github.com/Trum-ok/gh-dojo/internal/issue"
+	"github.com/Trum-ok/gh-dojo/internal/render"
 )
 
 // Issues on the command line and in output (spec F12). Every command that
@@ -24,7 +28,33 @@ func parseRef(s string) (issue.Ref, bool) { return issue.ParseRef(s, issue.Repo{
 
 // issueExamples shows how to pass an issue. A bare #42 is a comment in the
 // shell, so the # form is quoted; owner/repo#42 needs no quotes.
-const issueExamples = `42, "#42" or owner/repo#42`
+const issueExamples = `42, "#42", owner/repo#42 or the issue's URL`
+
+// clientHost is the GitHub host gh dojo talks to: gh's default host, as
+// graph.New picks it. Tests replace it.
+var clientHost = func() string {
+	host, _ := auth.DefaultHost()
+	return host
+}
+
+// checkArg checks an issue argument before anything is read: a reference
+// (else "is not an issue number", with what as the example's noun), on the
+// client's host, and not a pull request's URL (exit code 3, as a pull
+// request number read from GitHub is).
+func checkArg(cmd *cobra.Command, a, what string) error {
+	ref, ok := parseRef(a)
+	if !ok {
+		return render.Usage("%q is not an issue number; pass %s like %s", a, what, issueExamples).
+			WithFix(cmd.CommandPath() + " --help")
+	}
+	if err := ref.CheckHost(clientHost(), a); err != nil {
+		return err
+	}
+	if ref.Pull {
+		return render.NotFound("%s is a pull request; gh dojo works with issues only", a).WithFix(issue.ListFix)
+	}
+	return nil
+}
 
 // argRefs parses the validated issue arguments, a bare number in def,
 // dropping repeats. With an empty def a bare number stays without a

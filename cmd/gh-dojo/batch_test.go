@@ -227,6 +227,25 @@ func TestVerbsOtherRepo(t *testing.T) {
 	}
 }
 
+// TestVerbOneIssueTwoForms: a verb without batch takes 12 and
+// acme/shop#12 together, one issue of the default repository; 4 and
+// other/repo#4 are two issues, refused before anything is read.
+func TestVerbOneIssueTwoForms(t *testing.T) {
+	withConfig(t, verbsConfig)
+	f := &fakeBackend{issues: map[int]workflow.Issue{4: {Number: 4, OnBoard: true, Status: "Backlog"}}}
+	withBackend(t, f)
+	code, out := runOut("start", "4", "ACME/shop#4", "--dry-run")
+	if code != render.ExitOK || f.reads != 1 {
+		t.Errorf("exit code = %d, reads %d; want 0, 1\n%s", code, f.reads, out)
+	}
+	testutil.Golden(t, "verbs/one_issue_two_forms", out)
+	code, out = runOut("start", "4", "other/repo#4")
+	if code != render.ExitUsage || f.reads != 1 {
+		t.Errorf("exit code = %d, reads %d; want 1, 1\n%s", code, f.reads, out)
+	}
+	testutil.Golden(t, "verbs/two_issues_one_number", out)
+}
+
 // TestBatchConfirm: a batch verb with confirm = "user" refuses every issue
 // that needs it without --yes, and --yes applies to all of them. An issue
 // with nothing left to do needs no go-ahead.

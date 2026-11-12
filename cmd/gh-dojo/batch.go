@@ -66,6 +66,9 @@ func runBatch(cmd *cobra.Command, cfg *config.Config, v config.Verb, refs []issu
 	if refs = inRepo(refs, def); len(refs) == 1 { // 12 and owner/repo#12 of the default repository
 		return runVerb(cmd, cfg, v, refs[0], args, dryRun)
 	}
+	if !v.Batch { // issueArgs let one number in two forms through
+		return notBatch(cmd, cfg, v, len(refs))
+	}
 	ctx := cmd.Context()
 	b := &batchRun{
 		be: be, engine: workflow.New(cfg), v: v, args: args, json: jsonMode(cmd), def: def,
