@@ -1,0 +1,7 @@
+code: 0
+--- stdout
+dry run: start #21 "Refund a payment"
+  status: Backlog → In progress
+  assign: acme-bot
+  comment: "Started. Session: claude://claude.ai/epitaxy/abc"
+--- stderr

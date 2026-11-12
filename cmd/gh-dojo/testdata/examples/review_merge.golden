@@ -1,0 +1,6 @@
+code: 0
+--- stdout
+dry run: merge #28 "Refund currency rounding"
+  status: Approved → Merged
+  close: as completed
+--- stderr

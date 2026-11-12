@@ -679,14 +679,15 @@ func TestReadmeExamples(t *testing.T) {
 }
 
 // TestExampleConfigs keeps every examples/*.toml loadable, and checks that
-// each one builds on a preset and still has the preset's verbs.
+// one built on a preset still has the preset's verbs. review.toml has no
+// preset; cmd/gh-dojo's TestExampleReview runs its verbs.
 func TestExampleConfigs(t *testing.T) {
 	paths, err := filepath.Glob(filepath.Join("..", "..", "examples", "*.toml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(paths) < 2 {
-		t.Fatalf("found %d examples/*.toml, want at least 2", len(paths))
+	if len(paths) < 3 {
+		t.Fatalf("found %d examples/*.toml, want at least 3", len(paths))
 	}
 	for _, path := range paths {
 		name := "examples/" + filepath.Base(path)
@@ -700,7 +701,10 @@ func TestExampleConfigs(t *testing.T) {
 				t.Fatal(err)
 			}
 			if c.Preset == "" {
-				t.Fatalf("%s sets no preset", name)
+				if len(c.VerbNames()) == 0 {
+					t.Errorf("%s sets no preset and no verbs", name)
+				}
+				return
 			}
 			preset, err := loadPreset(c.Preset)
 			if err != nil {

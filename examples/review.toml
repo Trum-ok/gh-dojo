@@ -1,0 +1,118 @@
+# .github/dojo.toml for a code review flow, written without a preset: every
+# status and verb is defined here. An agent writes the change and opens a
+# pull request; a person reviews it, and approving or rejecting the change is
+# theirs to decide. Copy it to .github/dojo.toml, set [board] and the
+# reviewer, and rename statuses, labels and verbs to your team's.
+# `gh dojo doctor` checks the result against the board.
+#
+# Board: a GitHub Projects v2 board whose Status field has the options
+# Backlog, In progress, In review, Changes requested, Approved and Merged
+# (other options are fine).
+# Repository: the labels blocked, needs-review and changes-requested
+# (gh label create needs-review), and the reviewer can be assigned issues.
+#
+# Reference: https://github.com/Trum-ok/gh-dojo#configuration
+
+version = 1                  # no preset: nothing comes from kanban or sprints
+
+[board]
+owner = "acme"
+project = 12
+repos = ["acme/payments"]
+assignee = "@me"             # assign = true: the agent's user, the change's author
+
+[fields]
+status = "Status"            # required without a preset
+
+[statuses]
+initial = "Backlog"          # new sets it; an issue off the board counts as Backlog
+final = ["Merged"]           # list hides merged issues, with a counter
+resolved = ["Merged"]        # a blocker blocks until merged: approved is not in main yet
+
+[labels]
+types = ["bug", "feature", "chore"]
+area_prefix = "service:"     # new --area billing adds the label service:billing
+
+[session]
+env = ["CLAUDE_CODE_HOST_SESSION_ID"]
+link = "claude://claude.ai/epitaxy/{id}"
+
+# The author's verbs.
+
+[verbs.start]
+when = "You begin writing the change"
+to = "In progress"
+from = ["Backlog"]
+blockers = "deny"            # refuse while a blocker is not merged or closed
+assign = true                # board.assignee
+comment = """
+Started. Session: {session}
+
+{comment}"""
+
+[verbs.hold]
+when = "Work is stuck: waiting for another issue or an outside decision"
+from = ["In progress", "Changes requested"]   # no `to`: the status stays
+labels = ["+blocked"]
+blockers = "link"            # --by 17 also marks the issue blocked by #17
+require_one_of = ["by", "comment"]
+comment = """
+On hold until {by}.
+
+{comment}"""
+
+[verbs.resume]
+when = "What held the issue is resolved"
+from = ["In progress", "Changes requested"]
+labels = ["-blocked"]
+blockers = "deny"            # refuse while a blocker is still open
+comment = "{comment}"
+
+[verbs.review]
+when = "The pull request is open and ready for review"
+to = "In review"
+from = ["In progress", "Changes requested"]
+blockers = "deny"            # nothing goes to review on top of an unmerged change
+require = ["comment"]        # the pull request
+labels = ["+needs-review", "-changes-requested"]
+assign = "octocat"           # the reviewer, one login fixed here; added next to the author
+comment = "Ready for review: {comment}"
+
+[verbs.request-changes]
+when = "The reviewer asked for changes; the author makes them and runs review again"
+to = "Changes requested"
+from = ["In review"]
+require = ["comment"]        # what to change, in the reviewer's words
+labels = ["-needs-review", "+changes-requested"]
+comment = "Changes requested: {comment}"
+
+# The reviewer's decisions: exit code 2 until the user says yes (--yes).
+
+[verbs.approve]
+when = "The user approved the pull request after reviewing it"
+to = "Approved"
+from = ["In review"]
+labels = ["-needs-review"]
+confirm = "user"
+comment = """
+Approved.
+
+{comment}"""
+
+[verbs.reject]
+when = "The user decided the change is not wanted"
+from = ["In progress", "In review", "Changes requested", "Approved"]
+close = "not_planned"        # the status stays: closed issues leave list anyway
+labels = ["-needs-review", "-changes-requested"]
+require = ["comment"]        # the reason; with no template, --comment is the comment
+confirm = "user"
+
+# After the merge.
+
+[verbs.merge]
+when = "The approved pull request is merged into main"
+to = "Merged"
+from = ["Approved"]
+close = "completed"          # an issue the pull request closed stays closed
+batch = true                 # gh dojo merge 12 13 14
+comment = "{comment}"

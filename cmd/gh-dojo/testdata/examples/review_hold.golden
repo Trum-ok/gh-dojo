@@ -1,0 +1,7 @@
+code: 0
+--- stdout
+dry run: hold #22 "Partial refunds"
+  labels: +blocked
+  blocked by: #17
+  comment: "On hold until #17."
+--- stderr

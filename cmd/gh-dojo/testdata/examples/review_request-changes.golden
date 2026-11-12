@@ -1,0 +1,7 @@
+code: 0
+--- stdout
+dry run: request-changes #25 "Refund limits"
+  status: In review → Changes requested
+  labels: +changes-requested -needs-review
+  comment: "Changes requested: Round the refund to the currency's minor unit."
+--- stderr

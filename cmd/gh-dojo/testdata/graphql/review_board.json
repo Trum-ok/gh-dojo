@@ -1,0 +1,143 @@
+{
+  "comment": "Hand-crafted from internal/board/testdata/graphql/user_board.json (recorded), as org_acme_board.json: the board of examples/review.toml, organization acme, project 12, with the code review statuses in its Status field.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "BoardSchema",
+      "query": "query BoardSchema($owner: String!, $number: Int!) {\n  repositoryOwner(login: $owner) {\n    __typename\n    login\n    ... on User { projectV2(number: $number) { ...board } }\n    ... on Organization { projectV2(number: $number) { ...board } }\n  }\n}\n\nfragment board on ProjectV2 {\n  id\n  title\n  url\n  closed\n  fields(first: 100) {\n    nodes {\n      ... on ProjectV2FieldCommon { id name dataType }\n      ... on ProjectV2SingleSelectField { options { id name } }\n      ... on ProjectV2IterationField {\n        configuration {\n          iterations { id title startDate duration }\n          completedIterations { id title startDate duration }\n        }\n      }\n    }\n  }\n}",
+      "variables": {
+        "number": 12,
+        "owner": "acme"
+      },
+      "repeat": true,
+      "response": {
+        "data": {
+          "repositoryOwner": {
+            "__typename": "Organization",
+            "login": "acme",
+            "projectV2": {
+              "id": "PVT_kwDOCbZnTg4AV3xR",
+              "title": "Payments",
+              "url": "https://github.com/orgs/acme/projects/12",
+              "closed": false,
+              "fields": {
+                "nodes": [
+                  {
+                    "id": "PVTF_lADOCbZnTg4AV3xRzhpgKzI",
+                    "name": "Title",
+                    "dataType": "TITLE"
+                  },
+                  {
+                    "id": "PVTF_lADOCbZnTg4AV3xRzhpgKzM",
+                    "name": "Assignees",
+                    "dataType": "ASSIGNEES"
+                  },
+                  {
+                    "id": "PVTSSF_lADOCbZnTg4AV3xRzhpgKzQ",
+                    "name": "Status",
+                    "dataType": "SINGLE_SELECT",
+                    "options": [
+                      {
+                        "id": "f75ad846",
+                        "name": "Backlog"
+                      },
+                      {
+                        "id": "47fc9ee4",
+                        "name": "In progress"
+                      },
+                      {
+                        "id": "df73e18b",
+                        "name": "In review"
+                      },
+                      {
+                        "id": "c2e6a1d0",
+                        "name": "Changes requested"
+                      },
+                      {
+                        "id": "5b0e7c3f",
+                        "name": "Approved"
+                      },
+                      {
+                        "id": "98236657",
+                        "name": "Merged"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "PVTF_lADOCbZnTg4AV3xRzhpgKzU",
+                    "name": "Labels",
+                    "dataType": "LABELS"
+                  },
+                  {
+                    "id": "PVTF_lADOCbZnTg4AV3xRzhpgKzY",
+                    "name": "Linked pull requests",
+                    "dataType": "LINKED_PULL_REQUESTS"
+                  },
+                  {
+                    "id": "PVTF_lADOCbZnTg4AV3xRzhpgKzc",
+                    "name": "Milestone",
+                    "dataType": "MILESTONE"
+                  },
+                  {
+                    "id": "PVTF_lADOCbZnTg4AV3xRzhpgKzg",
+                    "name": "Repository",
+                    "dataType": "REPOSITORY"
+                  },
+                  {
+                    "id": "PVTF_lADOCbZnTg4AV3xRzhpgKzo",
+                    "name": "Reviewers",
+                    "dataType": "REVIEWERS"
+                  },
+                  {
+                    "id": "PVTF_lADOCbZnTg4AV3xRzhpgKzs",
+                    "name": "Parent issue",
+                    "dataType": "PARENT_ISSUE"
+                  },
+                  {
+                    "id": "PVTF_lADOCbZnTg4AV3xRzhpgKzw",
+                    "name": "Sub-issues progress",
+                    "dataType": "SUB_ISSUES_PROGRESS"
+                  },
+                  {
+                    "id": "PVTF_lADOCbZnTg4AV3xRzhpgKz0",
+                    "name": "Created",
+                    "dataType": "CREATED"
+                  },
+                  {
+                    "id": "PVTF_lADOCbZnTg4AV3xRzhpgKz4",
+                    "name": "Updated",
+                    "dataType": "UPDATED"
+                  },
+                  {
+                    "id": "PVTF_lADOCbZnTg4AV3xRzhpgK0A",
+                    "name": "Closed",
+                    "dataType": "CLOSED"
+                  },
+                  {
+                    "id": "PVTSSF_lADOCbZnTg4AV3xRzhpgLFw",
+                    "name": "Priority",
+                    "dataType": "SINGLE_SELECT",
+                    "options": [
+                      {
+                        "id": "79628723",
+                        "name": "P0"
+                      },
+                      {
+                        "id": "0a877460",
+                        "name": "P1"
+                      },
+                      {
+                        "id": "da944a9c",
+                        "name": "P2"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+code: 0
+--- stdout
+dry run: approve #26 "Refund audit log"
+  status: In review → Approved
+  labels: -needs-review
+  comment: "Approved."
+  needs --yes: this is the user's decision, ask the user first
+--- stderr
