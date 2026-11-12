@@ -1,0 +1,67 @@
+# .github/dojo.toml for a board with sprints, built on the sprints preset.
+# Copy it to .github/dojo.toml, set [board], and keep only the overrides you
+# want: every key below the preset line is optional. `gh dojo doctor` checks
+# the result against the board, including an iteration for today.
+#
+# Board: a GitHub Projects v2 board with
+#   - the built-in Status field with the options Backlog, In progress,
+#     Waiting, Ready and Done (other options are fine);
+#   - an iteration field named Sprint, with an iteration for today.
+#
+# Reference: https://github.com/Trum-ok/gh-dojo#configuration
+
+version = 1
+preset = "sprints"           # the kanban flow plus the sprint; see README "Sprints preset"
+
+[board]
+owner = "acme"               # an organization board works the same as a user's
+project = 7
+repos = ["acme/api", "acme/web"]   # issue numbers refer to acme/api
+timezone = "Europe/Berlin"   # the sprint's "today"; UTC when not set
+
+[fields]
+status = "Status"            # the preset's; ready and done read its history, so keep the built-in one
+sprint = "Sprint"            # the preset's; name your iteration field here if it differs
+
+[statuses]
+resolved = ["Done"]          # a blocker blocks until released (the preset: Ready and Done)
+
+[labels]
+area_prefix = "component:"   # new --area db adds the label component:db
+
+[verbs.start]
+blockers = "deny"            # refuse to take a blocked issue into the sprint (the preset warns)
+
+[verbs.done]
+from = ["Ready"]             # released only after ready (the preset: Ready or In progress)
+comment = "Released in {comment}."   # gh dojo done 12 13 --comment v2.4.0
+
+# New verbs.
+
+[verbs.plan]
+when = "The issue is taken into the current sprint, not started yet"
+from = ["Backlog"]
+iteration = "current"        # no `to`: the status stays Backlog
+
+[verbs.defer]
+when = "The issue will not be done in this sprint"
+to = "Backlog"
+from = ["In progress", "Waiting"]
+iteration = "clear"          # out of the sprint
+require = ["comment"]
+comment = "Moved out of the sprint: {comment}"
+
+[verbs.review]
+when = "A pull request is open and waits for review"
+from = ["In progress"]
+labels = ["+needs-review"]   # the label must exist in acme/api; gh dojo doctor checks
+assign = "octocat"           # the reviewer; "@me" assigns the authenticated user
+comment = "{comment}"
+
+# A verb can set other board fields to fixed values. The fields and options
+# must exist on the board, so this one is left out here:
+#
+# [verbs.urgent]
+# when = "The user asks to take the issue next"
+# [verbs.urgent.field]
+# Priority = "P0"            # single select: an option; numbers, text and dates work too

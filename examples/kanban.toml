@@ -1,0 +1,75 @@
+# .github/dojo.toml for a kanban board, built on the kanban preset.
+# Copy it to .github/dojo.toml, set [board], and keep only the overrides you
+# want: every key below the preset line is optional. `gh dojo doctor` checks
+# the result against the board.
+#
+# Board: a GitHub Projects v2 board whose Status field has the options
+# Backlog, In progress, Waiting, Ready and Done (other options are fine).
+# Repository: a label "blocked" (gh label create blocked), for wait and start.
+#
+# Reference: https://github.com/Trum-ok/gh-dojo#configuration
+
+version = 1
+preset = "kanban"            # start, wait, ready, done; see README "Kanban preset"
+
+[board]
+owner = "acme"               # user or organization that owns the project
+project = 3                  # the number in the project's URL
+repos = ["acme/shop"]        # the first one is the default for issue numbers and new
+assignee = "@me"             # who assign = true assigns: "@me" or a login
+
+# [fields], [statuses] and [labels] default to the preset's values:
+#   fields.status = "Status"
+#   statuses.initial = "Backlog", final = ["Done"], resolved = ["Ready", "Done"]
+#   labels.types = [] (any label without the area prefix), area_prefix = "area:"
+
+[labels]
+types = ["bug", "feature", "docs"]   # what new --type accepts
+
+[session]                    # fills {session}: a link back to the agent session
+env = ["CLAUDE_CODE_HOST_SESSION_ID"]
+link = "claude://claude.ai/epitaxy/{id}"
+
+# Overrides of the preset's verbs set only the keys they name; the rest
+# (to, from, checks) stay the preset's. `when` lines and comments go to
+# agents and issues as written, so write them in the team's language.
+
+[verbs.start]
+when = "берёшь задачу в работу"
+assign = true                # board.assignee: the agent's user
+labels = ["-blocked"]        # work goes on: drop the label wait adds
+blockers = "warn"            # the preset's: warn about unresolved blockers and run; "deny" refuses
+comment = """
+Взял в работу. Сессия: {session}
+
+{comment}"""
+
+[verbs.wait]
+when = "работа встала: ждём другую задачу или внешнее решение"
+labels = ["+blocked"]
+# blockers = "link" (the preset's): --by 17 also marks the issue blocked by #17
+comment = """
+Ждём {by}.
+
+{comment}"""
+
+[verbs.ready]
+when = "сделано, проверено и закоммичено в main"
+
+[verbs.done]
+when = "изменение вошло в релиз"
+# The preset's done closes the issue as completed and takes several numbers
+# (gh dojo done 12 13 14). To keep issues open in Done: close = false
+
+# New verbs. A verb needs `when` and at least one effect.
+
+[verbs.drop]
+when = "задача не нужна или это дубль"
+close = "not_planned"        # completed, not_planned or duplicate
+require = ["comment"]        # the reason; with no template, --comment is the comment
+confirm = "user"             # the user's decision: exit code 2 without --yes
+
+[verbs.revive]
+when = "закрытая задача снова нужна"
+to = "Backlog"
+reopen = true                # runs on closed issues

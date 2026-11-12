@@ -658,6 +658,43 @@ func TestReadmeExamples(t *testing.T) {
 	}
 }
 
+// TestExampleConfigs keeps every examples/*.toml loadable, and checks that
+// each one builds on a preset and still has the preset's verbs.
+func TestExampleConfigs(t *testing.T) {
+	paths, err := filepath.Glob(filepath.Join("..", "..", "examples", "*.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(paths) < 2 {
+		t.Fatalf("found %d examples/*.toml, want at least 2", len(paths))
+	}
+	for _, path := range paths {
+		name := "examples/" + filepath.Base(path)
+		t.Run(filepath.Base(path), func(t *testing.T) {
+			data, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			c, err := Parse(data, name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if c.Preset == "" {
+				t.Fatalf("%s sets no preset", name)
+			}
+			preset, err := loadPreset(c.Preset)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, verb := range preset.verbOrder {
+				if _, ok := c.Verb(verb); !ok {
+					t.Errorf("%s: preset %s verb %q is missing", name, c.Preset, verb)
+				}
+			}
+		})
+	}
+}
+
 func TestErrorfAndKeyPath(t *testing.T) {
 	c := mustLoad(t, presetOnly+"[verbs.start]\nto = \"Doing\"\n")
 	if got := c.KeyPath("verbs.start.to"); got != "verbs.start.to" {
