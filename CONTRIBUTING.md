@@ -82,7 +82,9 @@ examples and example configs must stay valid configs. `cmd/gh-dojo`'s
 `TestExampleReview` runs `describe`, a dry run of every verb and
 `agent install` on `examples/review.toml`, against the hand-crafted board
 and cards in `review_board.json` and `review_example.json`: a new verb
-there needs a dry run and a card.
+there needs a dry run and a card. Another example without a preset needs
+such a test too, and a line in `examplesWithoutPreset`, or
+`TestExampleConfigs` fails.
 
 ## GraphQL fixtures
 

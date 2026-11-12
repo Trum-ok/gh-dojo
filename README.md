@@ -996,32 +996,44 @@ to decide.
 | `review`          | In review         | In progress, Changes requested      | needs `--comment` (the pull request); labels; assigns the reviewer |
 | `request-changes` | Changes requested | In review                           | needs `--comment`; labels |
 | `approve`         | Approved          | In review                           | the user's decision (`--yes`) |
-| `reject`          | status unchanged  | any but Backlog and Merged          | the user's decision; closes as not planned |
-| `merge`           | Merged            | Approved                            | closes as completed; several issues at once |
+| `reject`          | status unchanged  | In progress, In review, Changes requested, Approved; any status once closed | the user's decision; closes as not planned |
+| `merged`          | Merged            | Approved                            | closes as completed; several issues at once |
+
+`reject` closes and has no `to`, so on an issue that is closed already its
+`from` is not checked: it runs like a repeat, and still posts its comment.
+`merged` records a merge; it does not merge the pull request.
 
 To write your own:
 
 1. Put the statuses on the board's status field, and the labels the verbs
-   add in the repository (`gh label create`).
-2. Without `preset`, the file defines everything a preset would:
-   [`fields.status`](#fields), [`[statuses]`](#statuses) and every verb. On
-   top of a preset, set only what differs, add verbs, and drop the preset's
-   with `disabled = true`.
+   add and remove in the repository (`gh label create`).
+2. Without `preset`, only [`fields.status`](#fields) and the verbs are
+   required. [`[statuses]`](#statuses) is optional, but without `initial`
+   `new` sets no status and `next` refuses to run, and without `resolved`
+   only a closed blocker is resolved. On top of a preset, set only what
+   differs, add verbs, and drop the preset's with `disabled = true`.
 3. A verb is a `when` line, [checks](#checks) (`from`, `require`,
    `require_one_of`, `blockers`, `confirm`) and [effects](#effects) (`to`,
    `labels`, `assign`, `comment`, `close`, `reopen`, `iteration`, `field`,
    the `blockers` link). A verb without `to` leaves the status alone, like
    `hold` above; one with `confirm = "user"` waits for a person.
 4. Check it: [`gh dojo doctor`](#doctor) against the board and the
-   repository (statuses, labels, assignees), `gh dojo describe` for the
-   process as an agent reads it, `gh dojo <verb> N --dry-run` for a verb's
-   plan on a real issue. Then [`gh dojo agent install`](#agent-install)
-   writes the agent instructions from the same file.
+   repository (statuses, the labels verbs add and remove, the users they
+   assign; not `labels.types` or areas), `gh dojo describe` for the process
+   as an agent reads it, `gh dojo <verb> N --dry-run` for a verb's plan on a
+   real issue. Then [`gh dojo agent install`](#agent-install) writes the
+   agent instructions from the same file.
 
-The config cannot yet name the assignee when a verb runs, so the example's
-reviewer is one login fixed in the file, and `assign` only adds people:
-handing an issue back to its author after `request-changes` is done with
-`gh issue edit`.
+What the config cannot say yet, and the example works around:
+
+- On hold is the `blocked` label, not a state: no check reads labels, so
+  `review`, `approve` and `merged` still run on an issue on hold. `resume`,
+  `reject` and `merged` remove the label.
+- `confirm = "user"` is the person the agent works for saying yes, not the
+  reviewer: gh-dojo does not check that the pull request was approved.
+- The reviewer is one login fixed in the file: a verb cannot name the
+  assignee when it runs. And `assign` only adds people, so removing the
+  reviewer after the review is done with `gh issue edit`.
 
 ## Output and exit codes
 
