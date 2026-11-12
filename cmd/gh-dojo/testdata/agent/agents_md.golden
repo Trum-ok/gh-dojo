@@ -62,7 +62,7 @@ Run a verb as `gh dojo <verb> N` (`N`, `#N` or `owner/repo#N`); `--dry-run` prin
 
 **When:** The issue is not needed or a duplicate
 
-`gh dojo drop N`: any status → status unchanged; needs --comment; also on closed issues; comments "{comment}"; closes as not planned.
+`gh dojo drop N`: any status → status unchanged; needs --comment; on a closed issue only if closed as not planned; comments "{comment}"; closes as not planned.
 
 - It is the user's decision: without `--yes` it exits with code 2. Ask the user, and run it again with `--yes` only if they agree; never add `--yes` on your own.
 - An issue closed already stays closed as it is.

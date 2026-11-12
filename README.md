@@ -494,7 +494,8 @@ A verb takes one issue number (several with [`batch = true`](#several-issues-at-
 and, in one command:
 
 1. checks that the issue is open (a verb that moves it to a final status,
-   closes it or reopens it also runs on a closed one), that its status is one
+   closes it or reopens it also runs on a closed one; one that closes and
+   has no `to`, only on an issue closed with its reason), that its status is one
    of the verb's `from` statuses (no status, or not on the board, counts as
    [`statuses.initial`](#statuses)), that the required arguments are given,
    the user's go-ahead (`confirm`) and the issue's blockers (`blockers`);
@@ -536,10 +537,10 @@ The board's built-in workflows run after the verb and may change the status
 it set: "Item closed" moves an issue a verb closed (to Done by default),
 "Item reopened" moves one it reopened. Turn them off in the board's workflow
 settings, or point them at the statuses your verbs set. A verb that closes
-the issue and has no `to` skips the `from` check on an issue it closed
-already (closed with the verb's reason), so its repeat is not refused
-because a workflow moved the issue; on an issue closed otherwise `from` is
-checked as on an open one. A verb that
+the issue and has no `to` skips the `from` check on an issue closed with the
+verb's reason, so its repeat is not refused because a workflow moved the
+issue; an issue closed with another reason it refuses, whatever its status.
+A verb that
 moves an issue closed as not planned or duplicate to a final status warns on
 stderr and keeps the reason.
 
@@ -785,7 +786,8 @@ rejected with "not supported in this version".
   repository, or the verb fails before writing, listing who can be.
 - **close**, **reopen**: a verb sets at most one of them. An issue already
   closed is not closed again, even with another reason; the line says
-  `already closed as completed`. `duplicate` marks the issue a duplicate
+  `already closed as completed`. A verb that closes and has no `to` refuses
+  an issue closed with another reason instead. `duplicate` marks the issue a duplicate
   without linking the original: name it in the comment.
 - **iteration**: sets the [sprint field](#fields) in the same mutation as
   the status. Dates are in [`board.timezone`](#board) (UTC by default), and
@@ -1003,7 +1005,8 @@ to decide.
 
 `reject` closes and has no `to`, so on an issue closed as not planned its
 `from` is not checked: it runs as a repeat and posts its comment only if it
-is missing. A merged issue, closed as completed, is refused by `from`.
+is missing. A merged issue, closed as completed, is refused whatever its
+status, and gets no comment.
 `merged` records a merge; it does not merge the pull request.
 
 To write your own:

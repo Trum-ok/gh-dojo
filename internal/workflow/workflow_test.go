@@ -248,7 +248,10 @@ func TestPlan(t *testing.T) {
 		{name: "drop_repeat", verb: "drop", noOps: true, args: Args{Comment: "not needed", HasComment: true},
 			issue: Issue{Number: 42, Closed: true, StateReason: "not_planned", OnBoard: true, Status: "Backlog",
 				Comments: []Comment{posted("drop", "not needed")}}},
-		{name: "drop_closed_as_completed", verb: "drop", hasOps: 1, args: Args{Comment: "not needed", HasComment: true, Yes: true},
+		// drop has no from, yet an issue closed otherwise (released, here)
+		// is no repeat: refused, no comment left.
+		{name: "drop_closed_as_completed", verb: "drop", code: render.ExitDenied,
+			args:  Args{Comment: "not needed", HasComment: true, Yes: true},
 			issue: Issue{Number: 42, Closed: true, StateReason: "completed", OnBoard: true, Status: "Done"}},
 		{name: "start_yes", verb: "start", issue: onBoard("Backlog"), args: Args{Yes: true}, code: render.ExitUsage},
 		// review: labels = ["+in-review", "-blocked"], assign = true (board.assignee alice).
@@ -274,13 +277,18 @@ func TestPlan(t *testing.T) {
 		{name: "shelve_repeat_after_automation", verb: "shelve", noOps: true,
 			issue: Issue{Number: 42, Closed: true, StateReason: "not_planned", OnBoard: true, Status: "Done"}},
 		// An issue closed otherwise (here, as completed) is no repeat of a
-		// verb that closes as not planned: from is checked, and it is in from.
-		{name: "shelve_closed_as_completed", verb: "shelve", noOps: true,
+		// verb that closes as not planned: refused, though its status is in from.
+		{name: "shelve_closed_as_completed", verb: "shelve", code: render.ExitDenied,
 			issue: Issue{Number: 42, Closed: true, StateReason: "completed", OnBoard: true, Status: "Backlog"}},
+		{name: "shelve_closed_as_duplicate", verb: "shelve", code: render.ExitDenied,
+			issue: Issue{Number: 42, Closed: true, StateReason: "duplicate", OnBoard: true, Status: "Backlog"}},
 		// reject closes as not planned and has no target. A merged issue,
-		// closed as completed and moved on, is refused: no comment is left.
+		// closed as completed, is refused whatever its status: no comment is left.
 		{name: "reject_merged", verb: "reject", code: render.ExitDenied, args: Args{Comment: "not needed", HasComment: true, Yes: true},
 			issue: Issue{Number: 42, Closed: true, StateReason: "completed", OnBoard: true, Status: "Done"}},
+		{name: "reject_merged_status_in_from", verb: "reject", code: render.ExitDenied,
+			args:  Args{Comment: "not needed", HasComment: true, Yes: true},
+			issue: Issue{Number: 42, Closed: true, StateReason: "completed", OnBoard: true, Status: "Waiting"}},
 		// A repeat: closed as not planned, the comment posted, and the
 		// board's "Item closed" workflow moved it to Done.
 		{name: "reject_repeat", verb: "reject", noOps: true, args: Args{Comment: "not needed", HasComment: true},
@@ -301,6 +309,12 @@ func TestPlan(t *testing.T) {
 			args: Args{Comment: "not needed", HasComment: true, Yes: true},
 			issue: Issue{Number: 42, Closed: true, OnBoard: true, Status: "Done",
 				Comments: []Comment{posted("reject", "not needed"), posted("note", "merged")}}},
+		// Only the viewer's own markers count: another user's reject is no
+		// repeat when the reason was not read.
+		{name: "reject_reason_unknown_other_user", verb: "reject", code: render.ExitDenied,
+			args: Args{Comment: "not needed", HasComment: true, Yes: true},
+			issue: Issue{Number: 42, Closed: true, OnBoard: true, Status: "Done",
+				Comments: []Comment{{Body: "not needed\n\n" + Marker("reject", "not needed")}}}},
 		// shelve has no target: its refusal says where it runs, not where it starts.
 		{name: "shelve_open_wrong_from", verb: "shelve", code: render.ExitDenied, issue: onBoard("Done")},
 		{name: "nudge_not_on_board", verb: "nudge", code: render.ExitDenied, issue: Issue{Number: 42}},

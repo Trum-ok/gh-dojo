@@ -112,7 +112,7 @@ Approved.
 
 [verbs.reject]
 when = "The user decided the change is not wanted"
-from = ["In progress", "In review", "Changes requested", "Approved"]   # a merged issue is refused
+from = ["In progress", "In review", "Changes requested", "Approved"]   # a merged issue is refused, whatever its status
 close = "not_planned"        # the status stays: closed issues leave list anyway
 labels = ["-needs-review", "-changes-requested", "-blocked"]
 require = ["comment"]        # the reason; with no template, --comment is the comment

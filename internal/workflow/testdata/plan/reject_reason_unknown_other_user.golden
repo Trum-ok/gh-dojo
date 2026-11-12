@@ -1,0 +1,3 @@
+code: 2
+error: #42 is closed; reject closes as not planned
+this is a process rule: ask the user what to do with #42

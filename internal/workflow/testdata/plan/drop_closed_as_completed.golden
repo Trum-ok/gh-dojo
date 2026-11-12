@@ -1,5 +1,3 @@
-dry run: drop #42
-  comment: "not needed"
-  close: already closed as completed
-confirm: #42 comment left, already closed as completed
-post: "not needed\n\n<!-- gh-dojo:drop:f121cf67 -->"
+code: 2
+error: #42 is closed as completed; drop closes as not planned
+this is a process rule: ask the user what to do with #42

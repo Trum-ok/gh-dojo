@@ -88,7 +88,13 @@ type processExitCode struct {
 var (
 	verbChecks = []func(cfg *config.Config, v config.Verb) string{
 		func(cfg *config.Config, v config.Verb) string {
-			if v.To != "" && slices.Contains(cfg.Statuses.Final, v.To) || v.Close != "" || v.Reopen {
+			switch {
+			case v.To != "" && slices.Contains(cfg.Statuses.Final, v.To) || v.Reopen:
+				return "also on closed issues"
+			case v.Close != "" && v.To == "":
+				// workflow.Plan: a closed issue only as a repeat.
+				return "on a closed issue only if closed as " + workflow.ReasonText(v.Close)
+			case v.Close != "":
 				return "also on closed issues"
 			}
 			return ""

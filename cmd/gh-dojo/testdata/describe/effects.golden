@@ -16,7 +16,7 @@ Verbs:
   done        The change is released
               several numbers at once (done 12 13 14); optional --comment; also on closed issues; comments "{comment}"; closes as completed
   drop        задача не нужна или дубль
-              needs --comment; also on closed issues; the user's decision: ask first, then --yes; comments "{comment}"; closes as not planned
+              needs --comment; on a closed issue only if closed as not planned; the user's decision: ask first, then --yes; comments "{comment}"; closes as not planned
   review      A pull request waits for review
               optional --comment; labels +enhancement -dogfood; assigns you; comments "{comment}"
   revive      A closed issue is needed after all

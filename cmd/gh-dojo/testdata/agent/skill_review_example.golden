@@ -77,7 +77,7 @@ Run a verb as `gh dojo <verb> N` (`N`, `#N` or `owner/repo#N`); `--dry-run` prin
 
 **When:** The user decided the change is not wanted
 
-`gh dojo reject N`: In progress, In review, Changes requested, Approved → status unchanged; needs --comment; also on closed issues; labels -needs-review -changes-requested -blocked; comments "{comment}"; closes as not planned.
+`gh dojo reject N`: In progress, In review, Changes requested, Approved → status unchanged; needs --comment; on a closed issue only if closed as not planned; labels -needs-review -changes-requested -blocked; comments "{comment}"; closes as not planned.
 
 - It is the user's decision: without `--yes` it exits with code 2. Ask the user, and run it again with `--yes` only if they agree; never add `--yes` on your own.
 - An issue closed already stays closed as it is.

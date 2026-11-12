@@ -359,10 +359,13 @@ func join(items []string, conj string) string {
 //
 //  1. CheckArgs (exit code 1);
 //  2. a closed issue is refused (exit code 2), unless the verb's target
-//     status is final (Engine.Final), or the verb closes or reopens it;
+//     status is final (Engine.Final), or the verb closes or reopens it; a
+//     verb without a target that closes runs on a closed issue only as a
+//     repeat (see closedRepeat), and refuses one closed otherwise (exit
+//     code 2);
 //  3. an issue already in the target status gets no status change, and the
 //     from check is skipped, so a repeat is safe; so is a repeat of a verb
-//     without a target that closes the issue (see closedRepeat);
+//     without a target that closes the issue;
 //  4. otherwise the current status must be in from (exit code 2). An issue
 //     not on the board or without a status counts as Engine.Initial;
 //  5. then, for a verb with blockers = "warn" or "deny", the issue's
@@ -403,6 +406,11 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 	if is.Closed && !e.runsOnClosed(v) {
 		return nil, render.Denied("%s is closed; %s works only on open issues\n"+
 			"this is a process rule: ask the user what to do with %s", is.Name(), v.Name, is.Name())
+	}
+	if v.To == "" && v.Close != "" && is.Closed && !closedRepeat(v, is) {
+		return nil, render.Denied("%s is %s; %s closes as %s\n"+
+			"this is a process rule: ask the user what to do with %s",
+			is.Name(), closedText(is), v.Name, ReasonText(v.Close), is.Name())
 	}
 	p := &Plan{Verb: v.Name, Issue: is, Target: v.To}
 	atTarget := v.To != "" && is.Status == v.To
@@ -617,8 +625,15 @@ func (p *Plan) checkBlockers(v config.Verb) error {
 // comment is the verb's. Then the from check is skipped: the board's "Item
 // closed" workflow may have moved the item since the verb closed it, so its
 // status says nothing about where the verb started. An issue closed
-// otherwise, say as completed by a merged pull request, is no repeat of a
-// verb that closes as not planned: from is checked as on an open issue.
+// otherwise, say as completed by a merged pull request, is no repeat: Plan
+// refuses it before the from check, whatever its status, so no comment
+// lands on an issue the verb would not close.
+//
+// The marker is looked for in the viewer's own comments only (see
+// LastMarker): with the reason not read, another user's repeat of a verb
+// someone else ran is no repeat and is refused. That is accepted: GitHub
+// reads the reason of nearly every closed issue, and the refusal asks the
+// user.
 func closedRepeat(v config.Verb, is Issue) bool {
 	if v.To != "" || v.Close == "" || !is.Closed {
 		return false
@@ -626,8 +641,17 @@ func closedRepeat(v config.Verb, is Issue) bool {
 	if is.StateReason != "" {
 		return is.StateReason == v.Close
 	}
-	last, ok := LastMarker(is.Comments)
+	last, ok := LastMarker(is.Comments) // see Marker
 	return ok && strings.HasPrefix(last, "<!-- gh-dojo:"+v.Name+":")
+}
+
+// closedText says how a closed issue is closed: "closed as completed", or
+// "closed" when the reason was not read.
+func closedText(is Issue) string {
+	if is.StateReason == "" {
+		return "closed"
+	}
+	return "closed as " + ReasonText(is.StateReason)
 }
 
 // checkFrom refuses an issue whose status is not in v.From. A verb without
@@ -661,11 +685,15 @@ func (e *Engine) checkFrom(v config.Verb, is Issue) error {
 	if is.Status == "" && current != "" {
 		from += ", which counts as " + current
 	}
+	name := is.Name()
+	if is.Closed {
+		name += " (" + closedText(is) + ")"
+	}
 	// No fix line and no allowed line: a refusal ends with asking the user,
 	// never with a command that works around the process.
 	return render.Denied("%s cannot %s %s%s; %s %s\n"+
 		"this is a process rule: ask the user how to proceed",
-		v.Name, action, is.Name(), from, allowed, join(v.From, "or"))
+		v.Name, action, name, from, allowed, join(v.From, "or"))
 }
 
 // runsOnClosed reports whether v may run on a closed issue: its target
