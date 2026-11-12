@@ -394,16 +394,18 @@ ok       verbs    octocat/shop: 2 labels exist, 1 assignee can be assigned
 | `token` | gh is logged in, and the token has the `project` scope (from `GH_TOKEN`: "set GH_TOKEN to …") |
 | `board` | The board exists, is open, and has every field and status the config names, each mismatch on its own line |
 | `repo` | Each repository of [`board.repos`](#board), or the current one, is visible with issues enabled; a warning when `board.repos` spells one otherwise than GitHub does |
-| `labels` | With [`labels.types`](#labels) or `labels.area_prefix` set, in each repository of the `repo` check: every type label exists (missing is a problem, since `new --type` fails on it, fixed by `gh label create`; spelled in another case is `warn`, since `new` matches labels regardless of case), and how many labels start with the area prefix. None is `warn` when `.github/dojo.toml` sets the prefix, since `new --area` finds nothing (create one, or set the prefix to `""`); with the prefix from a preset, which many teams never use, it is a note on the `ok` line |
+| `labels` | With [`labels.types`](#labels) or `labels.area_prefix` set, in each repository of the `repo` check: every type label exists (missing is a problem, since `new --type` fails on it, fixed by `gh label create`; spelled in another case is `warn`, since `new` matches labels regardless of case, fixed by `gh label edit`), and how many labels start with the area prefix. None is `warn` when `.github/dojo.toml` sets the prefix, since `new --area` finds nothing (create one, or set the prefix to `""`); with the prefix from a preset, which many teams never use, it is a note on the `ok` line. Past 100 labels the area count is a lower bound ("at least"), and none found is "could not confirm" rather than a warning |
 | `sprint` | With [`fields.sprint`](#fields): an iteration covers today, a date in [`board.timezone`](#board) |
 | `verbs` | When verbs have labels or assignees: the labels exist in the default repository, spelled exactly as there, and the users can be assigned |
 | `agent` | With [`[agent]`](#agent) set (and `targets` not empty), or a file with a gh-dojo marker: the files [`agent install`](#agent-install) writes are up to date (`agent install --check`, without the diff). Out of date or missing is `warn`, since the text also depends on the gh-dojo version; a hand-written skill under `[agent]` is a problem |
 
-It sends one request for the token and the repositories with their labels,
-one more for the board when its schema is not cached, and one for the
-verbs' labels and assignees when a verb has them. The exit code is 0 when no check is a
-problem (warnings included), 4 when one failed on auth or the network,
-else 1.
+It sends one request for the token and the repositories, one more for the
+board when its schema is not cached, one for the labels when
+`labels.types` or `labels.area_prefix` is set (plus a repository's labels
+page by page when it has over 100 and a type is not found), and one for
+the verbs' labels and assignees when a verb has them. The exit code is 0
+when no check is a problem (warnings included), 4 when one failed on auth
+or the network, else 1.
 
 ### agent install
 

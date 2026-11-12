@@ -1,18 +1,17 @@
 {
-  "comment": "Hand-crafted: the Doctor query of gh dojo doctor. The data shape follows the GraphQL schema (viewer, repository); X-OAuth-Scopes is the header GitHub sends for classic tokens, which recording does not keep. No X-OAuth-Scopes header (a fine-grained token); the second repository does not resolve (NOT_FOUND error, message as GitHub words it), the third has issues disabled. The labels fields (dojoConfig: the kanban preset's area_prefix \"area:\", no types) are the real API's answer for Trum-ok/gh-dojo, saved by hand.",
+  "comment": "Hand-crafted: the Doctor query of gh dojo doctor. The data shape follows the GraphQL schema (viewer, repository); X-OAuth-Scopes is the header GitHub sends for classic tokens, which recording does not keep. No X-OAuth-Scopes header (a fine-grained token); the second repository does not resolve (NOT_FOUND error, message as GitHub words it), the third has issues disabled. The DoctorLabels answer (dojoConfig: the kanban preset's area_prefix \"area:\", no types) is the real API's answer for Trum-ok/gh-dojo, saved by hand.",
   "handcrafted": true,
   "interactions": [
     {
       "operation": "Doctor",
-      "query": "query Doctor($owner0: String!, $name0: String!, $owner1: String!, $name1: String!, $owner2: String!, $name2: String!, $area: String!) {\n  viewer { login }\n  repo0: repository(owner: $owner0, name: $name0) { nameWithOwner hasIssuesEnabled\n    labels(first: 100) { totalCount nodes { name } }\n    area: labels(first: 100, query: $area) { nodes { name } }\n  }\n  repo1: repository(owner: $owner1, name: $name1) { nameWithOwner hasIssuesEnabled\n    labels(first: 100) { totalCount nodes { name } }\n    area: labels(first: 100, query: $area) { nodes { name } }\n  }\n  repo2: repository(owner: $owner2, name: $name2) { nameWithOwner hasIssuesEnabled\n    labels(first: 100) { totalCount nodes { name } }\n    area: labels(first: 100, query: $area) { nodes { name } }\n  }\n}",
+      "query": "query Doctor($owner0: String!, $name0: String!, $owner1: String!, $name1: String!, $owner2: String!, $name2: String!) {\n  viewer { login }\n  repo0: repository(owner: $owner0, name: $name0) { nameWithOwner hasIssuesEnabled }\n  repo1: repository(owner: $owner1, name: $name1) { nameWithOwner hasIssuesEnabled }\n  repo2: repository(owner: $owner2, name: $name2) { nameWithOwner hasIssuesEnabled }\n}",
       "variables": {
         "owner0": "Trum-ok",
         "name0": "gh-dojo",
         "owner1": "Trum-ok",
         "name1": "no-such-repo",
         "owner2": "Trum-ok",
-        "name2": "wiki",
-        "area": "area:"
+        "name2": "wiki"
       },
       "response": {
         "data": {
@@ -21,7 +20,42 @@
           },
           "repo0": {
             "nameWithOwner": "Trum-ok/gh-dojo",
-            "hasIssuesEnabled": true,
+            "hasIssuesEnabled": true
+          },
+          "repo1": null,
+          "repo2": {
+            "nameWithOwner": "Trum-ok/wiki",
+            "hasIssuesEnabled": false
+          }
+        },
+        "errors": [
+          {
+            "type": "NOT_FOUND",
+            "path": [
+              "repo1"
+            ],
+            "locations": [
+              {
+                "line": 3,
+                "column": 3
+              }
+            ],
+            "message": "Could not resolve to a Repository with the name 'Trum-ok/no-such-repo'."
+          }
+        ]
+      }
+    },
+    {
+      "operation": "DoctorLabels",
+      "query": "query DoctorLabels($owner0: String!, $name0: String!, $area: String!) {\n  repo0: repository(owner: $owner0, name: $name0) {\n    labels(first: 100) { totalCount nodes { name } }\n    area: labels(first: 100, query: $area) { nodes { name } }\n  }\n}",
+      "variables": {
+        "owner0": "Trum-ok",
+        "name0": "gh-dojo",
+        "area": "area:"
+      },
+      "response": {
+        "data": {
+          "repo0": {
             "labels": {
               "totalCount": 11,
               "nodes": [
@@ -63,35 +97,8 @@
             "area": {
               "nodes": []
             }
-          },
-          "repo1": null,
-          "repo2": {
-            "nameWithOwner": "Trum-ok/wiki",
-            "hasIssuesEnabled": false,
-            "labels": {
-              "totalCount": 0,
-              "nodes": []
-            },
-            "area": {
-              "nodes": []
-            }
           }
-        },
-        "errors": [
-          {
-            "type": "NOT_FOUND",
-            "path": [
-              "repo1"
-            ],
-            "locations": [
-              {
-                "line": 3,
-                "column": 3
-              }
-            ],
-            "message": "Could not resolve to a Repository with the name 'Trum-ok/no-such-repo'."
-          }
-        ]
+        }
       }
     }
   ]

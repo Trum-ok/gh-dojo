@@ -1,0 +1,1687 @@
+{
+  "comment": "Hand-crafted: doctor with labels.types = [\"bug\", \"Docs\"] and the kanban preset's area prefix on three made-up repositories with over 100 labels each; the shapes follow doctor_labels.json and new's RepoLabels query.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "Doctor",
+      "query": "query Doctor($owner0: String!, $name0: String!, $owner1: String!, $name1: String!, $owner2: String!, $name2: String!) {\n  viewer { login }\n  repo0: repository(owner: $owner0, name: $name0) { nameWithOwner hasIssuesEnabled }\n  repo1: repository(owner: $owner1, name: $name1) { nameWithOwner hasIssuesEnabled }\n  repo2: repository(owner: $owner2, name: $name2) { nameWithOwner hasIssuesEnabled }\n}",
+      "variables": {
+        "owner0": "Trum-ok",
+        "name0": "big",
+        "owner1": "Trum-ok",
+        "name1": "huge",
+        "owner2": "Trum-ok",
+        "name2": "paged"
+      },
+      "headers": {
+        "X-OAuth-Scopes": "gist, project, read:org, repo"
+      },
+      "response": {
+        "data": {
+          "viewer": {
+            "login": "Trum-ok"
+          },
+          "repo0": {
+            "nameWithOwner": "Trum-ok/big",
+            "hasIssuesEnabled": true
+          },
+          "repo1": {
+            "nameWithOwner": "Trum-ok/huge",
+            "hasIssuesEnabled": true
+          },
+          "repo2": {
+            "nameWithOwner": "Trum-ok/paged",
+            "hasIssuesEnabled": true
+          }
+        }
+      }
+    },
+    {
+      "operation": "DoctorLabels",
+      "query": "query DoctorLabels($owner0: String!, $name0: String!, $owner1: String!, $name1: String!, $owner2: String!, $name2: String!, $type0: String!, $type1: String!, $area: String!) {\n  repo0: repository(owner: $owner0, name: $name0) {\n    labels(first: 100) { totalCount nodes { name } }\n    type0: labels(first: 100, query: $type0) { nodes { name } }\n    type1: labels(first: 100, query: $type1) { nodes { name } }\n    area: labels(first: 100, query: $area) { nodes { name } }\n  }\n  repo1: repository(owner: $owner1, name: $name1) {\n    labels(first: 100) { totalCount nodes { name } }\n    type0: labels(first: 100, query: $type0) { nodes { name } }\n    type1: labels(first: 100, query: $type1) { nodes { name } }\n    area: labels(first: 100, query: $area) { nodes { name } }\n  }\n  repo2: repository(owner: $owner2, name: $name2) {\n    labels(first: 100) { totalCount nodes { name } }\n    type0: labels(first: 100, query: $type0) { nodes { name } }\n    type1: labels(first: 100, query: $type1) { nodes { name } }\n    area: labels(first: 100, query: $area) { nodes { name } }\n  }\n}",
+      "variables": {
+        "owner0": "Trum-ok",
+        "name0": "big",
+        "owner1": "Trum-ok",
+        "name1": "huge",
+        "owner2": "Trum-ok",
+        "name2": "paged",
+        "type0": "bug",
+        "type1": "Docs",
+        "area": "area:"
+      },
+      "response": {
+        "data": {
+          "repo0": {
+            "labels": {
+              "totalCount": 250,
+              "nodes": [
+                {
+                  "name": "triage-000"
+                },
+                {
+                  "name": "triage-001"
+                },
+                {
+                  "name": "triage-002"
+                },
+                {
+                  "name": "triage-003"
+                },
+                {
+                  "name": "triage-004"
+                },
+                {
+                  "name": "triage-005"
+                },
+                {
+                  "name": "triage-006"
+                },
+                {
+                  "name": "triage-007"
+                },
+                {
+                  "name": "triage-008"
+                },
+                {
+                  "name": "triage-009"
+                },
+                {
+                  "name": "triage-010"
+                },
+                {
+                  "name": "triage-011"
+                },
+                {
+                  "name": "triage-012"
+                },
+                {
+                  "name": "triage-013"
+                },
+                {
+                  "name": "triage-014"
+                },
+                {
+                  "name": "triage-015"
+                },
+                {
+                  "name": "triage-016"
+                },
+                {
+                  "name": "triage-017"
+                },
+                {
+                  "name": "triage-018"
+                },
+                {
+                  "name": "triage-019"
+                },
+                {
+                  "name": "triage-020"
+                },
+                {
+                  "name": "triage-021"
+                },
+                {
+                  "name": "triage-022"
+                },
+                {
+                  "name": "triage-023"
+                },
+                {
+                  "name": "triage-024"
+                },
+                {
+                  "name": "triage-025"
+                },
+                {
+                  "name": "triage-026"
+                },
+                {
+                  "name": "triage-027"
+                },
+                {
+                  "name": "triage-028"
+                },
+                {
+                  "name": "triage-029"
+                },
+                {
+                  "name": "triage-030"
+                },
+                {
+                  "name": "triage-031"
+                },
+                {
+                  "name": "triage-032"
+                },
+                {
+                  "name": "triage-033"
+                },
+                {
+                  "name": "triage-034"
+                },
+                {
+                  "name": "triage-035"
+                },
+                {
+                  "name": "triage-036"
+                },
+                {
+                  "name": "triage-037"
+                },
+                {
+                  "name": "triage-038"
+                },
+                {
+                  "name": "triage-039"
+                },
+                {
+                  "name": "triage-040"
+                },
+                {
+                  "name": "triage-041"
+                },
+                {
+                  "name": "triage-042"
+                },
+                {
+                  "name": "triage-043"
+                },
+                {
+                  "name": "triage-044"
+                },
+                {
+                  "name": "triage-045"
+                },
+                {
+                  "name": "triage-046"
+                },
+                {
+                  "name": "triage-047"
+                },
+                {
+                  "name": "triage-048"
+                },
+                {
+                  "name": "triage-049"
+                },
+                {
+                  "name": "triage-050"
+                },
+                {
+                  "name": "triage-051"
+                },
+                {
+                  "name": "triage-052"
+                },
+                {
+                  "name": "triage-053"
+                },
+                {
+                  "name": "triage-054"
+                },
+                {
+                  "name": "triage-055"
+                },
+                {
+                  "name": "triage-056"
+                },
+                {
+                  "name": "triage-057"
+                },
+                {
+                  "name": "triage-058"
+                },
+                {
+                  "name": "triage-059"
+                },
+                {
+                  "name": "triage-060"
+                },
+                {
+                  "name": "triage-061"
+                },
+                {
+                  "name": "triage-062"
+                },
+                {
+                  "name": "triage-063"
+                },
+                {
+                  "name": "triage-064"
+                },
+                {
+                  "name": "triage-065"
+                },
+                {
+                  "name": "triage-066"
+                },
+                {
+                  "name": "triage-067"
+                },
+                {
+                  "name": "triage-068"
+                },
+                {
+                  "name": "triage-069"
+                },
+                {
+                  "name": "triage-070"
+                },
+                {
+                  "name": "triage-071"
+                },
+                {
+                  "name": "triage-072"
+                },
+                {
+                  "name": "triage-073"
+                },
+                {
+                  "name": "triage-074"
+                },
+                {
+                  "name": "triage-075"
+                },
+                {
+                  "name": "triage-076"
+                },
+                {
+                  "name": "triage-077"
+                },
+                {
+                  "name": "triage-078"
+                },
+                {
+                  "name": "triage-079"
+                },
+                {
+                  "name": "triage-080"
+                },
+                {
+                  "name": "triage-081"
+                },
+                {
+                  "name": "triage-082"
+                },
+                {
+                  "name": "triage-083"
+                },
+                {
+                  "name": "triage-084"
+                },
+                {
+                  "name": "triage-085"
+                },
+                {
+                  "name": "triage-086"
+                },
+                {
+                  "name": "triage-087"
+                },
+                {
+                  "name": "triage-088"
+                },
+                {
+                  "name": "triage-089"
+                },
+                {
+                  "name": "triage-090"
+                },
+                {
+                  "name": "triage-091"
+                },
+                {
+                  "name": "triage-092"
+                },
+                {
+                  "name": "triage-093"
+                },
+                {
+                  "name": "triage-094"
+                },
+                {
+                  "name": "triage-095"
+                },
+                {
+                  "name": "triage-096"
+                },
+                {
+                  "name": "triage-097"
+                },
+                {
+                  "name": "triage-098"
+                },
+                {
+                  "name": "triage-099"
+                }
+              ]
+            },
+            "type0": {
+              "nodes": [
+                {
+                  "name": "bug"
+                }
+              ]
+            },
+            "type1": {
+              "nodes": [
+                {
+                  "name": "docs"
+                },
+                {
+                  "name": "docs-site"
+                }
+              ]
+            },
+            "area": {
+              "nodes": [
+                {
+                  "name": "area:cli"
+                },
+                {
+                  "name": "area:api"
+                },
+                {
+                  "name": "area:ui"
+                },
+                {
+                  "name": "needs area:triage"
+                }
+              ]
+            }
+          },
+          "repo1": {
+            "labels": {
+              "totalCount": 739,
+              "nodes": [
+                {
+                  "name": "triage-000"
+                },
+                {
+                  "name": "triage-001"
+                },
+                {
+                  "name": "triage-002"
+                },
+                {
+                  "name": "triage-003"
+                },
+                {
+                  "name": "triage-004"
+                },
+                {
+                  "name": "triage-005"
+                },
+                {
+                  "name": "triage-006"
+                },
+                {
+                  "name": "triage-007"
+                },
+                {
+                  "name": "triage-008"
+                },
+                {
+                  "name": "triage-009"
+                },
+                {
+                  "name": "triage-010"
+                },
+                {
+                  "name": "triage-011"
+                },
+                {
+                  "name": "triage-012"
+                },
+                {
+                  "name": "triage-013"
+                },
+                {
+                  "name": "triage-014"
+                },
+                {
+                  "name": "triage-015"
+                },
+                {
+                  "name": "triage-016"
+                },
+                {
+                  "name": "triage-017"
+                },
+                {
+                  "name": "triage-018"
+                },
+                {
+                  "name": "triage-019"
+                },
+                {
+                  "name": "triage-020"
+                },
+                {
+                  "name": "triage-021"
+                },
+                {
+                  "name": "triage-022"
+                },
+                {
+                  "name": "triage-023"
+                },
+                {
+                  "name": "triage-024"
+                },
+                {
+                  "name": "triage-025"
+                },
+                {
+                  "name": "triage-026"
+                },
+                {
+                  "name": "triage-027"
+                },
+                {
+                  "name": "triage-028"
+                },
+                {
+                  "name": "triage-029"
+                },
+                {
+                  "name": "triage-030"
+                },
+                {
+                  "name": "triage-031"
+                },
+                {
+                  "name": "triage-032"
+                },
+                {
+                  "name": "triage-033"
+                },
+                {
+                  "name": "triage-034"
+                },
+                {
+                  "name": "triage-035"
+                },
+                {
+                  "name": "triage-036"
+                },
+                {
+                  "name": "triage-037"
+                },
+                {
+                  "name": "triage-038"
+                },
+                {
+                  "name": "triage-039"
+                },
+                {
+                  "name": "triage-040"
+                },
+                {
+                  "name": "triage-041"
+                },
+                {
+                  "name": "triage-042"
+                },
+                {
+                  "name": "triage-043"
+                },
+                {
+                  "name": "triage-044"
+                },
+                {
+                  "name": "triage-045"
+                },
+                {
+                  "name": "triage-046"
+                },
+                {
+                  "name": "triage-047"
+                },
+                {
+                  "name": "triage-048"
+                },
+                {
+                  "name": "triage-049"
+                },
+                {
+                  "name": "triage-050"
+                },
+                {
+                  "name": "triage-051"
+                },
+                {
+                  "name": "triage-052"
+                },
+                {
+                  "name": "triage-053"
+                },
+                {
+                  "name": "triage-054"
+                },
+                {
+                  "name": "triage-055"
+                },
+                {
+                  "name": "triage-056"
+                },
+                {
+                  "name": "triage-057"
+                },
+                {
+                  "name": "triage-058"
+                },
+                {
+                  "name": "triage-059"
+                },
+                {
+                  "name": "triage-060"
+                },
+                {
+                  "name": "triage-061"
+                },
+                {
+                  "name": "triage-062"
+                },
+                {
+                  "name": "triage-063"
+                },
+                {
+                  "name": "triage-064"
+                },
+                {
+                  "name": "triage-065"
+                },
+                {
+                  "name": "triage-066"
+                },
+                {
+                  "name": "triage-067"
+                },
+                {
+                  "name": "triage-068"
+                },
+                {
+                  "name": "triage-069"
+                },
+                {
+                  "name": "triage-070"
+                },
+                {
+                  "name": "triage-071"
+                },
+                {
+                  "name": "triage-072"
+                },
+                {
+                  "name": "triage-073"
+                },
+                {
+                  "name": "triage-074"
+                },
+                {
+                  "name": "triage-075"
+                },
+                {
+                  "name": "triage-076"
+                },
+                {
+                  "name": "triage-077"
+                },
+                {
+                  "name": "triage-078"
+                },
+                {
+                  "name": "triage-079"
+                },
+                {
+                  "name": "triage-080"
+                },
+                {
+                  "name": "triage-081"
+                },
+                {
+                  "name": "triage-082"
+                },
+                {
+                  "name": "triage-083"
+                },
+                {
+                  "name": "triage-084"
+                },
+                {
+                  "name": "triage-085"
+                },
+                {
+                  "name": "triage-086"
+                },
+                {
+                  "name": "triage-087"
+                },
+                {
+                  "name": "triage-088"
+                },
+                {
+                  "name": "triage-089"
+                },
+                {
+                  "name": "triage-090"
+                },
+                {
+                  "name": "triage-091"
+                },
+                {
+                  "name": "triage-092"
+                },
+                {
+                  "name": "triage-093"
+                },
+                {
+                  "name": "triage-094"
+                },
+                {
+                  "name": "triage-095"
+                },
+                {
+                  "name": "triage-096"
+                },
+                {
+                  "name": "triage-097"
+                },
+                {
+                  "name": "triage-098"
+                },
+                {
+                  "name": "triage-099"
+                }
+              ]
+            },
+            "type0": {
+              "nodes": [
+                {
+                  "name": "bug"
+                }
+              ]
+            },
+            "type1": {
+              "nodes": [
+                {
+                  "name": "Docs"
+                }
+              ]
+            },
+            "area": {
+              "nodes": []
+            }
+          },
+          "repo2": {
+            "labels": {
+              "totalCount": 150,
+              "nodes": [
+                {
+                  "name": "triage-000"
+                },
+                {
+                  "name": "triage-001"
+                },
+                {
+                  "name": "triage-002"
+                },
+                {
+                  "name": "triage-003"
+                },
+                {
+                  "name": "triage-004"
+                },
+                {
+                  "name": "triage-005"
+                },
+                {
+                  "name": "triage-006"
+                },
+                {
+                  "name": "triage-007"
+                },
+                {
+                  "name": "triage-008"
+                },
+                {
+                  "name": "triage-009"
+                },
+                {
+                  "name": "triage-010"
+                },
+                {
+                  "name": "triage-011"
+                },
+                {
+                  "name": "triage-012"
+                },
+                {
+                  "name": "triage-013"
+                },
+                {
+                  "name": "triage-014"
+                },
+                {
+                  "name": "triage-015"
+                },
+                {
+                  "name": "triage-016"
+                },
+                {
+                  "name": "triage-017"
+                },
+                {
+                  "name": "triage-018"
+                },
+                {
+                  "name": "triage-019"
+                },
+                {
+                  "name": "triage-020"
+                },
+                {
+                  "name": "triage-021"
+                },
+                {
+                  "name": "triage-022"
+                },
+                {
+                  "name": "triage-023"
+                },
+                {
+                  "name": "triage-024"
+                },
+                {
+                  "name": "triage-025"
+                },
+                {
+                  "name": "triage-026"
+                },
+                {
+                  "name": "triage-027"
+                },
+                {
+                  "name": "triage-028"
+                },
+                {
+                  "name": "triage-029"
+                },
+                {
+                  "name": "triage-030"
+                },
+                {
+                  "name": "triage-031"
+                },
+                {
+                  "name": "triage-032"
+                },
+                {
+                  "name": "triage-033"
+                },
+                {
+                  "name": "triage-034"
+                },
+                {
+                  "name": "triage-035"
+                },
+                {
+                  "name": "triage-036"
+                },
+                {
+                  "name": "triage-037"
+                },
+                {
+                  "name": "triage-038"
+                },
+                {
+                  "name": "triage-039"
+                },
+                {
+                  "name": "triage-040"
+                },
+                {
+                  "name": "triage-041"
+                },
+                {
+                  "name": "triage-042"
+                },
+                {
+                  "name": "triage-043"
+                },
+                {
+                  "name": "triage-044"
+                },
+                {
+                  "name": "triage-045"
+                },
+                {
+                  "name": "triage-046"
+                },
+                {
+                  "name": "triage-047"
+                },
+                {
+                  "name": "triage-048"
+                },
+                {
+                  "name": "triage-049"
+                },
+                {
+                  "name": "triage-050"
+                },
+                {
+                  "name": "triage-051"
+                },
+                {
+                  "name": "triage-052"
+                },
+                {
+                  "name": "triage-053"
+                },
+                {
+                  "name": "triage-054"
+                },
+                {
+                  "name": "triage-055"
+                },
+                {
+                  "name": "triage-056"
+                },
+                {
+                  "name": "triage-057"
+                },
+                {
+                  "name": "triage-058"
+                },
+                {
+                  "name": "triage-059"
+                },
+                {
+                  "name": "triage-060"
+                },
+                {
+                  "name": "triage-061"
+                },
+                {
+                  "name": "triage-062"
+                },
+                {
+                  "name": "triage-063"
+                },
+                {
+                  "name": "triage-064"
+                },
+                {
+                  "name": "triage-065"
+                },
+                {
+                  "name": "triage-066"
+                },
+                {
+                  "name": "triage-067"
+                },
+                {
+                  "name": "triage-068"
+                },
+                {
+                  "name": "triage-069"
+                },
+                {
+                  "name": "triage-070"
+                },
+                {
+                  "name": "triage-071"
+                },
+                {
+                  "name": "triage-072"
+                },
+                {
+                  "name": "triage-073"
+                },
+                {
+                  "name": "triage-074"
+                },
+                {
+                  "name": "triage-075"
+                },
+                {
+                  "name": "triage-076"
+                },
+                {
+                  "name": "triage-077"
+                },
+                {
+                  "name": "triage-078"
+                },
+                {
+                  "name": "triage-079"
+                },
+                {
+                  "name": "triage-080"
+                },
+                {
+                  "name": "triage-081"
+                },
+                {
+                  "name": "triage-082"
+                },
+                {
+                  "name": "triage-083"
+                },
+                {
+                  "name": "triage-084"
+                },
+                {
+                  "name": "triage-085"
+                },
+                {
+                  "name": "triage-086"
+                },
+                {
+                  "name": "triage-087"
+                },
+                {
+                  "name": "triage-088"
+                },
+                {
+                  "name": "triage-089"
+                },
+                {
+                  "name": "triage-090"
+                },
+                {
+                  "name": "triage-091"
+                },
+                {
+                  "name": "triage-092"
+                },
+                {
+                  "name": "triage-093"
+                },
+                {
+                  "name": "triage-094"
+                },
+                {
+                  "name": "triage-095"
+                },
+                {
+                  "name": "triage-096"
+                },
+                {
+                  "name": "triage-097"
+                },
+                {
+                  "name": "triage-098"
+                },
+                {
+                  "name": "triage-099"
+                }
+              ]
+            },
+            "type0": {
+              "nodes": []
+            },
+            "type1": {
+              "nodes": []
+            },
+            "area": {
+              "nodes": []
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "RepoLabels",
+      "query": "query RepoLabels($owner: String!, $repo: String!, $cursor: String) {\n  repository(owner: $owner, name: $repo) {\n    labels(first: 100, after: $cursor, orderBy: {field: NAME, direction: ASC}) {\n      totalCount\n      pageInfo { hasNextPage endCursor }\n      nodes { id name }\n    }\n  }\n}",
+      "variables": {
+        "owner": "Trum-ok",
+        "repo": "paged",
+        "cursor": null
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "labels": {
+              "totalCount": 150,
+              "pageInfo": {
+                "hasNextPage": true,
+                "endCursor": "Y3Vyc29yOnYyOpLNAMg="
+              },
+              "nodes": [
+                {
+                  "id": "LA_triage-000",
+                  "name": "triage-000"
+                },
+                {
+                  "id": "LA_triage-001",
+                  "name": "triage-001"
+                },
+                {
+                  "id": "LA_triage-002",
+                  "name": "triage-002"
+                },
+                {
+                  "id": "LA_triage-003",
+                  "name": "triage-003"
+                },
+                {
+                  "id": "LA_triage-004",
+                  "name": "triage-004"
+                },
+                {
+                  "id": "LA_triage-005",
+                  "name": "triage-005"
+                },
+                {
+                  "id": "LA_triage-006",
+                  "name": "triage-006"
+                },
+                {
+                  "id": "LA_triage-007",
+                  "name": "triage-007"
+                },
+                {
+                  "id": "LA_triage-008",
+                  "name": "triage-008"
+                },
+                {
+                  "id": "LA_triage-009",
+                  "name": "triage-009"
+                },
+                {
+                  "id": "LA_triage-010",
+                  "name": "triage-010"
+                },
+                {
+                  "id": "LA_triage-011",
+                  "name": "triage-011"
+                },
+                {
+                  "id": "LA_triage-012",
+                  "name": "triage-012"
+                },
+                {
+                  "id": "LA_triage-013",
+                  "name": "triage-013"
+                },
+                {
+                  "id": "LA_triage-014",
+                  "name": "triage-014"
+                },
+                {
+                  "id": "LA_triage-015",
+                  "name": "triage-015"
+                },
+                {
+                  "id": "LA_triage-016",
+                  "name": "triage-016"
+                },
+                {
+                  "id": "LA_triage-017",
+                  "name": "triage-017"
+                },
+                {
+                  "id": "LA_triage-018",
+                  "name": "triage-018"
+                },
+                {
+                  "id": "LA_triage-019",
+                  "name": "triage-019"
+                },
+                {
+                  "id": "LA_triage-020",
+                  "name": "triage-020"
+                },
+                {
+                  "id": "LA_triage-021",
+                  "name": "triage-021"
+                },
+                {
+                  "id": "LA_triage-022",
+                  "name": "triage-022"
+                },
+                {
+                  "id": "LA_triage-023",
+                  "name": "triage-023"
+                },
+                {
+                  "id": "LA_triage-024",
+                  "name": "triage-024"
+                },
+                {
+                  "id": "LA_triage-025",
+                  "name": "triage-025"
+                },
+                {
+                  "id": "LA_triage-026",
+                  "name": "triage-026"
+                },
+                {
+                  "id": "LA_triage-027",
+                  "name": "triage-027"
+                },
+                {
+                  "id": "LA_triage-028",
+                  "name": "triage-028"
+                },
+                {
+                  "id": "LA_triage-029",
+                  "name": "triage-029"
+                },
+                {
+                  "id": "LA_triage-030",
+                  "name": "triage-030"
+                },
+                {
+                  "id": "LA_triage-031",
+                  "name": "triage-031"
+                },
+                {
+                  "id": "LA_triage-032",
+                  "name": "triage-032"
+                },
+                {
+                  "id": "LA_triage-033",
+                  "name": "triage-033"
+                },
+                {
+                  "id": "LA_triage-034",
+                  "name": "triage-034"
+                },
+                {
+                  "id": "LA_triage-035",
+                  "name": "triage-035"
+                },
+                {
+                  "id": "LA_triage-036",
+                  "name": "triage-036"
+                },
+                {
+                  "id": "LA_triage-037",
+                  "name": "triage-037"
+                },
+                {
+                  "id": "LA_triage-038",
+                  "name": "triage-038"
+                },
+                {
+                  "id": "LA_triage-039",
+                  "name": "triage-039"
+                },
+                {
+                  "id": "LA_triage-040",
+                  "name": "triage-040"
+                },
+                {
+                  "id": "LA_triage-041",
+                  "name": "triage-041"
+                },
+                {
+                  "id": "LA_triage-042",
+                  "name": "triage-042"
+                },
+                {
+                  "id": "LA_triage-043",
+                  "name": "triage-043"
+                },
+                {
+                  "id": "LA_triage-044",
+                  "name": "triage-044"
+                },
+                {
+                  "id": "LA_triage-045",
+                  "name": "triage-045"
+                },
+                {
+                  "id": "LA_triage-046",
+                  "name": "triage-046"
+                },
+                {
+                  "id": "LA_triage-047",
+                  "name": "triage-047"
+                },
+                {
+                  "id": "LA_triage-048",
+                  "name": "triage-048"
+                },
+                {
+                  "id": "LA_triage-049",
+                  "name": "triage-049"
+                },
+                {
+                  "id": "LA_triage-050",
+                  "name": "triage-050"
+                },
+                {
+                  "id": "LA_triage-051",
+                  "name": "triage-051"
+                },
+                {
+                  "id": "LA_triage-052",
+                  "name": "triage-052"
+                },
+                {
+                  "id": "LA_triage-053",
+                  "name": "triage-053"
+                },
+                {
+                  "id": "LA_triage-054",
+                  "name": "triage-054"
+                },
+                {
+                  "id": "LA_triage-055",
+                  "name": "triage-055"
+                },
+                {
+                  "id": "LA_triage-056",
+                  "name": "triage-056"
+                },
+                {
+                  "id": "LA_triage-057",
+                  "name": "triage-057"
+                },
+                {
+                  "id": "LA_triage-058",
+                  "name": "triage-058"
+                },
+                {
+                  "id": "LA_triage-059",
+                  "name": "triage-059"
+                },
+                {
+                  "id": "LA_triage-060",
+                  "name": "triage-060"
+                },
+                {
+                  "id": "LA_triage-061",
+                  "name": "triage-061"
+                },
+                {
+                  "id": "LA_triage-062",
+                  "name": "triage-062"
+                },
+                {
+                  "id": "LA_triage-063",
+                  "name": "triage-063"
+                },
+                {
+                  "id": "LA_triage-064",
+                  "name": "triage-064"
+                },
+                {
+                  "id": "LA_triage-065",
+                  "name": "triage-065"
+                },
+                {
+                  "id": "LA_triage-066",
+                  "name": "triage-066"
+                },
+                {
+                  "id": "LA_triage-067",
+                  "name": "triage-067"
+                },
+                {
+                  "id": "LA_triage-068",
+                  "name": "triage-068"
+                },
+                {
+                  "id": "LA_triage-069",
+                  "name": "triage-069"
+                },
+                {
+                  "id": "LA_triage-070",
+                  "name": "triage-070"
+                },
+                {
+                  "id": "LA_triage-071",
+                  "name": "triage-071"
+                },
+                {
+                  "id": "LA_triage-072",
+                  "name": "triage-072"
+                },
+                {
+                  "id": "LA_triage-073",
+                  "name": "triage-073"
+                },
+                {
+                  "id": "LA_triage-074",
+                  "name": "triage-074"
+                },
+                {
+                  "id": "LA_triage-075",
+                  "name": "triage-075"
+                },
+                {
+                  "id": "LA_triage-076",
+                  "name": "triage-076"
+                },
+                {
+                  "id": "LA_triage-077",
+                  "name": "triage-077"
+                },
+                {
+                  "id": "LA_triage-078",
+                  "name": "triage-078"
+                },
+                {
+                  "id": "LA_triage-079",
+                  "name": "triage-079"
+                },
+                {
+                  "id": "LA_triage-080",
+                  "name": "triage-080"
+                },
+                {
+                  "id": "LA_triage-081",
+                  "name": "triage-081"
+                },
+                {
+                  "id": "LA_triage-082",
+                  "name": "triage-082"
+                },
+                {
+                  "id": "LA_triage-083",
+                  "name": "triage-083"
+                },
+                {
+                  "id": "LA_triage-084",
+                  "name": "triage-084"
+                },
+                {
+                  "id": "LA_triage-085",
+                  "name": "triage-085"
+                },
+                {
+                  "id": "LA_triage-086",
+                  "name": "triage-086"
+                },
+                {
+                  "id": "LA_triage-087",
+                  "name": "triage-087"
+                },
+                {
+                  "id": "LA_triage-088",
+                  "name": "triage-088"
+                },
+                {
+                  "id": "LA_triage-089",
+                  "name": "triage-089"
+                },
+                {
+                  "id": "LA_triage-090",
+                  "name": "triage-090"
+                },
+                {
+                  "id": "LA_triage-091",
+                  "name": "triage-091"
+                },
+                {
+                  "id": "LA_triage-092",
+                  "name": "triage-092"
+                },
+                {
+                  "id": "LA_triage-093",
+                  "name": "triage-093"
+                },
+                {
+                  "id": "LA_triage-094",
+                  "name": "triage-094"
+                },
+                {
+                  "id": "LA_triage-095",
+                  "name": "triage-095"
+                },
+                {
+                  "id": "LA_triage-096",
+                  "name": "triage-096"
+                },
+                {
+                  "id": "LA_triage-097",
+                  "name": "triage-097"
+                },
+                {
+                  "id": "LA_triage-098",
+                  "name": "triage-098"
+                },
+                {
+                  "id": "LA_triage-099",
+                  "name": "triage-099"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "RepoLabels",
+      "query": "query RepoLabels($owner: String!, $repo: String!, $cursor: String) {\n  repository(owner: $owner, name: $repo) {\n    labels(first: 100, after: $cursor, orderBy: {field: NAME, direction: ASC}) {\n      totalCount\n      pageInfo { hasNextPage endCursor }\n      nodes { id name }\n    }\n  }\n}",
+      "variables": {
+        "owner": "Trum-ok",
+        "repo": "paged",
+        "cursor": "Y3Vyc29yOnYyOpLNAMg="
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "labels": {
+              "totalCount": 150,
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": null
+              },
+              "nodes": [
+                {
+                  "id": "LA_triage-100",
+                  "name": "triage-100"
+                },
+                {
+                  "id": "LA_triage-101",
+                  "name": "triage-101"
+                },
+                {
+                  "id": "LA_triage-102",
+                  "name": "triage-102"
+                },
+                {
+                  "id": "LA_triage-103",
+                  "name": "triage-103"
+                },
+                {
+                  "id": "LA_triage-104",
+                  "name": "triage-104"
+                },
+                {
+                  "id": "LA_triage-105",
+                  "name": "triage-105"
+                },
+                {
+                  "id": "LA_triage-106",
+                  "name": "triage-106"
+                },
+                {
+                  "id": "LA_triage-107",
+                  "name": "triage-107"
+                },
+                {
+                  "id": "LA_triage-108",
+                  "name": "triage-108"
+                },
+                {
+                  "id": "LA_triage-109",
+                  "name": "triage-109"
+                },
+                {
+                  "id": "LA_triage-110",
+                  "name": "triage-110"
+                },
+                {
+                  "id": "LA_triage-111",
+                  "name": "triage-111"
+                },
+                {
+                  "id": "LA_triage-112",
+                  "name": "triage-112"
+                },
+                {
+                  "id": "LA_triage-113",
+                  "name": "triage-113"
+                },
+                {
+                  "id": "LA_triage-114",
+                  "name": "triage-114"
+                },
+                {
+                  "id": "LA_triage-115",
+                  "name": "triage-115"
+                },
+                {
+                  "id": "LA_triage-116",
+                  "name": "triage-116"
+                },
+                {
+                  "id": "LA_triage-117",
+                  "name": "triage-117"
+                },
+                {
+                  "id": "LA_triage-118",
+                  "name": "triage-118"
+                },
+                {
+                  "id": "LA_triage-119",
+                  "name": "triage-119"
+                },
+                {
+                  "id": "LA_triage-120",
+                  "name": "triage-120"
+                },
+                {
+                  "id": "LA_triage-121",
+                  "name": "triage-121"
+                },
+                {
+                  "id": "LA_triage-122",
+                  "name": "triage-122"
+                },
+                {
+                  "id": "LA_triage-123",
+                  "name": "triage-123"
+                },
+                {
+                  "id": "LA_triage-124",
+                  "name": "triage-124"
+                },
+                {
+                  "id": "LA_triage-125",
+                  "name": "triage-125"
+                },
+                {
+                  "id": "LA_triage-126",
+                  "name": "triage-126"
+                },
+                {
+                  "id": "LA_triage-127",
+                  "name": "triage-127"
+                },
+                {
+                  "id": "LA_triage-128",
+                  "name": "triage-128"
+                },
+                {
+                  "id": "LA_triage-129",
+                  "name": "triage-129"
+                },
+                {
+                  "id": "LA_triage-130",
+                  "name": "triage-130"
+                },
+                {
+                  "id": "LA_triage-131",
+                  "name": "triage-131"
+                },
+                {
+                  "id": "LA_triage-132",
+                  "name": "triage-132"
+                },
+                {
+                  "id": "LA_triage-133",
+                  "name": "triage-133"
+                },
+                {
+                  "id": "LA_triage-134",
+                  "name": "triage-134"
+                },
+                {
+                  "id": "LA_triage-135",
+                  "name": "triage-135"
+                },
+                {
+                  "id": "LA_triage-136",
+                  "name": "triage-136"
+                },
+                {
+                  "id": "LA_triage-137",
+                  "name": "triage-137"
+                },
+                {
+                  "id": "LA_triage-138",
+                  "name": "triage-138"
+                },
+                {
+                  "id": "LA_triage-139",
+                  "name": "triage-139"
+                },
+                {
+                  "id": "LA_triage-140",
+                  "name": "triage-140"
+                },
+                {
+                  "id": "LA_triage-141",
+                  "name": "triage-141"
+                },
+                {
+                  "id": "LA_triage-142",
+                  "name": "triage-142"
+                },
+                {
+                  "id": "LA_triage-143",
+                  "name": "triage-143"
+                },
+                {
+                  "id": "LA_triage-144",
+                  "name": "triage-144"
+                },
+                {
+                  "id": "LA_triage-145",
+                  "name": "triage-145"
+                },
+                {
+                  "id": "LA_triage-146",
+                  "name": "triage-146"
+                },
+                {
+                  "id": "LA_triage-147",
+                  "name": "triage-147"
+                },
+                {
+                  "id": "LA_Bug",
+                  "name": "Bug"
+                },
+                {
+                  "id": "LA_area:db",
+                  "name": "area:db"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -42,7 +42,8 @@ warning is followed by the command that fixes it.
            repositories: every type label exists (missing: problem, since
            new --type fails; in another case: warn), and how many labels
            start with the area prefix (none: warn when the config sets the
-           prefix, not a preset, since --area finds nothing)
+           prefix, not a preset, since --area finds nothing; past 100
+           labels the count is a lower bound)
   sprint   with fields.sprint set: the field is an iteration field and an
            iteration covers today
   verbs    the labels verbs add or remove exist in the default repository,
@@ -50,9 +51,11 @@ warning is followed by the command that fixes it.
   agent    with [agent] set or a file agent install wrote: those files are
            up to date with the config and this gh-dojo (out of date: warn)
 
-It sends one request for the token and the repositories with their
-labels, one more for the board when its schema is not cached (an hour),
-and one for the verbs' labels and assignees when a verb has them.
+It sends one request for the token and the repositories, one more for the
+board when its schema is not cached (an hour), one for the labels of
+labels.types and labels.area_prefix when set (and, for a repository with
+over 100 labels where a type is not found, its labels page by page), and
+one for the verbs' labels and assignees when a verb has them.
 
 Exit codes: 0 when every check is ok or warns; 4 when a check failed on auth or the
 network; else 1.`,
@@ -162,8 +165,10 @@ func (r *doctorReport) err() error {
 
 // runDoctor runs the checks in order. Requests: one Doctor query (token
 // and repositories), plus the board schema when it is not cached (or the
-// cached one has no iteration for today), plus one DoctorVerbs query when
-// a verb has labels or assigns someone.
+// cached one has no iteration for today), plus one DoctorLabels query with
+// labels.types or labels.area_prefix set (and all the labels of a
+// repository with over 100 whose type it did not find), plus one
+// DoctorVerbs query when a verb has labels or assigns someone.
 func runDoctor(ctx context.Context, root *cobra.Command) *doctorReport {
 	r := &doctorReport{}
 	r.ok("version", "gh dojo %s", version)
@@ -179,7 +184,7 @@ func runDoctor(ctx context.Context, root *cobra.Command) *doctorReport {
 	a := newApp()
 	repos, repoErr := doctorRepos(a, cfg)
 	labels := newLabelsCheck(cfg)
-	reach, viewer := checkToken(ctx, r, a, repos, labels)
+	reach, viewer := checkToken(ctx, r, a, repos)
 
 	var schema *board.Schema
 	switch {
@@ -206,9 +211,7 @@ func runDoctor(ctx context.Context, root *cobra.Command) *doctorReport {
 			checkRepo(r, cfg, rp)
 		}
 		if labels != nil {
-			for _, rp := range repos {
-				checkRepoLabels(r, cfg, labels, rp)
-			}
+			checkDoctorLabels(ctx, r, a, cfg, labels, repos)
 		}
 	}
 
@@ -247,8 +250,7 @@ type doctorRepo struct {
 		NameWithOwner    string `json:"nameWithOwner"`
 		HasIssuesEnabled bool   `json:"hasIssuesEnabled"`
 	}
-	Err    error           // GitHub denied reading it, e.g. its organization's SAML SSO
-	Answer json.RawMessage // the repository's fields as GitHub answered, labels included
+	Err error // GitHub denied reading it, e.g. its organization's SAML SSO
 }
 
 // doctorRepos lists the repositories to check: board.repos, else the
@@ -284,10 +286,9 @@ type tokenClient interface {
 	AuthFix() string
 }
 
-// doctorQuery reads the viewer and each repository, aliased repo0, repo1...,
-// with the labels lc asks about when it is not nil. GitHub lists the
-// token's scopes in the response headers.
-func doctorQuery(repos []*doctorRepo, lc *labelsCheck) (string, map[string]any) {
+// doctorQuery reads the viewer and each repository, aliased repo0, repo1...
+// GitHub lists the token's scopes in the response headers.
+func doctorQuery(repos []*doctorRepo) (string, map[string]any) {
 	if len(repos) == 0 {
 		return "query Doctor { viewer { login } }", nil
 	}
@@ -296,17 +297,9 @@ func doctorQuery(repos []*doctorRepo, lc *labelsCheck) (string, map[string]any) 
 	vars := map[string]any{}
 	for i, r := range repos {
 		params[i] = fmt.Sprintf("$owner%d: String!, $name%d: String!", i, i)
-		fields[i] = fmt.Sprintf("  repo%d: repository(owner: $owner%d, name: $name%d) { nameWithOwner hasIssuesEnabled", i, i, i)
-		if lc != nil {
-			fields[i] += "\n" + lc.fields() + "\n "
-		}
-		fields[i] += " }"
+		fields[i] = fmt.Sprintf("  repo%d: repository(owner: $owner%d, name: $name%d) { nameWithOwner hasIssuesEnabled }", i, i, i)
 		vars[fmt.Sprintf("owner%d", i)] = r.Repo.Owner
 		vars[fmt.Sprintf("name%d", i)] = r.Repo.Name
-	}
-	if lc != nil {
-		params = append(params, lc.params()...)
-		lc.vars(vars)
 	}
 	return "query Doctor(" + strings.Join(params, ", ") + ") {\n  viewer { login }\n" +
 		strings.Join(fields, "\n") + "\n}", vars
@@ -316,13 +309,13 @@ func doctorQuery(repos []*doctorRepo, lc *labelsCheck) (string, map[string]any) 
 // what it found about repos. It reports whether GitHub answered, so the
 // checks that need it can run, and the authenticated user's login ("" when
 // not read).
-func checkToken(ctx context.Context, r *doctorReport, a *App, repos []*doctorRepo, lc *labelsCheck) (bool, string) {
+func checkToken(ctx context.Context, r *doctorReport, a *App, repos []*doctorRepo) (bool, string) {
 	c, ok := a.Client.(tokenClient)
 	if !ok {
 		r.skip("token", "this GitHub client cannot report token scopes")
 		return true, ""
 	}
-	query, vars := doctorQuery(repos, lc)
+	query, vars := doctorQuery(repos)
 	var out map[string]json.RawMessage
 	h, err := c.QueryHeaders(ctx, query, vars, &out)
 	failed, partial := repoErrors(err)
@@ -333,8 +326,7 @@ func checkToken(ctx context.Context, r *doctorReport, a *App, repos []*doctorRep
 	var viewer struct{ Login string }
 	_ = json.Unmarshal(out["viewer"], &viewer)
 	for i, rp := range repos {
-		rp.Answer = out[fmt.Sprintf("repo%d", i)]
-		_ = json.Unmarshal(rp.Answer, &rp.Found) // null: not found
+		_ = json.Unmarshal(out[fmt.Sprintf("repo%d", i)], &rp.Found) // null: not found
 		if failed[i] {
 			// SAML SSO or another denial: the client mapped it, with the
 			// fix for where the token comes from.
@@ -459,11 +451,14 @@ func checkRepo(r *doctorReport, cfg *config.Config, rp *doctorRepo) {
 	}
 }
 
-// labelsCheck is what the Doctor query asks about each repository's labels
-// for new: labels.types and labels.area_prefix. In each repository it reads
-// the first 100 labels and searches for each type and for the prefix, which
-// finds them past the first 100 (search matches words, so it misses a
-// one-letter name there).
+// labelsCheck is what the DoctorLabels query asks about each repository's
+// labels for new: labels.types and labels.area_prefix. In each repository
+// it reads the first 100 labels and searches for each type and for the
+// prefix. Search matches the start of words regardless of case: it finds a
+// type, one letter long or not, but not a prefix of punctuation such as
+// "~" or ".", and it also returns labels that only contain the prefix. So
+// past the first 100 labels an area count is a lower bound, and a type the
+// search did not find is looked up in all the labels, as new does.
 type labelsCheck struct {
 	types  []string
 	prefix string
@@ -478,51 +473,53 @@ func newLabelsCheck(cfg *config.Config) *labelsCheck {
 	return &labelsCheck{types: cfg.Labels.Types, prefix: cfg.Labels.AreaPrefix}
 }
 
-// labelsPage is the most labels one field of the Doctor query reads.
+// labelsPage is the most labels one field of the DoctorLabels query reads.
 const labelsPage = 100
 
-// fields are the label fields inside each repository of the Doctor query.
-func (c *labelsCheck) fields() string {
-	fields := []string{fmt.Sprintf("    labels(first: %d) { totalCount nodes { name } }", labelsPage)}
-	for i := range c.types {
-		fields = append(fields, fmt.Sprintf("    type%d: labels(first: %d, query: $type%d) { nodes { name } }", i, labelsPage, i))
+// query is the DoctorLabels query for the repositories at idx, each aliased
+// by its index in repos: repo0, repo1...
+func (c *labelsCheck) query(repos []*doctorRepo, idx []int) (string, map[string]any) {
+	var params, fields []string
+	vars := map[string]any{}
+	for _, i := range idx {
+		params = append(params, fmt.Sprintf("$owner%d: String!, $name%d: String!", i, i))
+		f := []string{
+			fmt.Sprintf("  repo%d: repository(owner: $owner%d, name: $name%d) {", i, i, i),
+			fmt.Sprintf("    labels(first: %d) { totalCount nodes { name } }", labelsPage),
+		}
+		for j := range c.types {
+			f = append(f, fmt.Sprintf("    type%d: labels(first: %d, query: $type%d) { nodes { name } }", j, labelsPage, j))
+		}
+		if c.prefix != "" {
+			f = append(f, fmt.Sprintf("    area: labels(first: %d, query: $area) { nodes { name } }", labelsPage))
+		}
+		fields = append(fields, strings.Join(f, "\n")+"\n  }")
+		vars[fmt.Sprintf("owner%d", i)] = repos[i].Repo.Owner
+		vars[fmt.Sprintf("name%d", i)] = repos[i].Repo.Name
 	}
-	if c.prefix != "" {
-		fields = append(fields, fmt.Sprintf("    area: labels(first: %d, query: $area) { nodes { name } }", labelsPage))
-	}
-	return strings.Join(fields, "\n")
-}
-
-func (c *labelsCheck) params() []string {
-	var params []string
-	for i := range c.types {
-		params = append(params, fmt.Sprintf("$type%d: String!", i))
+	for j, t := range c.types {
+		params = append(params, fmt.Sprintf("$type%d: String!", j))
+		vars[fmt.Sprintf("type%d", j)] = t
 	}
 	if c.prefix != "" {
 		params = append(params, "$area: String!")
-	}
-	return params
-}
-
-func (c *labelsCheck) vars(vars map[string]any) {
-	for i, t := range c.types {
-		vars[fmt.Sprintf("type%d", i)] = t
-	}
-	if c.prefix != "" {
 		vars["area"] = c.prefix
 	}
+	return "query DoctorLabels(" + strings.Join(params, ", ") + ") {\n" + strings.Join(fields, "\n") + "\n}", vars
 }
 
-// labelsFound is what the Doctor query found of one repository's labels.
+// labelsFound is what doctor found of one repository's labels.
 type labelsFound struct {
-	names    []string // distinct, from every label field
-	complete bool     // names has every label that starts with the prefix
+	names    []string // distinct
+	total    int      // how many labels the repository has
+	complete bool     // names has every label of the repository
 }
 
-func (c *labelsCheck) found(answer json.RawMessage) labelsFound {
+// found reads one repository of the DoctorLabels answer.
+func (c *labelsCheck) found(answer json.RawMessage) *labelsFound {
 	var fields map[string]json.RawMessage
 	_ = json.Unmarshal(answer, &fields)
-	var f labelsFound
+	f := &labelsFound{}
 	read := func(key string) (total, n int) {
 		var conn struct {
 			TotalCount int                      `json:"totalCount"`
@@ -530,44 +527,135 @@ func (c *labelsCheck) found(answer json.RawMessage) labelsFound {
 		}
 		_ = json.Unmarshal(fields[key], &conn)
 		for _, l := range conn.Nodes {
-			if l != nil && !slices.Contains(f.names, l.Name) {
-				f.names = append(f.names, l.Name)
+			if l != nil {
+				f.add(l.Name)
 			}
 		}
 		return conn.TotalCount, len(conn.Nodes)
 	}
 	total, n := read("labels")
-	for i := range c.types {
-		read(fmt.Sprintf("type%d", i))
+	for j := range c.types {
+		read(fmt.Sprintf("type%d", j))
 	}
-	_, areas := read("area")
-	f.complete = total <= n || areas < labelsPage
+	read("area")
+	f.total, f.complete = total, total <= n
 	return f
 }
 
-// checkRepoLabels checks one repository's labels against labels.types and
-// labels.area_prefix, from what the Doctor query found; it skips a
-// repository the repo check found broken. A missing type label is a
-// problem: new --type fails on it. One in another case is a warning, since
-// new matches labels without case. No label with the area prefix is a
-// warning when the config sets the prefix (new --area finds nothing), and
-// only a note on the ok line when a preset does: many teams never use the
-// preset's areas.
-func checkRepoLabels(r *doctorReport, cfg *config.Config, c *labelsCheck, rp *doctorRepo) {
-	name := rp.Repo.String()
-	if rp.Err != nil || rp.Found == nil || !rp.Found.HasIssuesEnabled {
-		r.skip("labels", "%s: needs the repository (see repo)", name)
-		return
+func (f *labelsFound) add(name string) {
+	if !slices.Contains(f.names, name) {
+		f.names = append(f.names, name)
 	}
-	f := c.found(rp.Answer)
+}
+
+// has reports whether a label matches name regardless of case, as new
+// looks labels up.
+func (f *labelsFound) has(name string) bool {
+	return slices.ContainsFunc(f.names, func(n string) bool { return strings.EqualFold(n, name) })
+}
+
+// allLabels reads every label of repo, page by page, as new does past the
+// first 100.
+func allLabels(ctx context.Context, q graph.Querier, repo issue.Repo) (*labelsFound, error) {
+	type resp struct {
+		Repository *struct {
+			Labels graph.Connection[newLabel] `json:"labels"`
+		} `json:"repository"`
+	}
+	vars := map[string]any{"owner": repo.Owner, "repo": repo.Name}
+	page, err := graph.Paginate(ctx, q, newLabelsQuery, vars, 0, func(r *resp) *graph.Connection[newLabel] {
+		if r.Repository == nil {
+			return nil
+		}
+		return &r.Repository.Labels
+	})
+	if err != nil {
+		return nil, err
+	}
+	f := &labelsFound{total: len(page.Nodes), complete: true}
+	for _, l := range page.Nodes {
+		f.add(l.Name)
+	}
+	return f, nil
+}
+
+// doctorUsable reports whether the repo check found rp usable.
+func doctorUsable(rp *doctorRepo) bool {
+	return rp.Err == nil && rp.Found != nil && rp.Found.HasIssuesEnabled
+}
+
+// checkDoctorLabels checks labels.types and labels.area_prefix in each repository
+// the repo check found usable: one DoctorLabels query for them all. A
+// failed request is a problem of this check alone; a repository it could
+// not read is a problem of its own.
+func checkDoctorLabels(ctx context.Context, r *doctorReport, a *App, cfg *config.Config, c *labelsCheck, repos []*doctorRepo) {
+	var idx []int
+	for i, rp := range repos {
+		if doctorUsable(rp) {
+			idx = append(idx, i)
+		}
+	}
+	var out map[string]json.RawMessage
+	var err error
+	var failed map[int]bool
+	if len(idx) > 0 {
+		query, vars := c.query(repos, idx)
+		err = a.Client.Query(ctx, query, vars, &out)
+		var partial bool
+		if failed, partial = repoErrors(err); err != nil && !partial {
+			r.problem("labels", err)
+			return
+		}
+	}
+	for i, rp := range repos {
+		name := rp.Repo.String()
+		answer := out[fmt.Sprintf("repo%d", i)]
+		switch {
+		case !doctorUsable(rp):
+			r.skip("labels", "%s: needs the repository (see repo)", name)
+		case failed[i] || len(answer) == 0 || string(answer) == "null":
+			if err == nil {
+				err = render.Network("GitHub did not answer with the labels")
+			}
+			e := render.FromError(err)
+			r.problem("labels", render.New(e.Code, "%s: %s", name, e.What).WithFix(e.Fix).WithCause(err))
+		default:
+			c.check(ctx, r, a, cfg, rp, len(repos) == 1, c.found(answer))
+		}
+	}
+}
+
+// check reports one repository's labels. A missing type label is a
+// problem: new --type fails on it. One in another case is a warning, since
+// new matches labels regardless of case; its fix renames the label, or with
+// one repository edits the config. With over 100 labels, a type found
+// neither among the first 100 nor by search is looked up in all of them.
+// No label with the area prefix is a warning when the config sets the
+// prefix (new --area finds nothing), and a note on the ok line when a
+// preset does: many teams never use the preset's areas. Past 100 labels
+// the area count is a lower bound, and none found cannot be confirmed.
+func (c *labelsCheck) check(ctx context.Context, r *doctorReport, a *App, cfg *config.Config, rp *doctorRepo, single bool, f *labelsFound) {
+	name := rp.Repo.String()
+	if !f.complete && slices.ContainsFunc(c.types, func(t string) bool { return !f.has(t) }) {
+		all, err := allLabels(ctx, a.Client, rp.Repo)
+		if err != nil {
+			e := render.FromError(err)
+			r.problem("labels", render.New(e.Code, "%s: %s", name, e.What).WithFix(e.Fix).WithCause(err))
+			return
+		}
+		f = all
+	}
 	var found []string
 	key, bad := cfg.KeyPath("labels.types"), 0
 	for _, t := range c.types {
 		switch spelled := spelling(t, f.names); {
 		case slices.Contains(f.names, t):
 		case spelled != "":
-			r.warn("labels", fmt.Sprintf("write it as %q in %s", spelled, key),
-				"%s: %q is %q in %s; new --type finds it regardless of case", key, t, spelled, name)
+			fix := fmt.Sprintf("gh label edit %q --name %q -R %s", spelled, t, name)
+			if single {
+				fix = fmt.Sprintf("write it as %q in %s, or %s", spelled, key, fix)
+			}
+			r.warn("labels", fix, "%s: %q is %q in %s; new --type finds it regardless of case", key, t, spelled, name)
 			bad++
 		default:
 			r.problem("labels", render.Usage("%s: no label %q in %s, so gh dojo new --type %s fails", key, t, name, t).
@@ -586,18 +674,19 @@ func checkRepoLabels(r *doctorReport, cfg *config.Config, c *labelsCheck, rp *do
 			}
 		}
 		switch {
+		case !f.complete && areas == 0:
+			found = append(found, fmt.Sprintf("could not confirm area labels (%s…): none among the first %d of %d labels or by search",
+				c.prefix, labelsPage, f.total))
+		case !f.complete:
+			found = append(found, fmt.Sprintf("at least %s (%s…)", plural(areas, "area label", "area labels"), c.prefix))
 		case areas == 0 && cfg.FromPreset("labels.area_prefix") != "":
-			// Presets set a prefix for everyone, and many never use
-			// areas: a warning on every run would be noise.
 			found = append(found, fmt.Sprintf("no area labels (%s…) yet: new --area fails until one exists", c.prefix))
 		case areas == 0:
 			r.warn("labels", fmt.Sprintf("gh label create %q -R %s, or set labels.area_prefix = \"\" in %s",
 				c.prefix+"<name>", name, cfg.Display),
 				"%s: no label starts with labels.area_prefix %q, so gh dojo new --area finds nothing", name, c.prefix)
-		case f.complete:
-			found = append(found, fmt.Sprintf("%s (%s…)", plural(areas, "area label", "area labels"), c.prefix))
 		default:
-			found = append(found, fmt.Sprintf("at least %s (%s…)", plural(areas, "area label", "area labels"), c.prefix))
+			found = append(found, fmt.Sprintf("%s (%s…)", plural(areas, "area label", "area labels"), c.prefix))
 		}
 	}
 	if len(found) > 0 {

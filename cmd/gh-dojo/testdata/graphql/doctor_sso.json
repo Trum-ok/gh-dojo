@@ -4,11 +4,10 @@
   "interactions": [
     {
       "operation": "Doctor",
-      "query": "query Doctor($owner0: String!, $name0: String!, $area: String!) {\n  viewer { login }\n  repo0: repository(owner: $owner0, name: $name0) { nameWithOwner hasIssuesEnabled\n    labels(first: 100) { totalCount nodes { name } }\n    area: labels(first: 100, query: $area) { nodes { name } }\n  }\n}",
+      "query": "query Doctor($owner0: String!, $name0: String!) {\n  viewer { login }\n  repo0: repository(owner: $owner0, name: $name0) { nameWithOwner hasIssuesEnabled }\n}",
       "variables": {
         "owner0": "acme",
-        "name0": "shop",
-        "area": "area:"
+        "name0": "shop"
       },
       "headers": {
         "X-OAuth-Scopes": "gist, project, read:org, repo"

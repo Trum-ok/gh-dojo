@@ -1,14 +1,13 @@
 {
-  "comment": "Hand-crafted from doctor_ok.json: board.repos spells the default repository trum-ok/GH-Dojo; GitHub finds it and answers with its own spelling, Trum-ok/gh-dojo. The labels fields (dojoConfig: the kanban preset's area_prefix \"area:\", no types) are the real API's answer for Trum-ok/gh-dojo, saved by hand.",
+  "comment": "Hand-crafted from doctor_ok.json: board.repos spells the default repository trum-ok/GH-Dojo; GitHub finds it and answers with its own spelling, Trum-ok/gh-dojo. The DoctorLabels answer (dojoConfig: the kanban preset's area_prefix \"area:\", no types) is the real API's answer for Trum-ok/gh-dojo, saved by hand.",
   "handcrafted": true,
   "interactions": [
     {
       "operation": "Doctor",
-      "query": "query Doctor($owner0: String!, $name0: String!, $area: String!) {\n  viewer { login }\n  repo0: repository(owner: $owner0, name: $name0) { nameWithOwner hasIssuesEnabled\n    labels(first: 100) { totalCount nodes { name } }\n    area: labels(first: 100, query: $area) { nodes { name } }\n  }\n}",
+      "query": "query Doctor($owner0: String!, $name0: String!) {\n  viewer { login }\n  repo0: repository(owner: $owner0, name: $name0) { nameWithOwner hasIssuesEnabled }\n}",
       "variables": {
         "owner0": "trum-ok",
-        "name0": "GH-Dojo",
-        "area": "area:"
+        "name0": "GH-Dojo"
       },
       "headers": {
         "X-OAuth-Scopes": "gist, project, read:org, repo"
@@ -20,7 +19,22 @@
           },
           "repo0": {
             "nameWithOwner": "Trum-ok/gh-dojo",
-            "hasIssuesEnabled": true,
+            "hasIssuesEnabled": true
+          }
+        }
+      }
+    },
+    {
+      "operation": "DoctorLabels",
+      "query": "query DoctorLabels($owner0: String!, $name0: String!, $area: String!) {\n  repo0: repository(owner: $owner0, name: $name0) {\n    labels(first: 100) { totalCount nodes { name } }\n    area: labels(first: 100, query: $area) { nodes { name } }\n  }\n}",
+      "variables": {
+        "owner0": "trum-ok",
+        "name0": "GH-Dojo",
+        "area": "area:"
+      },
+      "response": {
+        "data": {
+          "repo0": {
             "labels": {
               "totalCount": 11,
               "nodes": [

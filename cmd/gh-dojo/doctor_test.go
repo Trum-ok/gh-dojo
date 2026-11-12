@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -27,7 +26,8 @@ const (
 
 // TestDoctor runs doctor with a cold schema cache on recorded boards and
 // hand-crafted token answers. Every run sends the Doctor query, plus the
-// board schema when the token works.
+// board schema when the token works, plus the DoctorLabels query when a
+// repository is usable (dojoConfig's preset sets labels.area_prefix).
 func TestDoctor(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -36,9 +36,9 @@ func TestDoctor(t *testing.T) {
 		code     render.Code
 		requests int
 	}{
-		{"ok", dojoConfig, []string{doctorFixtures + "ok.json", boardFixture}, render.ExitOK, 2},
-		{"read_project", dojoConfig, []string{doctorFixtures + "read_project.json", boardFixture}, render.ExitNetwork, 2},
-		{"no_scope", dojoConfig, []string{doctorFixtures + "no_scope.json", boardFixtures + "insufficient_scopes.json"}, render.ExitNetwork, 2},
+		{"ok", dojoConfig, []string{doctorFixtures + "ok.json", boardFixture}, render.ExitOK, 3},
+		{"read_project", dojoConfig, []string{doctorFixtures + "read_project.json", boardFixture}, render.ExitNetwork, 3},
+		{"no_scope", dojoConfig, []string{doctorFixtures + "no_scope.json", boardFixtures + "insufficient_scopes.json"}, render.ExitNetwork, 3},
 		{"unauthorized", dojoConfig, []string{doctorFixtures + "401.json"}, render.ExitNetwork, 1},
 		{"status_typo", dojoConfig + `
 [verbs.start]
@@ -46,28 +46,42 @@ to = "In progres"
 
 [verbs.wait]
 from = ["In Progress"]
-`, []string{doctorFixtures + "ok.json", boardFixture}, render.ExitUsage, 2},
+`, []string{doctorFixtures + "ok.json", boardFixture}, render.ExitUsage, 3},
 		{"board_not_found", strings.Replace(dojoConfig, "project = 5", "project = 99", 1),
-			[]string{doctorFixtures + "ok.json", boardFixtures + "board_not_found.json"}, render.ExitUsage, 2},
+			[]string{doctorFixtures + "ok.json", boardFixtures + "board_not_found.json"}, render.ExitUsage, 3},
 		{"repos", strings.Replace(dojoConfig, `repos = ["Trum-ok/gh-dojo"]`,
 			`repos = ["Trum-ok/gh-dojo", "Trum-ok/no-such-repo", "Trum-ok/wiki"]`, 1),
-			[]string{doctorFixtures + "repos.json", boardFixture}, render.ExitUsage, 2},
-		// labels.types and labels.area_prefix come with the Doctor query,
-		// for each repository: a missing type is a problem, one in another
-		// case and no area label are warnings.
+			[]string{doctorFixtures + "repos.json", boardFixture}, render.ExitUsage, 3},
+		// labels.types and labels.area_prefix take one DoctorLabels query
+		// for every repository: a missing type is a problem, one in
+		// another case and no area label are warnings.
 		{"labels", strings.Replace(dojoConfig, `repos = ["Trum-ok/gh-dojo"]`,
 			`repos = ["Trum-ok/gh-dojo", "Trum-ok/gh-dojo-site"]`, 1) + `
 [labels]
 types = ["bug", "Enhancement", "chore"]
 area_prefix = "service:"
-`, []string{doctorFixtures + "labels.json", boardFixture}, render.ExitUsage, 2},
+`, []string{doctorFixtures + "labels.json", boardFixture}, render.ExitUsage, 3},
+		// The preset's area_prefix written in the config itself: no area
+		// label is a warning, as with any prefix the config sets.
+		{"area_in_config", dojoConfig + `
+[labels]
+area_prefix = "area:"
+`, []string{doctorFixtures + "ok.json", boardFixture}, render.ExitOK, 3},
+		// Over 100 labels: a type the search finds needs no more reads, an
+		// area count is a lower bound and none found is not confirmed; a
+		// type not found reads all the labels (two pages for 150).
+		{"labels_many", strings.Replace(dojoConfig, `repos = ["Trum-ok/gh-dojo"]`,
+			`repos = ["Trum-ok/big", "Trum-ok/huge", "Trum-ok/paged"]`, 1) + `
+[labels]
+types = ["bug", "Docs"]
+`, []string{doctorFixtures + "labels_many.json", boardFixture}, render.ExitUsage, 5},
 		// Verbs' labels and assignees take one more read: each label
 		// missing or spelled in another case and each user who cannot be
 		// assigned is a problem.
 		{"verbs", effectsDojoConfig, []string{doctorFixtures + "ok.json", boardFixture, doctorFixtures + "verbs.json"},
-			render.ExitUsage, 3},
+			render.ExitUsage, 4},
 		{"verbs_ok", doctorVerbsOKConfig, []string{doctorFixtures + "ok.json", boardFixture, doctorFixtures + "verbs_ok.json"},
-			render.ExitOK, 3},
+			render.ExitOK, 4},
 		// The organization's SAML SSO blocks both the repository and the
 		// board: each gets the SSO fix.
 		{"sso", orgConfig, []string{doctorFixtures + "sso.json", boardFixtures + "org_board_saml.json"}, render.ExitNetwork, 2},
@@ -91,7 +105,52 @@ area_prefix = "service:"
 	}
 }
 
-// TestDoctorCached: with a warm schema cache doctor sends one request.
+// TestDoctorLabelsFailed: a failed DoctorLabels query is a problem of the
+// labels check alone; the token, board and repositories stay ok.
+func TestDoctorLabelsFailed(t *testing.T) {
+	withConfig(t, dojoConfig)
+	srv := withApp(t, doctorLabels502Fixture(t), boardFixture)
+	code, out := runOut("doctor")
+	if code != render.ExitNetwork {
+		t.Errorf("exit code = %d, want %d", code, render.ExitNetwork)
+	}
+	if n := srv.Requests(); n != 2+graph.MaxAttempts {
+		t.Errorf("requests = %d, want %d (DoctorLabels retried)", n, 2+graph.MaxAttempts)
+	}
+	testutil.Golden(t, "doctor/labels_502", out)
+}
+
+// doctorLabels502Fixture writes doctor_ok.json with GitHub answering 502 to
+// the DoctorLabels query, and returns its path.
+func doctorLabels502Fixture(t *testing.T) string {
+	t.Helper()
+	data, err := os.ReadFile(doctorFixtures + "ok.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var f map[string]any
+	if err := json.Unmarshal(data, &f); err != nil {
+		t.Fatal(err)
+	}
+	for _, it := range f["interactions"].([]any) {
+		it := it.(map[string]any)
+		if it["operation"] == "DoctorLabels" {
+			it["status"], it["repeat"] = 502, true
+			it["headers"] = map[string]string{"Content-Type": "text/html"}
+			it["response"] = "<html><body><h1>502 Bad Gateway</h1></body></html>"
+		}
+	}
+	if data, err = json.Marshal(f); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "doctor_labels_502.json")
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// TestDoctorCached: with a warm schema cache doctor sends no board request.
 func TestDoctorCached(t *testing.T) {
 	withConfig(t, dojoConfig)
 	srv := withApp(t, doctorFixtures+"ok.json", boardFixture)
@@ -103,8 +162,8 @@ func TestDoctorCached(t *testing.T) {
 	if code != render.ExitOK {
 		t.Errorf("exit code = %d, want 0", code)
 	}
-	if n := srv.Requests() - before; n != 1 {
-		t.Errorf("requests = %d, want 1", n)
+	if n := srv.Requests() - before; n != 2 {
+		t.Errorf("requests = %d, want 2 (Doctor, DoctorLabels)", n)
 	}
 	testutil.Golden(t, "doctor/ok_cached", out)
 }
@@ -286,17 +345,9 @@ sprint = "Sprint"
 }
 
 // TestDoctorLabelsFound: label names come from the first page and the
-// searches; the area count is exact when the first page has every label or
-// the area search was not cut at a page.
+// searches; they are complete only when the first page has every label.
 func TestDoctorLabelsFound(t *testing.T) {
 	c := &labelsCheck{types: []string{"bug"}, prefix: "area:"}
-	page := func(n int, prefix string) string {
-		var nodes []string
-		for i := range n {
-			nodes = append(nodes, fmt.Sprintf(`{"name": "%s%d"}`, prefix, i))
-		}
-		return `{"nodes": [` + strings.Join(nodes, ", ") + `]}`
-	}
 	for _, tt := range []struct {
 		name     string
 		answer   string
@@ -305,16 +356,18 @@ func TestDoctorLabelsFound(t *testing.T) {
 	}{
 		{"one page", `{"labels": {"totalCount": 2, "nodes": [{"name": "bug"}, {"name": "area:cli"}]},
 			"type0": {"nodes": [{"name": "bug"}]}, "area": {"nodes": [{"name": "area:cli"}]}}`, 2, true},
-		{"more labels, area search complete", `{"labels": {"totalCount": 300, "nodes": []},
-			"type0": {"nodes": [{"name": "Bug"}]}, "area": ` + page(3, "area:") + `}`, 4, true},
-		{"more labels, area search cut", `{"labels": {"totalCount": 300, "nodes": []},
-			"area": ` + page(labelsPage, "area:") + `}`, labelsPage, false},
+		// Search found these past the first page, but not necessarily all.
+		{"more labels", `{"labels": {"totalCount": 101, "nodes": [{"name": "x"}]},
+			"type0": {"nodes": [{"name": "Bug"}]}, "area": {"nodes": [{"name": "area:cli"}, {"name": "area:db"}]}}`, 4, false},
 		{"repository null", `null`, 0, true},
 	} {
 		f := c.found(json.RawMessage(tt.answer))
 		if len(f.names) != tt.names || f.complete != tt.complete {
 			t.Errorf("%s: %d names, complete %v; want %d, %v", tt.name, len(f.names), f.complete, tt.names, tt.complete)
 		}
+	}
+	if f := c.found(json.RawMessage(`{"type0": {"nodes": [{"name": "Bug"}]}}`)); !f.has("bug") || f.has("bugs") {
+		t.Error("has: want a match regardless of case, and only of the whole name")
 	}
 }
 
