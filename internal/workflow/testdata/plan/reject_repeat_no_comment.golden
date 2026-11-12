@@ -1,0 +1,5 @@
+dry run: reject #42
+  comment: "not needed"
+  close: already closed as not planned
+confirm: #42 comment left, already closed as not planned
+post: "not needed\n\n<!-- gh-dojo:reject:553f2b27 -->"

@@ -361,9 +361,8 @@ func join(items []string, conj string) string {
 //  2. a closed issue is refused (exit code 2), unless the verb's target
 //     status is final (Engine.Final), or the verb closes or reopens it;
 //  3. an issue already in the target status gets no status change, and the
-//     from check is skipped, so a repeat is safe; so is a closed issue for
-//     a verb without a target that closes it (a board workflow such as
-//     "Item closed" may have moved it since the verb closed it);
+//     from check is skipped, so a repeat is safe; so is a repeat of a verb
+//     without a target that closes the issue (see closedRepeat);
 //  4. otherwise the current status must be in from (exit code 2). An issue
 //     not on the board or without a status counts as Engine.Initial;
 //  5. then, for a verb with blockers = "warn" or "deny", the issue's
@@ -407,11 +406,7 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 	}
 	p := &Plan{Verb: v.Name, Issue: is, Target: v.To}
 	atTarget := v.To != "" && is.Status == v.To
-	// A verb that only closes, run again on an issue it closed: the
-	// board's "Item closed" workflow may have moved the item since, so its
-	// status says nothing about where the verb started.
-	closedRepeat := v.To == "" && v.Close != "" && is.Closed
-	if !atTarget && !closedRepeat {
+	if !atTarget && !closedRepeat(v, is) {
 		if err := e.checkFrom(v, is); err != nil {
 			return nil, err
 		}
@@ -614,6 +609,25 @@ func (p *Plan) checkBlockers(v config.Verb) error {
 	}
 	return render.Denied("%s cannot %s %s while it has unresolved blockers: %s\n"+
 		"this is a process rule: ask the user how to proceed", v.Name, action, is.Name(), list)
+}
+
+// closedRepeat reports whether v, a verb without a target that closes the
+// issue, runs again on an issue it closed: the issue is closed with the
+// verb's reason, or, when the reason was not read, the latest gh-dojo
+// comment is the verb's. Then the from check is skipped: the board's "Item
+// closed" workflow may have moved the item since the verb closed it, so its
+// status says nothing about where the verb started. An issue closed
+// otherwise, say as completed by a merged pull request, is no repeat of a
+// verb that closes as not planned: from is checked as on an open issue.
+func closedRepeat(v config.Verb, is Issue) bool {
+	if v.To != "" || v.Close == "" || !is.Closed {
+		return false
+	}
+	if is.StateReason != "" {
+		return is.StateReason == v.Close
+	}
+	last, ok := LastMarker(is.Comments)
+	return ok && strings.HasPrefix(last, "<!-- gh-dojo:"+v.Name+":")
 }
 
 // checkFrom refuses an issue whose status is not in v.From. A verb without

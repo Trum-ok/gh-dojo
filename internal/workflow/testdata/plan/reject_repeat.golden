@@ -1,0 +1,4 @@
+dry run: reject #42
+  comment: already present, not posted again
+  close: already closed as not planned
+confirm: #42 comment already present, already closed as not planned

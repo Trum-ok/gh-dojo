@@ -536,8 +536,10 @@ The board's built-in workflows run after the verb and may change the status
 it set: "Item closed" moves an issue a verb closed (to Done by default),
 "Item reopened" moves one it reopened. Turn them off in the board's workflow
 settings, or point them at the statuses your verbs set. A verb that closes
-the issue and has no `to` skips the `from` check on an issue already closed,
-so its repeat is not refused because a workflow moved the issue. A verb that
+the issue and has no `to` skips the `from` check on an issue it closed
+already (closed with the verb's reason), so its repeat is not refused
+because a workflow moved the issue; on an issue closed otherwise `from` is
+checked as on an open one. A verb that
 moves an issue closed as not planned or duplicate to a final status warns on
 stderr and keeps the reason.
 
@@ -996,11 +998,12 @@ to decide.
 | `review`          | In review         | In progress, Changes requested      | needs `--comment` (the pull request); labels; assigns the reviewer |
 | `request-changes` | Changes requested | In review                           | needs `--comment`; labels |
 | `approve`         | Approved          | In review                           | the user's decision (`--yes`) |
-| `reject`          | status unchanged  | In progress, In review, Changes requested, Approved; any status once closed | the user's decision; closes as not planned |
+| `reject`          | status unchanged  | In progress, In review, Changes requested, Approved | the user's decision; closes as not planned |
 | `merged`          | Merged            | Approved                            | closes as completed; several issues at once |
 
-`reject` closes and has no `to`, so on an issue that is closed already its
-`from` is not checked: it runs like a repeat, and still posts its comment.
+`reject` closes and has no `to`, so on an issue closed as not planned its
+`from` is not checked: it runs as a repeat and posts its comment only if it
+is missing. A merged issue, closed as completed, is refused by `from`.
 `merged` records a merge; it does not merge the pull request.
 
 To write your own:

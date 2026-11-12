@@ -78,6 +78,14 @@ close = "not_planned"
 when = "Hand it over"
 assign = "octocat"
 
+# Closes without moving, with from and a comment: the review example's reject.
+[verbs.reject]
+when = "The user decided the change is not wanted"
+from = ["In progress", "Waiting"]
+close = "not_planned"
+require = ["comment"]
+confirm = "user"
+
 # No target and a from without the initial status.
 [verbs.nudge]
 when = "Remind whoever has it"
@@ -265,6 +273,34 @@ func TestPlan(t *testing.T) {
 		// a repeat of a verb that only closes is not refused by from.
 		{name: "shelve_repeat_after_automation", verb: "shelve", noOps: true,
 			issue: Issue{Number: 42, Closed: true, StateReason: "not_planned", OnBoard: true, Status: "Done"}},
+		// An issue closed otherwise (here, as completed) is no repeat of a
+		// verb that closes as not planned: from is checked, and it is in from.
+		{name: "shelve_closed_as_completed", verb: "shelve", noOps: true,
+			issue: Issue{Number: 42, Closed: true, StateReason: "completed", OnBoard: true, Status: "Backlog"}},
+		// reject closes as not planned and has no target. A merged issue,
+		// closed as completed and moved on, is refused: no comment is left.
+		{name: "reject_merged", verb: "reject", code: render.ExitDenied, args: Args{Comment: "not needed", HasComment: true, Yes: true},
+			issue: Issue{Number: 42, Closed: true, StateReason: "completed", OnBoard: true, Status: "Done"}},
+		// A repeat: closed as not planned, the comment posted, and the
+		// board's "Item closed" workflow moved it to Done.
+		{name: "reject_repeat", verb: "reject", noOps: true, args: Args{Comment: "not needed", HasComment: true},
+			issue: Issue{Number: 42, Closed: true, StateReason: "not_planned", OnBoard: true, Status: "Done",
+				Comments: []Comment{posted("reject", "not needed")}}},
+		// A repeat after a partial write: closed, but the comment is missing.
+		{name: "reject_repeat_no_comment", verb: "reject", hasOps: 1, args: Args{Comment: "not needed", HasComment: true, Yes: true},
+			issue: Issue{Number: 42, Closed: true, StateReason: "not_planned", OnBoard: true, Status: "Done"}},
+		// The other partial write: the comment posted, the issue still open.
+		{name: "reject_repeat_open", verb: "reject", hasOps: 1, args: Args{Comment: "not needed", HasComment: true, Yes: true},
+			issue: Issue{Number: 42, OnBoard: true, Status: "Waiting", Comments: []Comment{posted("reject", "not needed")}}},
+		// The close reason was not read: the verb's own latest comment
+		// tells a repeat.
+		{name: "reject_reason_unknown_repeat", verb: "reject", noOps: true, args: Args{Comment: "not needed", HasComment: true},
+			issue: Issue{Number: 42, Closed: true, OnBoard: true, Status: "Done",
+				Comments: []Comment{posted("reject", "not needed")}}},
+		{name: "reject_reason_unknown_other_comment", verb: "reject", code: render.ExitDenied,
+			args: Args{Comment: "not needed", HasComment: true, Yes: true},
+			issue: Issue{Number: 42, Closed: true, OnBoard: true, Status: "Done",
+				Comments: []Comment{posted("reject", "not needed"), posted("note", "merged")}}},
 		// shelve has no target: its refusal says where it runs, not where it starts.
 		{name: "shelve_open_wrong_from", verb: "shelve", code: render.ExitDenied, issue: onBoard("Done")},
 		{name: "nudge_not_on_board", verb: "nudge", code: render.ExitDenied, issue: Issue{Number: 42}},
