@@ -74,7 +74,8 @@ make golden   # UPDATE_GOLDEN=1 go test ./...
 
 Rewriting is refused when `CI` is set, so CI can never pass by accepting its
 own output. `internal/config`'s `TestReadmeExamples` loads every `toml` block
-in `README.md`, so README examples must stay valid configs.
+in `README.md`, and `TestExampleConfigs` every `examples/*.toml`, so README
+examples and example configs must stay valid configs.
 
 ## GraphQL fixtures
 
@@ -116,7 +117,8 @@ is, so review the log before sharing it. Any other `GH_DEBUG` value except
 
 gh-dojo tracks its own development on its board with the repository's
 [`.github/dojo.toml`](.github/dojo.toml): issues are created and moved only
-through `gh dojo` (`new`, `start`, `wait`, `ready`, `done`, `comment`).
+through `gh dojo` (`new`, `start`, `wait`, `ready`, `done`, `comment`,
+`block`, `unblock`).
 `Ready` means committed to `main`; `Done` means released. Agents load the
 rules from [`.claude/skills/gh-dojo/SKILL.md`](.claude/skills/gh-dojo/SKILL.md).
 
