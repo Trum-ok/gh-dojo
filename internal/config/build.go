@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"maps"
 	"math"
+	"path"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
@@ -41,6 +43,9 @@ func (c *Config) build(r *rawFile) error {
 		return err
 	}
 	if err := c.buildSession(r.Session); err != nil {
+		return err
+	}
+	if err := c.buildAgent(r.Agent); err != nil {
 		return err
 	}
 	for _, name := range r.verbOrder {
@@ -197,6 +202,38 @@ func (c *Config) buildSession(r rawSession) error {
 			return c.Errorf("%s must contain {id}, the session ID", key)
 		}
 		c.Session.Link = *r.Link
+	}
+	return nil
+}
+
+// buildAgent validates [agent]. Notes must be a path inside the repository
+// written with slashes, so the generated files are the same on every OS;
+// whether the file exists is checked by agent install, which reads it.
+func (c *Config) buildAgent(r rawAgent) error {
+	c.Agent = Agent{Set: r.Targets != nil || r.Notes != nil, Targets: []string{AgentClaude}}
+	if r.Targets != nil {
+		if err := c.checkList("agent.targets", *r.Targets); err != nil {
+			return err
+		}
+		for _, t := range *r.Targets {
+			if !slices.Contains(agentTargets, t) {
+				return c.Errorf("agent.targets: unknown agent %q", t).WithAllowed(agentTargets...)
+			}
+		}
+		c.Agent.Targets = slices.Clone(*r.Targets)
+	}
+	if r.Notes != nil {
+		n := *r.Notes
+		fix := `write a path relative to the repository root, like notes = "docs/agent-notes.md"`
+		switch {
+		case strings.TrimSpace(n) == "":
+			return c.Errorf("agent.notes is empty").WithFix(fix + ", or remove it")
+		case strings.Contains(n, `\`):
+			return c.Errorf("agent.notes: %q: separate directories with /", n).WithFix(fix)
+		case !filepath.IsLocal(filepath.FromSlash(n)) || path.Clean(n) != n:
+			return c.Errorf("agent.notes: %q is not a clean path inside the repository", n).WithFix(fix)
+		}
+		c.Agent.Notes = n
 	}
 	return nil
 }

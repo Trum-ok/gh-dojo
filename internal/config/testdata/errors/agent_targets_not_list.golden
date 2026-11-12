@@ -1,0 +1,1 @@
+error: .github/dojo.toml:11: agent.targets: wrong type: got string, want array

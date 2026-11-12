@@ -1,0 +1,2 @@
+error: .github/dojo.toml: agent.notes: "docs/./notes.md" is not a clean path inside the repository
+fix: write a path relative to the repository root, like notes = "docs/agent-notes.md"

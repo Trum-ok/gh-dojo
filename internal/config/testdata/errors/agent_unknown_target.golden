@@ -1,0 +1,2 @@
+error: .github/dojo.toml: agent.targets: unknown agent "cursor"
+allowed: claude, agents-md, copilot

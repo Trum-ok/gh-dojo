@@ -1,0 +1,2 @@
+error: .github/dojo.toml: agent.notes is empty
+fix: write a path relative to the repository root, like notes = "docs/agent-notes.md", or remove it

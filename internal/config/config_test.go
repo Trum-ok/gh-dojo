@@ -121,6 +121,9 @@ func dump(c *Config) string {
 	w("statuses: initial=%q final=%q resolved=%q", c.Statuses.Initial, c.Statuses.Final, c.Statuses.Resolved)
 	w("labels: types=%q area_prefix=%q", c.Labels.Types, c.Labels.AreaPrefix)
 	w("session: env=%q link=%q", c.Session.Env, c.Session.Link)
+	if c.Agent.Set { // left out otherwise: the default is always ["claude"]
+		w("agent: targets=%q notes=%q", c.Agent.Targets, c.Agent.Notes)
+	}
 	for _, v := range c.Verbs {
 		w("verb %s", v.Name)
 		w("  when: %s", v.When)
@@ -179,6 +182,8 @@ close = false
 when = "The issue is taken into the current sprint"
 iteration = "current"
 `},
+		{"agent", presetOnly + "[agent]\ntargets = [\"agents-md\", \"claude\"]\nnotes = \"docs/agent-notes.md\"\n"},
+		{"agent_no_targets", presetOnly + "[agent]\ntargets = []\n"},
 		{"blockers_off", presetOnly + "[verbs.wait]\nblockers = false\n"},
 		{"blockers_deny", presetOnly + "[verbs.start]\nblockers = \"deny\"\n[verbs.wait]\nblockers = \"warn\"\n"},
 		{"override_verb_key", presetOnly + `
@@ -399,6 +404,16 @@ func TestLoadErrors(t *testing.T) {
 		{"verbs_not_table", "verbs = 1\n" + presetOnly},
 		{"field_not_string", strings.Replace(presetOnly, `"Status"`, `2`, 1)},
 		{"unknown_session_key", presetOnly + "[session]\nenvs = [\"X\"]\n"},
+		{"unknown_agent_key", presetOnly + "[agent]\ntarget = [\"claude\"]\n"},
+		{"agent_unknown_target", presetOnly + "[agent]\ntargets = [\"claude\", \"cursor\"]\n"},
+		{"agent_target_duplicate", presetOnly + "[agent]\ntargets = [\"claude\", \"claude\"]\n"},
+		{"agent_targets_not_list", presetOnly + "[agent]\ntargets = \"claude\"\n"},
+		{"agent_notes_empty", presetOnly + "[agent]\nnotes = \" \"\n"},
+		{"agent_notes_absolute", presetOnly + "[agent]\nnotes = \"/etc/notes.md\"\n"},
+		{"agent_notes_outside", presetOnly + "[agent]\nnotes = \"../notes.md\"\n"},
+		{"agent_notes_unclean", presetOnly + "[agent]\nnotes = \"docs/./notes.md\"\n"},
+		{"agent_notes_backslash", presetOnly + "[agent]\nnotes = \"docs\\\\notes.md\"\n"},
+		{"agent_not_table", "agent = \"claude\"\n" + presetOnly},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

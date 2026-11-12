@@ -74,6 +74,7 @@ type Config struct {
 	Labels   Labels
 	Session  Session
 	Verbs    []Verb // preset verbs in preset order, then the repo's own in file order
+	Agent    Agent
 
 	origin map[string]string // key path → preset name, for values only the preset set
 }
@@ -182,6 +183,34 @@ type Statuses struct {
 	// its work is complete (kanban: Ready, Done). A closed blocker is
 	// resolved whatever its status.
 	Resolved []string
+}
+
+// Agents gh dojo agent install writes instructions for: a Claude Code
+// skill, a section of AGENTS.md (read by Codex and other agents), and a
+// section of GitHub Copilot's repository instructions.
+const (
+	AgentClaude   = "claude"
+	AgentAgentsMD = "agents-md"
+	AgentCopilot  = "copilot"
+)
+
+var agentTargets = []string{AgentClaude, AgentAgentsMD, AgentCopilot}
+
+// AgentTargets lists the agents [agent] targets and agent install --agent
+// accept.
+func AgentTargets() []string { return slices.Clone(agentTargets) }
+
+// Agent is the [agent] table: what gh dojo agent install writes.
+type Agent struct {
+	// Set says the config has an [agent] table with a key in it.
+	Set bool
+	// Targets are the agents to write instructions for, in config order;
+	// [AgentClaude] when not set, empty when set to [].
+	Targets []string
+	// Notes is the path of a markdown file, relative to the repository
+	// root (the directory holding .github) and slash-separated, appended
+	// as is to the generated instructions; "" for none.
+	Notes string
 }
 
 // Labels maps `new` flags to label names.
