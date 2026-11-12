@@ -7,5 +7,6 @@ problem  board    GitHub denied access: the organization enforces SAML single si
                   fix: gh auth refresh -s project, and authorize the organization's SSO on the page it opens
 problem  repo     acme/shop (default): GitHub denied access: the organization enforces SAML single sign-on and the token is not authorized for it
                   fix: gh auth refresh -s project, and authorize the organization's SSO on the page it opens
+skip     labels   acme/shop: needs the repository (see repo)
 --- stderr
 error: doctor found 2 problems; fix as shown above, then run gh dojo doctor again

@@ -1,0 +1,153 @@
+{
+  "comment": "Hand-crafted: the Doctor query of gh dojo doctor with labels.types = [\"bug\", \"Enhancement\", \"chore\"] and labels.area_prefix = \"service:\". repo0 is the real API's answer for Trum-ok/gh-dojo, saved by hand (enhancement differs in case, no chore, no service: label); repo1, Trum-ok/gh-dojo-site, is made up: every type and three service: labels, one in another case. X-OAuth-Scopes as in doctor_ok.json.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "Doctor",
+      "query": "query Doctor($owner0: String!, $name0: String!, $owner1: String!, $name1: String!, $type0: String!, $type1: String!, $type2: String!, $area: String!) {\n  viewer { login }\n  repo0: repository(owner: $owner0, name: $name0) { nameWithOwner hasIssuesEnabled\n    labels(first: 100) { totalCount nodes { name } }\n    type0: labels(first: 100, query: $type0) { nodes { name } }\n    type1: labels(first: 100, query: $type1) { nodes { name } }\n    type2: labels(first: 100, query: $type2) { nodes { name } }\n    area: labels(first: 100, query: $area) { nodes { name } }\n  }\n  repo1: repository(owner: $owner1, name: $name1) { nameWithOwner hasIssuesEnabled\n    labels(first: 100) { totalCount nodes { name } }\n    type0: labels(first: 100, query: $type0) { nodes { name } }\n    type1: labels(first: 100, query: $type1) { nodes { name } }\n    type2: labels(first: 100, query: $type2) { nodes { name } }\n    area: labels(first: 100, query: $area) { nodes { name } }\n  }\n}",
+      "variables": {
+        "owner0": "Trum-ok",
+        "name0": "gh-dojo",
+        "owner1": "Trum-ok",
+        "name1": "gh-dojo-site",
+        "type0": "bug",
+        "type1": "Enhancement",
+        "type2": "chore",
+        "area": "service:"
+      },
+      "headers": {
+        "X-OAuth-Scopes": "gist, project, read:org, repo"
+      },
+      "response": {
+        "data": {
+          "viewer": {
+            "login": "Trum-ok"
+          },
+          "repo0": {
+            "nameWithOwner": "Trum-ok/gh-dojo",
+            "hasIssuesEnabled": true,
+            "labels": {
+              "totalCount": 11,
+              "nodes": [
+                {
+                  "name": "accessibility"
+                },
+                {
+                  "name": "bug"
+                },
+                {
+                  "name": "documentation"
+                },
+                {
+                  "name": "duplicate"
+                },
+                {
+                  "name": "enhancement"
+                },
+                {
+                  "name": "good first issue"
+                },
+                {
+                  "name": "help wanted"
+                },
+                {
+                  "name": "invalid"
+                },
+                {
+                  "name": "question"
+                },
+                {
+                  "name": "wontfix"
+                },
+                {
+                  "name": "dogfood"
+                }
+              ]
+            },
+            "type0": {
+              "nodes": [
+                {
+                  "name": "bug"
+                }
+              ]
+            },
+            "type1": {
+              "nodes": [
+                {
+                  "name": "enhancement"
+                }
+              ]
+            },
+            "type2": {
+              "nodes": []
+            },
+            "area": {
+              "nodes": []
+            }
+          },
+          "repo1": {
+            "nameWithOwner": "Trum-ok/gh-dojo-site",
+            "hasIssuesEnabled": true,
+            "labels": {
+              "totalCount": 6,
+              "nodes": [
+                {
+                  "name": "bug"
+                },
+                {
+                  "name": "Enhancement"
+                },
+                {
+                  "name": "chore"
+                },
+                {
+                  "name": "service:billing"
+                },
+                {
+                  "name": "service:auth"
+                },
+                {
+                  "name": "Service:web"
+                }
+              ]
+            },
+            "type0": {
+              "nodes": [
+                {
+                  "name": "bug"
+                }
+              ]
+            },
+            "type1": {
+              "nodes": [
+                {
+                  "name": "Enhancement"
+                }
+              ]
+            },
+            "type2": {
+              "nodes": [
+                {
+                  "name": "chore"
+                }
+              ]
+            },
+            "area": {
+              "nodes": [
+                {
+                  "name": "service:billing"
+                },
+                {
+                  "name": "service:auth"
+                },
+                {
+                  "name": "Service:web"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

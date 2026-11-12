@@ -381,6 +381,7 @@ ok       config   .github/dojo.toml: preset sprints, 6 verbs
 ok       token    github.com as octocat, with the project scope
 ok       board    octocat/3 "Shop": field Status and 5 statuses match
 ok       repo     octocat/shop (default): visible, issues enabled
+ok       labels   octocat/shop: 4 area labels (area:…)
 problem  sprint   Sprint has no iteration for today (2026-12-20, UTC)
                   fix: add one in the Sprint field settings: https://github.com/users/octocat/projects/3/settings
 ok       verbs    octocat/shop: 2 labels exist, 1 assignee can be assigned
@@ -393,13 +394,14 @@ ok       verbs    octocat/shop: 2 labels exist, 1 assignee can be assigned
 | `token` | gh is logged in, and the token has the `project` scope (from `GH_TOKEN`: "set GH_TOKEN to …") |
 | `board` | The board exists, is open, and has every field and status the config names, each mismatch on its own line |
 | `repo` | Each repository of [`board.repos`](#board), or the current one, is visible with issues enabled; a warning when `board.repos` spells one otherwise than GitHub does |
+| `labels` | With [`labels.types`](#labels) or `labels.area_prefix` set, in each repository of the `repo` check: every type label exists (missing is a problem, since `new --type` fails on it, fixed by `gh label create`; spelled in another case is `warn`, since `new` matches labels regardless of case), and how many labels start with the area prefix (none is `warn`, since `new --area` finds nothing: create one, or set the prefix to `""` when you use no areas) |
 | `sprint` | With [`fields.sprint`](#fields): an iteration covers today, a date in [`board.timezone`](#board) |
 | `verbs` | When verbs have labels or assignees: the labels exist in the default repository, spelled exactly as there, and the users can be assigned |
 | `agent` | With [`[agent]`](#agent) set (and `targets` not empty), or a file with a gh-dojo marker: the files [`agent install`](#agent-install) writes are up to date (`agent install --check`, without the diff). Out of date or missing is `warn`, since the text also depends on the gh-dojo version; a hand-written skill under `[agent]` is a problem |
 
-It sends one request for the token and the repositories, one more for the
-board when its schema is not cached, and one for the verbs' labels and
-assignees when a verb has them. The exit code is 0 when no check is a
+It sends one request for the token and the repositories with their labels,
+one more for the board when its schema is not cached, and one for the
+verbs' labels and assignees when a verb has them. The exit code is 0 when no check is a
 problem (warnings included), 4 when one failed on auth or the network,
 else 1.
 
@@ -1024,8 +1026,8 @@ To write your own:
    the `blockers` link). A verb without `to` leaves the status alone, like
    `hold` above; one with `confirm = "user"` waits for a person.
 4. Check it: [`gh dojo doctor`](#doctor) against the board and the
-   repository (statuses, the labels verbs add and remove, the users they
-   assign; not `labels.types` or areas), `gh dojo describe` for the process
+   repositories (statuses, the labels verbs add and remove, the users they
+   assign, the type and area labels), `gh dojo describe` for the process
    as an agent reads it, `gh dojo <verb> N --dry-run` for a verb's plan on a
    real issue. Then [`gh dojo agent install`](#agent-install) writes the
    agent instructions from the same file.

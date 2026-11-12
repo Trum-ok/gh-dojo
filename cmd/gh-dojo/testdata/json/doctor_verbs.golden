@@ -46,6 +46,13 @@ code: 1
       "fix": null
     },
     {
+      "name": "labels",
+      "result": "warn",
+      "detail": "Trum-ok/gh-dojo: no label starts with labels.area_prefix (from preset kanban) \"area:\", so gh dojo new --area finds nothing",
+      "allowed": [],
+      "fix": "gh label create \"area:<name>\" -R Trum-ok/gh-dojo, or set labels.area_prefix = \"\" in .github/dojo.toml"
+    },
+    {
       "name": "verbs",
       "result": "problem",
       "detail": "verbs.tag.labels: no label \"enhancment\" in Trum-ok/gh-dojo",

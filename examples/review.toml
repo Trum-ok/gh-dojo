@@ -13,8 +13,9 @@
 #   - types, for new --type: bug, feature, chore;
 #   - areas, for new --area billing: service:billing and the like;
 #   - the verbs': blocked, needs-review, changes-requested.
-# gh dojo doctor checks the verbs' labels, not the types and areas. The
-# reviewer must be able to be assigned issues in the repository.
+# gh dojo doctor checks them and prints a gh label create for each one
+# missing; of the areas, that at least one exists. The reviewer must be able
+# to be assigned issues in the repository.
 #
 # Reference: https://github.com/Trum-ok/gh-dojo#configuration
 

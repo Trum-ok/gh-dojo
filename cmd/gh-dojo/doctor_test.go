@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -51,6 +52,15 @@ from = ["In Progress"]
 		{"repos", strings.Replace(dojoConfig, `repos = ["Trum-ok/gh-dojo"]`,
 			`repos = ["Trum-ok/gh-dojo", "Trum-ok/no-such-repo", "Trum-ok/wiki"]`, 1),
 			[]string{doctorFixtures + "repos.json", boardFixture}, render.ExitUsage, 2},
+		// labels.types and labels.area_prefix come with the Doctor query,
+		// for each repository: a missing type is a problem, one in another
+		// case and no area label are warnings.
+		{"labels", strings.Replace(dojoConfig, `repos = ["Trum-ok/gh-dojo"]`,
+			`repos = ["Trum-ok/gh-dojo", "Trum-ok/gh-dojo-site"]`, 1) + `
+[labels]
+types = ["bug", "Enhancement", "chore"]
+area_prefix = "service:"
+`, []string{doctorFixtures + "labels.json", boardFixture}, render.ExitUsage, 2},
 		// Verbs' labels and assignees take one more read: each label
 		// missing or spelled in another case and each user who cannot be
 		// assigned is a problem.
@@ -273,6 +283,39 @@ sprint = "Sprint"
 	var b strings.Builder
 	r.write(&b)
 	testutil.Golden(t, "doctor/sprint", []byte(b.String()))
+}
+
+// TestDoctorLabelsFound: label names come from the first page and the
+// searches; the area count is exact when the first page has every label or
+// the area search was not cut at a page.
+func TestDoctorLabelsFound(t *testing.T) {
+	c := &labelsCheck{types: []string{"bug"}, prefix: "area:"}
+	page := func(n int, prefix string) string {
+		var nodes []string
+		for i := range n {
+			nodes = append(nodes, fmt.Sprintf(`{"name": "%s%d"}`, prefix, i))
+		}
+		return `{"nodes": [` + strings.Join(nodes, ", ") + `]}`
+	}
+	for _, tt := range []struct {
+		name     string
+		answer   string
+		names    int
+		complete bool
+	}{
+		{"one page", `{"labels": {"totalCount": 2, "nodes": [{"name": "bug"}, {"name": "area:cli"}]},
+			"type0": {"nodes": [{"name": "bug"}]}, "area": {"nodes": [{"name": "area:cli"}]}}`, 2, true},
+		{"more labels, area search complete", `{"labels": {"totalCount": 300, "nodes": []},
+			"type0": {"nodes": [{"name": "Bug"}]}, "area": ` + page(3, "area:") + `}`, 4, true},
+		{"more labels, area search cut", `{"labels": {"totalCount": 300, "nodes": []},
+			"area": ` + page(labelsPage, "area:") + `}`, labelsPage, false},
+		{"repository null", `null`, 0, true},
+	} {
+		f := c.found(json.RawMessage(tt.answer))
+		if len(f.names) != tt.names || f.complete != tt.complete {
+			t.Errorf("%s: %d names, complete %v; want %d, %v", tt.name, len(f.names), f.complete, tt.names, tt.complete)
+		}
+	}
 }
 
 // withClient makes newApp use c and a private schema cache.

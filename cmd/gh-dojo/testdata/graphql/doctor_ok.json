@@ -1,13 +1,14 @@
 {
-  "comment": "Hand-crafted: the Doctor query of gh dojo doctor. The data shape follows the GraphQL schema (viewer, repository); X-OAuth-Scopes is the header GitHub sends for classic tokens, which recording does not keep. A token with the project scope.",
+  "comment": "Hand-crafted: the Doctor query of gh dojo doctor. The data shape follows the GraphQL schema (viewer, repository); X-OAuth-Scopes is the header GitHub sends for classic tokens, which recording does not keep. A token with the project scope. The labels fields (dojoConfig: the kanban preset's area_prefix \"area:\", no types) are the real API's answer for Trum-ok/gh-dojo, saved by hand.",
   "handcrafted": true,
   "interactions": [
     {
       "operation": "Doctor",
-      "query": "query Doctor($owner0: String!, $name0: String!) {\n  viewer { login }\n  repo0: repository(owner: $owner0, name: $name0) { nameWithOwner hasIssuesEnabled }\n}",
+      "query": "query Doctor($owner0: String!, $name0: String!, $area: String!) {\n  viewer { login }\n  repo0: repository(owner: $owner0, name: $name0) { nameWithOwner hasIssuesEnabled\n    labels(first: 100) { totalCount nodes { name } }\n    area: labels(first: 100, query: $area) { nodes { name } }\n  }\n}",
       "variables": {
         "owner0": "Trum-ok",
-        "name0": "gh-dojo"
+        "name0": "gh-dojo",
+        "area": "area:"
       },
       "headers": {
         "X-OAuth-Scopes": "gist, project, read:org, repo"
@@ -19,7 +20,48 @@
           },
           "repo0": {
             "nameWithOwner": "Trum-ok/gh-dojo",
-            "hasIssuesEnabled": true
+            "hasIssuesEnabled": true,
+            "labels": {
+              "totalCount": 11,
+              "nodes": [
+                {
+                  "name": "accessibility"
+                },
+                {
+                  "name": "bug"
+                },
+                {
+                  "name": "documentation"
+                },
+                {
+                  "name": "duplicate"
+                },
+                {
+                  "name": "enhancement"
+                },
+                {
+                  "name": "good first issue"
+                },
+                {
+                  "name": "help wanted"
+                },
+                {
+                  "name": "invalid"
+                },
+                {
+                  "name": "question"
+                },
+                {
+                  "name": "wontfix"
+                },
+                {
+                  "name": "dogfood"
+                }
+              ]
+            },
+            "area": {
+              "nodes": []
+            }
           }
         }
       }

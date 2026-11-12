@@ -6,5 +6,6 @@ problem  token    not logged in to GitHub (github.com)
                   fix: gh auth login -s project
 skip     board    needs GitHub access (see token)
 skip     repo     needs GitHub access (see token)
+skip     labels   needs GitHub access (see token)
 --- stderr
 error: doctor found 1 problem; fix as shown above, then run gh dojo doctor again

@@ -4,10 +4,11 @@
   "interactions": [
     {
       "operation": "Doctor",
-      "query": "query Doctor($owner0: String!, $name0: String!) {\n  viewer { login }\n  repo0: repository(owner: $owner0, name: $name0) { nameWithOwner hasIssuesEnabled }\n}",
+      "query": "query Doctor($owner0: String!, $name0: String!, $area: String!) {\n  viewer { login }\n  repo0: repository(owner: $owner0, name: $name0) { nameWithOwner hasIssuesEnabled\n    labels(first: 100) { totalCount nodes { name } }\n    area: labels(first: 100, query: $area) { nodes { name } }\n  }\n}",
       "variables": {
         "owner0": "Trum-ok",
-        "name0": "gh-dojo"
+        "name0": "gh-dojo",
+        "area": "area:"
       },
       "status": 401,
       "response": {
