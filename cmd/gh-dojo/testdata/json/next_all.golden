@@ -39,7 +39,9 @@ code: 0
           "repo": "Trum-ok/gh-dojo",
           "number": 38,
           "on_board": true,
-          "status": "In progress"
+          "status": "In progress",
+          "archived": false,
+          "status_unknown_reason": null
         }
       ],
       "unread_blockers": 0
@@ -62,7 +64,9 @@ code: 0
           "repo": "Trum-ok/gh-dojo",
           "number": 40,
           "on_board": true,
-          "status": "In progress"
+          "status": "In progress",
+          "archived": false,
+          "status_unknown_reason": null
         }
       ],
       "unread_blockers": 0

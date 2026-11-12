@@ -1,8 +1,8 @@
 code: 0
 --- stdout
 #50 Triage me [bug]
-showing 1 of 6, use --limit 6
-hidden: 4 blocked, use --all
+showing 1 of 7, use --limit 7
+hidden: 6 blocked, use --all
 skipped: 1 draft issue, 1 pull request, 1 item the token cannot see (next shows issues only)
 --- stderr
 warning: GitHub withheld parts of some board items from this token; their lines may be incomplete

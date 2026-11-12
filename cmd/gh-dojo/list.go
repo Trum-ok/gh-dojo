@@ -112,10 +112,12 @@ func runList(cmd *cobra.Command, o *listOpts) error {
 	if err != nil {
 		return err
 	}
-	field, items, warnings, err := readBoard(cmd, a, cfg, o, false)
+	rb, err := readBoard(cmd, a, cfg, o, false)
 	if err != nil {
 		return err
 	}
+	field, items := rb.field, rb.items
+	warnings := readWarnings(cmd, items, items.Incomplete)
 	repo := ""
 	if r, err := a.Repo(); err == nil { // only shortens refs; list works without it
 		repo = r.String()
@@ -129,17 +131,17 @@ func runList(cmd *cobra.Command, o *listOpts) error {
 // readBoard reads the board's items for list and next: the schema, the
 // --status and --sprint of o checked against it, every item in board order
 // (with its sprint for --sprint, and its blockers when blockers is set),
-// then --label checked against the items. Warnings about the read are
-// printed on stderr and returned for the JSON.
+// then --label checked against the items. See readWarnings for the
+// warnings about the read.
 //
 // A cached schema may be out of date: a status added or renamed since, or
 // the status field renamed. It is re-read once, which also surfaces the
 // config error when the config no longer matches the board.
-func readBoard(cmd *cobra.Command, a *App, cfg *config.Config, o *listOpts, blockers bool) (*board.Field, *board.Items, []string, error) {
+func readBoard(cmd *cobra.Command, a *App, cfg *config.Config, o *listOpts, blockers bool) (*boardRead, error) {
 	ctx := cmd.Context()
 	s, err := a.Schema(ctx)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 	refreshed := false
 	refresh := func() (*board.Field, error) {
@@ -157,7 +159,7 @@ func readBoard(cmd *cobra.Command, a *App, cfg *config.Config, o *listOpts, bloc
 		field, err = refresh()
 	}
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 	opts := board.ItemsOptions{Blockers: blockers}
 	if o.sprint != "" {
@@ -165,18 +167,33 @@ func readBoard(cmd *cobra.Command, a *App, cfg *config.Config, o *listOpts, bloc
 	}
 	items, err := board.ReadItemsWith(ctx, a.Client, s, cfg.StatusField(), opts)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 	if !refreshed && s.Cached && staleStatus(field, items) {
 		if field, err = refresh(); err != nil {
-			return nil, nil, nil, err
+			return nil, err
 		}
 	}
 	if err := checkLabels(items, o.labels); err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
+	return &boardRead{schema: s, field: field, items: items}, nil
+}
+
+// boardRead is the board as readBoard read it.
+type boardRead struct {
+	schema *board.Schema
+	field  *board.Field // the status field
+	items  *board.Items
+}
+
+// readWarnings prints on stderr, and returns for the JSON, the warnings
+// about a read of the board's items: incomplete says GitHub withheld parts
+// of the items the command shows (or counts), and the board may have
+// changed between pages.
+func readWarnings(cmd *cobra.Command, items *board.Items, incomplete bool) []string {
 	var warnings []string
-	if items.Incomplete {
+	if incomplete {
 		warnings = append(warnings, "GitHub withheld parts of some board items from this token; their lines may be incomplete")
 	}
 	if len(items.Items) != items.TotalCount {
@@ -186,7 +203,7 @@ func readBoard(cmd *cobra.Command, a *App, cfg *config.Config, o *listOpts, bloc
 	for _, w := range warnings {
 		render.Warn(cmd.ErrOrStderr(), "%s", w)
 	}
-	return field, items, warnings, nil
+	return warnings
 }
 
 // listResult is list's JSON: the issues printed, in the same order and

@@ -1,0 +1,105 @@
+{
+  "comment": "Hand-crafted: the place on the gh-dojo board of the blockers of next_items.json's candidates that are not among its items: acme/api#7 on another project only, #70 archived in Ready, #71 archived in In progress, and secret/vault#1 in a repository the token cannot see (NOT_FOUND, the shape of GitHub's error for a repository it cannot resolve).",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "BlockerPlaces",
+      "query": "query BlockerPlaces($status: String!, $r0Owner: String!, $r0Name: String!, $r1Owner: String!, $r1Name: String!, $r2Owner: String!, $r2Name: String!) {\n  r0: repository(owner: $r0Owner, name: $r0Name) {\n    i7: issue(number: 7) { ...place }\n  }\n  r1: repository(owner: $r1Owner, name: $r1Name) {\n    i70: issue(number: 70) { ...place }\n    i71: issue(number: 71) { ...place }\n  }\n  r2: repository(owner: $r2Owner, name: $r2Name) {\n    i1: issue(number: 1) { ...place }\n  }\n}\n\nfragment place on Issue {\n  state\n  projectItems(first: 10) {\n    totalCount\n    nodes {\n      isArchived\n      project { id }\n      status: fieldValueByName(name: $status) {\n        ... on ProjectV2ItemFieldSingleSelectValue { name field { ... on ProjectV2FieldCommon { id } } }\n      }\n    }\n  }\n}",
+      "variables": {
+        "status": "Status",
+        "r0Owner": "acme",
+        "r0Name": "api",
+        "r1Owner": "Trum-ok",
+        "r1Name": "gh-dojo",
+        "r2Owner": "secret",
+        "r2Name": "vault"
+      },
+      "response": {
+        "data": {
+          "r0": {
+            "i7": {
+              "state": "OPEN",
+              "projectItems": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "isArchived": false,
+                    "project": {
+                      "id": "PVT_other"
+                    },
+                    "status": null
+                  }
+                ]
+              }
+            }
+          },
+          "r1": {
+            "i70": {
+              "state": "OPEN",
+              "projectItems": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "isArchived": true,
+                    "project": {
+                      "id": "PVT_kwHOBFGd5c4BrMYF"
+                    },
+                    "status": {
+                      "name": "Ready",
+                      "field": {
+                        "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "i71": {
+              "state": "OPEN",
+              "projectItems": {
+                "totalCount": 2,
+                "nodes": [
+                  {
+                    "isArchived": false,
+                    "project": {
+                      "id": "PVT_other"
+                    },
+                    "status": null
+                  },
+                  {
+                    "isArchived": true,
+                    "project": {
+                      "id": "PVT_kwHOBFGd5c4BrMYF"
+                    },
+                    "status": {
+                      "name": "In progress",
+                      "field": {
+                        "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "r2": null
+        },
+        "errors": [
+          {
+            "type": "NOT_FOUND",
+            "path": [
+              "r2"
+            ],
+            "locations": [
+              {
+                "line": 9,
+                "column": 3
+              }
+            ],
+            "message": "Could not resolve to a Repository with the name 'secret/vault'."
+          }
+        ]
+      }
+    }
+  ]
+}

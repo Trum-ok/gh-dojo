@@ -1,0 +1,60 @@
+{
+  "comment": "Recorded: the place on the gh-dojo board (user Trum-ok, project 5) of its issues #1 and #37 (next's read of blockers not among the board's items).",
+  "interactions": [
+    {
+      "operation": "BlockerPlaces",
+      "query": "query BlockerPlaces($status: String!, $r0Owner: String!, $r0Name: String!) {\n  r0: repository(owner: $r0Owner, name: $r0Name) {\n    i1: issue(number: 1) { ...place }\n    i37: issue(number: 37) { ...place }\n  }\n}\n\nfragment place on Issue {\n  state\n  projectItems(first: 10) {\n    totalCount\n    nodes {\n      isArchived\n      project { id }\n      status: fieldValueByName(name: $status) {\n        ... on ProjectV2ItemFieldSingleSelectValue { name field { ... on ProjectV2FieldCommon { id } } }\n      }\n    }\n  }\n}",
+      "variables": {
+        "r0Name": "gh-dojo",
+        "r0Owner": "Trum-ok",
+        "status": "Status"
+      },
+      "response": {
+        "data": {
+          "r0": {
+            "i1": {
+              "state": "OPEN",
+              "projectItems": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "isArchived": false,
+                    "project": {
+                      "id": "PVT_kwHOBFGd5c4BrMYF"
+                    },
+                    "status": {
+                      "name": "Ready",
+                      "field": {
+                        "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "i37": {
+              "state": "CLOSED",
+              "projectItems": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "isArchived": false,
+                    "project": {
+                      "id": "PVT_kwHOBFGd5c4BrMYF"
+                    },
+                    "status": {
+                      "name": "Done",
+                      "field": {
+                        "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

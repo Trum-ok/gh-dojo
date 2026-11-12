@@ -2,7 +2,6 @@ code: 0
 --- stdout
 Trum-ok/other#5 Other repo issue [area:cli] @Trum-ok
 #62 Polish the help [documentation, bug] @Trum-ok
-filtered out: 8 issues not matching --mine
+filtered out: 11 issues not matching --mine
 skipped: 1 draft issue, 1 pull request, 1 item the token cannot see (next shows issues only)
 --- stderr
-warning: GitHub withheld parts of some board items from this token; their lines may be incomplete

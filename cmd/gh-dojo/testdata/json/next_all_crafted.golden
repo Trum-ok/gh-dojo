@@ -1,0 +1,285 @@
+code: 0
+--- stdout
+{
+  "schema_version": 1,
+  "error": null,
+  "sprint_filter": null,
+  "sprint": null,
+  "issues": [
+    {
+      "repo": "Trum-ok/gh-dojo",
+      "number": 50,
+      "title": "Triage me",
+      "state": "open",
+      "status": null,
+      "labels": [
+        "bug"
+      ],
+      "labels_total": 1,
+      "assignees": [],
+      "assignees_total": 0,
+      "unresolved_blockers": [],
+      "unread_blockers": 0
+    },
+    {
+      "repo": "Trum-ok/gh-dojo",
+      "number": 51,
+      "title": "Blocked by work in progress",
+      "state": "open",
+      "status": "Backlog",
+      "labels": [],
+      "labels_total": 0,
+      "assignees": [],
+      "assignees_total": 0,
+      "unresolved_blockers": [
+        {
+          "ref": "#52",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 52,
+          "on_board": true,
+          "status": "In progress",
+          "archived": false,
+          "status_unknown_reason": null
+        }
+      ],
+      "unread_blockers": 0
+    },
+    {
+      "repo": "Trum-ok/gh-dojo",
+      "number": 53,
+      "title": "Blockers resolved",
+      "state": "open",
+      "status": "Backlog",
+      "labels": [],
+      "labels_total": 0,
+      "assignees": [],
+      "assignees_total": 0,
+      "unresolved_blockers": [],
+      "unread_blockers": 0
+    },
+    {
+      "repo": "Trum-ok/gh-dojo",
+      "number": 57,
+      "title": "Blocked outside the board",
+      "state": "open",
+      "status": "Backlog",
+      "labels": [],
+      "labels_total": 0,
+      "assignees": [],
+      "assignees_total": 0,
+      "unresolved_blockers": [
+        {
+          "ref": "acme/api#7",
+          "repo": "acme/api",
+          "number": 7,
+          "on_board": false,
+          "status": null,
+          "archived": false,
+          "status_unknown_reason": null
+        }
+      ],
+      "unread_blockers": 0
+    },
+    {
+      "repo": "Trum-ok/gh-dojo",
+      "number": 58,
+      "title": "Blocker withheld",
+      "state": "open",
+      "status": "Backlog",
+      "labels": [],
+      "labels_total": 0,
+      "assignees": [],
+      "assignees_total": 0,
+      "unresolved_blockers": [],
+      "unread_blockers": 1
+    },
+    {
+      "repo": "Trum-ok/other",
+      "number": 5,
+      "title": "Other repo issue",
+      "state": "open",
+      "status": "Backlog",
+      "labels": [
+        "area:cli"
+      ],
+      "labels_total": 1,
+      "assignees": [
+        "Trum-ok"
+      ],
+      "assignees_total": 1,
+      "unresolved_blockers": [],
+      "unread_blockers": 0
+    },
+    {
+      "repo": "Trum-ok/gh-dojo",
+      "number": 60,
+      "title": "Blocked four ways",
+      "state": "open",
+      "status": "Backlog",
+      "labels": [],
+      "labels_total": 0,
+      "assignees": [],
+      "assignees_total": 0,
+      "unresolved_blockers": [
+        {
+          "ref": "#50",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 50,
+          "on_board": true,
+          "status": null,
+          "archived": false,
+          "status_unknown_reason": null
+        },
+        {
+          "ref": "#52",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 52,
+          "on_board": true,
+          "status": "In progress",
+          "archived": false,
+          "status_unknown_reason": null
+        },
+        {
+          "ref": "#57",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 57,
+          "on_board": true,
+          "status": "Backlog",
+          "archived": false,
+          "status_unknown_reason": null
+        },
+        {
+          "ref": "#51",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 51,
+          "on_board": true,
+          "status": "Backlog",
+          "archived": false,
+          "status_unknown_reason": null
+        }
+      ],
+      "unread_blockers": 0
+    },
+    {
+      "repo": "Trum-ok/gh-dojo",
+      "number": 61,
+      "title": "Write the docs",
+      "state": "open",
+      "status": "Backlog",
+      "labels": [
+        "documentation"
+      ],
+      "labels_total": 1,
+      "assignees": [],
+      "assignees_total": 0,
+      "unresolved_blockers": [],
+      "unread_blockers": 0
+    },
+    {
+      "repo": "Trum-ok/gh-dojo",
+      "number": 62,
+      "title": "Polish the help",
+      "state": "open",
+      "status": "Backlog",
+      "labels": [
+        "documentation",
+        "bug"
+      ],
+      "labels_total": 2,
+      "assignees": [
+        "Trum-ok"
+      ],
+      "assignees_total": 1,
+      "unresolved_blockers": [],
+      "unread_blockers": 0
+    },
+    {
+      "repo": "Trum-ok/gh-dojo",
+      "number": 63,
+      "title": "Untriaged idea",
+      "state": "open",
+      "status": null,
+      "labels": [],
+      "labels_total": 0,
+      "assignees": [],
+      "assignees_total": 0,
+      "unresolved_blockers": [],
+      "unread_blockers": 0
+    },
+    {
+      "repo": "Trum-ok/gh-dojo",
+      "number": 64,
+      "title": "Blocked by an archived Ready issue",
+      "state": "open",
+      "status": "Backlog",
+      "labels": [],
+      "labels_total": 0,
+      "assignees": [],
+      "assignees_total": 0,
+      "unresolved_blockers": [],
+      "unread_blockers": 0
+    },
+    {
+      "repo": "Trum-ok/gh-dojo",
+      "number": 65,
+      "title": "Blocked by an archived issue in progress",
+      "state": "open",
+      "status": "Backlog",
+      "labels": [],
+      "labels_total": 0,
+      "assignees": [],
+      "assignees_total": 0,
+      "unresolved_blockers": [
+        {
+          "ref": "#71",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 71,
+          "on_board": true,
+          "status": "In progress",
+          "archived": true,
+          "status_unknown_reason": null
+        }
+      ],
+      "unread_blockers": 0
+    },
+    {
+      "repo": "Trum-ok/gh-dojo",
+      "number": 66,
+      "title": "Blocked in a hidden repository",
+      "state": "open",
+      "status": "Backlog",
+      "labels": [],
+      "labels_total": 0,
+      "assignees": [],
+      "assignees_total": 0,
+      "unresolved_blockers": [
+        {
+          "ref": "secret/vault#1",
+          "repo": "secret/vault",
+          "number": 1,
+          "on_board": false,
+          "status": null,
+          "archived": false,
+          "status_unknown_reason": "GitHub withheld it from the token"
+        }
+      ],
+      "unread_blockers": 0
+    }
+  ],
+  "matched": 13,
+  "unchecked": 0,
+  "hidden": 0,
+  "filtered": 0,
+  "skipped": {
+    "draft_issues": 1,
+    "pull_requests": 1,
+    "unseen": 1
+  },
+  "incomplete": true,
+  "warnings": [
+    "GitHub withheld parts of some board items from this token; their lines may be incomplete"
+  ]
+}
+
+--- stderr
+warning: GitHub withheld parts of some board items from this token; their lines may be incomplete

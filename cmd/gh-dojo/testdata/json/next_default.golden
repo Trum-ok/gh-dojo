@@ -85,9 +85,9 @@ code: 0
       "unread_blockers": 0
     }
   ],
-  "matched": 6,
+  "matched": 7,
   "unchecked": 0,
-  "hidden": 4,
+  "hidden": 6,
   "filtered": 0,
   "skipped": {
     "draft_issues": 1,

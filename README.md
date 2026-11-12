@@ -197,13 +197,14 @@ days; an unknown title lists the iterations.
 gh dojo next [--label L]... [--mine] [--sprint current|TITLE|none] [--all] [--limit N]
 ```
 
-What to work on next: one line per open issue in the initial status
-([`statuses.initial`](#statuses)) or without a status, in board order, as
-`list` prints it, leaving out the issues with an unresolved blocker. A
-blocker is resolved when it is closed or on the board in a
-[`statuses.resolved`](#statuses) status, the rule of `show` and the
-`blockers` check; a blocker not on the board (or archived there) or that the
-token cannot read counts as unresolved. The blocked issues are counted
+What to work on next: the open issues in the initial status
+([`statuses.initial`](#statuses)) or without a status, one line per issue as
+in `list`, in the board's own order (issues without a status mixed with the
+initial ones, no groups), leaving out the issues with an unresolved blocker.
+A blocker is resolved when it is closed or on the board in a
+[`statuses.resolved`](#statuses) status, archived or not: the rule of `show`
+and the `blockers` check. A blocker not on the board, or whose place the
+token cannot read, counts as unresolved. The blocked issues are counted
 (`hidden: 2 blocked, use --all`); `--all` shows them too, each with its
 blockers:
 
@@ -222,8 +223,11 @@ issues they leave out are counted. At most `--limit` issues are printed
 (default 5), with the total. Closed issues and issues in other statuses are
 not candidates; draft issues, pull requests and items the token cannot see in
 the initial status or without one are counted as skipped. Blockers are read
-with the board's items, so `next` takes as many requests as `list`. It needs
-`statuses.initial`: without it, it is a config error (exit code 1).
+with the board's items, so `next` usually takes as many requests as `list`;
+when a candidate's open blocker is not among the board's items (not on the
+board, or archived there), one more request reads where those blockers
+stand. It needs `statuses.initial`: without it, it is a config error (exit
+code 1).
 
 ### new
 
@@ -1022,7 +1026,7 @@ The schemas, by command, after `schema_version` and `error`:
 | `show` | `brief` (`--brief`: every card's `history` and `comments` are `[]`, `body` `null`), `issues`: cards; `failed`: `[{number, error}]` for numbers not shown; `warnings` |
 | card | `number`, `repo`, `url`, `title`, `state` (`open`/`closed`), `state_reason` (`completed`, `not_planned`, `duplicate`, `reopened` or `null`), `author`, `created_at`, `closed_at`, `incomplete` (GitHub withheld part of it); `board`: `{on_board, unknown_reason, status, status_unknown, archived, fields: [{name, value}], fields_truncated}`; `sprint`: `null` without `fields.sprint`, else `{field, iteration: {title, start_date, end_date, duration_days} or null, unknown_reason}`; `milestone`: `{title, due_on}` or `null`; `labels`, `assignees` with `labels_total`, `assignees_total`; `blocked_by`, `blocking`: `[{ref, repo, number, title, state, on_board, status, archived, status_unknown_reason, resolved}]` with `blocked_by_total`, `blocking_total`, `unresolved_blockers`; `history`: `[{at, from, to, actor, automated}]` with `history_truncated`, `history_untracked`; `body`: `{text, cut, length}`; `comments`: `[{author, created_at, text, cut, length}]` with `comments_total` |
 | `list` | `sprint_filter` (`null` without `--sprint`, `"none"` for issues without a sprint, `"iteration"` for those in `sprint`), `sprint` (the `--sprint` iteration or `null`), `issues`: `[{repo, number, title, state, status, labels, labels_total, assignees, assignees_total}]` in the printed order, cut to `--limit`; `matched` (before `--limit`), `unchecked`, `hidden`, `filtered`, `skipped`: `{draft_issues, pull_requests, unseen}`, `incomplete`, `warnings` |
-| `next` | as `list`, each issue with `unresolved_blockers`: `[{ref, repo, number, on_board, status}]` (empty unless `--all`) and `unread_blockers` (blockers the token cannot read, unresolved); `matched` counts the issues to show with `--all`'s blocked ones, `hidden` the blocked ones left out |
+| `next` | as `list`, each issue with `unresolved_blockers`: `[{ref, repo, number, on_board, status, archived, status_unknown_reason}]` (empty unless `--all`) and `unread_blockers` (blockers the token cannot read, unresolved); `matched`: issues to show before `--limit` (with `--all`, the blocked ones too); `hidden`: blocked issues left out (0 with `--all`); `incomplete`: GitHub withheld part of an issue to show or hide, or of its blockers |
 | verbs | `verb`, `repo`, `dry_run`, `issues`: `[{number, title, outcome, planned, applied, in_place, needs_yes, warnings, error}]` in argument order (`title` `null` when the issue was not read), `summary`: `{total, done, written, failed, not_attempted}` |
 | `new` | `number`, `repo`, `title`, `created` (`false`: resumed), `labels`, `status`, `status_set`, `unarchived`, `milestone` (`{title, due_on}` or `null`), `milestone_set`, `blocked_by`, `already_blocked_by` |
 | `comment` | `number`, `repo`, `posted` (`false`: already the last comment) |

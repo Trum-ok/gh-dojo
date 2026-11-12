@@ -5,6 +5,7 @@ incomplete: true
 - Trum-ok/gh-dojo#21 OPEN status="" "Triage me" labels=[bug]/1 assignees=[]/0
 - "DraftIssue" status="Backlog"
 - Trum-ok/gh-dojo#22 OPEN status="Backlog" "Add --json to list" labels=[enhancement area:cli]/2 assignees=[]/0
+  incomplete
 - Trum-ok/gh-dojo#23 OPEN status="In progress" "Fix   login\tredirect" labels=[bug]/1 assignees=[Trum-ok alice]/2
 - acme/shop#7 OPEN status="In progress" "Cross-repo task" labels=[]/0 assignees=[alice]/1
 - "PullRequest" status="In review"

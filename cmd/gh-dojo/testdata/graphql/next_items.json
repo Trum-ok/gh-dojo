@@ -1,5 +1,5 @@
 {
-  "comment": "Hand-crafted from the recorded items_dojo_blockers.json query (next): the gh-dojo board with issues in Backlog or without a status that next shows or hides: blockers open, closed, in a resolved status, without a status, not on the board, withheld from the token, more than three; an issue in another repository; a closed issue, a draft, a pull request and an item the token cannot see. Error shapes follow GitHub's partial-data errors (items_two_pages.json).",
+  "comment": "Hand-crafted from the recorded items_dojo_blockers.json query (next): the gh-dojo board with issues in Backlog or without a status that next shows or hides: blockers open, closed, in a resolved status, without a status, not on the board, withheld from the token, more than three; blockers not among the items (another project only, archived in a resolved status, archived in progress, a repository the token cannot see: next_places.json); an issue in another repository; an issue in another status with its labels withheld; a closed issue, a draft, a pull request and an item the token cannot see. Error shapes follow GitHub's partial-data errors (items_two_pages.json).",
   "handcrafted": true,
   "interactions": [
     {
@@ -22,7 +22,7 @@
                 "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ"
               },
               "items": {
-                "totalCount": 17,
+                "totalCount": 20,
                 "pageInfo": {
                   "hasNextPage": false,
                   "endCursor": "Y3Vyc29yOnYyOpMRAA"
@@ -511,6 +511,108 @@
                         "nodes": []
                       }
                     }
+                  },
+                  {
+                    "status": {
+                      "name": "Backlog"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 64,
+                      "title": "Blocked by an archived Ready issue",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "Trum-ok/gh-dojo"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "blockedBy": {
+                        "totalCount": 1,
+                        "nodes": [
+                          {
+                            "number": 70,
+                            "state": "OPEN",
+                            "repository": {
+                              "nameWithOwner": "Trum-ok/gh-dojo"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "Backlog"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 65,
+                      "title": "Blocked by an archived issue in progress",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "Trum-ok/gh-dojo"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "blockedBy": {
+                        "totalCount": 1,
+                        "nodes": [
+                          {
+                            "number": 71,
+                            "state": "OPEN",
+                            "repository": {
+                              "nameWithOwner": "Trum-ok/gh-dojo"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "Backlog"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 66,
+                      "title": "Blocked in a hidden repository",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "Trum-ok/gh-dojo"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "blockedBy": {
+                        "totalCount": 1,
+                        "nodes": [
+                          {
+                            "number": 1,
+                            "state": "OPEN",
+                            "repository": {
+                              "nameWithOwner": "secret/vault"
+                            }
+                          }
+                        ]
+                      }
+                    }
                   }
                 ]
               }
@@ -548,6 +650,25 @@
               "nodes",
               12,
               "content"
+            ],
+            "locations": [
+              {
+                "line": 14,
+                "column": 7
+              }
+            ],
+            "message": "Resource not accessible by integration"
+          },
+          {
+            "type": "FORBIDDEN",
+            "path": [
+              "repositoryOwner",
+              "projectV2",
+              "items",
+              "nodes",
+              2,
+              "content",
+              "labels"
             ],
             "locations": [
               {

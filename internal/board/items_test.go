@@ -92,6 +92,9 @@ func dumpItems(items *board.Items) []byte {
 		fmt.Fprintf(&b, "- %s#%d %s status=%q %q labels=%v/%d assignees=%v/%d\n",
 			it.Repo, it.Number, it.State, it.Status, it.Title,
 			it.Labels.Nodes, it.Labels.TotalCount, it.Assignees.Nodes, it.Assignees.TotalCount)
+		if it.Incomplete {
+			b.WriteString("  incomplete\n")
+		}
 		if it.BlockedBy.TotalCount > 0 {
 			fmt.Fprintf(&b, "  blocked by %d:", it.BlockedBy.TotalCount)
 			for _, bl := range it.BlockedBy.Nodes {

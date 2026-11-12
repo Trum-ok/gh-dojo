@@ -2,6 +2,7 @@ package board
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strconv"
 	"strings"
@@ -127,6 +128,9 @@ type Item struct {
 	// only, up to BlockersWindow. TotalCount also counts the blockers the
 	// token cannot see, which are not in Nodes.
 	BlockedBy graph.Page[Blocker]
+	// Incomplete is set when GitHub withheld part of the item, such as its
+	// labels or a blocker (Items.Incomplete for any item).
+	Incomplete bool
 }
 
 // Blocker is an issue that blocks a board item's issue. Its board status
@@ -186,6 +190,11 @@ func ReadItemsWith(ctx context.Context, q graph.Querier, s *Schema, statusField 
 			out.StatusFieldID = p.Field.ID
 		}
 		first = false
+		for _, i := range tq.page {
+			if i < len(p.Items.Nodes) && p.Items.Nodes[i] != nil {
+				p.Items.Nodes[i].partial = true
+			}
+		}
 		return &p.Items
 	})
 	if err != nil {
@@ -232,6 +241,8 @@ type itemsResponse struct {
 }
 
 type itemJSON struct {
+	partial bool // GitHub withheld part of it (tolerant)
+
 	Status *struct {
 		Name string `json:"name"`
 	} `json:"status"`
@@ -278,6 +289,7 @@ func (n *itemJSON) item() Item {
 	if n == nil {
 		return it
 	}
+	it.Incomplete = n.partial
 	if n.Status != nil {
 		it.Status = n.Status.Name
 	}
@@ -322,12 +334,17 @@ func (n *itemJSON) item() Item {
 // FORBIDDEN inside items (e.g. an issue in a repository the token cannot
 // see): the rest of the page is accurate. A withheld item or content reads
 // as ContentHidden; anything withheld below the content sets partial.
+//
+// page holds the indices of the nodes of the last page read with parts
+// withheld, for Item.Incomplete.
 type tolerant struct {
 	q       graph.Querier
 	partial bool
+	page    []int
 }
 
 func (t *tolerant) Query(ctx context.Context, query string, vars map[string]any, out any) error {
+	t.page = t.page[:0]
 	err := t.q.Query(ctx, query, vars, out)
 	if err == nil {
 		return nil
@@ -337,6 +354,7 @@ func (t *tolerant) Query(ctx context.Context, query string, vars map[string]any,
 		return err
 	}
 	partial := false
+	var page []int
 	for _, e := range gqlErr.Errors {
 		p := e.Path
 		if len(p) < 5 || p[0] != "repositoryOwner" || p[1] != "projectV2" || p[2] != "items" || p[3] != "nodes" {
@@ -348,8 +366,26 @@ func (t *tolerant) Query(ctx context.Context, query string, vars map[string]any,
 		// nodes.<i> and nodes.<i>.content are counted as hidden items.
 		if len(p) > 6 || (len(p) == 6 && p[5] != "content") {
 			partial = true
+			if i, ok := pathIndex(p[4]); ok {
+				page = append(page, i)
+			}
 		}
 	}
 	t.partial = t.partial || partial
+	t.page = page
 	return nil
+}
+
+// pathIndex is a list index in a GraphQL error path: a JSON number.
+func pathIndex(v any) (int, bool) {
+	switch n := v.(type) {
+	case float64:
+		return int(n), n >= 0
+	case int:
+		return n, n >= 0
+	case json.Number:
+		i, err := strconv.Atoi(string(n))
+		return i, err == nil && i >= 0
+	}
+	return 0, false
 }

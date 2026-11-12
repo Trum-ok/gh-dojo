@@ -10,6 +10,9 @@ Trum-ok/other#5 Other repo issue [area:cli] @Trum-ok
 #61 Write the docs [documentation]
 #62 Polish the help [documentation, bug] @Trum-ok
 #63 Untriaged idea
+#64 Blocked by an archived Ready issue
+#65 Blocked by an archived issue in progress — blocked by #71 (In progress, archived)
+#66 Blocked in a hidden repository — blocked by secret/vault#1 (status not read: GitHub withheld it from the token)
 skipped: 1 draft issue, 1 pull request, 1 item the token cannot see (next shows issues only)
 --- stderr
 warning: GitHub withheld parts of some board items from this token; their lines may be incomplete

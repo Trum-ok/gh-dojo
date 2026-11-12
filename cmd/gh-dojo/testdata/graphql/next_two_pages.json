@@ -1,0 +1,192 @@
+{
+  "comment": "Hand-crafted from the recorded items_dojo_blockers.json query: two pages of the gh-dojo board, candidates on the first, their blockers on the second (next).",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "BoardItems",
+      "query": "query BoardItems($owner: String!, $number: Int!, $status: String!, $cursor: String) {\n  viewer { login }\n  repositoryOwner(login: $owner) {\n    ... on User { projectV2(number: $number) { ...items } }\n    ... on Organization { projectV2(number: $number) { ...items } }\n  }\n}\n\nfragment items on ProjectV2 {\n  field(name: $status) { ... on ProjectV2SingleSelectField { id } }\n  items(first: 100, after: $cursor) {\n    totalCount\n    pageInfo { hasNextPage endCursor }\n    nodes {\n      status: fieldValueByName(name: $status) {\n        ... on ProjectV2ItemFieldSingleSelectValue { name }\n      }\n      content {\n        __typename\n        ... on Issue {\n          number\n          title\n          state\n          repository { nameWithOwner }\n          labels(first: 100) { totalCount nodes { name } }\n          assignees(first: 10) { totalCount nodes { login } }\n          blockedBy(first: 50) { totalCount nodes { number state repository { nameWithOwner } } }\n        }\n      }\n    }\n  }\n}",
+      "variables": {
+        "cursor": null,
+        "number": 5,
+        "owner": "Trum-ok",
+        "status": "Status"
+      },
+      "response": {
+        "data": {
+          "viewer": {
+            "login": "Trum-ok"
+          },
+          "repositoryOwner": {
+            "projectV2": {
+              "field": {
+                "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ"
+              },
+              "items": {
+                "totalCount": 4,
+                "pageInfo": {
+                  "hasNextPage": true,
+                  "endCursor": "Y3Vyc29yOnYyOpICAA"
+                },
+                "nodes": [
+                  {
+                    "status": {
+                      "name": "Backlog"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 80,
+                      "title": "Blocker done on the next page",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "Trum-ok/gh-dojo"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "blockedBy": {
+                        "totalCount": 1,
+                        "nodes": [
+                          {
+                            "number": 81,
+                            "state": "OPEN",
+                            "repository": {
+                              "nameWithOwner": "Trum-ok/gh-dojo"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "Backlog"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 82,
+                      "title": "Blocker in progress on the next page",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "Trum-ok/gh-dojo"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "blockedBy": {
+                        "totalCount": 1,
+                        "nodes": [
+                          {
+                            "number": 83,
+                            "state": "OPEN",
+                            "repository": {
+                              "nameWithOwner": "Trum-ok/gh-dojo"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "BoardItems",
+      "query": "query BoardItems($owner: String!, $number: Int!, $status: String!, $cursor: String) {\n  viewer { login }\n  repositoryOwner(login: $owner) {\n    ... on User { projectV2(number: $number) { ...items } }\n    ... on Organization { projectV2(number: $number) { ...items } }\n  }\n}\n\nfragment items on ProjectV2 {\n  field(name: $status) { ... on ProjectV2SingleSelectField { id } }\n  items(first: 100, after: $cursor) {\n    totalCount\n    pageInfo { hasNextPage endCursor }\n    nodes {\n      status: fieldValueByName(name: $status) {\n        ... on ProjectV2ItemFieldSingleSelectValue { name }\n      }\n      content {\n        __typename\n        ... on Issue {\n          number\n          title\n          state\n          repository { nameWithOwner }\n          labels(first: 100) { totalCount nodes { name } }\n          assignees(first: 10) { totalCount nodes { login } }\n          blockedBy(first: 50) { totalCount nodes { number state repository { nameWithOwner } } }\n        }\n      }\n    }\n  }\n}",
+      "variables": {
+        "cursor": "Y3Vyc29yOnYyOpICAA",
+        "number": 5,
+        "owner": "Trum-ok",
+        "status": "Status"
+      },
+      "response": {
+        "data": {
+          "viewer": {
+            "login": "Trum-ok"
+          },
+          "repositoryOwner": {
+            "projectV2": {
+              "field": {
+                "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ"
+              },
+              "items": {
+                "totalCount": 4,
+                "pageInfo": {
+                  "hasNextPage": false,
+                  "endCursor": "Y3Vyc29yOnYyOpIEAA"
+                },
+                "nodes": [
+                  {
+                    "status": {
+                      "name": "Ready"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 81,
+                      "title": "Done, not released",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "Trum-ok/gh-dojo"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "blockedBy": {
+                        "totalCount": 0,
+                        "nodes": []
+                      }
+                    }
+                  },
+                  {
+                    "status": {
+                      "name": "In progress"
+                    },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 83,
+                      "title": "Work in progress",
+                      "state": "OPEN",
+                      "repository": {
+                        "nameWithOwner": "Trum-ok/gh-dojo"
+                      },
+                      "labels": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "assignees": {
+                        "totalCount": 0,
+                        "nodes": []
+                      },
+                      "blockedBy": {
+                        "totalCount": 0,
+                        "nodes": []
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
