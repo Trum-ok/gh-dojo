@@ -4,6 +4,7 @@
 [![Release](https://img.shields.io/github/v/release/Trum-ok/gh-dojo)](https://github.com/Trum-ok/gh-dojo/releases/latest)
 [![Go](https://img.shields.io/github/go-mod/go-version/Trum-ok/gh-dojo)](go.mod)
 [![gh extension](https://img.shields.io/badge/gh-extension-2b3137?logo=github)](https://cli.github.com/manual/gh_extension)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![AI-native](https://img.shields.io/badge/AI-native-8a2be2)](#agents)
 
 A [GitHub CLI](https://cli.github.com/) extension that gives AI agents process
@@ -42,7 +43,7 @@ versioned. See the [roadmap](#roadmap).
 **Contents:** [Install](#install) · [Quick start](#quick-start) ·
 [Commands](#commands) · [Configuration](#configuration) ·
 [Output and exit codes](#output-and-exit-codes) · [Agents](#agents) ·
-[Development](#development) · [Roadmap](#roadmap)
+[Development](#development) · [Roadmap](#roadmap) · [License](#license)
 
 ## Install
 
@@ -1430,3 +1431,7 @@ configs.
   repositories.
 - **v0.3 — extensibility.** Hooks (`pre` and `post` for a verb) and
   sub-issues.
+
+## License
+
+[MIT](LICENSE)
