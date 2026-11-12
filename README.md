@@ -409,10 +409,10 @@ a verb can jump over in parentheses); the initial, final and resolved
 statuses; each verb with its `when`, the statuses it moves between, its
 arguments, checks and effects, and the rules behind them (ask the user before
 `--yes`, don't work around a refused blockers check, what `--by` links,
-several numbers at once); `show` and `list`; `new`, `comment`, `block` and
-`unblock`; safe repeats; the session link; exit codes; JSON; and a table of
-the commands of the gh-dojo that wrote them, so a command added in a later
-version shows up there by itself. The skill's `description` names the
+several numbers at once); `show`, `next` and `list`; `new`, `comment`,
+`block` and `unblock`; safe repeats; the session link; exit codes; JSON; and
+a table of the commands of the gh-dojo that wrote them, so a command added in
+a later version shows up there by itself. The skill's `description` names the
 repository, the board and the verbs, and [`[agent] description`](#agent)
 adds to it. The markdown file [`[agent] notes`](#agent) names is appended as
 it is, in the project's language, for what the config cannot say.

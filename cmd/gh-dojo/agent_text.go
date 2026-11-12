@@ -429,15 +429,44 @@ func (d *agentDoc) reading(w *mdWriter) {
 	if d.cfg.SprintField() != "" {
 		listFilters += ", `--sprint current`"
 	}
-	w.heading(1, "Reading")
-	w.list([]string{
+	items := []string{
 		"`gh dojo show N` before you work on an issue: its status, " + sprint + "milestone, labels, blockers both " +
 			"ways (unresolved first, each with its board status), status history, description and the last 5 " +
 			"comments. `gh dojo show 12 13 --brief` prints three lines per issue, `--comments all` the whole " +
 			"thread (up to 100), `--full` everything uncut.",
-		"`gh dojo list`: the open issues on the board, grouped by status; closed issues and final statuses are " +
-			"hidden and counted. Filters: " + listFilters + ", `--all`, `--limit 100`.",
-	})
+	}
+	if d.hasCommand("next") {
+		items = append(items, d.nextItem())
+	}
+	items = append(items, "`gh dojo list`: the open issues on the board, grouped by status; closed issues and "+
+		"final statuses are hidden and counted. Filters: "+listFilters+", `--all`, `--limit 100`.")
+	w.heading(1, "Reading")
+	w.list(items)
+}
+
+// hasCommand reports whether this build has the built-in command name.
+func (d *agentDoc) hasCommand(name string) bool {
+	return slices.ContainsFunc(d.cmds, func(c agentCommand) bool { return c.name == name })
+}
+
+// nextItem explains gh dojo next, when this build has it.
+func (d *agentDoc) nextItem() string {
+	cfg := d.cfg
+	where := "without a status"
+	if s := cfg.Statuses.Initial; s != "" {
+		where = "in " + code(s) + " or without a status"
+	}
+	filters := "`--mine`, `--label <label>`"
+	if cfg.SprintField() != "" {
+		filters += ", `--sprint current`"
+	}
+	s := "`gh dojo next`: what to take next, the open issues " + where + ", with no unresolved blocker, in " +
+		"board order, 5 by default (`--limit N`). The blocked ones are hidden and counted; `--all` shows them " +
+		"with their blockers. Filters: " + filters + ". Once you pick one, `gh dojo show N`"
+	if take := d.verbsFrom(cfg.Statuses.Initial); cfg.Statuses.Initial != "" && len(take) > 0 {
+		s += ", then " + code("gh dojo "+take[0]+" N")
+	}
+	return s + "."
 }
 
 func (d *agentDoc) writing(w *mdWriter) {
