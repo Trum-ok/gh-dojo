@@ -146,10 +146,10 @@ code: 3
       "number": 2,
       "repo": "cli/cli",
       "url": "https://github.com/cli/cli/issues/2",
-      "title": "Reimagine how the app determines its context",
+      "title": "An issue in another repository",
       "state": "closed",
       "state_reason": "completed",
-      "author": "mislav",
+      "author": "octocat",
       "created_at": "2019-10-07T17:49:57Z",
       "closed_at": "2019-11-13T19:03:21Z",
       "incomplete": false,
@@ -178,7 +178,7 @@ code: 3
       "history_untracked": false,
       "body": null,
       "comments": [],
-      "comments_total": 4
+      "comments_total": 0
     }
   ],
   "failed": [

@@ -49,7 +49,7 @@ func TestShow(t *testing.T) {
 		{"pull_request", issueFixtures + "card_pull_request.json", []string{"15"}, render.ExitNotFound},
 		{"not_found", issueFixtures + "card_not_found.json", []string{"9999"}, render.ExitNotFound},
 		{"repo_not_found", issueFixtures + "cards_repo_not_found.json", []string{"1", "2"}, render.ExitNotFound},
-		// Recorded: three repositories in one request; the missing one and
+		// Three repositories in one request (cards_repos.json); the missing one and
 		// the pull request fail alone, after the cards.
 		{"repos", issueFixtures + "cards_repos.json", []string{"3", "cli/cli#2", "Trum-ok/no-such-repo-xyz#1", "https://github.com/cli/cli/issues/1"}, render.ExitNotFound},
 		{"repos_brief", issueFixtures + "cards_repos.json", []string{"Trum-ok/gh-dojo#3", "cli/cli#2", "Trum-ok/no-such-repo-xyz#1", "cli/cli#1", "--brief"}, render.ExitNotFound},
