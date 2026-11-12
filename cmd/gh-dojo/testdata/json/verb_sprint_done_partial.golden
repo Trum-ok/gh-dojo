@@ -2,7 +2,14 @@ code: 5
 --- stdout
 {
   "schema_version": 1,
+  "error": {
+    "exit_code": 5,
+    "message": "#42 Ready → Done; sprint not set: GitHub denied access; gh auth refresh -s project, then re-run the same command",
+    "allowed": [],
+    "fix": "gh auth refresh -s project"
+  },
   "verb": "done",
+  "repo": "acme/shop",
   "dry_run": false,
   "issues": [
     {
@@ -17,7 +24,7 @@ code: 5
         },
         {
           "op": "set_iteration",
-          "from": "",
+          "from": null,
           "to": "Sprint 11",
           "start_date": "2026-10-26"
         }

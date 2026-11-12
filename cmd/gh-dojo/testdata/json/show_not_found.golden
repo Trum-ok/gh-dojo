@@ -1,5 +1,15 @@
 code: 3
 --- stdout
+{
+  "schema_version": 1,
+  "error": {
+    "exit_code": 3,
+    "message": "issue #9999 not found in Trum-ok/gh-dojo",
+    "allowed": [],
+    "fix": "gh dojo list"
+  }
+}
+
 --- stderr
 error: issue #9999 not found in Trum-ok/gh-dojo
 fix: gh dojo list

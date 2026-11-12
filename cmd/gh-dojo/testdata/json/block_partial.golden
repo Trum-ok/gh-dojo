@@ -2,6 +2,12 @@ code: 5
 --- stdout
 {
   "schema_version": 1,
+  "error": {
+    "exit_code": 5,
+    "message": "#3 blocked by #2; not blocked by #26: GitHub API rejected the request; re-run the same command",
+    "allowed": [],
+    "fix": null
+  },
   "number": 3,
   "repo": "Trum-ok/gh-dojo",
   "action": "block",
@@ -11,13 +17,7 @@ code: 5
   "unchanged": [],
   "missed": [
     "#26"
-  ],
-  "error": {
-    "exit_code": 5,
-    "message": "#3 blocked by #2; not blocked by #26: GitHub API rejected the request; re-run the same command",
-    "allowed": [],
-    "fix": ""
-  }
+  ]
 }
 
 --- stderr

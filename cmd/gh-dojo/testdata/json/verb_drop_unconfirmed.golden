@@ -1,5 +1,52 @@
 code: 2
 --- stdout
+{
+  "schema_version": 1,
+  "error": {
+    "exit_code": 2,
+    "message": "drop needs the user's go-ahead for #3 (would be: comment left, closed as not planned)\nthis is the user's decision: ask the user, and re-run with --yes only if they agree",
+    "allowed": [],
+    "fix": null
+  },
+  "verb": "drop",
+  "repo": "Trum-ok/gh-dojo",
+  "dry_run": false,
+  "issues": [
+    {
+      "number": 3,
+      "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)",
+      "outcome": "failed",
+      "planned": [
+        {
+          "op": "add_comment",
+          "body": "Duplicate of #2."
+        },
+        {
+          "op": "close",
+          "reason": "not_planned"
+        }
+      ],
+      "applied": [],
+      "in_place": [],
+      "needs_yes": true,
+      "warnings": [],
+      "error": {
+        "exit_code": 2,
+        "message": "drop needs the user's go-ahead for #3 (would be: comment left, closed as not planned)\nthis is the user's decision: ask the user, and re-run with --yes only if they agree",
+        "allowed": [],
+        "fix": null
+      }
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "done": 0,
+    "written": 0,
+    "failed": 1,
+    "not_attempted": 0
+  }
+}
+
 --- stderr
 error: drop needs the user's go-ahead for #3 (would be: comment left, closed as not planned)
 this is the user's decision: ask the user, and re-run with --yes only if they agree

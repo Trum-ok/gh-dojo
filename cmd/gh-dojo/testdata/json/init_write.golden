@@ -2,6 +2,7 @@ code: 0
 --- stdout
 {
   "schema_version": 1,
+  "error": null,
   "path": ".github/dojo.toml",
   "written": true,
   "board": "Trum-ok/5",

@@ -1,5 +1,55 @@
 code: 4
 --- stdout
+{
+  "schema_version": 1,
+  "error": {
+    "exit_code": 4,
+    "message": "GitHub write failed (HTTP 502); it may have been applied, re-run the command to check",
+    "allowed": [],
+    "fix": null
+  },
+  "verb": "start",
+  "repo": "Trum-ok/gh-dojo",
+  "dry_run": false,
+  "issues": [
+    {
+      "number": 3,
+      "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)",
+      "outcome": "failed",
+      "planned": [
+        {
+          "op": "set_status",
+          "from": "Ready",
+          "to": "In progress"
+        },
+        {
+          "op": "add_comment",
+          "body": "Started. Session: claude://s/abc"
+        }
+      ],
+      "applied": [],
+      "in_place": [],
+      "needs_yes": false,
+      "warnings": [
+        "#3 has unresolved blockers: #2 (not on the board), #1 (not on the board)"
+      ],
+      "error": {
+        "exit_code": 4,
+        "message": "GitHub write failed (HTTP 502); it may have been applied, re-run the command to check",
+        "allowed": [],
+        "fix": null
+      }
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "done": 0,
+    "written": 0,
+    "failed": 1,
+    "not_attempted": 0
+  }
+}
+
 --- stderr
 warning: #3 has unresolved blockers: #2 (not on the board), #1 (not on the board)
 error: GitHub write failed (HTTP 502); it may have been applied, re-run the command to check

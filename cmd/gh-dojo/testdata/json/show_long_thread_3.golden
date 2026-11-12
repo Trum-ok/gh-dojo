@@ -2,6 +2,8 @@ code: 0
 --- stdout
 {
   "schema_version": 1,
+  "error": null,
+  "brief": false,
   "issues": [
     {
       "number": 42,
@@ -16,7 +18,7 @@ code: 0
       "incomplete": false,
       "board": {
         "on_board": true,
-        "unknown_reason": "",
+        "unknown_reason": null,
         "status": "Ready",
         "status_unknown": false,
         "archived": false,
@@ -59,9 +61,9 @@ code: 0
           "title": "Auth library upgrade",
           "state": "closed",
           "on_board": false,
-          "status": "",
+          "status": null,
           "archived": false,
-          "status_unknown_reason": "",
+          "status_unknown_reason": null,
           "resolved": true
         }
       ],
@@ -72,7 +74,7 @@ code: 0
       "history": [
         {
           "at": "2026-11-11T18:19:14Z",
-          "from": "",
+          "from": null,
           "to": "Backlog",
           "actor": "github-project-automation",
           "automated": true
@@ -125,7 +127,8 @@ code: 0
       "comments_total": 45
     }
   ],
-  "failed": []
+  "failed": [],
+  "warnings": []
 }
 
 --- stderr

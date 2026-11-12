@@ -154,25 +154,33 @@ func runList(cmd *cobra.Command, o *listOpts) error {
 	if err := checkLabels(items, o.labels); err != nil {
 		return err
 	}
-	stderr := cmd.ErrOrStderr()
+	var warnings []string // on stderr and in the JSON
 	if items.Incomplete {
-		render.Warn(stderr, "GitHub withheld parts of some board items from this token; their lines may be incomplete")
+		warnings = append(warnings, "GitHub withheld parts of some board items from this token; their lines may be incomplete")
 	}
 	if len(items.Items) != items.TotalCount {
-		render.Warn(stderr, "the board changed while it was read (%d items read, GitHub reports %d); run again for an exact list",
-			len(items.Items), items.TotalCount)
+		warnings = append(warnings, fmt.Sprintf("the board changed while it was read (%d items read, GitHub reports %d); run again for an exact list",
+			len(items.Items), items.TotalCount))
+	}
+	for _, w := range warnings {
+		render.Warn(cmd.ErrOrStderr(), "%s", w)
 	}
 	repo := ""
 	if r, err := a.Repo(); err == nil { // only shortens refs; list works without it
 		repo = r.String()
 	}
 	l := buildList(cfg, field.OptionNames(), items, o)
-	return emit(cmd, l.result(o, items), func(w io.Writer) { l.write(w, repo, cfg, o) })
+	res := l.result(o, items)
+	res.Warnings = orEmpty(warnings)
+	return emit(cmd, res, func(w io.Writer) { l.write(w, repo, cfg, o) })
 }
 
 // listResult is list's JSON: the issues printed, in the same order and
 // cut to --limit, and the counts of those left out.
 type listResult struct {
+	// SprintFilter is null without --sprint, "none" for --sprint none
+	// (issues without a sprint), else "iteration": the issues in Sprint.
+	SprintFilter *string `json:"sprint_filter"`
 	// Sprint is the iteration --sprint selects, null without --sprint or
 	// for --sprint none.
 	Sprint  *jsonIteration `json:"sprint"`
@@ -190,6 +198,8 @@ type listResult struct {
 	} `json:"skipped"`
 	// Incomplete: GitHub withheld parts of some items (warned on stderr).
 	Incomplete bool `json:"incomplete"`
+	// Warnings are also printed on stderr.
+	Warnings []string `json:"warnings"`
 }
 
 type listIssue struct {
@@ -197,7 +207,7 @@ type listIssue struct {
 	Number         int      `json:"number"`
 	Title          string   `json:"title"`
 	State          string   `json:"state"`  // open or closed
-	Status         string   `json:"status"` // "" for no status
+	Status         *string  `json:"status"` // null for no status
 	Labels         []string `json:"labels"`
 	LabelsTotal    int      `json:"labels_total"`
 	Assignees      []string `json:"assignees"`
@@ -209,6 +219,13 @@ func (l *list) result(o *listOpts, items *board.Items) listResult {
 	r := listResult{
 		Sprint: iterationJSON(o.sprintIt), Issues: []listIssue{}, Matched: l.shown,
 		Unchecked: l.unchecked, Hidden: l.hidden, Filtered: l.filtered, Incomplete: items.Incomplete,
+		Warnings: []string{},
+	}
+	switch {
+	case o.sprintIt != nil:
+		r.SprintFilter = orNull("iteration")
+	case o.sprint != "":
+		r.SprintFilter = orNull(sprintNone)
 	}
 	r.Skipped.DraftIssues, r.Skipped.PullRequests, r.Skipped.Unseen = l.drafts, l.pulls, l.unseen
 	for _, g := range l.groups {
@@ -218,7 +235,7 @@ func (l *list) result(o *listOpts, items *board.Items) listResult {
 			}
 			r.Issues = append(r.Issues, listIssue{
 				Repo: it.Repo, Number: it.Number, Title: singleLine(it.Title), State: strings.ToLower(it.State),
-				Status: it.Status, Labels: orEmpty(it.Labels.Nodes), LabelsTotal: max(it.Labels.TotalCount, len(it.Labels.Nodes)),
+				Status: orNull(it.Status), Labels: orEmpty(it.Labels.Nodes), LabelsTotal: max(it.Labels.TotalCount, len(it.Labels.Nodes)),
 				Assignees: orEmpty(it.Assignees.Nodes), AssigneesTotal: max(it.Assignees.TotalCount, len(it.Assignees.Nodes)),
 			})
 		}

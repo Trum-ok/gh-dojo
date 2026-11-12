@@ -1,5 +1,5 @@
 code: 1
 --- stdout
 --- stderr
-error: invalid --jq expression: unexpected EOF
+error: invalid --jq expression: failed to parse jq expression (line 1, column 9): unexpected EOF
 fix: gh dojo show --help

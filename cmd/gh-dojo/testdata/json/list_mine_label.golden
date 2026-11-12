@@ -2,6 +2,8 @@ code: 0
 --- stdout
 {
   "schema_version": 1,
+  "error": null,
+  "sprint_filter": null,
   "sprint": null,
   "issues": [
     {
@@ -30,7 +32,10 @@ code: 0
     "pull_requests": 1,
     "unseen": 2
   },
-  "incomplete": true
+  "incomplete": true,
+  "warnings": [
+    "GitHub withheld parts of some board items from this token; their lines may be incomplete"
+  ]
 }
 
 --- stderr

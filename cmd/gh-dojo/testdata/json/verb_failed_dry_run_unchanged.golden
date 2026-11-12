@@ -1,0 +1,41 @@
+code: 0
+--- stdout
+{
+  "schema_version": 1,
+  "error": null,
+  "verb": "done",
+  "repo": "acme/shop",
+  "dry_run": true,
+  "issues": [
+    {
+      "number": 3,
+      "title": "Done already",
+      "outcome": "unchanged",
+      "planned": [],
+      "applied": [],
+      "in_place": [
+        {
+          "op": "set_status",
+          "from": "Done",
+          "to": "Done"
+        },
+        {
+          "op": "close",
+          "reason": "completed"
+        }
+      ],
+      "needs_yes": false,
+      "warnings": [],
+      "error": null
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "done": 1,
+    "written": 0,
+    "failed": 0,
+    "not_attempted": 0
+  }
+}
+
+--- stderr

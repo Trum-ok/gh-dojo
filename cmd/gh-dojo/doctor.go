@@ -69,7 +69,7 @@ type doctorCheck struct {
 	Result  string   `json:"result"` // checkOK, checkProblem or checkSkip
 	Detail  string   `json:"detail"`
 	Allowed []string `json:"allowed"`
-	Fix     string   `json:"fix"` // "" for none
+	Fix     *string  `json:"fix"` // null for none
 
 	code render.Code // of a problem: render.ExitNetwork for auth and network, else render.ExitUsage
 }
@@ -97,7 +97,7 @@ func (r *doctorReport) problem(name string, err error) {
 		code = render.ExitNetwork
 	}
 	r.Checks = append(r.Checks, doctorCheck{
-		Name: name, Result: checkProblem, Detail: e.What, Allowed: orEmpty(e.Allowed), Fix: e.Fix, code: code,
+		Name: name, Result: checkProblem, Detail: e.What, Allowed: orEmpty(e.Allowed), Fix: orNull(e.Fix), code: code,
 	})
 }
 
@@ -112,7 +112,11 @@ func (r *doctorReport) write(w io.Writer) {
 	for _, c := range r.Checks {
 		// render's error block keeps long values short and drops a fix too
 		// long to be a command; its first line is the detail.
-		text := (&render.Error{What: c.Detail, Allowed: c.Allowed, Fix: c.Fix}).Text()
+		fix := ""
+		if c.Fix != nil {
+			fix = *c.Fix
+		}
+		text := (&render.Error{What: c.Detail, Allowed: c.Allowed, Fix: fix}).Text()
 		text = strings.TrimPrefix(text, "error: ")
 		fmt.Fprintf(w, "%-8s %-8s %s\n", c.Result, c.Name, strings.ReplaceAll(text, "\n", "\n"+indent))
 	}

@@ -2,6 +2,12 @@ code: 1
 --- stdout
 {
   "schema_version": 1,
+  "error": {
+    "exit_code": 1,
+    "message": "doctor found 5 problems; fix as shown above, then run gh dojo doctor again",
+    "allowed": [],
+    "fix": null
+  },
   "ok": false,
   "checks": [
     {
@@ -9,35 +15,35 @@ code: 1
       "result": "ok",
       "detail": "gh dojo dev",
       "allowed": [],
-      "fix": ""
+      "fix": null
     },
     {
       "name": "config",
       "result": "ok",
       "detail": ".github/dojo.toml: preset kanban, 13 verbs",
       "allowed": [],
-      "fix": ""
+      "fix": null
     },
     {
       "name": "token",
       "result": "ok",
       "detail": "github.com as Trum-ok, with the project scope",
       "allowed": [],
-      "fix": ""
+      "fix": null
     },
     {
       "name": "board",
       "result": "ok",
       "detail": "Trum-ok/5 \"gh-dojo\": field Status and 6 statuses match",
       "allowed": [],
-      "fix": ""
+      "fix": null
     },
     {
       "name": "repo",
       "result": "ok",
       "detail": "Trum-ok/gh-dojo (default): visible, issues enabled",
       "allowed": [],
-      "fix": ""
+      "fix": null
     },
     {
       "name": "verbs",

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/Trum-ok/gh-dojo/internal/config"
+	"github.com/Trum-ok/gh-dojo/internal/issue"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/Trum-ok/gh-dojo/internal/testutil"
 	"github.com/Trum-ok/gh-dojo/internal/workflow"
@@ -125,6 +126,8 @@ func (f *fakeBackend) Apply(_ context.Context, p *workflow.Plan) ([]workflow.Op,
 }
 
 func (f *fakeBackend) Reset() error { return nil }
+
+func (f *fakeBackend) Repo() (issue.Repo, error) { return issue.Repo{Owner: "acme", Name: "shop"}, nil }
 
 func withBackend(t *testing.T, f *fakeBackend) {
 	t.Helper()

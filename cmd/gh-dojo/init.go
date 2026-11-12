@@ -315,18 +315,19 @@ func writeInitConfig(cmd *cobra.Command, a *App, o initOpts, repo string) error 
 		}
 		text = func(w io.Writer) { fmt.Fprintln(w, render.Confirm(subject, s.Title, effects...)) }
 	}
-	err = emit(cmd, res, text)
-	if len(problems) == 0 {
-		return err
+	var mismatch error
+	if len(problems) > 0 {
+		fix := "gh dojo list" // checks the config against the board again
+		if o.dryRun {
+			fix = o.command(o.owner, project, "")
+		}
+		mismatch = problemsError(cfg, s, problems, o.dryRun, fix)
 	}
-	if err != nil { // the mismatch decides the exit code
-		render.Warn(cmd.ErrOrStderr(), "%s", render.FromError(err).What)
+	err = emitWrite(cmd, res, text, mismatch, !o.dryRun)
+	for _, p := range problems {
+		fmt.Fprintf(cmd.ErrOrStderr(), "problem: %s\n  fix: %s\n", p.what, p.fix)
 	}
-	fix := "gh dojo list" // checks the config against the board again
-	if o.dryRun {
-		fix = o.command(o.owner, project, "")
-	}
-	return reportProblems(cmd.ErrOrStderr(), cfg, s, problems, o.dryRun, fix)
+	return err
 }
 
 // initWritten is the config init wrote, or would write with --dry-run,
@@ -532,12 +533,9 @@ func override(key string) string {
 	return fmt.Sprintf("[%s] %s = %s", table, name, value)
 }
 
-// reportProblems writes each problem with its fix and returns the error
-// that ends init: exit code 1, the file kept.
-func reportProblems(w io.Writer, cfg *config.Config, s *board.Schema, problems []initProblem, dryRun bool, fix string) error {
-	for _, p := range problems {
-		fmt.Fprintf(w, "problem: %s\n  fix: %s\n", p.what, p.fix)
-	}
+// problemsError is the error that ends init when the config does not
+// match the board: exit code 1, the file kept.
+func problemsError(cfg *config.Config, s *board.Schema, problems []initProblem, dryRun bool, fix string) error {
 	noun := "problems"
 	if len(problems) == 1 {
 		noun = "problem"

@@ -54,7 +54,7 @@ text after someone else's comment is posted.`,
 			if err != nil {
 				return err
 			}
-			return emit(cmd, res, res.write)
+			return emitWrite(cmd, res, res.write, nil, res.Posted)
 		},
 	}
 	cmd.Flags().StringVar(&bodyFile, bodyFileFlag, "", "read the text from `file`; - reads stdin")

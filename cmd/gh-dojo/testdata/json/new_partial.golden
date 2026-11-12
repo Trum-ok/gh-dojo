@@ -2,6 +2,12 @@ code: 5
 --- stdout
 {
   "schema_version": 1,
+  "error": {
+    "exit_code": 5,
+    "message": "#15 created, but setting status Backlog failed\nGitHub write failed (HTTP 502); it may have been applied, re-run the command to check",
+    "allowed": [],
+    "fix": "re-run the same gh dojo new command: it finds #15 and finishes it"
+  },
   "number": 15,
   "repo": "Trum-ok/gh-dojo",
   "title": "Fix login redirect",
@@ -10,19 +16,13 @@ code: 5
     "bug",
     "area:cli"
   ],
-  "status": "",
+  "status": null,
   "status_set": false,
   "unarchived": false,
   "milestone": null,
   "milestone_set": false,
   "blocked_by": [],
-  "already_blocked_by": [],
-  "error": {
-    "exit_code": 5,
-    "message": "#15 created, but setting status Backlog failed\nGitHub write failed (HTTP 502); it may have been applied, re-run the command to check",
-    "allowed": [],
-    "fix": "re-run the same gh dojo new command: it finds #15 and finishes it"
-  }
+  "already_blocked_by": []
 }
 
 --- stderr

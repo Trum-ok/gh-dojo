@@ -13,8 +13,13 @@ import (
 
 // showResult is show's JSON.
 type showResult struct {
+	// Brief: --brief, so history and comments are [] and body null in
+	// every card.
+	Brief  bool         `json:"brief"`
 	Issues []showCard   `json:"issues"`
 	Failed []showFailed `json:"failed"` // numbers not shown; the error on stderr names them too
+	// Warnings are also printed on stderr.
+	Warnings []string `json:"warnings"`
 }
 
 // showFailed is an issue show could not print: not found, a pull
@@ -30,7 +35,7 @@ type showCard struct {
 	URL         string     `json:"url"`
 	Title       string     `json:"title"`
 	State       string     `json:"state"`        // open or closed
-	StateReason string     `json:"state_reason"` // completed, not_planned, duplicate, reopened; "" never closed
+	StateReason *string    `json:"state_reason"` // completed, not_planned, duplicate, reopened; null never closed
 	Author      string     `json:"author"`       // "ghost" for a deleted account
 	CreatedAt   *time.Time `json:"created_at"`
 	ClosedAt    *time.Time `json:"closed_at"` // null while open
@@ -54,23 +59,23 @@ type showCard struct {
 	Blocking       []showLink `json:"blocking"`
 	BlockingTotal  int        `json:"blocking_total"`
 
-	// History, Body and Comments are left out with --brief.
-	History          *[]showChange  `json:"history,omitempty"`
-	HistoryTruncated bool           `json:"history_truncated"`
-	HistoryUntracked bool           `json:"history_untracked"`
-	Body             *showText      `json:"body,omitempty"`
-	Comments         *[]showComment `json:"comments,omitempty"`
-	CommentsTotal    int            `json:"comments_total"`
+	// History and Comments are [] and Body null with --brief.
+	History          []showChange  `json:"history"`
+	HistoryTruncated bool          `json:"history_truncated"`
+	HistoryUntracked bool          `json:"history_untracked"`
+	Body             *showText     `json:"body"`
+	Comments         []showComment `json:"comments"`
+	CommentsTotal    int           `json:"comments_total"`
 }
 
 type showBoard struct {
 	OnBoard bool `json:"on_board"` // false also when unknown_reason is set
 	// UnknownReason says why board membership is unknown: the issue may be
-	// on the board; "" when known.
-	UnknownReason string `json:"unknown_reason"`
-	Status        string `json:"status"`         // "" for none, not on the board, or unknown
-	StatusUnknown bool   `json:"status_unknown"` // the status could not be read
-	Archived      bool   `json:"archived"`
+	// on the board; null when known.
+	UnknownReason *string `json:"unknown_reason"`
+	Status        *string `json:"status"`         // null for none, not on the board, or unknown
+	StatusUnknown bool    `json:"status_unknown"` // the status could not be read
+	Archived      bool    `json:"archived"`
 	// Fields are the item's other set field values, sprint and status aside.
 	Fields          []showField `json:"fields"`
 	FieldsTruncated bool        `json:"fields_truncated"`
@@ -84,16 +89,16 @@ type showField struct {
 type sprintJSON struct {
 	Field     string         `json:"field"`
 	Iteration *jsonIteration `json:"iteration"` // null for none
-	// UnknownReason says why the iteration is not known; "" when known.
-	UnknownReason string `json:"unknown_reason"`
+	// UnknownReason says why the iteration is not known; null when known.
+	UnknownReason *string `json:"unknown_reason"`
 }
 
 // jsonIteration is a sprint iteration with its days, as JSON.
 type jsonIteration struct {
-	Title        string `json:"title"`
-	StartDate    string `json:"start_date"` // YYYY-MM-DD
-	EndDate      string `json:"end_date"`   // the last day
-	DurationDays int    `json:"duration_days"`
+	Title        string  `json:"title"`
+	StartDate    string  `json:"start_date"` // YYYY-MM-DD
+	EndDate      *string `json:"end_date"`   // the last day; null when not known
+	DurationDays int     `json:"duration_days"`
 }
 
 // iterationJSON is it as JSON, nil for nil.
@@ -103,14 +108,14 @@ func iterationJSON(it *board.Iteration) *jsonIteration {
 	}
 	out := &jsonIteration{Title: it.Title, StartDate: it.StartDate, DurationDays: it.Duration}
 	if start, err := time.Parse(time.DateOnly, it.StartDate); err == nil && it.Duration > 0 {
-		out.EndDate = start.AddDate(0, 0, it.Duration-1).Format(time.DateOnly)
+		out.EndDate = orNull(start.AddDate(0, 0, it.Duration-1).Format(time.DateOnly))
 	}
 	return out
 }
 
 type jsonMilestone struct {
-	Title string `json:"title"`
-	DueOn string `json:"due_on"` // YYYY-MM-DD; "" without a due date
+	Title string  `json:"title"`
+	DueOn *string `json:"due_on"` // YYYY-MM-DD; null without a due date
 }
 
 type showLink struct {
@@ -121,10 +126,10 @@ type showLink struct {
 	State  string `json:"state"`
 	// OnBoard, Status and Archived are its place on the board; when
 	// StatusUnknownReason is set they are not known.
-	OnBoard             bool   `json:"on_board"`
-	Status              string `json:"status"`
-	Archived            bool   `json:"archived"`
-	StatusUnknownReason string `json:"status_unknown_reason"`
+	OnBoard             bool    `json:"on_board"`
+	Status              *string `json:"status"` // null for none or not on the board
+	Archived            bool    `json:"archived"`
+	StatusUnknownReason *string `json:"status_unknown_reason"` // null when known
 	// Resolved: closed, or in a status of statuses.resolved. A blocker
 	// that is not resolved still blocks.
 	Resolved bool `json:"resolved"`
@@ -132,8 +137,8 @@ type showLink struct {
 
 type showChange struct {
 	At        *time.Time `json:"at"`
-	From      string     `json:"from"` // "" for no status
-	To        string     `json:"to"`
+	From      *string    `json:"from"` // null for no status
+	To        *string    `json:"to"`   // null for no status
 	Actor     string     `json:"actor"`
 	Automated bool       `json:"automated"`
 }
@@ -155,7 +160,7 @@ type showComment struct {
 // result is show's JSON for the cards read, the ones that failed and
 // those left unread by readErr.
 func (v cardView) result(cards []*issue.Card, brief bool, failed []issue.Result, unread []int, readErr error) showResult {
-	out := showResult{Issues: []showCard{}, Failed: []showFailed{}}
+	out := showResult{Brief: brief, Issues: []showCard{}, Failed: []showFailed{}, Warnings: []string{}}
 	for _, c := range cards {
 		out.Issues = append(out.Issues, v.cardJSON(c, brief))
 	}
@@ -177,7 +182,7 @@ func (v cardView) cardJSON(c *issue.Card, brief bool) showCard {
 		URL:              c.URL,
 		Title:            singleLine(c.Title),
 		State:            strings.ToLower(c.State),
-		StateReason:      strings.ToLower(c.StateReason),
+		StateReason:      orNull(strings.ToLower(c.StateReason)),
 		Author:           cardLogin(c.Author),
 		CreatedAt:        jsonTime(c.CreatedAt),
 		ClosedAt:         jsonTime(c.ClosedAt),
@@ -194,45 +199,43 @@ func (v cardView) cardJSON(c *issue.Card, brief bool) showCard {
 		BlockingTotal:    max(c.Blocking.TotalCount, len(c.Blocking.Nodes)),
 		HistoryTruncated: c.HistoryTruncated,
 		HistoryUntracked: c.HistoryUntracked,
+		History:          []showChange{},
+		Comments:         []showComment{},
 		CommentsTotal:    max(c.Comments.TotalCount, len(c.Comments.Nodes)),
 	}
 	if v.sprintField != "" {
 		it, unknown := v.sprintOf(c)
-		out.Sprint = &sprintJSON{Field: v.sprintField, Iteration: iterationJSON(it), UnknownReason: unknown}
+		out.Sprint = &sprintJSON{Field: v.sprintField, Iteration: iterationJSON(it), UnknownReason: orNull(unknown)}
 	}
 	if m := c.Milestone; m != nil {
 		out.Milestone = &jsonMilestone{Title: singleLine(m.Title)}
 		if !m.DueOn.IsZero() {
-			out.Milestone.DueOn = cardDay(m.DueOn)
+			out.Milestone.DueOn = orNull(cardDay(m.DueOn))
 		}
 	}
 	if brief {
 		return out
 	}
-	history := []showChange{}
 	if c.OnBoard() || c.BoardUnknown {
 		for _, h := range c.History {
-			history = append(history, showChange{
-				At: jsonTime(h.At), From: h.From, To: h.To, Actor: cardLogin(h.Actor),
+			out.History = append(out.History, showChange{
+				At: jsonTime(h.At), From: orNull(h.From), To: orNull(h.To), Actor: cardLogin(h.Actor),
 				Automated: h.Automated || projectAutomation[h.Actor],
 			})
 		}
 	}
-	out.History = &history
 	body := cleanText(c.Body, true)
 	out.Body = textJSON(body, v.bodyRunes)
-	comments := []showComment{}
 	shown, bodies, limit := v.shownComments(c)
 	for i, cm := range shown {
 		text := bodies[i]
 		if text == "(empty)" && cleanText(cm.Body, cm.ViewerDidAuthor) == "" {
 			text = ""
 		}
-		comments = append(comments, showComment{
+		out.Comments = append(out.Comments, showComment{
 			Author: cardLogin(cm.Author), CreatedAt: jsonTime(cm.CreatedAt), showText: *textJSON(text, limit),
 		})
 	}
-	out.Comments = &comments
 	return out
 }
 
@@ -246,14 +249,14 @@ func textJSON(text string, limit int) *showText {
 func (v cardView) boardJSON(c *issue.Card) showBoard {
 	b := showBoard{
 		OnBoard:       c.OnBoard(),
-		UnknownReason: c.BoardUnknownReason,
-		Status:        c.Status(),
+		UnknownReason: orNull(c.BoardUnknownReason),
+		Status:        orNull(c.Status()),
 		StatusUnknown: c.StatusUnknown(),
 		Archived:      c.Archived(),
 		Fields:        []showField{},
 	}
-	if c.BoardUnknown && b.UnknownReason == "" {
-		b.UnknownReason = "GitHub did not return all of its projects"
+	if c.BoardUnknown && b.UnknownReason == nil {
+		b.UnknownReason = orNull("GitHub did not return all of its projects")
 	}
 	if c.Item != nil {
 		for _, val := range c.Item.Values {
@@ -276,8 +279,8 @@ func (v cardView) linksJSON(c *issue.Card, links []issue.Link) []showLink {
 		}
 		out = append(out, showLink{
 			Ref: l.Ref(c.Repo), Repo: repo.String(), Number: l.Number, Title: singleLine(l.Title),
-			State: strings.ToLower(l.State), OnBoard: l.OnBoard, Status: l.Status, Archived: l.Archived,
-			StatusUnknownReason: l.StatusUnknown, Resolved: l.Resolved(v.resolved),
+			State: strings.ToLower(l.State), OnBoard: l.OnBoard, Status: orNull(l.Status), Archived: l.Archived,
+			StatusUnknownReason: orNull(l.StatusUnknown), Resolved: l.Resolved(v.resolved),
 		})
 	}
 	return out

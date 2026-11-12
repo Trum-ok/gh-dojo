@@ -54,9 +54,12 @@ tests and finishing a partially applied command rely on.
 
 A command prints its result through `emit` (`cmd/gh-dojo/output.go`): it
 builds one typed result and passes the function that prints it as text, so
-the text and `--json` come from the same data. JSON fields are snake_case,
-lists never `null`, no node IDs; a new field is fine, a renamed or removed
-one needs a new `schema_version` (README, "JSON output", lists the schemas).
+the text and `--json` come from the same data (`emitWrite` for a command
+that writes). JSON fields are snake_case and always present: lists are `[]`,
+an absent value is `null`, never `""`; no node IDs. A command returns its
+error as usual: `run` prints it as JSON too. A new field is fine, a renamed or
+removed one needs a new `schema_version` (README, "JSON output", lists the
+schemas).
 Each command has JSON golden files under `cmd/gh-dojo/testdata/json/`.
 
 ## Golden files

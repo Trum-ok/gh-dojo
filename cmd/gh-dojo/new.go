@@ -275,11 +275,11 @@ func newNewCmd() (*cobra.Command, error) {
 			}
 			// A run that stopped after creating the issue prints it as JSON
 			// too; its text is the error.
-			return emitResult(cmd, r.result(err), func(w io.Writer) {
+			return emitWrite(cmd, r.result(), func(w io.Writer) {
 				if err == nil {
 					fmt.Fprintln(w, r.confirm())
 				}
-			}, err)
+			}, err, r.wrote())
 		},
 	}
 	f := cmd.Flags()
@@ -437,11 +437,11 @@ type newResult struct {
 	// found it by its marker and finished it.
 	Created bool     `json:"created"`
 	Labels  []string `json:"labels"`
-	// Status is the issue's status on the board, "" for none; StatusSet
+	// Status is the issue's status on the board, null for none; StatusSet
 	// says this run set it.
-	Status     string `json:"status"`
-	StatusSet  bool   `json:"status_set"`
-	Unarchived bool   `json:"unarchived"`
+	Status     *string `json:"status"`
+	StatusSet  bool    `json:"status_set"`
+	Unarchived bool    `json:"unarchived"`
 	// Milestone is the issue's milestone, nil for none; MilestoneSet says
 	// this run set it. A resumed issue keeps a different milestone it had.
 	Milestone    *jsonMilestone `json:"milestone"`
@@ -450,23 +450,27 @@ type newResult struct {
 	// a resumed issue had.
 	BlockedBy        []string `json:"blocked_by"`
 	AlreadyBlockedBy []string `json:"already_blocked_by"`
-	// Error is what stopped a run after the issue existed (exit code 5,
-	// or 1 for a dependency cycle): re-run the same command.
-	Error *jsonError `json:"error"`
+	// What stopped a run after the issue existed (exit code 5, or 1 for a
+	// dependency cycle) is the top-level "error": re-run the same command.
 }
 
-// result is the run as JSON, err what stopped it.
-func (r *newRun) result(err error) newResult {
+// wrote reports whether this run wrote anything: created the issue, or
+// finished one an earlier run created.
+func (r *newRun) wrote() bool {
+	return !r.resumed || r.added || r.statusSet || r.unarchived || r.milestoneSet || len(r.linked) > 0
+}
+
+// result is the run as JSON.
+func (r *newRun) result() newResult {
 	title := r.title
 	if title == "" {
 		title = r.opts.Title
 	}
 	return newResult{
 		Number: r.number, Repo: r.repo.String(), Title: singleLine(title), Created: !r.resumed,
-		Labels: orEmpty(r.labels), Status: r.status, StatusSet: r.statusSet, Unarchived: r.unarchived,
+		Labels: orEmpty(r.labels), Status: orNull(r.status), StatusSet: r.statusSet, Unarchived: r.unarchived,
 		Milestone: r.milestone.json(), MilestoneSet: r.milestoneSet,
 		BlockedBy: refList(r.linked, r.repo), AlreadyBlockedBy: refList(r.linkedFound, r.repo),
-		Error: errorJSON(err),
 	}
 }
 
@@ -509,6 +513,7 @@ type newRun struct {
 	labels  []string
 
 	itemID     string
+	added      bool   // this run added the issue to the board
 	archived   bool   // the board item was archived when found
 	unarchived bool   // and this run restored it
 	status     string // the status found, "" for none
@@ -762,7 +767,7 @@ func (r *newRun) addToBoard(ctx context.Context, projectID, statusField string) 
 		if out.Add == nil || out.Add.Item == nil || out.Add.Item.ID == "" {
 			return render.Internal("addProjectV2ItemById returned no item")
 		}
-		r.itemID = out.Add.Item.ID
+		r.itemID, r.added = out.Add.Item.ID, true
 		return nil
 	}
 	if errors.Is(err, graph.ErrUnknownOutcome) || ctx.Err() != nil {
@@ -987,7 +992,7 @@ func (m *newMilestone) json() *jsonMilestone {
 	out := &jsonMilestone{Title: singleLine(m.Title)}
 	if m.DueOn != nil {
 		if t, err := time.Parse(time.RFC3339, *m.DueOn); err == nil {
-			out.DueOn = cardDay(t)
+			out.DueOn = orNull(cardDay(t))
 		}
 	}
 	return out

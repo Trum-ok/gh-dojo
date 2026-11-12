@@ -2,6 +2,8 @@ code: 0
 --- stdout
 {
   "schema_version": 1,
+  "error": null,
+  "brief": false,
   "issues": [
     {
       "number": 3,
@@ -9,14 +11,14 @@ code: 0
       "url": "https://github.com/Trum-ok/gh-dojo/issues/3",
       "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)",
       "state": "open",
-      "state_reason": "",
+      "state_reason": null,
       "author": "Trum-ok",
       "created_at": "2026-11-11T18:19:10Z",
       "closed_at": null,
       "incomplete": false,
       "board": {
         "on_board": true,
-        "unknown_reason": "",
+        "unknown_reason": null,
         "status": "Ready",
         "status_unknown": false,
         "archived": false,
@@ -31,7 +33,7 @@ code: 0
       "sprint": null,
       "milestone": {
         "title": "v0.0 — самохостинг",
-        "due_on": ""
+        "due_on": null
       },
       "labels": [],
       "labels_total": 0,
@@ -47,7 +49,7 @@ code: 0
           "on_board": true,
           "status": "Ready",
           "archived": false,
-          "status_unknown_reason": "",
+          "status_unknown_reason": null,
           "resolved": true
         },
         {
@@ -59,7 +61,7 @@ code: 0
           "on_board": true,
           "status": "Ready",
           "archived": false,
-          "status_unknown_reason": "",
+          "status_unknown_reason": null,
           "resolved": true
         }
       ],
@@ -75,7 +77,7 @@ code: 0
           "on_board": true,
           "status": "Ready",
           "archived": false,
-          "status_unknown_reason": "",
+          "status_unknown_reason": null,
           "resolved": true
         },
         {
@@ -87,7 +89,7 @@ code: 0
           "on_board": true,
           "status": "Ready",
           "archived": false,
-          "status_unknown_reason": "",
+          "status_unknown_reason": null,
           "resolved": true
         },
         {
@@ -99,7 +101,7 @@ code: 0
           "on_board": true,
           "status": "Ready",
           "archived": false,
-          "status_unknown_reason": "",
+          "status_unknown_reason": null,
           "resolved": true
         },
         {
@@ -111,7 +113,7 @@ code: 0
           "on_board": true,
           "status": "Ready",
           "archived": false,
-          "status_unknown_reason": "",
+          "status_unknown_reason": null,
           "resolved": true
         },
         {
@@ -123,7 +125,7 @@ code: 0
           "on_board": true,
           "status": "Ready",
           "archived": false,
-          "status_unknown_reason": "",
+          "status_unknown_reason": null,
           "resolved": true
         }
       ],
@@ -131,7 +133,7 @@ code: 0
       "history": [
         {
           "at": "2026-11-11T18:19:14Z",
-          "from": "",
+          "from": null,
           "to": "Backlog",
           "actor": "github-project-automation",
           "automated": true
@@ -162,7 +164,8 @@ code: 0
       "comments_total": 0
     }
   ],
-  "failed": []
+  "failed": [],
+  "warnings": []
 }
 
 --- stderr

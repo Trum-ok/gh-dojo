@@ -2,7 +2,14 @@ code: 5
 --- stdout
 {
   "schema_version": 1,
+  "error": {
+    "exit_code": 5,
+    "message": "2 of 3 done; #7: GitHub write failed (HTTP 502)\nre-run the same command to retry #7: it skips the issues done",
+    "allowed": [],
+    "fix": null
+  },
   "verb": "done",
+  "repo": "Trum-ok/gh-dojo",
   "dry_run": false,
   "issues": [
     {
@@ -59,7 +66,7 @@ code: 5
         "exit_code": 4,
         "message": "GitHub write failed (HTTP 502); it may have been applied, re-run the command to check",
         "allowed": [],
-        "fix": ""
+        "fix": null
       }
     },
     {

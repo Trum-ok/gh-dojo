@@ -2,6 +2,12 @@ code: 1
 --- stdout
 {
   "schema_version": 1,
+  "error": {
+    "exit_code": 1,
+    "message": "choose a project: --project is required (user Trum-ok has 5 projects, listed above)",
+    "allowed": [],
+    "fix": "gh dojo init --owner Trum-ok --project 5"
+  },
   "owner": "Trum-ok",
   "owner_type": "user",
   "projects": [

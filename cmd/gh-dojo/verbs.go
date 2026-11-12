@@ -19,6 +19,7 @@ import (
 	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/effects"
 	"github.com/Trum-ok/gh-dojo/internal/graph"
+	"github.com/Trum-ok/gh-dojo/internal/issue"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/Trum-ok/gh-dojo/internal/workflow"
 	"github.com/spf13/cobra"
@@ -103,6 +104,8 @@ type Backend interface {
 	// runVerb reports a partial write (exit code 5); errors keep their
 	// cause, so board.IsStale tells a rejected schema ID.
 	Apply(ctx context.Context, p *workflow.Plan) ([]workflow.Op, error)
+	// Repo is the default repository, where ReadIssue reads, for the JSON.
+	Repo() (issue.Repo, error)
 	// Reset drops the cached board schema after GitHub rejected one of its
 	// IDs, so the next ReadIssue and Apply use a fresh one.
 	Reset() error
@@ -179,6 +182,10 @@ func newVerbCmd(cfg *config.Config, v config.Verb) *cobra.Command {
 	return cmd
 }
 
+// runVerb runs verb v on issue n. An error that read nothing, such as
+// bad arguments or the network, is the command's alone; once the issue
+// was read (or found missing), its JSON is a verb result for it, as for
+// one issue of a batch, also when it is refused (outcome "failed").
 func runVerb(cmd *cobra.Command, cfg *config.Config, v config.Verb, n int, args workflow.Args, dryRun bool) error {
 	if err := workflow.CheckArgs(v, args, n); err != nil {
 		return err
@@ -190,33 +197,45 @@ func runVerb(cmd *cobra.Command, cfg *config.Config, v config.Verb, n int, args 
 	ctx := cmd.Context()
 	engine := workflow.New(cfg)
 	engine.Getenv = getenv
-	plan, err := readPlanFresh(ctx, be, engine, v, n, args)
+	it, err := readPlanFresh(ctx, be, engine, v, n, args)
 	if err != nil {
 		return err
 	}
+	repo := backendRepo(be)
+	none := func(io.Writer) {} // the text of a failed issue is its error
+	if it.run == nil {
+		return emitResult(cmd, verbJSON(v.Name, repo, dryRun, []*batchItem{it}), none, it.err)
+	}
+	run, plan := it.run, it.run.first
+	run.stderr = cmd.ErrOrStderr()
 	for _, w := range plan.Warnings {
 		render.Warn(cmd.ErrOrStderr(), "%s", w)
 	}
-	run := &verbRun{first: plan, stderr: cmd.ErrOrStderr()}
-	it := &batchItem{n: n, run: run}
 	if dryRun {
-		return emit(cmd, verbJSON(v.Name, true, []*batchItem{it}), func(w io.Writer) {
+		return emit(cmd, verbJSON(v.Name, repo, true, []*batchItem{it}), func(w io.Writer) {
 			fmt.Fprintln(w, plan.DryRun())
 		})
 	}
-	if err := plan.Unconfirmed(); err != nil {
-		return err
+	if it.err = plan.Unconfirmed(); it.err != nil {
+		return emitResult(cmd, verbJSON(v.Name, repo, false, []*batchItem{it}), none, it.err)
 	}
 	it.err = run.applyFresh(ctx, be, func() (*workflow.Plan, error) { return readPlan(ctx, be, engine, v, n, args) })
-	if it.err != nil && len(run.done) == 0 {
-		return it.err // nothing written: stdout stays empty
-	}
 	// A partial write prints what it applied as JSON; its text is the error.
-	return emitResult(cmd, verbJSON(v.Name, false, []*batchItem{it}), func(w io.Writer) {
+	return emitWrite(cmd, verbJSON(v.Name, repo, false, []*batchItem{it}), func(w io.Writer) {
 		if it.err == nil {
 			fmt.Fprintln(w, run.applied().Confirm())
 		}
-	}, it.err)
+	}, it.err, it.wrote())
+}
+
+// backendRepo is the default repository of be, owner/name, for the JSON;
+// "" when not known.
+func backendRepo(be Backend) string {
+	r, err := be.Repo()
+	if err != nil || r == (issue.Repo{}) {
+		return ""
+	}
+	return r.String()
 }
 
 // applyFresh applies r.first. When GitHub rejects a board ID from the
@@ -407,19 +426,50 @@ type schemaCacher interface {
 	SchemaCached() bool
 }
 
-// readPlanFresh is readPlan, once more with a fresh board schema when the
-// one used came from the cache and may explain the error (board.IsStale):
-// say, no iteration for today, added on the board since the schema was
-// cached. Nothing was written yet, so a retry is safe.
-func readPlanFresh(ctx context.Context, be Backend, e *workflow.Engine, v config.Verb, n int, args workflow.Args) (*workflow.Plan, error) {
-	plan, err := readPlan(ctx, be, e, v, n, args)
-	if c, ok := be.(schemaCacher); err == nil || !ok || !c.SchemaCached() || !board.IsStale(err) {
-		return plan, err
+// readPlanFresh reads issue n as runBatch reads each issue and plans v
+// on it, once more with a fresh board schema when the one used came from
+// the cache and may explain the failure (board.IsStale): say, no
+// iteration for today, added on the board since the schema was cached.
+// Nothing was written yet, so a retry is safe.
+//
+// err fails the command, with nothing read (the network, a config error
+// of v); the issue's own failure (not found, a refusal) is the item's
+// err, with read set once the issue was read.
+func readPlanFresh(ctx context.Context, be Backend, e *workflow.Engine, v config.Verb, n int, args workflow.Args) (*batchItem, error) {
+	it, err := readPlanItem(ctx, be, e, v, n, args)
+	failed := err
+	if err == nil {
+		failed = it.err
+	}
+	if c, ok := be.(schemaCacher); failed == nil || !ok || !c.SchemaCached() || !board.IsStale(failed) {
+		return it, err
 	}
 	if be.Reset() != nil {
+		return it, err
+	}
+	return readPlanItem(ctx, be, e, v, n, args)
+}
+
+// readPlanItem is one try of readPlanFresh.
+func readPlanItem(ctx context.Context, be Backend, e *workflow.Engine, v config.Verb, n int, args workflow.Args) (*batchItem, error) {
+	reads, err := be.ReadIssues(ctx, v, []int{n}, args)
+	if err != nil {
 		return nil, err
 	}
-	return readPlan(ctx, be, e, v, n, args)
+	if len(reads) != 1 {
+		return nil, render.Internal("read %d issues for #%d", len(reads), n)
+	}
+	it := &batchItem{n: n}
+	if r := reads[0]; r.Err != nil {
+		it.fail(r.Err)
+	} else if p, err := e.Plan(v, r.Issue, args); err != nil {
+		it.read = &r.Issue
+		it.fail(err)
+	} else {
+		it.read = &r.Issue
+		it.run = &verbRun{first: p}
+	}
+	return it, nil
 }
 
 var issueRE = regexp.MustCompile(`^#?[1-9][0-9]*$`)

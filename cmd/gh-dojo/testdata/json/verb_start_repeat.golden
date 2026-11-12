@@ -2,7 +2,9 @@ code: 0
 --- stdout
 {
   "schema_version": 1,
+  "error": null,
   "verb": "start",
+  "repo": "Trum-ok/gh-dojo",
   "dry_run": false,
   "issues": [
     {
@@ -18,7 +20,8 @@ code: 0
           "to": "In progress"
         },
         {
-          "op": "add_comment"
+          "op": "add_comment",
+          "body": null
         }
       ],
       "needs_yes": false,

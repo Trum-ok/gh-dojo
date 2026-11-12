@@ -2,6 +2,7 @@ code: 0
 --- stdout
 {
   "schema_version": 1,
+  "error": null,
   "number": 3,
   "repo": "Trum-ok/gh-dojo",
   "action": "block",
@@ -10,8 +11,7 @@ code: 0
     "#2",
     "#26"
   ],
-  "missed": [],
-  "error": null
+  "missed": []
 }
 
 --- stderr

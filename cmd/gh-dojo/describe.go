@@ -40,7 +40,7 @@ config is printed as an error (exit code 1). --json gives the same as data.`,
 // process is what describe prints, and its JSON.
 type process struct {
 	Config    string            `json:"config"`
-	Preset    string            `json:"preset"` // "" without one
+	Preset    *string           `json:"preset"` // null without one
 	Board     string            `json:"board"`  // owner/number
 	Repos     []string          `json:"repos"`  // the first is the default; none: the current repository
 	Verbs     []processVerb     `json:"verbs"`
@@ -54,7 +54,7 @@ type process struct {
 
 // processStatuses are the statuses with a role in the process.
 type processStatuses struct {
-	Initial  string   `json:"initial"`  // new issues; "" for none
+	Initial  *string  `json:"initial"`  // new issues; null for none
 	Final    []string `json:"final"`    // list hides them
 	Resolved []string `json:"resolved"` // a blocker in one no longer blocks
 }
@@ -64,7 +64,7 @@ type processVerb struct {
 	Name          string   `json:"name"`
 	When          string   `json:"when"`
 	From          []string `json:"from"` // empty: any status
-	To            string   `json:"to"`   // empty: the status is not changed
+	To            *string  `json:"to"`   // null: the status is not changed
 	Requires      []string `json:"requires"`
 	RequiresOneOf []string `json:"requires_one_of"`
 	Optional      []string `json:"optional"`
@@ -187,17 +187,17 @@ const maxTemplateRunes = 60
 func describeProcess(cfg *config.Config) *process {
 	p := &process{
 		Config: cfg.Display,
-		Preset: cfg.Preset,
+		Preset: orNull(cfg.Preset),
 		Board:  fmt.Sprintf("%s/%d", cfg.Board.Owner, cfg.Board.Project),
 		Repos:  orEmpty(cfg.Board.Repos),
 		Verbs:  []processVerb{},
 		Statuses: processStatuses{
-			Initial: cfg.Statuses.Initial, Final: orEmpty(cfg.Statuses.Final), Resolved: orEmpty(cfg.Statuses.Resolved),
+			Initial: orNull(cfg.Statuses.Initial), Final: orEmpty(cfg.Statuses.Final), Resolved: orEmpty(cfg.Statuses.Resolved),
 		},
 	}
 	for _, v := range cfg.Verbs {
 		pv := processVerb{
-			Name: v.Name, When: v.When, From: orEmpty(v.From), To: v.To, Batch: v.Batch,
+			Name: v.Name, When: v.When, From: orEmpty(v.From), To: orNull(v.To), Batch: v.Batch,
 			Requires: []string{}, RequiresOneOf: []string{}, Optional: []string{}, Checks: []string{}, Effects: []string{},
 		}
 		for _, arg := range config.Args() {
@@ -248,8 +248,8 @@ func describeProcess(cfg *config.Config) *process {
 //	  ...
 func (p *process) text() string {
 	head := "Process from " + p.Config
-	if p.Preset != "" {
-		head += " (preset " + p.Preset + ")"
+	if p.Preset != nil {
+		head += " (preset " + *p.Preset + ")"
 	}
 	issues := "the current repository"
 	if len(p.Repos) > 0 {

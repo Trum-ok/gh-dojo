@@ -3,6 +3,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -22,28 +23,75 @@ func main() {
 
 // run builds the root command with newRoot, executes it with args and returns
 // the exit code. Errors, including those of building the commands, are
-// printed to stderr as a short error block.
+// printed to stderr as a short error block; with --json, --jq or
+// --template they are also printed on stdout as JSON (see report).
 //
 // A panic while building or running the commands becomes the same short
 // internal error. Only panics on this goroutine are caught: a panic in a
 // goroutine started by a command still crashes the process with a trace, so
 // such goroutines must recover themselves and return an error.
 func run(newRoot func() (*cobra.Command, error), args []string, stdout, stderr io.Writer) (code render.Code) {
+	o := rawOutput(args) // until cobra parsed the flags
 	defer func() {
 		if r := recover(); r != nil {
 			msg, _, _ := strings.Cut(fmt.Sprint(r), "\n") // never print a trace
-			code = render.WriteError(stderr, render.Internal("%s", msg))
+			code = report(stdout, stderr, o, render.Internal("%s", msg))
 		}
 	}()
 	root, err := newRoot()
 	if err != nil {
-		return render.WriteError(stderr, err)
+		return report(stdout, stderr, o, err)
 	}
 	if args == nil {
 		args = []string{} // cobra reads os.Args for nil
 	}
+	if fields, single := jsonFields(args); fields != "" && !single {
+		// gh's --json number,title: refused before the command runs, or
+		// the list would be read as an argument.
+		cmd, _, ferr := root.Find(args)
+		if ferr != nil {
+			cmd = root
+		}
+		return report(stdout, stderr, o, jsonFieldsError(cmd, fields))
+	}
 	root.SetArgs(args)
 	root.SetOut(stdout)
 	root.SetErr(stderr)
-	return render.WriteError(stderr, root.Execute())
+	cmd, err := root.ExecuteC()
+	if cmd != nil {
+		if co := outputOf(cmd); co.json {
+			o = co
+		}
+		// --json number: one field, taken as an argument the command
+		// rejected. new and comment take text: only an error naming it
+		// is about it. At the root it is more likely a mistyped command.
+		if fields, _ := jsonFields(args); fields != "" && err != nil && cmd.HasParent() && !isCommand(cmd.Root(), fields) {
+			if e := render.FromError(err); e.Code == render.ExitUsage &&
+				(strings.Contains(e.What, fields) || strings.Contains(e.What, "takes no arguments")) {
+				err = jsonFieldsError(cmd, fields)
+			}
+		}
+	}
+	return report(stdout, stderr, o, err)
+}
+
+// report prints err, if any, and returns the exit code: as text on stderr,
+// and in JSON mode (o) also on stdout as {"schema_version":1,"error":...},
+// unless the command printed its JSON with the error in it already.
+func report(stdout, stderr io.Writer, o output, err error) render.Code {
+	if err == nil {
+		return render.ExitOK
+	}
+	var done reportedError
+	if o.json && !errors.As(err, &done) {
+		writeErrorJSON(stdout, o, err)
+	}
+	return render.WriteError(stderr, err)
+}
+
+// isCommand reports whether name is a command of root (gh dojo --json
+// start 3).
+func isCommand(root *cobra.Command, name string) bool {
+	c, _, err := root.Find([]string{name})
+	return err == nil && c != root
 }

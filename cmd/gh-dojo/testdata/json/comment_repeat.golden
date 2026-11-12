@@ -2,6 +2,7 @@ code: 0
 --- stdout
 {
   "schema_version": 1,
+  "error": null,
   "number": 3,
   "repo": "Trum-ok/gh-dojo",
   "posted": false

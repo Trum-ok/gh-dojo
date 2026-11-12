@@ -2,7 +2,14 @@ code: 2
 --- stdout
 {
   "schema_version": 1,
+  "error": {
+    "exit_code": 2,
+    "message": "3 of 4 done (2 written); #17: done cannot move #17 from Backlog, it starts only from Ready or In progress\nthis is a process rule: ask the user how to proceed",
+    "allowed": [],
+    "fix": null
+  },
   "verb": "done",
+  "repo": "Trum-ok/gh-dojo",
   "dry_run": false,
   "issues": [
     {
@@ -90,7 +97,7 @@ code: 2
     },
     {
       "number": 17,
-      "title": "",
+      "title": "Issue 17",
       "outcome": "failed",
       "planned": [],
       "applied": [],
@@ -101,7 +108,7 @@ code: 2
         "exit_code": 2,
         "message": "done cannot move #17 from Backlog; it starts only from Ready or In progress\nthis is a process rule: ask the user how to proceed",
         "allowed": [],
-        "fix": ""
+        "fix": null
       }
     }
   ],

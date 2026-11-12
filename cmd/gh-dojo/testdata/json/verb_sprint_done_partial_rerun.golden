@@ -2,7 +2,9 @@ code: 0
 --- stdout
 {
   "schema_version": 1,
+  "error": null,
   "verb": "done",
+  "repo": "acme/shop",
   "dry_run": false,
   "issues": [
     {
@@ -12,7 +14,7 @@ code: 0
       "planned": [
         {
           "op": "set_iteration",
-          "from": "",
+          "from": null,
           "to": "Sprint 11",
           "start_date": "2026-10-26"
         }
@@ -20,7 +22,7 @@ code: 0
       "applied": [
         {
           "op": "set_iteration",
-          "from": "",
+          "from": null,
           "to": "Sprint 11",
           "start_date": "2026-10-26"
         }

@@ -11,6 +11,7 @@ import (
 // verbResult is a verb's JSON.
 type verbResult struct {
 	Verb    string      `json:"verb"`
+	Repo    *string     `json:"repo"` // owner/name of the issues; null when not known
 	DryRun  bool        `json:"dry_run"`
 	Issues  []verbIssue `json:"issues"` // in the order of the arguments
 	Summary verbSummary `json:"summary"`
@@ -34,7 +35,7 @@ type verbSummary struct {
 const (
 	outcomePlanned   = "planned"   // dry run: this would be applied
 	outcomeApplied   = "applied"   // every planned op applied
-	outcomeUnchanged = "unchanged" // nothing to apply: every effect in place
+	outcomeUnchanged = "unchanged" // nothing to apply, also in a dry run: every effect in place
 	outcomePartial   = "partial"   // some ops applied, the rest not: see error
 	outcomeFailed    = "failed"    // nothing applied: see error
 	// outcomeNotAttempted: an error that stops every write (auth, rate
@@ -43,9 +44,9 @@ const (
 )
 
 type verbIssue struct {
-	Number  int    `json:"number"`
-	Title   string `json:"title"` // "" when the issue was not read
-	Outcome string `json:"outcome"`
+	Number  int     `json:"number"`
+	Title   *string `json:"title"` // null when the issue was not read
+	Outcome string  `json:"outcome"`
 	// Planned are the ops to apply, Applied the ones GitHub confirmed (none
 	// in a dry run), InPlace the effects found done already.
 	Planned  []jsonOp `json:"planned"`
@@ -58,35 +59,76 @@ type verbIssue struct {
 }
 
 // jsonOp is one effect of a plan. Op names its kind; the other fields are
-// those of the kind, left out otherwise.
+// those of the kind (see MarshalJSON), each always there.
 type jsonOp struct {
 	// Op is add_to_board, unarchive, reopen, set_status, set_iteration,
 	// set_fields, add_labels, remove_labels, assign, add_blocked_by,
 	// add_comment or close.
-	Op string `json:"op"`
+	Op string
 	// From and To are the status (set_status) or iteration title
-	// (set_iteration) before and after; "" for none.
-	From      *string           `json:"from,omitempty"`
-	To        *string           `json:"to,omitempty"`
-	StartDate string            `json:"start_date,omitempty"` // set_iteration: the start of To
-	Fields    []jsonFieldChange `json:"fields,omitempty"`     // set_fields
-	Labels    []string          `json:"labels,omitempty"`     // add_labels, remove_labels
-	Login     string            `json:"login,omitempty"`      // assign
-	Issue     string            `json:"issue,omitempty"`      // add_blocked_by: "#12" or "owner/name#12"
-	Body      string            `json:"body,omitempty"`       // add_comment, without the hidden marker; "" when in place
-	Reason    string            `json:"reason,omitempty"`     // close: completed, not_planned, duplicate
+	// (set_iteration) before and after; "" (null) for none.
+	From, To  string
+	StartDate string            // set_iteration: the start of To; "" (null) for none
+	Fields    []jsonFieldChange // set_fields
+	Labels    []string          // add_labels, remove_labels
+	Login     string            // assign
+	Issue     string            // add_blocked_by: "#12" or "owner/name#12"
+	Body      string            // add_comment, without the hidden marker; "" (null) when in place
+	Reason    string            // close: completed, not_planned, duplicate
+}
+
+// MarshalJSON writes op and the fields of its kind, in this order.
+func (o jsonOp) MarshalJSON() ([]byte, error) {
+	type kv struct {
+		k string
+		v any
+	}
+	fields := []kv{{"op", o.Op}}
+	switch o.Op {
+	case "set_status":
+		fields = append(fields, kv{"from", orNull(o.From)}, kv{"to", orNull(o.To)})
+	case "set_iteration":
+		fields = append(fields, kv{"from", orNull(o.From)}, kv{"to", orNull(o.To)}, kv{"start_date", orNull(o.StartDate)})
+	case "set_fields":
+		fields = append(fields, kv{"fields", orEmpty(o.Fields)})
+	case "add_labels", "remove_labels":
+		fields = append(fields, kv{"labels", orEmpty(o.Labels)})
+	case "assign":
+		fields = append(fields, kv{"login", o.Login})
+	case "add_blocked_by":
+		fields = append(fields, kv{"issue", o.Issue})
+	case "add_comment":
+		fields = append(fields, kv{"body", orNull(o.Body)})
+	case "close":
+		fields = append(fields, kv{"reason", o.Reason})
+	}
+	b := []byte{'{'}
+	for i, f := range fields {
+		if i > 0 {
+			b = append(b, ',')
+		}
+		k, err := marshal(f.k)
+		if err != nil {
+			return nil, err
+		}
+		v, err := marshal(f.v)
+		if err != nil {
+			return nil, err
+		}
+		b = append(append(append(b, k...), ':'), v...)
+	}
+	return append(b, '}'), nil
 }
 
 type jsonFieldChange struct {
-	Field string `json:"field"`
-	From  string `json:"from"`
-	To    string `json:"to"`
+	Field string  `json:"field"`
+	From  *string `json:"from"` // null for none
+	To    *string `json:"to"`   // null: cleared
 }
 
 // opJSON is op as JSON. The status of an issue not on the board reads
-// from "" (no status).
+// from null (no status).
 func opJSON(op workflow.Op) jsonOp {
-	str := func(s string) *string { return &s }
 	switch op := op.(type) {
 	case workflow.AddToBoard:
 		return jsonOp{Op: "add_to_board"}
@@ -95,19 +137,19 @@ func opJSON(op workflow.Op) jsonOp {
 	case workflow.Reopen:
 		return jsonOp{Op: "reopen"}
 	case workflow.SetStatus:
-		return jsonOp{Op: "set_status", From: str(op.From), To: str(op.To)}
+		return jsonOp{Op: "set_status", From: op.From, To: op.To}
 	case workflow.SetIteration:
-		return jsonOp{Op: "set_iteration", From: str(op.From), To: str(op.To), StartDate: op.Start}
+		return jsonOp{Op: "set_iteration", From: op.From, To: op.To, StartDate: op.Start}
 	case workflow.SetFields:
 		out := jsonOp{Op: "set_fields", Fields: []jsonFieldChange{}}
 		for _, c := range op.Changes {
-			out.Fields = append(out.Fields, jsonFieldChange{Field: c.Field, From: c.From, To: c.To})
+			out.Fields = append(out.Fields, jsonFieldChange{Field: c.Field, From: orNull(c.From), To: orNull(c.To)})
 		}
 		return out
 	case workflow.AddLabels:
-		return jsonOp{Op: "add_labels", Labels: orEmpty(op.Names)}
+		return jsonOp{Op: "add_labels", Labels: op.Names}
 	case workflow.RemoveLabels:
-		return jsonOp{Op: "remove_labels", Labels: orEmpty(op.Names)}
+		return jsonOp{Op: "remove_labels", Labels: op.Names}
 	case workflow.Assign:
 		return jsonOp{Op: "assign", Login: op.Login}
 	case workflow.AddBlockedBy:
@@ -149,9 +191,10 @@ func inPlaceJSON(p *workflow.Plan) []jsonOp {
 	return opsJSON(append(ops, closing...))
 }
 
-// verbJSON is the JSON of verb v run on items; dry for a dry run.
-func verbJSON(v string, dry bool, items []*batchItem) verbResult {
-	r := verbResult{Verb: v, DryRun: dry, Issues: []verbIssue{}, Summary: verbSummary{Total: len(items)}}
+// verbJSON is the JSON of verb v run on items of repo ("" when not
+// known); dry for a dry run.
+func verbJSON(v, repo string, dry bool, items []*batchItem) verbResult {
+	r := verbResult{Verb: v, Repo: orNull(repo), DryRun: dry, Issues: []verbIssue{}, Summary: verbSummary{Total: len(items)}}
 	for _, it := range items {
 		is := it.json(dry)
 		switch is.Outcome {
@@ -176,17 +219,24 @@ func (it *batchItem) json(dry bool) verbIssue {
 		Number: it.n, Outcome: outcomeFailed, Planned: []jsonOp{}, Applied: []jsonOp{}, InPlace: []jsonOp{},
 		Warnings: []string{}, Error: errorJSON(it.err),
 	}
+	if it.read != nil {
+		out.Title = orNull(singleLine(it.read.Title))
+	}
 	if it.run == nil {
 		return out
 	}
 	first := it.run.first
-	out.Title = singleLine(first.Issue.Title)
+	out.Title = orNull(singleLine(first.Issue.Title))
 	out.Planned = opsJSON(first.Ops)
 	out.NeedsYes = first.NeedsYes
 	out.Warnings = orEmpty(first.Warnings)
 	if dry {
 		out.InPlace = inPlaceJSON(first)
-		if it.err == nil {
+		switch {
+		case it.err != nil:
+		case first.Empty():
+			out.Outcome = outcomeUnchanged
+		default:
 			out.Outcome = outcomePlanned
 		}
 		return out

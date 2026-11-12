@@ -88,7 +88,8 @@ func runBatch(cmd *cobra.Command, cfg *config.Config, v config.Verb, ns []int, a
 	}
 	// The text was printed issue by issue as it went; JSON comes at the
 	// end, for every issue, also when the summary is an error.
-	return emitResult(cmd, verbJSON(v.Name, dryRun, items), func(io.Writer) {}, b.summary(items, dryRun))
+	return emitWrite(cmd, verbJSON(v.Name, backendRepo(be), dryRun, items), func(io.Writer) {},
+		b.summary(items, dryRun), slices.ContainsFunc(items, (*batchItem).wrote))
 }
 
 // batchRun is one run of a verb on several issues.
@@ -106,8 +107,9 @@ type batchRun struct {
 
 // batchItem is one issue of a batch run.
 type batchItem struct {
-	n   int
-	run *verbRun // nil until planned
+	n    int
+	read *workflow.Issue // nil until read
+	run  *verbRun        // nil until planned
 	// err is why the issue was not applied, or not in full; why is its
 	// reason in the summary, without ";" so the summary can list several.
 	err error
@@ -122,6 +124,7 @@ func (b *batchRun) plan(it *batchItem, r IssueRead) {
 		it.fail(r.Err)
 		return
 	}
+	it.read = &r.Issue
 	p, err := b.engine.Plan(b.v, r.Issue, b.args)
 	if err != nil {
 		it.fail(err)
@@ -177,7 +180,7 @@ func (b *batchRun) replanStale(ctx context.Context, items []*batchItem) {
 		if err == nil {
 			r = reads[i]
 		}
-		it.err, it.why, it.run = nil, "", nil
+		it.err, it.why, it.read, it.run = nil, "", nil, nil
 		b.plan(it, r)
 	}
 }

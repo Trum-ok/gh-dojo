@@ -42,6 +42,6 @@ Flags:
 
 Global Flags:
   -q, --jq expression       filter the JSON with a jq expression (implies --json)
-      --json                print the result as JSON (schema_version 1); errors stay text on stderr
+      --json                print the result as JSON (schema_version 1), errors too
   -t, --template template   format the JSON with a Go template (implies --json)
 --- stderr

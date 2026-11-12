@@ -2,6 +2,17 @@ code: 1
 --- stdout
 {
   "schema_version": 1,
+  "error": {
+    "exit_code": 1,
+    "message": ".github/dojo.toml would not match board github/4247: 5 problems above",
+    "allowed": [
+      "Up Next",
+      "Exploring",
+      "Shipped",
+      "Paused"
+    ],
+    "fix": "gh dojo init --owner github --project 4247"
+  },
   "path": ".github/dojo.toml",
   "written": false,
   "board": "github/4247",

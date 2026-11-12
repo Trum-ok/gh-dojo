@@ -116,7 +116,7 @@ printed, with exit code 3.`,
 				}
 			}
 			err = showError(repo, unread, failed, readErr)
-			if len(cards) == 0 { // it failed outright: stdout stays empty
+			if len(cards) == 0 { // it failed outright: the error alone, also in JSON
 				return err
 			}
 			return emitResult(cmd, v.result(cards, brief, failed, unread, readErr), text, err)

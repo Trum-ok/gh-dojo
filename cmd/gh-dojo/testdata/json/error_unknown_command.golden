@@ -1,0 +1,30 @@
+code: 1
+--- stdout
+{
+  "schema_version": 1,
+  "error": {
+    "exit_code": 1,
+    "message": "unknown command \"nosuch\"",
+    "allowed": [
+      "block",
+      "comment",
+      "describe",
+      "doctor",
+      "done",
+      "init",
+      "list",
+      "new",
+      "ready",
+      "show",
+      "start",
+      "unblock",
+      "wait"
+    ],
+    "fix": "gh dojo --help"
+  }
+}
+
+--- stderr
+error: unknown command "nosuch"
+allowed: block, comment, describe, doctor, done, init, list, new, ready, show, start, unblock, wait
+fix: gh dojo --help

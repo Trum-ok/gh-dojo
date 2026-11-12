@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
 	"slices"
 	"strconv"
 	"strings"
@@ -74,7 +75,6 @@ func buildRoot(ctors []constructor) (*cobra.Command, error) {
 		Long: "gh dojo moves issues through a GitHub Projects board with process verbs\n" +
 			"defined in .github/dojo.toml, so agents never deal with field or option IDs." +
 			configNote(),
-		Version: version,
 		Annotations: map[string]string{
 			cobra.CommandDisplayNameAnnotation: "gh dojo",
 			rootSectionsAnnotation:             processHelp() + exitCodesHelp(),
@@ -84,8 +84,10 @@ func buildRoot(ctors []constructor) (*cobra.Command, error) {
 		CompletionOptions:          cobra.CompletionOptions{DisableDefaultCmd: true},
 		Args:                       unknownCommand,
 		SuggestionsMinimumDistance: 2,
-		RunE:                       func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
+		RunE:                       runRoot,
 	}
+	// --version is gh-dojo's own, not cobra's, so it prints JSON too.
+	root.Flags().BoolP("version", "v", false, "version for gh dojo")
 	root.SetUsageTemplate(rootUsageTemplate(root.UsageTemplate()))
 	addOutputFlags(root)
 	root.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
@@ -130,6 +132,17 @@ func buildRoot(ctors []constructor) (*cobra.Command, error) {
 	}
 	prepare(root)
 	return root, nil
+}
+
+// runRoot prints the version for --version, and for --json, which has no
+// other result to show; else the help.
+func runRoot(cmd *cobra.Command, _ []string) error {
+	if v, _ := cmd.Flags().GetBool("version"); v || jsonMode(cmd) {
+		return emit(cmd, versionResult{Version: version}, func(w io.Writer) {
+			fmt.Fprintf(w, "gh dojo version %s\n", version)
+		})
+	}
+	return cmd.Help()
 }
 
 // rootSectionsAnnotation holds the root help sections that follow the

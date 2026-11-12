@@ -1,5 +1,43 @@
 code: 2
 --- stdout
+{
+  "schema_version": 1,
+  "error": {
+    "exit_code": 2,
+    "message": "done cannot move #43 from Waiting; it starts only from Ready or In progress\nthis is a process rule: ask the user how to proceed",
+    "allowed": [],
+    "fix": null
+  },
+  "verb": "done",
+  "repo": "acme/shop",
+  "dry_run": true,
+  "issues": [
+    {
+      "number": 43,
+      "title": "Pay with gift cards",
+      "outcome": "failed",
+      "planned": [],
+      "applied": [],
+      "in_place": [],
+      "needs_yes": false,
+      "warnings": [],
+      "error": {
+        "exit_code": 2,
+        "message": "done cannot move #43 from Waiting; it starts only from Ready or In progress\nthis is a process rule: ask the user how to proceed",
+        "allowed": [],
+        "fix": null
+      }
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "done": 0,
+    "written": 0,
+    "failed": 1,
+    "not_attempted": 0
+  }
+}
+
 --- stderr
 error: done cannot move #43 from Waiting; it starts only from Ready or In progress
 this is a process rule: ask the user how to proceed

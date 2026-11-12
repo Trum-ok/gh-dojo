@@ -451,6 +451,8 @@ func statusUnknown(c *issue.Card) error {
 
 func (b *githubBackend) Reset() error { return b.app.ResetSchema() }
 
+func (b *githubBackend) Repo() (issue.Repo, error) { return b.app.Repo() }
+
 // Apply sends the plan's ops as effects.Batches, one mutation each, and
 // returns the ops GitHub confirmed. It stops at the first mutation that
 // left an op unconfirmed. A mutation that answered for every field but

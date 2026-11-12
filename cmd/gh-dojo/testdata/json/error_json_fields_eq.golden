@@ -1,0 +1,15 @@
+code: 1
+--- stdout
+{
+  "schema_version": 1,
+  "error": {
+    "exit_code": 1,
+    "message": "--json takes no fields, got \"number,title\": it prints them all; pick some with --jq, like --jq '{number, title}'",
+    "allowed": [],
+    "fix": "gh dojo show --help"
+  }
+}
+
+--- stderr
+error: --json takes no fields, got "number,title": it prints them all; pick some with --jq, like --jq '{number, title}'
+fix: gh dojo show --help

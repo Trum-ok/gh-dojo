@@ -2,6 +2,7 @@ code: 0
 --- stdout
 {
   "schema_version": 1,
+  "error": null,
   "number": 15,
   "repo": "Trum-ok/gh-dojo",
   "title": "Fix login redirect",
@@ -16,8 +17,7 @@ code: 0
   "milestone": null,
   "milestone_set": false,
   "blocked_by": [],
-  "already_blocked_by": [],
-  "error": null
+  "already_blocked_by": []
 }
 
 --- stderr

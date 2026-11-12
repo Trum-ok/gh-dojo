@@ -1,0 +1,15 @@
+code: 1
+--- stdout
+{
+  "schema_version": 1,
+  "error": {
+    "exit_code": 1,
+    "message": "unknown flag: --bogus",
+    "allowed": [],
+    "fix": "gh dojo list --help"
+  }
+}
+
+--- stderr
+error: unknown flag: --bogus
+fix: gh dojo list --help

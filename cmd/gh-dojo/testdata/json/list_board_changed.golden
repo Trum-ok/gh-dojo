@@ -2,6 +2,8 @@ code: 0
 --- stdout
 {
   "schema_version": 1,
+  "error": null,
+  "sprint_filter": null,
   "sprint": null,
   "issues": [
     {
@@ -36,7 +38,10 @@ code: 0
     "pull_requests": 0,
     "unseen": 0
   },
-  "incomplete": false
+  "incomplete": false,
+  "warnings": [
+    "the board changed while it was read (2 items read, GitHub reports 3); run again for an exact list"
+  ]
 }
 
 --- stderr

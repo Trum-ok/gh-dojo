@@ -71,7 +71,7 @@ written (exit code 3).`
 			if res == nil { // nothing done
 				return err
 			}
-			return emitResult(cmd, res, res.write, err) // err: done in part
+			return emitWrite(cmd, res, res.write, err, len(res.Changed) > 0) // err: done in part
 		},
 	}
 	cmd.Flags().StringArrayVar(&bys, byFlag, nil, "the blocking `issue`: 12, \"#12\", owner/repo#12 or its URL; repeatable, or comma-separated")
@@ -173,7 +173,7 @@ func runLinks(cmd *cobra.Command, add bool, n int, bys []string) (*linksResult, 
 		return &linksResult{
 			Number: n, Repo: repo.String(), Action: cmd.Name(),
 			Changed: refList(done, repo), Unchanged: refList(same, repo), Missed: refList(missed, repo),
-			Error: errorJSON(err), line: line(done), err: err,
+			line: line(done), err: err,
 		}
 	}
 	if len(change) == 0 {
@@ -238,11 +238,10 @@ type linksResult struct {
 	Action string `json:"action"` // block or unblock
 	// Changed are the blockers linked (block) or unlinked (unblock) now,
 	// Unchanged those already as asked, Missed those a partial write left
-	// as they were (see error).
-	Changed   []string   `json:"changed"`
-	Unchanged []string   `json:"unchanged"`
-	Missed    []string   `json:"missed"`
-	Error     *jsonError `json:"error"`
+	// as they were (see the top-level "error").
+	Changed   []string `json:"changed"`
+	Unchanged []string `json:"unchanged"`
+	Missed    []string `json:"missed"`
 
 	line string // the confirmation line
 	err  error  // what stopped a partial write

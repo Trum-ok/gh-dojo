@@ -62,8 +62,8 @@ func warmApp(t *testing.T, fixtures ...string) {
 }
 
 // TestShowJSON: show --json for full and brief cards, several numbers with
-// one missing (exit code 3, the error text on stderr), and blockers both
-// ways.
+// one missing (exit code 3, the error in the JSON and as text on stderr),
+// one missing alone (the error object only), and blockers both ways.
 func TestShowJSON(t *testing.T) {
 	for _, tt := range []struct {
 		name    string
@@ -178,8 +178,8 @@ func checkJSONRuns(t *testing.T, srv *graphtest.Server, before int, steps ...run
 
 // TestVerbJSON: a verb's plan, what it applied and what was in place, for
 // one issue: applied, unchanged on a repeat, a partial write (exit 5, the
-// JSON says what applied and the error stays text on stderr), and dry
-// runs, which give the plan.
+// JSON says what applied and its error what did not), a refusal or a
+// failed write (outcome failed), and dry runs, which give the plan.
 func TestVerbJSON(t *testing.T) {
 	t.Run("start", func(t *testing.T) {
 		srv, before := withWarmVerbApp(t, verbFixture("start_ok"))
@@ -200,7 +200,7 @@ func TestVerbJSON(t *testing.T) {
 			runs{[]string{"start", "3"}, render.ExitOK, 2, "verb_start_partial_rerun"},
 		)
 	})
-	t.Run("start_502", func(t *testing.T) { // nothing confirmed: no JSON
+	t.Run("start_502", func(t *testing.T) { // nothing confirmed: outcome failed
 		srv, before := withWarmVerbApp(t, verbFixture("start_502"))
 		checkJSONRuns(t, srv, before, runs{[]string{"start", "3"}, render.ExitNetwork, 2, "verb_start_502"})
 	})
@@ -249,7 +249,7 @@ func TestVerbJSON(t *testing.T) {
 		before := warmSchema(t, srv)
 		checkJSONRuns(t, srv, before,
 			runs{[]string{"start", "43", "--comment", "Card form first", "--dry-run"}, render.ExitOK, 1, "verb_sprints_start_dry_run"},
-			// Refused: an error before anything is written leaves stdout empty.
+			// Refused once read: the verb's JSON, outcome failed.
 			runs{[]string{"done", "43", "--dry-run"}, render.ExitDenied, 1, "verb_sprints_done_waiting"},
 		)
 	})
@@ -257,7 +257,7 @@ func TestVerbJSON(t *testing.T) {
 
 // TestBatchJSON: a verb on several issues reports each one, also those
 // refused or failed, then exits with the batch's code; the summary error
-// stays text on stderr.
+// is the top-level error, and text on stderr.
 func TestBatchJSON(t *testing.T) {
 	t.Run("refused", func(t *testing.T) {
 		srv, before := withWarmVerbApp(t, verbFixture("batch_done_refused"))
@@ -310,7 +310,7 @@ func TestBatchOutcomesJSON(t *testing.T) {
 }
 
 // TestWriteJSON: comment, new, block and unblock, also a partial write:
-// exit 5, the JSON saying what was done, the error text on stderr.
+// exit 5, the JSON saying what was done and its error what was not.
 func TestWriteJSON(t *testing.T) {
 	t.Run("comment", func(t *testing.T) {
 		withConfig(t, dojoConfig)
@@ -470,5 +470,154 @@ func TestOutputFlags(t *testing.T) {
 			}
 			testutil.Golden(t, "json/flags_"+tt.name, out)
 		})
+	}
+}
+
+// runStreams runs gh dojo with args and returns the exit code, stdout and
+// stderr.
+func runStreams(args ...string) (render.Code, string, string) {
+	var stdout, stderr bytes.Buffer
+	code := run(newRootCmd, args, &stdout, &stderr)
+	return code, stdout.String(), stderr.String()
+}
+
+// TestErrorJSON: in JSON mode an error with no result is JSON on stdout,
+// {"schema_version":1,"error":{...}}, with the same exit code and the
+// same text on stderr; also for a flag cobra could not parse.
+func TestErrorJSON(t *testing.T) {
+	withConfig(t, dojoConfig)
+	for _, tt := range []struct {
+		name string
+		args []string
+		code render.Code
+	}{
+		{"bad_limit", []string{"list", "--limit", "0", "--json"}, render.ExitUsage},
+		{"unknown_flag", []string{"list", "--json", "--bogus"}, render.ExitUsage},
+		{"unknown_flag_first", []string{"list", "--bogus", "--json"}, render.ExitUsage},
+		{"unknown_command", []string{"--json", "nosuch"}, render.ExitUsage},
+		{"json_fields", []string{"list", "--json", "number,title"}, render.ExitUsage},
+		{"json_fields_eq", []string{"show", "--json=number,title", "3"}, render.ExitUsage},
+		{"json_field_arg", []string{"show", "--json", "number", "3"}, render.ExitUsage},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			code, out := runJSON(t, tt.args...) // newApp is noApp: no request may be sent
+			if code != tt.code {
+				t.Errorf("exit code = %d, want %d\n%s", code, tt.code, out)
+			}
+			testutil.Golden(t, "json/error_"+tt.name, out)
+		})
+	}
+}
+
+// TestErrorJQ: --jq and --template apply to the error object too; one
+// that fails on it leaves stdout empty, the error on stderr.
+func TestErrorJQ(t *testing.T) {
+	withConfig(t, dojoConfig)
+	for _, tt := range []struct {
+		args   []string
+		stdout string
+	}{
+		{[]string{"list", "--limit", "0", "--jq", ".error.exit_code"}, "1\n"},
+		{[]string{"list", "--limit", "0", "--template", "{{.error.message}}"}, "invalid --limit 0: want 1 or greater"},
+		{[]string{"list", "--limit", "0", "--jq", ".issues[]"}, ""},
+		{[]string{"list", "--limit", "0", "--jq", ".issues["}, ""}, // invalid: nothing to apply
+	} {
+		code, stdout, stderr := runStreams(tt.args...)
+		if code != render.ExitUsage || stdout != tt.stdout || !strings.HasPrefix(stderr, "error: ") {
+			t.Errorf("%q: code %d, stdout %q, stderr %q; want 1, %q, the error", tt.args, code, stdout, stderr, tt.stdout)
+		}
+	}
+}
+
+// TestVerbFailedJSON: once the issue was read (or found missing), a verb
+// that fails prints its result with outcome "failed", as a batch does for
+// each issue; a dry run with nothing to do is "unchanged".
+func TestVerbFailedJSON(t *testing.T) {
+	withConfig(t, verbsConfig)
+	withBackend(t, &fakeBackend{issues: map[int]workflow.Issue{
+		3: {Number: 3, Title: "Done already", OnBoard: true, Status: "Done", Closed: true, StateReason: "completed"},
+		4: {Number: 4, Title: "In backlog", OnBoard: true, Status: "Backlog"},
+	}})
+	for _, tt := range []struct {
+		name string
+		args []string
+		code render.Code
+	}{
+		{"not_found", []string{"done", "9"}, render.ExitNotFound},
+		{"refused", []string{"done", "4"}, render.ExitDenied},
+		{"dry_run_unchanged", []string{"done", "3", "--dry-run"}, render.ExitOK},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			code, out := runJSON(t, append(tt.args, "--json")...)
+			if code != tt.code {
+				t.Errorf("exit code = %d, want %d\n%s", code, tt.code, out)
+			}
+			testutil.Golden(t, "json/verb_failed_"+tt.name, out)
+		})
+	}
+}
+
+// TestFilterAfterWrite: --jq or --template failing on the result of a
+// write is a warning naming what was applied; the exit code stays the
+// command's, never 1 after a write.
+func TestFilterAfterWrite(t *testing.T) {
+	withConfig(t, verbsConfig)
+	f := &fakeBackend{issues: map[int]workflow.Issue{2: {Number: 2, OnBoard: true, Status: "Ready"}}}
+	withBackend(t, f)
+	code, stdout, stderr := runStreams("done", "2", "--jq", ".nope[]")
+	want := "warning: done applied; --jq failed on its result: cannot iterate over: null\n"
+	if code != render.ExitOK || stdout != "" || stderr != want || len(f.applied) != 1 {
+		t.Errorf("code %d, stdout %q, stderr %q, %d applied; want 0, none, %q, 1", code, stdout, stderr, len(f.applied), want)
+	}
+}
+
+// TestTemplateBuffered: a template that fails part way leaves stdout
+// empty, not cut in the middle.
+func TestTemplateBuffered(t *testing.T) {
+	withConfig(t, dojoConfig)
+	withApp(t, boardFixture, itemsTwoPagesFixture)
+	code, stdout, stderr := runStreams("list", "--template", `{{range .issues}}#{{.number}}{{end}}{{index .issues 999}}`)
+	if code != render.ExitUsage || stdout != "" || !strings.Contains(stderr, "error: --template: ") {
+		t.Errorf("code %d, stdout %q, stderr %q; want 1, none, the --template error", code, stdout, stderr)
+	}
+}
+
+// TestVersionJSON: gh dojo --json and --version --json print the version
+// as JSON; --version alone stays text.
+func TestVersionJSON(t *testing.T) {
+	saved := version
+	t.Cleanup(func() { version = saved })
+	version = "v1.2.3"
+	for _, tt := range []struct {
+		args   []string
+		stdout string
+	}{
+		{[]string{"--json"}, `{"schema_version":1,"error":null,"version":"v1.2.3"}` + "\n"},
+		{[]string{"--version", "--json"}, `{"schema_version":1,"error":null,"version":"v1.2.3"}` + "\n"},
+		{[]string{"--version", "--jq", ".version"}, "v1.2.3\n"},
+		{[]string{"-v"}, "gh dojo version v1.2.3\n"},
+	} {
+		code, stdout, stderr := runStreams(tt.args...)
+		if code != render.ExitOK || stdout != tt.stdout || stderr != "" {
+			t.Errorf("%q: code %d, stdout %q, stderr %q; want 0, %q, none", tt.args, code, stdout, stderr, tt.stdout)
+		}
+	}
+}
+
+// TestListSprintFilterJSON: sprint_filter tells --sprint none (no
+// sprint) from no --sprint at all; sprint is null for both.
+func TestListSprintFilterJSON(t *testing.T) {
+	withSprintApp(t, time.Time{}, verbFixture("sprint_items"))
+	for _, tt := range []struct {
+		args   []string
+		stdout string
+	}{
+		{[]string{"list", "--sprint", "none"}, `"none" null`},
+		{[]string{"list", "--sprint", "current"}, `"iteration" "Sprint 12"`},
+	} { // without --sprint: null, see json/list_limit
+		code, stdout, stderr := runStreams(append(tt.args, "--jq", `"\(.sprint_filter | tojson) \(.sprint.title | tojson)"`)...)
+		if code != render.ExitOK || strings.TrimSpace(stdout) != tt.stdout {
+			t.Errorf("%q: code %d, stdout %q, stderr %q; want 0, %q", tt.args, code, stdout, stderr, tt.stdout)
+		}
 	}
 }

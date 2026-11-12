@@ -2,6 +2,8 @@ code: 0
 --- stdout
 {
   "schema_version": 1,
+  "error": null,
+  "brief": true,
   "issues": [
     {
       "number": 13,
@@ -9,14 +11,14 @@ code: 0
       "url": "https://github.com/Trum-ok/gh-dojo/issues/13",
       "title": "Доска и .github/dojo.toml для самого gh-dojo",
       "state": "open",
-      "state_reason": "",
+      "state_reason": null,
       "author": "Trum-ok",
       "created_at": "2026-11-11T18:20:59Z",
       "closed_at": null,
       "incomplete": false,
       "board": {
         "on_board": true,
-        "unknown_reason": "",
+        "unknown_reason": null,
         "status": "Ready",
         "status_unknown": false,
         "archived": false,
@@ -31,7 +33,7 @@ code: 0
       "sprint": null,
       "milestone": {
         "title": "v0.0 — самохостинг",
-        "due_on": ""
+        "due_on": null
       },
       "labels": [],
       "labels_total": 0,
@@ -47,7 +49,7 @@ code: 0
           "on_board": true,
           "status": "Ready",
           "archived": false,
-          "status_unknown_reason": "",
+          "status_unknown_reason": null,
           "resolved": true
         },
         {
@@ -59,7 +61,7 @@ code: 0
           "on_board": true,
           "status": "Ready",
           "archived": false,
-          "status_unknown_reason": "",
+          "status_unknown_reason": null,
           "resolved": true
         }
       ],
@@ -75,17 +77,21 @@ code: 0
           "on_board": true,
           "status": "Ready",
           "archived": false,
-          "status_unknown_reason": "",
+          "status_unknown_reason": null,
           "resolved": true
         }
       ],
       "blocking_total": 1,
+      "history": [],
       "history_truncated": false,
       "history_untracked": false,
+      "body": null,
+      "comments": [],
       "comments_total": 2
     }
   ],
-  "failed": []
+  "failed": [],
+  "warnings": []
 }
 
 --- stderr

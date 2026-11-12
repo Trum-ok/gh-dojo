@@ -2,6 +2,13 @@ code: 3
 --- stdout
 {
   "schema_version": 1,
+  "error": {
+    "exit_code": 3,
+    "message": "issue #9999 not found in Trum-ok/gh-dojo",
+    "allowed": [],
+    "fix": "gh dojo list"
+  },
+  "brief": true,
   "issues": [
     {
       "number": 3,
@@ -9,14 +16,14 @@ code: 3
       "url": "https://github.com/Trum-ok/gh-dojo/issues/3",
       "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)",
       "state": "open",
-      "state_reason": "",
+      "state_reason": null,
       "author": "Trum-ok",
       "created_at": "2026-11-11T18:19:10Z",
       "closed_at": null,
       "incomplete": false,
       "board": {
         "on_board": true,
-        "unknown_reason": "",
+        "unknown_reason": null,
         "status": "Ready",
         "status_unknown": false,
         "archived": false,
@@ -31,7 +38,7 @@ code: 3
       "sprint": null,
       "milestone": {
         "title": "v0.0 — самохостинг",
-        "due_on": ""
+        "due_on": null
       },
       "labels": [],
       "labels_total": 0,
@@ -47,7 +54,7 @@ code: 3
           "on_board": true,
           "status": "Ready",
           "archived": false,
-          "status_unknown_reason": "",
+          "status_unknown_reason": null,
           "resolved": true
         },
         {
@@ -59,7 +66,7 @@ code: 3
           "on_board": true,
           "status": "Ready",
           "archived": false,
-          "status_unknown_reason": "",
+          "status_unknown_reason": null,
           "resolved": true
         }
       ],
@@ -75,7 +82,7 @@ code: 3
           "on_board": true,
           "status": "Ready",
           "archived": false,
-          "status_unknown_reason": "",
+          "status_unknown_reason": null,
           "resolved": true
         },
         {
@@ -87,7 +94,7 @@ code: 3
           "on_board": true,
           "status": "Ready",
           "archived": false,
-          "status_unknown_reason": "",
+          "status_unknown_reason": null,
           "resolved": true
         },
         {
@@ -99,7 +106,7 @@ code: 3
           "on_board": true,
           "status": "Ready",
           "archived": false,
-          "status_unknown_reason": "",
+          "status_unknown_reason": null,
           "resolved": true
         },
         {
@@ -111,7 +118,7 @@ code: 3
           "on_board": true,
           "status": "Ready",
           "archived": false,
-          "status_unknown_reason": "",
+          "status_unknown_reason": null,
           "resolved": true
         },
         {
@@ -123,13 +130,16 @@ code: 3
           "on_board": true,
           "status": "Ready",
           "archived": false,
-          "status_unknown_reason": "",
+          "status_unknown_reason": null,
           "resolved": true
         }
       ],
       "blocking_total": 5,
+      "history": [],
       "history_truncated": false,
       "history_untracked": false,
+      "body": null,
+      "comments": [],
       "comments_total": 0
     },
     {
@@ -138,14 +148,14 @@ code: 3
       "url": "https://github.com/Trum-ok/gh-dojo/issues/7",
       "title": "Команда show <N>…",
       "state": "open",
-      "state_reason": "",
+      "state_reason": null,
       "author": "Trum-ok",
       "created_at": "2026-11-11T18:19:52Z",
       "closed_at": null,
       "incomplete": false,
       "board": {
         "on_board": true,
-        "unknown_reason": "",
+        "unknown_reason": null,
         "status": "Ready",
         "status_unknown": false,
         "archived": false,
@@ -160,7 +170,7 @@ code: 3
       "sprint": null,
       "milestone": {
         "title": "v0.0 — самохостинг",
-        "due_on": ""
+        "due_on": null
       },
       "labels": [],
       "labels_total": 0,
@@ -176,7 +186,7 @@ code: 3
           "on_board": true,
           "status": "Ready",
           "archived": false,
-          "status_unknown_reason": "",
+          "status_unknown_reason": null,
           "resolved": true
         },
         {
@@ -188,7 +198,7 @@ code: 3
           "on_board": true,
           "status": "Ready",
           "archived": false,
-          "status_unknown_reason": "",
+          "status_unknown_reason": null,
           "resolved": true
         },
         {
@@ -200,7 +210,7 @@ code: 3
           "on_board": true,
           "status": "Ready",
           "archived": false,
-          "status_unknown_reason": "",
+          "status_unknown_reason": null,
           "resolved": true
         }
       ],
@@ -216,13 +226,16 @@ code: 3
           "on_board": true,
           "status": "Ready",
           "archived": false,
-          "status_unknown_reason": "",
+          "status_unknown_reason": null,
           "resolved": true
         }
       ],
       "blocking_total": 1,
+      "history": [],
       "history_truncated": false,
       "history_untracked": false,
+      "body": null,
+      "comments": [],
       "comments_total": 1
     }
   ],
@@ -236,7 +249,8 @@ code: 3
         "fix": "gh dojo list"
       }
     }
-  ]
+  ],
+  "warnings": []
 }
 
 --- stderr

@@ -5,7 +5,6 @@ go 1.27
 require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/cli/go-gh/v2 v2.17.0
-	github.com/itchyny/gojq v0.12.19
 	github.com/rivo/uniseg v0.4.7
 	github.com/spf13/cobra v1.10.2
 )
@@ -31,6 +30,7 @@ require (
 	github.com/henvic/httpretty v0.2.0 // indirect
 	github.com/huandu/xstrings v1.5.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/itchyny/gojq v0.12.19 // indirect
 	github.com/itchyny/timefmt-go v0.1.8 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.1 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
