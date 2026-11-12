@@ -21,7 +21,9 @@ func newDescribeCmd() (*cobra.Command, error) {
 		Long: `Print this project's process, short enough for an agent's context: when to
 use each verb, what it needs, what it checks and does along the way, the
 lifecycle (from → to), the initial, final and resolved statuses, and the exit
-codes. gh dojo <verb> --help has the details of one verb.
+codes. gh dojo <verb> --help has the details of one verb, and gh dojo agent
+install writes the same, with what an agent should do about it, into the
+instructions agents read.
 
 It reads only ` + config.FileName + `, never the network. A missing or broken
 config is printed as an error (exit code 1). --json gives the same as data.`,

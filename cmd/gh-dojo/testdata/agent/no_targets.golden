@@ -1,0 +1,6 @@
+code: 1
+--- stdout
+--- stderr
+error: .github/dojo.toml: agent.targets is empty: no agent to write for
+allowed: claude, agents-md, copilot
+fix: gh dojo agent install --agent claude

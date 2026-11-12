@@ -1,0 +1,6 @@
+code: 0
+--- stdout
+.claude/skills/gh-dojo/SKILL.md: created
+AGENTS.md: updated
+.github/copilot-instructions.md: created
+--- stderr

@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: .github/dojo.toml: agent.notes: notes.md has a gh-dojo marker line: <!-- gh-dojo:end -->
+fix: remove the <!-- gh-dojo: ... --> lines from notes.md

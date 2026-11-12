@@ -1,0 +1,6 @@
+code: 1
+--- stdout
+.claude/skills/gh-dojo/SKILL.md: missing
+--- stderr
+error: 1 of 1 agent file not up to date with .github/dojo.toml
+fix: gh dojo agent install

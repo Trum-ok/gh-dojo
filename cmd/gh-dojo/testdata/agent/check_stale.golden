@@ -1,0 +1,13 @@
+code: 1
+--- stdout
+.claude/skills/gh-dojo/SKILL.md: out of date
+  @@ line 36
+  -**When:** The work is done, verified and committed, but not released yet
+  +**When:** Merged into main
+AGENTS.md: out of date
+  @@ line 30
+  -**When:** The work is done, verified and committed, but not released yet
+  +**When:** Merged into main
+--- stderr
+error: 2 of 2 agent files not up to date with .github/dojo.toml
+fix: gh dojo agent install

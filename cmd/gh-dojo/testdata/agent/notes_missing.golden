@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: .github/dojo.toml: agent.notes: notes.md does not exist
+fix: create notes.md, or remove notes from [agent] in .github/dojo.toml

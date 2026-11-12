@@ -9,13 +9,15 @@ make build    # ./gh-dojo, stamped with git describe
 make test     # go test ./...
 make vet      # go vet ./...
 make dist     # release binaries for all platforms into dist/
+make agent    # regenerate the agent skill from .github/dojo.toml
 make install  # build and install as the gh dojo extension (see README)
 ```
 
 CI (`.github/workflows/ci.yml`) runs on pushes to `main` and on pull
 requests. Once, on Linux: `gofmt -l .` must print nothing, then
 `go mod tidy -diff`, `go vet ./...` (also with `GOOS=windows` and
-`GOOS=darwin`) and the release build. On Ubuntu, macOS and Windows:
+`GOOS=darwin`), the release build, and `agent install --check` with that
+build (see below). On Ubuntu, macOS and Windows:
 `go test ./...` (with `-race` on Ubuntu) and `go build ./...`. Run the
 checks and `go test -race ./...` before sending a change.
 
@@ -47,6 +49,7 @@ into issues (verb `when` lines and comment templates) come from the config.
 | `internal/issue`    | Reading issues (cards) and batches of them                         |
 | `internal/graph`    | GraphQL client over go-gh: retries, pagination, error mapping      |
 | `internal/render`   | Errors, exit codes, confirmations, folding with counts             |
+| `internal/agent`    | `agent install`'s files: targets, markers, writing, diffs          |
 
 The plan is separate from its execution: the workflow engine returns the
 operations without touching the network, which is what `--dry-run`, the
@@ -120,10 +123,17 @@ gh-dojo tracks its own development on its board with the repository's
 through `gh dojo` (`new`, `start`, `wait`, `ready`, `done`, `comment`,
 `block`, `unblock`).
 `Ready` means committed to `main`; `Done` means released. Agents load the
-rules from [`.claude/skills/gh-dojo/SKILL.md`](.claude/skills/gh-dojo/SKILL.md).
+rules from [`.claude/skills/gh-dojo/SKILL.md`](.claude/skills/gh-dojo/SKILL.md),
+which `gh dojo agent install` generates from the config and the Russian notes
+in [`.github/dojo-notes.md`](.github/dojo-notes.md). Never edit the skill:
+change the config or the notes and run `make agent`, which uses the build of
+your branch. So does CI's `agent install --check`, so a change to a command's
+short help, the generated text or the config needs `make agent` too.
 
 - Use the installed `gh dojo`, the last `make install` from `main`, not a
   build of your branch: a broken branch must not break issue tracking.
-  After a change is merged, run `make install` on `main` again.
+  After a change is merged, run `make install` on `main` again. Unknown
+  config keys are errors, so a change that adds a key to `.github/dojo.toml`
+  (as `[agent]` did) breaks the installed `gh dojo` until that reinstall.
 - Any inconvenience noticed while using gh-dojo becomes an issue right away:
   `gh dojo new "<title>" --type dogfood --body "..."`.

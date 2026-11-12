@@ -11,6 +11,7 @@ Process verbs (from .github/dojo.toml):
   note        You want to leave a note without moving the issue
 
 Additional Commands:
+  agent       Write this project's process into agent instructions
   block       Mark an issue blocked by other issues, without changing its status
   comment     Comment on an issue without changing its status
   describe    Learn this project's process: verbs, statuses and exit codes in a few lines

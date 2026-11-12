@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: AGENTS.md: two gh-dojo:begin markers
+fix: keep one <!-- gh-dojo:begin ... --> line and one <!-- gh-dojo:end --> line after it in AGENTS.md, or remove both; then run gh dojo agent install

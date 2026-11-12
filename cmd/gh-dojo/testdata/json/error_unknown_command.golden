@@ -6,6 +6,7 @@ code: 1
     "exit_code": 1,
     "message": "unknown command \"nosuch\"",
     "allowed": [
+      "agent",
       "block",
       "comment",
       "describe",
@@ -27,5 +28,5 @@ code: 1
 
 --- stderr
 error: unknown command "nosuch"
-allowed: block, comment, describe, doctor, done, init, list, new, next, ready, show, start, unblock, wait
+allowed: agent, block, comment, describe, doctor, done, init, list, new, next, ready, show, start, unblock, wait
 fix: gh dojo --help

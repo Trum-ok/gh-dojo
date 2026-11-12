@@ -41,6 +41,8 @@ command that fixes it.
            iteration covers today
   verbs    the labels verbs add or remove exist in the default repository,
            spelled as there, and the users they assign can be assigned
+  agent    with [agent] set or an agent file present: the files agent
+           install writes are up to date with the config
 
 It sends one request for the token and the repositories, one more for the
 board when its schema is not cached (an hour), and one for the verbs'
@@ -50,7 +52,7 @@ Exit codes: 0 when every check is ok; 4 when a check failed on auth or the
 network; else 1.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			r := runDoctor(cmd.Context())
+			r := runDoctor(cmd.Context(), cmd.Root())
 			err := r.err()
 			r.OK = err == nil
 			return emitResult(cmd, r, r.write, err)
@@ -148,7 +150,7 @@ func (r *doctorReport) err() error {
 // and repositories), plus the board schema when it is not cached (or the
 // cached one has no iteration for today), plus one DoctorVerbs query when
 // a verb has labels or assigns someone.
-func runDoctor(ctx context.Context) *doctorReport {
+func runDoctor(ctx context.Context, root *cobra.Command) *doctorReport {
 	r := &doctorReport{}
 	r.ok("version", "gh dojo %s", version)
 
@@ -198,6 +200,7 @@ func runDoctor(ctx context.Context) *doctorReport {
 	}
 	if cfg != nil {
 		checkVerbs(ctx, r, a, cfg, repos, reach, viewer)
+		checkAgentFiles(r, cfg, root)
 	}
 	return r
 }

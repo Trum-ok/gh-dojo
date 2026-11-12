@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: unknown command "extra" for "gh dojo agent install"
+fix: gh dojo agent install --help

@@ -9,7 +9,7 @@ LDFLAGS := -X main.version=$(VERSION)
 # last path element must be gh-dojo.
 INSTALL_DIR ?= $(HOME)/.local/share/gh-dojo/$(BIN)
 
-.PHONY: build test vet golden dist install
+.PHONY: build test vet golden agent dist install
 
 build:
 	go build -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/gh-dojo
@@ -24,6 +24,12 @@ vet:
 # diff before committing. Refused when CI is set.
 golden:
 	UPDATE_GOLDEN=1 go test ./...
+
+# Regenerate the agent skill from .github/dojo.toml with this branch's
+# build, after changing the config, its notes or a command; CI runs
+# agent install --check.
+agent:
+	go run ./cmd/gh-dojo agent install
 
 # Cross-compile the release binaries into dist/ the way the release workflow
 # does (script/build-release.sh), stamped with VERSION.

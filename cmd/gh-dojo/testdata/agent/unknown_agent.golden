@@ -1,0 +1,6 @@
+code: 1
+--- stdout
+--- stderr
+error: unknown agent "cursor" for --agent
+allowed: claude, agents-md, copilot
+fix: gh dojo agent install --help

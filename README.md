@@ -137,6 +137,7 @@ also be authorized for it.
 | [`init`](#init) | Write `.github/dojo.toml` for a board and check it |
 | [`describe`](#describe) | Print this project's process, for an agent's context |
 | [`doctor`](#doctor) | Check config, token, board and repositories, with fixes |
+| [`agent install`](#agent-install) | Write the process into a skill or `AGENTS.md` section for agents |
 | [`<verb>`](#process-verbs) | The project's process verbs, from the config (`start`, `wait`, …) |
 
 Issue numbers are written `42` or `#42` and refer to the default repository
@@ -375,11 +376,58 @@ ok       verbs    octocat/shop: 2 labels exist, 1 assignee can be assigned
 | `repo` | Each repository of [`board.repos`](#board), or the current one, is visible with issues enabled |
 | `sprint` | With [`fields.sprint`](#fields): an iteration covers today, a date in [`board.timezone`](#board) |
 | `verbs` | When verbs have labels or assignees: the labels exist in the default repository, spelled exactly as there, and the users can be assigned |
+| `agent` | With [`[agent]`](#agent) set, or a file of its targets present: the files [`agent install`](#agent-install) writes are up to date (`agent install --check`, without the diff) |
 
 It sends one request for the token and the repositories, one more for the
 board when its schema is not cached, and one for the verbs' labels and
 assignees when a verb has them. The exit code is 0 when every check is ok, 4
 when one failed on auth or the network, else 1.
+
+### agent install
+
+```sh
+gh dojo agent install                          # the agents of [agent] targets, by default claude
+gh dojo agent install --agent claude,agents-md # these agents instead
+gh dojo agent install --check                  # in CI: write nothing, fail when out of date
+```
+
+Writes the project's process, built from the config, into the files agents
+read, so the rules are written once, in the config:
+
+| Agent | File |
+|-------|------|
+| `claude` | `.claude/skills/gh-dojo/SKILL.md`: a Claude Code skill, with a `description` that loads it whenever the agent deals with the project's issues |
+| `agents-md` | A section of `AGENTS.md`, which Codex and other agents read |
+| `copilot` | A section of `.github/copilot-instructions.md` |
+
+The instructions are in English and say what `describe` says, with what an
+agent should do about it: use only `gh dojo` for issues; each verb with its
+`when`, the statuses it moves between, its arguments, checks and effects,
+and the rules behind them (ask the user before `--yes`, don't work around a
+refused blockers check, what `--by` links, several numbers at once); the
+initial, final and resolved statuses; `show` and `list`; `new`, `comment`,
+`block` and `unblock`; safe repeats; the session link; exit codes; JSON; and
+a table of the commands of the gh-dojo that wrote them, so a command added
+in a later version shows up there by itself. The markdown file
+[`[agent] notes`](#agent) names is appended as it is, in the project's
+language, for what the config cannot say.
+
+The skill is gh-dojo's whole file, marked as generated after its front
+matter; a skill without that marker, written by hand, is not overwritten
+(exit code 1): move what is worth keeping into the notes and delete it. In
+`AGENTS.md` and the Copilot file gh-dojo owns only the lines from
+`<!-- gh-dojo:begin ... -->` to `<!-- gh-dojo:end -->`, and the rest of the
+file stays as it is; a file without the markers gets the section at its end.
+Markers out of order are an error, and nothing is written.
+
+A repeat with the same config writes nothing and prints `up to date` for
+each file. `--check` writes nothing either: a file that is missing or
+differs from what install would write is `missing` or `out of date`, with up
+to 20 changed lines, and the exit code is 1 with `gh dojo agent install` as
+the fix. The files depend on the config, the notes and the gh-dojo version,
+not on where it runs: run `--check` in CI with the build being tested, as
+this repository does. Paths are relative to the repository root, the
+directory that holds `.github`; agent install never uses the network.
 
 ### Process verbs
 
@@ -490,6 +538,10 @@ area_prefix = "area:"        # `new --area cli` → label "area:cli"
 env = ["CLAUDE_CODE_HOST_SESSION_ID"]   # the first set variable wins
 link = "claude://claude.ai/epitaxy/{id}"
 
+[agent]                      # gh dojo agent install
+targets = ["claude", "agents-md"]       # claude (the default), agents-md, copilot
+notes = "docs/agent-notes.md" # appended as is to the generated instructions
+
 [verbs.start]                # overrides the preset's start key by key
 when = "You begin working on the issue"   # one line; first line of --help
 blockers = "deny"            # refuse while a blocker is unresolved (the preset warns)
@@ -596,6 +648,15 @@ session that wrote it.
 
 When `env` is set but none of its variables is, `{session}` is empty and
 gh-dojo warns; the verb still runs.
+
+### agent
+
+What [`agent install`](#agent-install) writes. A preset cannot set it.
+
+| Key       | Meaning |
+|-----------|---------|
+| `targets` | The agents to write for: `claude`, `agents-md`, `copilot`. Default: `["claude"]`; `[]` writes nothing without `--agent` |
+| `notes`   | A markdown file, relative to the repository root and written with `/`, appended as is after the generated instructions: what the config cannot say, in the project's language. Its headings land as written, so in an `AGENTS.md` section start them one level down |
 
 ### verbs
 
@@ -1033,6 +1094,7 @@ The schemas, by command, after `schema_version` and `error`:
 | `block`, `unblock` | `number`, `repo`, `action`, `changed`, `unchanged`, `missed` |
 | `describe` | `config`, `preset`, `board`, `repos`, `verbs`: `[{name, when, from, to, requires, requires_one_of, optional, batch, checks, effects}]`, `statuses`: `{initial, final, resolved}`, `exit_codes`: `[{code, meaning, next}]` |
 | `doctor` | `ok`, `checks`: `[{name, result, detail, allowed, fix}]` |
+| `agent install` | `check`, `files`: `[{agent, path, state, diff}]`; `state` is `created`, `updated` or `up_to_date`, with `--check` `up_to_date`, `missing` or `out_of_date`; `diff` (`--check`, out of date) the changed lines as printed, else `[]` |
 | `init` | without `--project` (exit code 1, the choice is yours): `owner`, `owner_type`, `projects`: `[{number, title, items, closed}]`, `suggested_project`, `command`; with it: `path`, `written`, `board`, `board_title`, `preset`, `repos`, `matches_board`, `problems`: `[{problem, fix}]`, `content` |
 | `--version`, or `gh dojo --json` | `version` |
 
@@ -1075,19 +1137,24 @@ one place, the config:
   one action each: fix the arguments (1), ask a human (2), check the number
   (3), retry later (4), re-run the same command (5).
 - **`confirm = "user"`** marks a verb as the user's decision. The exit code 2
-  is a signal, not a lock, so tell agents in their instructions to ask the
-  user before adding `--yes`.
+  is a signal, not a lock, so agents are told in their instructions
+  ([`agent install`](#agent-install) writes it) to ask the user before
+  adding `--yes`.
 - **`[session]`** puts a link to the agent session into comments, so a human
   can trace who moved an issue and why.
 
-Point your agent at gh-dojo with a short skill or `AGENTS.md` section: use
-`gh dojo` for every issue and board change, read `gh dojo describe` first,
-`gh dojo show N` before working on an issue, and never work around exit code
-2. This repository's own skill,
-[`.claude/skills/gh-dojo/SKILL.md`](.claude/skills/gh-dojo/SKILL.md) (in
-Russian, hand-written), is an example. In v0.2, `gh dojo agent install` will
-generate the skill and an `AGENTS.md` section from the config, with
-`--check` for CI.
+Point your agent at gh-dojo with [`gh dojo agent install`](#agent-install):
+it writes a Claude Code skill, an `AGENTS.md` section or Copilot
+instructions from the config, which tell the agent to use `gh dojo` for
+every issue and board change, read `gh dojo describe` first and
+`gh dojo show N` before working on an issue, never work around exit code 2,
+ask the user before `--yes`, and when and how to use each verb. Project
+rules the config cannot express go into [`[agent] notes`](#agent), and
+`agent install --check` in CI catches instructions that fell behind the
+config. This repository's own skill,
+[`.claude/skills/gh-dojo/SKILL.md`](.claude/skills/gh-dojo/SKILL.md), is
+generated from [`.github/dojo.toml`](.github/dojo.toml) and the Russian
+notes in [`.github/dojo-notes.md`](.github/dojo-notes.md).
 
 ## Development
 

@@ -1,0 +1,46 @@
+code: 0
+--- stdout
+Write this project's process, built from .github/dojo.toml, into the
+files agents read, so the rules are written once, in the config:
+
+  claude     .claude/skills/gh-dojo/SKILL.md, a Claude Code skill
+  agents-md  a section of AGENTS.md, which Codex and other agents read
+  copilot    a section of .github/copilot-instructions.md
+
+The instructions are in English: the lifecycle, each verb with when to use
+it, what it needs, checks and does along the way, blockers, the session
+link, reading and creating issues, exit codes and JSON, and the commands of
+this gh-dojo. The markdown file [agent] notes names is appended as it is,
+for what the config cannot say. Without --agent, the agents of [agent]
+targets are written (by default claude).
+
+The skill is gh-dojo's whole file: one that exists without gh-dojo's
+marker, written by hand, is not overwritten (exit code 1). In AGENTS.md and
+the Copilot file only the text between the gh-dojo:begin and gh-dojo:end
+markers is gh-dojo's, and the rest stays as it is; a file without them gets
+the section at its end.
+
+A repeat with the same config changes nothing and says "up to date".
+--check writes nothing and exits 1 when a file is missing or differs from
+what install would write, showing the changed lines: run it in CI. Paths
+are relative to the repository root, the directory that holds .github.
+It never uses the network.
+
+Usage:
+  gh dojo agent install [flags]
+
+Examples:
+  gh dojo agent install
+  gh dojo agent install --agent claude,agents-md
+  gh dojo agent install --check
+
+Flags:
+      --agent agent   write for agent: claude, agents-md, copilot; repeatable, or comma-separated (default: [agent] targets)
+      --check         write nothing; exit 1 when a file is not up to date
+  -h, --help          help for install
+
+Global Flags:
+  -q, --jq expression       filter the JSON with a jq expression (implies --json)
+      --json                print the result as JSON (schema_version 1), errors too
+  -t, --template template   format the JSON with a Go template (implies --json)
+--- stderr

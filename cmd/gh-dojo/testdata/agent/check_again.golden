@@ -1,0 +1,6 @@
+code: 0
+--- stdout
+.claude/skills/gh-dojo/SKILL.md: up to date
+AGENTS.md: up to date
+.github/copilot-instructions.md: up to date
+--- stderr
