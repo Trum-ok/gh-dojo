@@ -78,6 +78,12 @@ close = "not_planned"
 when = "Hand it over"
 assign = "octocat"
 
+# No target and a from without the initial status.
+[verbs.nudge]
+when = "Remind whoever has it"
+from = ["In progress", "Waiting"]
+labels = ["+nudged"]
+
 # The blockers check: begin warns, claim and check refuse.
 [verbs.begin]
 when = "Begin, even if blocked"
@@ -259,7 +265,11 @@ func TestPlan(t *testing.T) {
 		// a repeat of a verb that only closes is not refused by from.
 		{name: "shelve_repeat_after_automation", verb: "shelve", noOps: true,
 			issue: Issue{Number: 42, Closed: true, StateReason: "not_planned", OnBoard: true, Status: "Done"}},
+		// shelve has no target: its refusal says where it runs, not where it starts.
 		{name: "shelve_open_wrong_from", verb: "shelve", code: render.ExitDenied, issue: onBoard("Done")},
+		{name: "nudge_not_on_board", verb: "nudge", code: render.ExitDenied, issue: Issue{Number: 42}},
+		{name: "nudge_no_status", verb: "nudge", code: render.ExitDenied, issue: Issue{Number: 42, OnBoard: true}},
+		{name: "nudge_in_from", verb: "nudge", hasOps: 1, issue: onBoard("Waiting")},
 		// done on an issue closed as not planned moves it to Done, with a warning.
 		{name: "done_closed_not_planned", verb: "done", hasOps: 1,
 			issue: Issue{Number: 42, Closed: true, StateReason: "not_planned", OnBoard: true, Status: "Ready"}},

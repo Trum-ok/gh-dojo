@@ -616,7 +616,12 @@ func (p *Plan) checkBlockers(v config.Verb) error {
 		"this is a process rule: ask the user how to proceed", v.Name, action, is.Name(), list)
 }
 
-// checkFrom refuses an issue whose status is not in v.From.
+// checkFrom refuses an issue whose status is not in v.From. A verb without
+// a target moves nothing, so its refusal says where it runs, as
+// checkBlockers does:
+//
+//	ready cannot move #42 from Backlog; it starts only from In progress or Waiting
+//	hold cannot run on #42 in Backlog; it runs only in In progress or Changes requested
 func (e *Engine) checkFrom(v config.Verb, is Issue) error {
 	current := is.Status
 	if current == "" {
@@ -626,6 +631,10 @@ func (e *Engine) checkFrom(v config.Verb, is Issue) error {
 		return nil
 	}
 	// The same words as the dry run and confirmation line use.
+	action, in, allowed := "move", " from ", "it starts only from"
+	if v.To == "" {
+		action, in, allowed = "run on", " in ", "it runs only in"
+	}
 	var from string
 	switch {
 	case !is.OnBoard:
@@ -633,16 +642,16 @@ func (e *Engine) checkFrom(v config.Verb, is Issue) error {
 	case is.Status == "":
 		from = ": " + noStatus
 	default:
-		from = " from " + is.Status
+		from = in + is.Status
 	}
 	if is.Status == "" && current != "" {
 		from += ", which counts as " + current
 	}
 	// No fix line and no allowed line: a refusal ends with asking the user,
 	// never with a command that works around the process.
-	return render.Denied("%s cannot move %s%s; it starts only from %s\n"+
+	return render.Denied("%s cannot %s %s%s; %s %s\n"+
 		"this is a process rule: ask the user how to proceed",
-		v.Name, is.Name(), from, join(v.From, "or"))
+		v.Name, action, is.Name(), from, allowed, join(v.From, "or"))
 }
 
 // runsOnClosed reports whether v may run on a closed issue: its target

@@ -1,3 +1,3 @@
 code: 2
-error: shelve cannot move #42 from Done; it starts only from Backlog
+error: shelve cannot run on #42 in Done; it runs only in Backlog
 this is a process rule: ask the user how to proceed
