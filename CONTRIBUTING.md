@@ -34,6 +34,16 @@ darwin, linux and windows for amd64 and arm64 with the tag stamped into
 `gh dojo --version`, and publishes them as a GitHub release for
 `gh extension install`. A tag with a `-` (`v0.1.0-rc.1`) makes a prerelease.
 
+Once the tag is pushed, its issues move to Done with the installed
+`gh dojo`: `gh dojo release vX.Y.Z --verb done --dry-run` lists them (found
+through `Refs #N` and closing keywords in the commits since the previous
+version tag, see `[release]` in `.github/dojo.toml`), then the same without
+`--dry-run`. The first release has no version tag before it:
+`--since c720ec9`, the first commit. `done` starts only from Ready here, so
+an open issue still in progress with a `Refs` commit in the release is
+listed as not ready and left alone; a later release picks it up only if its
+commits name it again, else `gh dojo done N` once it is Ready and released.
+
 The interface, help text and documentation are in English. Texts that go
 into issues (verb `when` lines and comment templates) come from the config.
 
@@ -127,8 +137,8 @@ is, so review the log before sharing it. Any other `GH_DEBUG` value except
 
 gh-dojo tracks its own development on its board with the repository's
 [`.github/dojo.toml`](.github/dojo.toml): issues are created and moved only
-through `gh dojo` (`new`, `start`, `wait`, `ready`, `done`, `comment`,
-`block`, `unblock`).
+through `gh dojo` (`new`, `start`, `wait`, `ready`, `done`, `release`,
+`comment`, `block`, `unblock`).
 `Ready` means committed to `main`; `Done` means released. Agents load the
 rules from [`.claude/skills/gh-dojo/SKILL.md`](.claude/skills/gh-dojo/SKILL.md),
 which `gh dojo agent install` generates from the config and the Russian notes

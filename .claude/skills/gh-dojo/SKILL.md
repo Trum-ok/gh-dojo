@@ -15,7 +15,7 @@ A bare `12` or `#12` is an issue of `Trum-ok/gh-dojo`; an issue of any other rep
 
 ## Lifecycle
 
-`Backlog` → `In progress` → (`Waiting`) → (`Ready`) → `Done`, through `start`, `wait`, `ready`, `done`. A status in parentheses may be skipped. Each verb below says which statuses it moves from and to.
+`Backlog` → `In progress` → (`Waiting`) → `Ready` → `Done`, through `start`, `wait`, `ready`, `done`. A status in parentheses may be skipped. Each verb below says which statuses it moves from and to.
 
 - `Backlog` is the initial status: `gh dojo new` puts new issues there, and an issue without a status or not on the board counts as `Backlog`.
 - Final: `Done`. `gh dojo list` hides issues there unless `--all`.
@@ -54,10 +54,10 @@ Run a verb as `gh dojo <verb> N` (`N`, `#N` or `owner/repo#N`); `--dry-run` prin
 
 **When:** изменение вошло в релиз
 
-`gh dojo done N`: Ready, In progress → Done; optional --comment; also on closed issues; comments "{comment}"; closes as completed.
+`gh dojo done N`: Ready → Done; optional --comment; also on closed issues; comments "{comment}"; closes as completed.
 
 - It takes several numbers at once, `gh dojo done 12 13 14`: each issue is checked and written on its own, one that fails is skipped, and a summary names each issue not done. Running the same command again touches only what is left.
-- For a release, `gh dojo release <tag> --verb done --dry-run` lists the issues the release includes (those the merged pull requests of its commits close, or its commit messages name after `close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves`, `resolved`), how each was found and its plan; without `--dry-run` it runs `done` on them as one batch. An open issue whose status it does not start from is listed as not ready and left out, not failed; only a later release whose commits name it again picks it up, so once it is ready run `gh dojo done N` on it. A closed issue it does not start from is refused (exit code 2): ask the user. The start is the previous version tag; the first release needs `--since <tag or commit>`.
+- For a release, `gh dojo release <tag> --verb done --dry-run` lists the issues the release includes (those the merged pull requests of its commits close, or its commit messages name after `close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves`, `resolved`, `refs`), how each was found and its plan; without `--dry-run` it runs `done` on them as one batch. An open issue whose status it does not start from is listed as not ready and left out, not failed; only a later release whose commits name it again picks it up, so once it is ready run `gh dojo done N` on it. A closed issue it does not start from is refused (exit code 2): ask the user. The start is the previous version tag; the first release needs `--since <tag or commit>`.
 - It comments only when given `--comment`.
 - An issue closed already stays closed as it is.
 
@@ -131,9 +131,20 @@ gh dojo show 42 --jq '.issues[0].blocked_by[] | select(.resolved | not) | .ref'
 
 ## Процесс: когда какой глагол
 
-- `ready` — только когда изменение **в main** (смёрджено, тесты зелёные), а не когда готово на ветке. Обычный путь —
-  через `Ready`: `done` прямо из `In progress` конфиг разрешает, но у нас так не делаем.
+- `ready` — только когда изменение **в main** (смёрджено, тесты зелёные), а не когда готово на ветке. `done` идёт
+  только из `Ready` (`from = ["Ready"]` в конфиге).
 - `done` — только когда изменение вошло в релиз; **без указания пользователя не ставь**.
+- `done` по релизу — через `gh dojo release`, когда тег `vX.Y.Z` запушен: сначала
+  `gh dojo release vX.Y.Z --verb done --dry-run`, покажи список пользователю, и только по его указанию — то же без
+  `--dry-run` (можно с `--comment "vX.Y.Z"`). Release находит задачи по `Refs #N` и закрывающим словам в коммитах
+  с прошлого тега версии (`[release] keywords` в `.github/dojo.toml`); первый релиз — с `--since c720ec9`.
+- Строка `not ready (done starts only from Ready): #41 (In progress)` в выводе release — это нормально:
+  в релиз попал частичный коммит (`Refs #41`) открытой задачи, которая ещё в работе. Release её не трогает и не
+  считает сбоем (код 0). Не двигай её руками ради релиза. Но сама она в `Done` не попадёт: её подберёт только
+  релиз, коммиты которого снова назовут её (`Refs #41`); иначе, когда она будет в `Ready` и войдёт в релиз,
+  переведи её явно: `gh dojo done 41 --comment "vX.Y.Z"` (по указанию пользователя, как любой `done`).
+- Код 2 от release — отказ, а не «not ready»: например, задача закрыта (`Fixes #12` в коммите), но не в `Ready`
+  (`#12 is closed but in In progress`). Release её не переведёт ни сейчас, ни потом — спроси пользователя.
 - В `--comment` у `ready` и `done` полезно указать коммит или релиз: `--comment "5fc0e30"`.
 
 ## Неудобство → задача `dogfood`

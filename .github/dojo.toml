@@ -36,6 +36,9 @@ when = "сделано, проверено и закоммичено в main"
 
 [verbs.done]
 when = "изменение вошло в релиз"
+# Done только через Ready: release оставит задачи в работе (частичный
+# коммит с Refs #N) как not ready, а не переведёт их.
+from = ["Ready"]
 
 # gh dojo agent install: skill для Claude Code из этого конфига плюс наши
 # заметки (русский текст про процесс, «Чего нет в gh-dojo», версия).
@@ -43,3 +46,8 @@ when = "изменение вошло в релиз"
 targets = ["claude"]
 notes = ".github/dojo-notes.md"
 description = "Also load it when you notice an inconvenience in gh-dojo itself: it becomes a dogfood issue right away."
+
+# gh dojo release: мы коммитим в main без PR и пишем в коммите `Refs #N`,
+# поэтому кроме закрывающих слов GitHub релиз ищет задачи и по `Refs`.
+[release]
+keywords = ["close", "closes", "closed", "fix", "fixes", "fixed", "resolve", "resolves", "resolved", "refs"]
