@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.start.assign = "ALL": assign adds one user; "all" is a value of unassign
+fix: to leave the issue to the user this verb assigns, set unassign = "all" next to assign

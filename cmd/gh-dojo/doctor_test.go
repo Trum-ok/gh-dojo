@@ -82,6 +82,10 @@ types = ["bug", "Docs"]
 			render.ExitUsage, 4},
 		{"verbs_ok", doctorVerbsOKConfig, []string{doctorFixtures + "ok.json", boardFixture, doctorFixtures + "verbs_ok.json"},
 			render.ExitOK, 4},
+		// A login to unassign who cannot be assigned is a warning: the verb
+		// removes current assignees by ID, and the login is likely a typo.
+		{"verbs_unassign", doctorVerbsOKConfig + "\n[verbs.leave]\nwhen = \"x\"\nunassign = \"octo-nobody\"\n",
+			[]string{doctorFixtures + "ok.json", boardFixture, doctorFixtures + "verbs_unassign.json"}, render.ExitOK, 4},
 		// The organization's SAML SSO blocks both the repository and the
 		// board: each gets the SSO fix.
 		{"sso", orgConfig, []string{doctorFixtures + "sso.json", boardFixtures + "org_board_saml.json"}, render.ExitNetwork, 2},

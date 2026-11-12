@@ -63,6 +63,13 @@ verb leave
   require: [] require_one_of: []
   comment: ""
   assign_arg: false unassign: "octocat"
+verb clear
+  when: Nobody works on it
+  to: ""
+  from: []
+  require: [] require_one_of: []
+  comment: ""
+  assign_arg: false unassign: "all"
 verb hand-over
   when: Pass the issue on
   to: ""

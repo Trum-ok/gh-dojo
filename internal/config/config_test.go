@@ -246,6 +246,10 @@ unassign = "@me"
 when = "Hand the issue back"
 unassign = "octocat"
 
+[verbs.clear]
+when = "Nobody works on it"
+unassign = "All"             # "all" in any case
+
 [verbs.hand-over]
 when = "Pass the issue on"
 assign = "{assignee}"
@@ -399,6 +403,7 @@ func TestLoadErrors(t *testing.T) {
 		{"assign_wrong_type", presetOnly + "[verbs.start]\nassign = 1\n"},
 		{"assign_unknown_placeholder", presetOnly + "[verbs.start]\nassign = \"{by}\"\n"},
 		{"unassign_from_arg", presetOnly + "[verbs.start]\nunassign = \"{assignee}\"\n"},
+		{"assign_all", presetOnly + "[verbs.start]\nassign = \"ALL\"\n"},
 		{"unassign_true_without_board", presetOnly + "[verbs.start]\nunassign = true\n"},
 		{"unassign_bad_login", presetOnly + "[verbs.start]\nunassign = \"@octocat\"\n"},
 		{"unassign_wrong_type", presetOnly + "[verbs.start]\nunassign = [\"octocat\"]\n"},

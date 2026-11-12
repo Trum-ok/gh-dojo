@@ -370,7 +370,7 @@ func placeholder(arg string) string {
 	case config.ArgBy:
 		return `"<#N or name>"`
 	case config.ArgAssignee:
-		return "<login>"
+		return `"<login>"`
 	}
 	return `"<text>"`
 }
@@ -560,7 +560,9 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 // --assignee for assign = "{assignee}"; "@me" (config.Me) is the viewer.
 // One already among the assignees is in place. unassign removes the user
 // it names (in place when not assigned) or, with "all", every assignee
-// but the one the verb assigns: the verb never removes whom it assigns.
+// but the one the verb assigns: the verb never removes whom it assigns
+// (a user it names is then in place, Kept). Unassign comes before Assign
+// in Ops.
 // GitHub allows 10 assignees per issue and the reader reads as many, so
 // Issue.Assignees are all of them.
 func (p *Plan) planAssign(v config.Verb, a Args) (string, error) {
@@ -592,14 +594,6 @@ func (p *Plan) planAssign(v config.Verb, a Args) (string, error) {
 	case login != "" && is.AssignLogin != "":
 		login = is.AssignLogin // as GitHub spells it
 	}
-	if login != "" {
-		if _, ok := assignee(login); ok {
-			p.InPlace = append(p.InPlace, Assign{Login: login})
-		} else {
-			p.Ops = append(p.Ops, Assign{Login: login})
-		}
-	}
-
 	keep := func(s string) bool { return login != "" && strings.EqualFold(s, login) }
 	switch u := v.Unassign; u {
 	case "":
@@ -625,11 +619,21 @@ func (p *Plan) planAssign(v config.Verb, a Args) (string, error) {
 		switch spelled, ok := assignee(u); {
 		case keep(u):
 			// The verb assigns this user too (--assignee, or "@me" and the
-			// same person's login): assigning wins.
+			// same person's login): assigning wins, and the line says so.
+			p.InPlace = append(p.InPlace, Unassign{Logins: []string{login}, Kept: true})
 		case ok:
 			p.Ops = append(p.Ops, Unassign{Logins: []string{spelled}})
 		default:
 			p.InPlace = append(p.InPlace, Unassign{Logins: []string{u}})
+		}
+	}
+	// After the unassign op: GitHub allows 10 assignees, so a full issue
+	// needs the room before the user is added.
+	if login != "" {
+		if _, ok := assignee(login); ok {
+			p.InPlace = append(p.InPlace, Assign{Login: login})
+		} else {
+			p.Ops = append(p.Ops, Assign{Login: login})
 		}
 	}
 	return login, nil

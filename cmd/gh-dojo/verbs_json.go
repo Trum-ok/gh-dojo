@@ -76,6 +76,7 @@ type jsonOp struct {
 	Labels    []string          // add_labels, remove_labels
 	Login     string            // assign
 	Logins    []string          // unassign; empty in place for unassign = "all" with nobody to remove
+	Kept      bool              // unassign, in place: the verb assigns the user it names, so they stay
 	Issue     string            // add_blocked_by: "owner/name#12", in full
 	Body      string            // add_comment, without the hidden marker; "" (null) when in place
 	Reason    string            // close: completed, not_planned, duplicate
@@ -100,7 +101,7 @@ func (o jsonOp) MarshalJSON() ([]byte, error) {
 	case "assign":
 		fields = append(fields, kv{"login", o.Login})
 	case "unassign":
-		fields = append(fields, kv{"logins", orEmpty(o.Logins)})
+		fields = append(fields, kv{"logins", orEmpty(o.Logins)}, kv{"kept", o.Kept})
 	case "add_blocked_by":
 		fields = append(fields, kv{"issue", o.Issue})
 	case "add_comment":
@@ -160,7 +161,7 @@ func opJSON(op workflow.Op, def string) jsonOp {
 	case workflow.Assign:
 		return jsonOp{Op: "assign", Login: op.Login}
 	case workflow.Unassign:
-		return jsonOp{Op: "unassign", Logins: op.Logins}
+		return jsonOp{Op: "unassign", Logins: op.Logins, Kept: op.Kept}
 	case workflow.AddBlockedBy:
 		return jsonOp{Op: "add_blocked_by", Issue: fullText(op.Ref, def)}
 	case workflow.AddComment:

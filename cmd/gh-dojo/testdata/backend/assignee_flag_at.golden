@@ -2,4 +2,4 @@ code: 1
 --- stdout
 --- stderr
 error: --assignee "@trum-ok": write the login without @, or @me for yourself
-fix: gh dojo pass 3 --assignee <login>
+fix: gh dojo pass 3 --assignee "<login>"

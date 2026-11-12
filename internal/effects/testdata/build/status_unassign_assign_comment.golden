@@ -1,7 +1,7 @@
-mutation Verb($project: ID!, $item: ID!, $field: ID!, $option: String!, $issue: ID!, $assignees: [ID!]!, $unassignees: [ID!]!, $body: String!) {
+mutation Verb($project: ID!, $item: ID!, $field: ID!, $option: String!, $issue: ID!, $unassignees: [ID!]!, $assignees: [ID!]!, $body: String!) {
   status: updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field, value: {singleSelectOptionId: $option}}) { projectV2Item { id } }
-  assign: addAssigneesToAssignable(input: {assignableId: $issue, assigneeIds: $assignees}) { clientMutationId }
   unassign: removeAssigneesFromAssignable(input: {assignableId: $issue, assigneeIds: $unassignees}) { clientMutationId }
+  assign: addAssigneesToAssignable(input: {assignableId: $issue, assigneeIds: $assignees}) { clientMutationId }
   comment: addComment(input: {subjectId: $issue, body: $body}) { commentEdge { node { id } } }
 }
 --- vars
@@ -21,4 +21,4 @@ mutation Verb($project: ID!, $item: ID!, $field: ID!, $option: String!, $issue: 
   ]
 }
 --- steps
-status, assign, unassign, comment
+status, unassign, assign, comment

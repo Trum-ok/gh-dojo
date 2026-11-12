@@ -1,4 +1,4 @@
 dry run: swap #42
-  assign: bob
   unassign: carol
-confirm: #42 assigned bob, unassigned carol
+  assign: bob
+confirm: #42 unassigned carol, assigned bob

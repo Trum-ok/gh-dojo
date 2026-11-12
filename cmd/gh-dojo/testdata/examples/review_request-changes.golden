@@ -3,7 +3,7 @@ code: 0
 dry run: request-changes #25 "Refund limits"
   status: In review → Changes requested
   labels: +changes-requested -needs-review
-  assign: acme-bot already assigned
   unassign: octocat
+  assign: acme-bot already assigned
   comment: "Changes requested: Round the refund to the currency's minor unit."
 --- stderr

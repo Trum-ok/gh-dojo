@@ -483,7 +483,7 @@ notes, the generator or a command's short help, run `make agent`.
 ### Process verbs
 
 ```sh
-gh dojo <verb> <N> [--comment TEXT] [--by N|TEXT] [--yes] [--dry-run]
+gh dojo <verb> <N> [--comment TEXT] [--by N|TEXT] [--assignee LOGIN] [--yes] [--dry-run]
 gh dojo <verb> <N>... [flags]     # a verb with batch = true, such as done
 ```
 
@@ -517,9 +517,13 @@ the status needs the new board item), so a verb on an issue on the board
 costs one read and one write.
 
 `--comment` and `--by` fill `{comment}` and `{by}` in the template; a verb
-whose template does not use one of them rejects that flag. `--by` takes an issue number (rendered `#12`) or free text;
-with [`blockers = "link"`](#checks) issues are also marked as blocking this
-one. `--yes` exists only on a verb with [`confirm = "user"`](#checks).
+whose template does not use one of them rejects that flag. `--by` takes an
+issue number (rendered `#12`) or free text; with
+[`blockers = "link"`](#checks) issues are also marked as blocking this one.
+`--assignee` (a login, or `@me`) exists only on a verb with
+[`assign = "{assignee}"`](#effects), and is required there: the user to
+assign, also `{assignee}` in the template. `--yes` exists only on a verb
+with [`confirm = "user"`](#checks).
 `--dry-run` prints the plan without changing anything:
 
 ```console
@@ -662,7 +666,7 @@ disabled = true              # drop a verb that the preset defines
 | `owner`    | yes      | User or organization login that owns the project; which one is detected |
 | `project`  | yes      | Project number from its URL, 1 or greater |
 | `repos`    | no       | `owner/name` list; the first is the default repo for bare issue numbers and `new`, the others are reached with `owner/repo#N` and `new --repo`. Empty: the current repo (`GH_REPO`, else the git remote) |
-| `assignee` | no       | Who a verb with `assign = true` assigns: `"@me"` (the authenticated user) or a login |
+| `assignee` | no       | Who a verb with `assign = true` assigns, or `unassign = true` removes: `"@me"` (the authenticated user) or a login |
 | `timezone` | no       | An IANA time zone, like `"Europe/Moscow"`; UTC when not set. The [`iteration`](#effects) effect, `list --sprint current`, `next --sprint current` and `doctor` take today, and the day an issue entered a status, as dates in it |
 
 ### fields
@@ -744,9 +748,11 @@ commands (`show`, `list`, `new`, `comment`, `describe`, `init`, `doctor`,
 | `disabled`       | —      | `true` removes a verb the preset defines; it stands alone in its table |
 
 A verb needs at least one effect: `to`, `comment`, `labels`, `assign`,
-`unassign`, `close`, `reopen`, `iteration` or `field`. Every argument in `require` and
-`require_one_of` must appear in the verb's comment template; a verb that
-requires `comment` and has no template posts the `--comment` text as is.
+`unassign`, `close`, `reopen`, `iteration` or `field`. `comment` and `by` in
+`require` and `require_one_of` must appear in the verb's comment template; a
+verb that requires `comment` and has no template posts the `--comment` text
+as is. `assignee` needs `assign = "{assignee}"`, which requires it anyway, so
+it may only be repeated in `require`.
 Keys from the design that are not implemented yet (`pre`, `post`) are
 rejected with "not supported in this version".
 
@@ -798,14 +804,20 @@ rejected with "not supported in this version".
   with `assign = "{assignee}"` takes it.
 - **unassign**: removes users and keeps the others, in the same mutation:
   `"@me"` or a login removes that user (one not assigned is in place:
-  `octocat already unassigned`), and `"all"` removes everyone but the user
-  the verb assigns, so `assign = true` with `unassign = "all"` hands the
-  issue back to its author alone. A verb never removes the user it assigns,
-  and cannot name one user in both keys. Who to remove is always in the
-  config: a verb cannot take it from the command line (`"all"` covers
-  removing a reviewer named at run time), and a user named `all` cannot be
-  named. [`gh dojo doctor`](#doctor) checks a login of `unassign` like one
-  of `assign`: one who cannot be assigned can never be removed either.
+  `octocat already unassigned`), and `"all"` (in any case) removes everyone
+  but the user the verb assigns, so `assign = true` with `unassign = "all"`
+  hands the issue back to its author alone. `"@me"`, and `board.assignee =
+  "@me"`, are whoever runs the verb: such a verb hands the issue back to its
+  author only when the author (or the author's agent) runs it; run by the
+  reviewer, it would keep the reviewer and remove the author. A verb never
+  removes the user it assigns (the line says `octocat kept: the verb
+  assigns them`), and cannot name one user in both keys. Users are removed
+  before the verb assigns its own, since an issue has at most 10 assignees.
+  Who to remove is always in the config: a verb cannot take it from the
+  command line (`"all"` covers removing a reviewer named at run time), and
+  a user named `all` cannot be named. [`gh dojo doctor`](#doctor) warns
+  about a login of `unassign` that cannot be assigned: the verb removes
+  current assignees, so such a login is likely a typo.
 - **close**, **reopen**: a verb sets at most one of them. An issue already
   closed is not closed again, even with another reason; the line says
   `already closed as completed`. A verb that closes and has no `to` refuses
@@ -1066,7 +1078,8 @@ What the config cannot say yet, and the example works around:
 - `request-changes` and `approve` hand the issue back by removing everyone
   but the author (`unassign = "all"`), not the reviewer by name: gh-dojo
   does not remember who `review` assigned, so someone else assigned by hand
-  is removed too.
+  is removed too. The author is `@me`, whoever runs the verb: the author's
+  agent runs them; a reviewer running them would remove the author.
 
 ## Output and exit codes
 
@@ -1266,7 +1279,7 @@ error object alone. `planned`, `applied` and `in_place` are lists of ops:
 | `set_fields` | `fields`: `[{field, from, to}]` |
 | `add_labels`, `remove_labels` | `labels` |
 | `assign` | `login` |
-| `unassign` | `logins` (in `in_place`: the users not assigned; empty for `unassign = "all"` with nobody to remove) |
+| `unassign` | `logins` (in `in_place`: the users not assigned; empty for `unassign = "all"` with nobody to remove), `kept` (`true` in `in_place` for a user it names and also assigns, who stays) |
 | `add_blocked_by` | `issue` (`owner/name#12`) |
 | `add_comment` | `body` (`null` in `in_place`: the comment was posted before) |
 | `close` | `reason` (`completed`, `not_planned`, `duplicate`) |

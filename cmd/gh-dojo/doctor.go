@@ -768,10 +768,13 @@ func (c *verbsCheck) query(repo issue.Repo) (string, map[string]any) {
 
 // checkVerbs checks the labels of every verb against the default
 // repository, exactly as a verb looks them up, and that the users verbs
-// assign can be assigned there: one DoctorVerbs query, sent only when a
-// verb has labels or assigns someone. A label to add that is missing, or
-// any label spelled in another case, fails the verb; a label to remove
-// that is missing never removes anything, likely a typo.
+// assign or unassign by login can be assigned there: one DoctorVerbs
+// query, sent only when a verb has labels or names someone. A label to add
+// that is missing, or any label spelled in another case, fails the verb; a
+// label to remove that is missing never removes anything, likely a typo.
+// A user to assign who cannot be assigned fails the verb; one to unassign
+// is a warning: a verb removes current assignees by their IDs, and someone
+// who lost access may still be one, but the login is likely a typo.
 func checkVerbs(ctx context.Context, r *doctorReport, a *App, cfg *config.Config, repos []*doctorRepo, reach bool, viewer string) {
 	c := newVerbsCheck(cfg, viewer)
 	if c.empty() {
@@ -822,7 +825,7 @@ func checkVerbs(ctx context.Context, r *doctorReport, a *App, cfg *config.Config
 		})
 	}
 
-	repoName, problems := repo.Repo.String(), 0
+	repoName, problems := repo.Repo.String(), 0 // problems counts warnings too: no ok line then
 	problem := func(err error) { r.problem("verbs", err); problems++ }
 	for _, v := range cfg.Verbs {
 		key := cfg.KeyPath("verbs." + v.Name + ".labels")
@@ -845,19 +848,24 @@ func checkVerbs(ctx context.Context, r *doctorReport, a *App, cfg *config.Config
 		}
 		for _, u := range verbUsers(v) {
 			key := cfg.KeyPath("verbs." + v.Name + "." + u.key)
-			never := ""
-			if u.key == "unassign" {
-				never = ", so unassign never removes anyone"
+			name, who := u.name, u.name // the login, and how the line names it
+			if u.name == config.Me {
+				name, who = viewer, fmt.Sprintf("%q: you (%s)", config.Me, viewer)
 			}
 			switch login := u.name; {
 			case login == config.Me && viewer == "":
 				// The token check did not read the viewer.
+			case u.key == "unassign" && !assignable(name):
+				r.warn("verbs", "check the login in "+key,
+					"%s: %s cannot be assigned issues in %s: the verb removes them only if they are assigned already",
+					key, who, repoName)
+				problems++
 			case login == config.Me && !assignable(viewer):
-				problem(render.Usage("%s = %q: you (%s) cannot be assigned issues in %s%s",
-					key, config.Me, viewer, repoName, never).
+				problem(render.Usage("%s = %q: you (%s) cannot be assigned issues in %s",
+					key, config.Me, viewer, repoName).
 					WithFix(fmt.Sprintf("get write access to %s, or change %s", repoName, key)))
 			case login != config.Me && !assignable(login):
-				problem(render.Usage("%s: %s cannot be assigned issues in %s%s", key, login, repoName, never).
+				problem(render.Usage("%s: %s cannot be assigned issues in %s", key, login, repoName).
 					WithFix(fmt.Sprintf("check the login, or give %s access to %s", login, repoName)))
 			}
 		}

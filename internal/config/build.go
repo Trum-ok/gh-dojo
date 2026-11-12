@@ -424,8 +424,9 @@ func (c *Config) buildEffects(name string, r *rawVerb, v *Verb) error {
 
 // buildAssign validates assign and unassign. assign is true
 // (board.assignee), false, a login ("@me" or a user) or "{assignee}", the
-// --assignee user; unassign the same but "{assignee}", or "all". The two
-// cannot name the same user: the verb never removes whom it assigns.
+// --assignee user; unassign the same but "{assignee}", or "all" (any
+// case; a user named all cannot be named). The two cannot name the same
+// user: the verb never removes whom it assigns.
 func (c *Config) buildAssign(name string, r *rawVerb, v *Verb) error {
 	p := "verbs." + name + "."
 	user := func(k string, a *rawAssign) (string, error) {
@@ -438,8 +439,13 @@ func (c *Config) buildAssign(name string, r *rawVerb, v *Verb) error {
 				WithFix(fmt.Sprintf(`add assignee = %q under [board] in %s, or set %s = %q`, Me, c.Display, k, Me))
 		case a.Bool != nil:
 			return c.Board.Assignee, nil
-		case k == "assign" && *a.User == AssignFromArg, k == "unassign" && *a.User == UnassignAll:
+		case k == "assign" && *a.User == AssignFromArg:
 			return *a.User, nil
+		case k == "unassign" && strings.EqualFold(*a.User, UnassignAll):
+			return UnassignAll, nil
+		case k == "assign" && strings.EqualFold(*a.User, UnassignAll):
+			return "", c.Errorf("%s = %q: assign adds one user; %q is a value of unassign", key, *a.User, UnassignAll).
+				WithFix(fmt.Sprintf(`to leave the issue to the user this verb assigns, set unassign = %q next to assign`, UnassignAll))
 		case k == "unassign" && *a.User == AssignFromArg:
 			return "", c.Errorf("%s = %q: a verb removes only users the config names", key, *a.User).
 				WithAllowed("true", "false", strconv.Quote(Me), "a login", strconv.Quote(UnassignAll))

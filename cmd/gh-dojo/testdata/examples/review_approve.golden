@@ -3,8 +3,8 @@ code: 0
 dry run: approve #26 "Refund audit log"
   status: In review → Approved
   labels: -needs-review
-  assign: acme-bot already assigned
   unassign: octocat
+  assign: acme-bot already assigned
   comment: "Approved."
   needs --yes: this is the user's decision, ask the user first
 --- stderr

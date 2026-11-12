@@ -23,7 +23,7 @@ type Plan struct {
 	// Ops are the operations to apply, in this order, each at most once
 	// (AddBlockedBy once per blocking issue): AddToBoard or Unarchive,
 	// Reopen, SetStatus, SetIteration, SetFields, AddLabels, RemoveLabels,
-	// Assign, Unassign, AddBlockedBy, AddComment, Close. Empty when there
+	// Unassign, Assign, AddBlockedBy, AddComment, Close. Empty when there
 	// is nothing to do.
 	Ops []Op
 
@@ -32,8 +32,8 @@ type Plan struct {
 	// InPlace are the verb's effects found already in place, as the ops
 	// that would have applied them: Reopen, SetIteration (From = To),
 	// SetFields (the fields already set), AddLabels, RemoveLabels,
-	// Assign, Unassign (the users not assigned; none for "all" with nobody
-	// to remove), AddBlockedBy, and Close with the reason the issue was
+	// Assign, Unassign (the users not assigned, none for "all" with nobody
+	// to remove; or Kept, the user the verb assigns), AddBlockedBy, and Close with the reason the issue was
 	// closed with ("" when unknown). They are never applied; they give the "already" wording of
 	// the dry run and the confirmation line.
 	InPlace []Op
@@ -48,7 +48,7 @@ type Plan struct {
 }
 
 // Op is one operation of a plan: AddToBoard, Unarchive, Reopen, SetStatus,
-// SetIteration, SetFields, AddLabels, RemoveLabels, Assign, Unassign,
+// SetIteration, SetFields, AddLabels, RemoveLabels, Unassign, Assign,
 // AddBlockedBy, AddComment or Close. Each kind has its
 // own type, its own field in the mutation (see package effects) and its
 // own words in the dry run, the confirmation line and a partial report.
@@ -94,10 +94,13 @@ type Assign struct {
 
 // Unassign removes Logins from the issue's assignees; the others stay.
 // All says the verb removes every assignee but the one it assigns
-// (unassign = "all").
+// (unassign = "all"). It comes before Assign: an issue has at most 10
+// assignees. Kept is only in Plan.InPlace: the verb does not remove the
+// user it names because it assigns them too.
 type Unassign struct {
 	Logins []string
 	All    bool
+	Kept   bool
 }
 
 // AddBlockedBy marks the issue blocked by the issue Ref ("#12" or
@@ -273,7 +276,8 @@ func (p *Plan) Unconfirmed() error {
 
 // lines returns one entry per effect, in a fixed order: board, reopen,
 // status, sprint, fields (one entry per field), labels, assignees (who is
-// assigned, then who is removed), blocked-by link, comment, close. dry picks the dry-run wording
+// removed, then who is assigned, as the mutation does), blocked-by link,
+// comment, close. dry picks the dry-run wording
 // (Describe), otherwise the confirmation wording (Effect). Effects already
 // in place are included. The status change of an issue not on the board
 // reads "not on the board → In progress"; in the confirmation that line
@@ -357,7 +361,10 @@ func (p *Plan) lines(dry bool) []string {
 			assign = append(assign, key("assign", op.Login+" already assigned"))
 		case Unassign:
 			text := join(op.Logins, "and") + " already unassigned"
-			if op.All {
+			switch {
+			case op.Kept:
+				text = join(op.Logins, "and") + " kept: the verb assigns them"
+			case op.All:
 				text = "no assignees"
 				if slices.ContainsFunc(append(slices.Clone(p.Ops), p.InPlace...), func(o Op) bool { _, ok := o.(Assign); return ok }) {
 					text = "no one else assigned"
@@ -399,7 +406,7 @@ func (p *Plan) lines(dry bool) []string {
 	}
 	board = append(board, unarchive...)
 	var out []string
-	for _, group := range [][]string{board, reopen, status, sprint, fields, label, assign, unassign, blocked, comment, closing} {
+	for _, group := range [][]string{board, reopen, status, sprint, fields, label, unassign, assign, blocked, comment, closing} {
 		out = append(out, group...)
 	}
 	return out

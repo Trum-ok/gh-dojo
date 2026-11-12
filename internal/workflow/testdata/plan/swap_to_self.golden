@@ -1,3 +1,4 @@
 dry run: swap #42
+  unassign: carol kept: the verb assigns them
   assign: carol
-confirm: #42 assigned carol
+confirm: #42 carol kept: the verb assigns them, assigned carol

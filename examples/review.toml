@@ -44,7 +44,9 @@ area_prefix = "service:"     # new --area billing adds the label service:billing
 env = ["CLAUDE_CODE_HOST_SESSION_ID"]
 link = "claude://claude.ai/epitaxy/{id}"
 
-# The author's verbs.
+# The author's verbs. The author's agent runs every verb here, so "@me" (and
+# board.assignee) is the author: run by the reviewer, request-changes and
+# approve would keep the reviewer and unassign the author.
 
 [verbs.start]
 when = "You begin writing the change"
@@ -95,8 +97,8 @@ to = "Changes requested"
 from = ["In review"]
 require = ["comment"]        # what to change, in the reviewer's words
 labels = ["-needs-review", "+changes-requested"]
-assign = true                # back to the author (board.assignee)...
-unassign = "all"             # ...alone: the reviewer is removed
+assign = true                # back to the author (board.assignee: @me, the
+unassign = "all"             # author's agent runs it) alone, without the reviewer
 comment = "Changes requested: {comment}"
 
 # The user's decisions: exit code 2 until the agent asks the person it works

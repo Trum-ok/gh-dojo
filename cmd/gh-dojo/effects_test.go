@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 
 	"github.com/Trum-ok/gh-dojo/internal/graph/graphtest"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/Trum-ok/gh-dojo/internal/testutil"
+	"github.com/Trum-ok/gh-dojo/internal/workflow"
 )
 
 // effectsDojoConfig is the recorded gh-dojo board with verbs that use the
@@ -251,5 +253,23 @@ func TestVerbEffectsHelp(t *testing.T) {
 			t.Fatalf("%s --help = %d\n%s", verb, code, out)
 		}
 		testutil.Golden(t, "verbs/help_"+verb, out)
+	}
+}
+
+// TestUnassignJSON: an unassign op names its logins, and kept says the
+// verb leaves a user it names because it assigns them too.
+func TestUnassignJSON(t *testing.T) {
+	for _, tt := range []struct {
+		op   workflow.Unassign
+		want string
+	}{
+		{workflow.Unassign{Logins: []string{"bob", "carol"}, All: true}, `{"op":"unassign","logins":["bob","carol"],"kept":false}`},
+		{workflow.Unassign{All: true}, `{"op":"unassign","logins":[],"kept":false}`},
+		{workflow.Unassign{Logins: []string{"carol"}, Kept: true}, `{"op":"unassign","logins":["carol"],"kept":true}`},
+	} {
+		got, err := json.Marshal(opJSON(tt.op, "Trum-ok/gh-dojo"))
+		if err != nil || string(got) != tt.want {
+			t.Errorf("%+v: %s, %v; want %s", tt.op, got, err, tt.want)
+		}
 	}
 }

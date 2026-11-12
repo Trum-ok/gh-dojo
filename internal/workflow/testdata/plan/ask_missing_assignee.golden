@@ -1,3 +1,3 @@
 code: 1
 error: ask needs --assignee
-fix: gh dojo ask 42 --assignee <login>
+fix: gh dojo ask 42 --assignee "<login>"

@@ -64,7 +64,7 @@ func TestBuild(t *testing.T) {
 		{"close_duplicate", []workflow.Op{workflow.Close{Reason: "duplicate"}}, ids},
 		{"reopen_status", []workflow.Op{reopen, status}, ids},
 		{"labels_assign", []workflow.Op{addLabels, rmLabels, assign}, ids},
-		{"status_assign_unassign_comment", []workflow.Op{status, assign, unassign, comment}, ids},
+		{"status_unassign_assign_comment", []workflow.Op{status, unassign, assign, comment}, ids},
 		{"all", []workflow.Op{unarchive, reopen, status, addLabels, rmLabels, assign, comment}, ids},
 		{"board_labels_close", []workflow.Op{toBoard, addLabels, comment, closing}, notOnBoard},
 		{"status_sprint_close", []workflow.Op{status, sprint, closing}, ids},
@@ -105,7 +105,7 @@ func TestBuildDeclaresWhatItUses(t *testing.T) {
 	for _, ops := range [][]workflow.Op{
 		{status, comment}, {status}, {comment}, {toBoard}, {toBoard, comment}, {unarchive, status},
 		{closing}, {reopen}, {addLabels}, {rmLabels}, {assign}, {reopen, status, addLabels, rmLabels, assign, comment},
-		{unassign}, {assign, unassign, comment},
+		{unassign}, {unassign, assign, comment},
 		{comment, closing}, {sprint}, {unsprint}, {setFields}, {status, sprint, setFields, comment}, {blockedBy}, {status, blockedBy, comment}, {blockedBy, blocked2},
 	} {
 		m, err := effects.Build(ops, ids)
