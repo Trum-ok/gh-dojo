@@ -15,6 +15,7 @@ import (
 	"github.com/Trum-ok/gh-dojo/internal/board"
 	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/graph"
+	"github.com/Trum-ok/gh-dojo/internal/issue"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/Trum-ok/gh-dojo/internal/workflow"
 )
@@ -50,30 +51,37 @@ import (
 // A stale schema is retried once per run, as for one issue (see
 // retryStale): the schema is dropped and the issues it failed are re-read
 // in one request, then planned and applied afresh.
-func runBatch(cmd *cobra.Command, cfg *config.Config, v config.Verb, ns []int, args workflow.Args, dryRun bool) error {
-	if err := workflow.CheckArgs(v, args, ns...); err != nil {
+func runBatch(cmd *cobra.Command, cfg *config.Config, v config.Verb, refs []issue.Ref, args workflow.Args, dryRun bool) error {
+	if err := workflow.CheckArgs(v, args, refArgs(refs, issue.Repo{})...); err != nil {
 		return err
 	}
 	be, err := newBackend(cfg)
 	if err != nil {
 		return err
 	}
+	def, err := be.Repo()
+	if err != nil {
+		return err
+	}
+	if refs = inRepo(refs, def); len(refs) == 1 { // 12 and owner/repo#12 of the default repository
+		return runVerb(cmd, cfg, v, refs[0], args, dryRun)
+	}
 	ctx := cmd.Context()
 	b := &batchRun{
-		be: be, engine: workflow.New(cfg), v: v, args: args, json: jsonMode(cmd),
+		be: be, engine: workflow.New(cfg), v: v, args: args, json: jsonMode(cmd), def: def,
 		stdout: cmd.OutOrStdout(), stderr: cmd.ErrOrStderr(), warned: map[string]bool{},
 	}
 	b.engine.Getenv = getenv
-	reads, err := be.ReadIssues(ctx, v, ns, args)
+	reads, err := be.ReadIssues(ctx, v, refs, args)
 	if err != nil && b.retryStale(err, false) {
-		reads, err = be.ReadIssues(ctx, v, ns, args)
+		reads, err = be.ReadIssues(ctx, v, refs, args)
 	}
 	if err != nil {
 		return err
 	}
 	items := make([]*batchItem, len(reads))
 	for i, r := range reads {
-		items[i] = &batchItem{n: r.Number}
+		items[i] = &batchItem{ref: r.Ref}
 		b.plan(items[i], r)
 	}
 	b.replanStale(ctx, items)
@@ -100,6 +108,7 @@ type batchRun struct {
 	args           workflow.Args
 	stdout, stderr io.Writer
 	json           bool            // --json: nothing on stdout until runBatch emits the result
+	def            issue.Repo      // the default repository, which output names issues relative to
 	warned         map[string]bool // warnings printed, each once per run
 	retried        bool            // the stale-schema retry is spent (retryStale)
 	stop           error           // the error that stopped the writes (graph.AffectsAll)
@@ -107,7 +116,7 @@ type batchRun struct {
 
 // batchItem is one issue of a batch run.
 type batchItem struct {
-	n    int
+	ref  issue.Ref       // in its repository
 	read *workflow.Issue // nil until read
 	run  *verbRun        // nil until planned
 	// err is why the issue was not applied, or not in full; why is its
@@ -164,19 +173,19 @@ func (b *batchRun) retryStale(err error, onWrite bool) bool {
 // and one read per issue.MaxBatch issues.
 func (b *batchRun) replanStale(ctx context.Context, items []*batchItem) {
 	var stale []*batchItem
-	var ns []int
+	var refs []issue.Ref
 	for _, it := range items {
 		if it.err != nil && board.IsStale(it.err) {
 			stale = append(stale, it)
-			ns = append(ns, it.n)
+			refs = append(refs, it.ref)
 		}
 	}
 	if len(stale) == 0 || !b.retryStale(stale[0].err, false) {
 		return
 	}
-	reads, err := b.be.ReadIssues(ctx, b.v, ns, b.args)
+	reads, err := b.be.ReadIssues(ctx, b.v, refs, b.args)
 	for i, it := range stale {
-		r := IssueRead{Number: it.n, Err: err}
+		r := IssueRead{Ref: it.ref, Err: err}
 		if err == nil {
 			r = reads[i]
 		}
@@ -234,16 +243,16 @@ func (b *batchRun) applyAll(ctx context.Context, items []*batchItem) {
 func (b *batchRun) reread(ctx context.Context, items []*batchItem, staleErr error) {
 	stale := items[0]
 	var todo []*batchItem
-	var ns []int
+	var refs []issue.Ref
 	for _, it := range items {
 		if it.err == nil {
 			todo = append(todo, it)
-			ns = append(ns, it.n)
+			refs = append(refs, it.ref)
 		}
 	}
-	reads, err := b.be.ReadIssues(ctx, b.v, ns, b.args)
+	reads, err := b.be.ReadIssues(ctx, b.v, refs, b.args)
 	for i, it := range todo {
-		r := IssueRead{Number: it.n, Err: err}
+		r := IssueRead{Ref: it.ref, Err: err}
 		if err == nil {
 			r = reads[i]
 		}
@@ -292,7 +301,7 @@ func (it *batchItem) failRun(p *workflow.Plan, cause, err error) {
 	it.err = it.run.partial(missed, cause, err)
 	it.why = reason(err)
 	if len(it.run.done) > 0 {
-		done := strings.TrimPrefix(it.run.applied().Confirm(), fmt.Sprintf("#%d ", it.n))
+		done := strings.TrimPrefix(it.run.applied().Confirm(), p.Issue.Name()+" ")
 		it.why = fmt.Sprintf("%s, %s: %s", done, missedText(missed, cause), reason(err))
 	}
 }
@@ -320,20 +329,28 @@ const maxSummaryRunes = 190
 
 func runes(s string) int { return utf8.RuneCountInString(s) }
 
-// issueRefRE matches an issue reference in a reason: "#9", "issue #9".
-var issueRefRE = regexp.MustCompile(`(issue )?#(\d+)\b`)
+// issueRefRE matches an issue reference in a reason: "#9", "issue #9",
+// "acme/api#9".
+var issueRefRE = regexp.MustCompile(`(issue )?([A-Za-z0-9][A-Za-z0-9_-]*/[A-Za-z0-9._-]+)?#(\d+)\b`)
 
-// generalReason words why, the reason issue n failed, without n, so the
-// issues that failed alike share one entry: "issue #9 not found" reads
-// "issue not found", "#9 is closed" reads "it is closed".
-func generalReason(why string, n int) string {
-	num := strconv.Itoa(n)
+// generalReason words why, the reason issue ref failed, without naming
+// it, so the issues that failed alike share one entry: "issue #9 not
+// found" reads "issue not found", "#9 is closed" reads "it is closed". A
+// bare #9 is the issue whatever its repository: "issue #9 not found in
+// acme/api" names the repository apart.
+func generalReason(why string, ref issue.Ref) string {
+	num := strconv.Itoa(ref.Number)
 	return issueRefRE.ReplaceAllStringFunc(why, func(m string) string {
-		issue, ref, _ := strings.Cut(m, "#")
+		sub := issueRefRE.FindStringSubmatch(m)
 		switch {
-		case ref != num:
+		case sub[3] != num:
 			return m
-		case issue != "":
+		case sub[2] != "":
+			if r, err := issue.ParseRepo(sub[2]); err != nil || !ref.Same(issue.Ref{Repo: r, Number: ref.Number}) {
+				return m
+			}
+		}
+		if sub[1] != "" {
 			return "issue"
 		}
 		return "it"
@@ -342,15 +359,15 @@ func generalReason(why string, n int) string {
 
 // failGroup is the issues that failed for one reason.
 type failGroup struct {
-	key, why string // the reason without the issue's number, and with it
-	ns       []int
+	key, why string // the reason without naming the issue, and with it
+	refs     []issue.Ref
 	err      error // of the first issue
 	code     render.Code
 }
 
 // reason is the group's reason in the summary.
 func (g *failGroup) reason() string {
-	if len(g.ns) > 1 {
+	if len(g.refs) > 1 {
 		return g.key
 	}
 	return g.why
@@ -362,8 +379,8 @@ func (g *failGroup) next() (advice, fix string) {
 	e := render.FromError(g.err)
 	if _, a, ok := strings.Cut(e.What, "\n"); ok {
 		advice = strings.TrimSpace(a)
-		if len(g.ns) > 1 {
-			advice = generalReason(advice, g.ns[0])
+		if len(g.refs) > 1 {
+			advice = generalReason(advice, g.refs[0])
 		}
 	}
 	return advice, strings.TrimSpace(e.Fix)
@@ -414,12 +431,12 @@ func (b *batchRun) summary(items []*batchItem, dry bool) error {
 	}
 	wrote := slices.ContainsFunc(items, (*batchItem).wrote)
 	groups := failGroups(failed, codeOrder(wrote))
-	out := &render.Error{Code: batchCode(failed, wrote), What: summaryLine(head, groups)}
+	out := &render.Error{Code: batchCode(failed, wrote), What: summaryLine(head, groups, b.def)}
 
 	// Next steps: the advice of each kind, the retry of the issues a re-run
 	// may finish, and the first fix.
 	var advice []string
-	var retry []int
+	var retry []issue.Ref
 	retryFix := ""
 	for _, g := range groups {
 		a, fix := g.next()
@@ -430,7 +447,7 @@ func (b *batchRun) summary(items []*batchItem, dry bool) error {
 			out.Fix = fix
 		}
 		if g.retryable() {
-			retry = append(retry, g.ns...)
+			retry = append(retry, g.refs...)
 			if retryFix == "" {
 				retryFix = fix
 			}
@@ -441,7 +458,7 @@ func (b *batchRun) summary(items []*batchItem, dry bool) error {
 		next = append(next, strings.Join(advice, "; "))
 	}
 	if len(retry) > 0 {
-		slices.Sort(retry)
+		slices.SortFunc(retry, compareRefs(b.def))
 		lead, tail := "re-run the same command to retry ", ""
 		if retryFix != "" && retryFix != out.Fix {
 			lead = retryFix + ", then " + lead
@@ -449,7 +466,7 @@ func (b *batchRun) summary(items []*batchItem, dry bool) error {
 		if !dry {
 			tail = ": it skips the issues done"
 		}
-		hint := lead + refsWithin(retry, maxSummaryRunes-runes(lead+tail)) + tail
+		hint := lead + refsWithin(retry, maxSummaryRunes-runes(lead+tail), b.def) + tail
 		if out.Code == render.ExitNetwork || out.Code == render.ExitPartial {
 			next = append([]string{hint}, next...) // the step of the code first
 		} else {
@@ -468,13 +485,13 @@ func (b *batchRun) summary(items []*batchItem, dry bool) error {
 func failGroups(failed []*batchItem, order []render.Code) []*failGroup {
 	var groups []*failGroup
 	for _, it := range failed {
-		key := generalReason(it.why, it.n)
+		key := generalReason(it.why, it.ref)
 		i := slices.IndexFunc(groups, func(g *failGroup) bool { return g.key == key })
 		if i < 0 {
 			groups = append(groups, &failGroup{key: key, why: it.why, err: it.err, code: render.FromError(it.err).Code})
 			i = len(groups) - 1
 		}
-		groups[i].ns = append(groups[i].ns, it.n)
+		groups[i].refs = append(groups[i].refs, it.ref)
 	}
 	rank := func(c render.Code) int {
 		if i := slices.Index(order, c); i >= 0 {
@@ -493,70 +510,70 @@ func failGroups(failed []*batchItem, order []render.Code) []*failGroup {
 // too long, its issues are named as few as needed (at least one, the rest
 // counted), then its reason is cut, leaving room to name a few issues
 // after it.
-func summaryLine(head string, groups []*failGroup) string {
+func summaryLine(head string, groups []*failGroup, def issue.Repo) string {
 	line := head
 	for i, g := range groups {
-		rest := groupNumbers(groups[i+1:])
+		rest := groupRefs(groups[i+1:], def)
 		why := g.reason()
-		if entry := "; " + issueRefs(g.ns) + ": " + why; runes(line+entry) <= maxSummaryRunes-tailRunes(rest, 1) {
+		if entry := "; " + refNames(g.refs, def) + ": " + why; runes(line+entry) <= maxSummaryRunes-tailRunes(rest, 1, def) {
 			line += entry
 			continue
 		}
 		if i > 0 {
-			return line + alsoNotDone(groupNumbers(groups[i:]), maxSummaryRunes-runes(line))
+			return line + alsoNotDone(groupRefs(groups[i:], def), maxSummaryRunes-runes(line), def)
 		}
-		room := maxSummaryRunes - runes(line) - tailRunes(rest, 3)
-		refs := refsWithin(g.ns, room-runes("; : "+why))
+		room := maxSummaryRunes - runes(line) - tailRunes(rest, 3, def)
+		refs := refsWithin(g.refs, room-runes("; : "+why), def)
 		line += "; " + refs + ": " + clipRunes(why, max(room-runes("; "+refs+": "), 2))
-		return line + alsoNotDone(rest, maxSummaryRunes-runes(line))
+		return line + alsoNotDone(rest, maxSummaryRunes-runes(line), def)
 	}
 	return line
 }
 
 const alsoNotDonePrefix = "; also not done: "
 
-// alsoNotDone names ns after the entries of the summary line, within
+// alsoNotDone names refs after the entries of the summary line, within
 // budget runes; "" for none.
-func alsoNotDone(ns []int, budget int) string {
-	if len(ns) == 0 {
+func alsoNotDone(refs []issue.Ref, budget int, def issue.Repo) string {
+	if len(refs) == 0 {
 		return ""
 	}
-	return alsoNotDonePrefix + refsWithin(ns, budget-runes(alsoNotDonePrefix))
+	return alsoNotDonePrefix + refsWithin(refs, budget-runes(alsoNotDonePrefix), def)
 }
 
-// tailRunes is the length of alsoNotDone of ns naming up to k of them.
-func tailRunes(ns []int, k int) int {
-	if len(ns) == 0 {
+// tailRunes is the length of alsoNotDone of refs naming up to k of them.
+func tailRunes(refs []issue.Ref, k int, def issue.Repo) int {
+	if len(refs) == 0 {
 		return 0
 	}
-	k = min(k, len(ns))
-	return runes(alsoNotDonePrefix + refsText(ns[:k], len(ns)-k))
+	k = min(k, len(refs))
+	return runes(alsoNotDonePrefix + refsText(refs[:k], len(refs)-k, def))
 }
 
-// groupNumbers lists the issues of groups in ascending order.
-func groupNumbers(groups []*failGroup) []int {
-	var ns []int
+// groupRefs lists the issues of groups in order (see compareRefs).
+func groupRefs(groups []*failGroup, def issue.Repo) []issue.Ref {
+	var refs []issue.Ref
 	for _, g := range groups {
-		ns = append(ns, g.ns...)
+		refs = append(refs, g.refs...)
 	}
-	slices.Sort(ns)
-	return ns
+	slices.SortFunc(refs, compareRefs(def))
+	return refs
 }
 
-// refsWithin names ns as issueRefs does, as many as fit in budget runes
+// refsWithin names refs as refNames does, as many as fit in budget runes
 // (at least one), the rest counted: "#4, #5 and 12 more".
-func refsWithin(ns []int, budget int) string {
-	for k := min(len(ns), maxErrorRefs); k > 1; k-- {
-		if s := refsText(ns[:k], len(ns)-k); runes(s) <= budget {
+func refsWithin(refs []issue.Ref, budget int, def issue.Repo) string {
+	for k := min(len(refs), maxErrorRefs); k > 1; k-- {
+		if s := refsText(refs[:k], len(refs)-k, def); runes(s) <= budget {
 			return s
 		}
 	}
-	return refsText(ns[:1], len(ns)-1)
+	return refsText(refs[:1], len(refs)-1, def)
 }
 
 // refsText is "#1, #2", then " and N more" for more issues not named.
-func refsText(shown []int, more int) string {
-	s := issueRefs(shown)
+func refsText(shown []issue.Ref, more int, def issue.Repo) string {
+	s := refNames(shown, def)
 	if more > 0 {
 		s += fmt.Sprintf(" and %d more", more)
 	}

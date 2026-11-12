@@ -3,7 +3,8 @@ code: 0
 Process from .github/dojo.toml (preset kanban): board acme/3, issues in acme/shop, acme/api.
 Find an issue to take with gh dojo next (Backlog or no status, no unresolved blockers);
 read it with gh dojo show <N>.
-Run a verb as gh dojo <verb> <N>; --dry-run shows its plan first.
+Run a verb as gh dojo <verb> <N>, N in acme/shop, or owner/repo#N in another repository;
+--dry-run shows its plan first; gh dojo new --repo owner/repo creates in another one.
 Every command takes --json (schema_version 1), --jq and --template, as gh does.
 
 Verbs:

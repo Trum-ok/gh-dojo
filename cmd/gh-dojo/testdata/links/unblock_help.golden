@@ -3,8 +3,9 @@ code: 0
 Remove the blocked-by links between issue N and the issues --by names,
 without changing its status.
 
---by takes 12, "#12", owner/repo#12 or the issue's URL; repeat it, or
-separate them with commas. A link already gone is not an error: the line
+N and --by take 12, "#12" (the default repository, board.repos[0]),
+owner/repo#12 or the issue's URL; repeat --by, or separate the issues
+with commas. A link already gone is not an error: the line
 says "already". An issue that does not exist fails before anything is
 written (exit code 3).
 

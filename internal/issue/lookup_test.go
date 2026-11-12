@@ -116,11 +116,14 @@ func (q *queryRecorder) Query(_ context.Context, query string, _ map[string]any,
 
 // firstQuery is a graph.Querier that keeps the first query and fails
 // every one.
-type firstQuery struct{ query string }
+type firstQuery struct {
+	query string
+	vars  map[string]any
+}
 
-func (q *firstQuery) Query(_ context.Context, query string, _ map[string]any, _ any) error {
+func (q *firstQuery) Query(_ context.Context, query string, vars map[string]any, _ any) error {
 	if q.query == "" {
-		q.query = query
+		q.query, q.vars = query, vars
 	}
 	return errors.New("not sent")
 }

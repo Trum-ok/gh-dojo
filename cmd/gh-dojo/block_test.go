@@ -51,6 +51,19 @@ func TestBlock(t *testing.T) {
 	)
 }
 
+// TestBlockOtherRepo: the issue to block is in another repository
+// (acme/api, outside board.repos); a bare --by number is in the default
+// one. The line names acme/api's issues in full and the default
+// repository's as #3, in the text and the JSON alike.
+func TestBlockOtherRepo(t *testing.T) {
+	srv, before := withLinksApp(t, verbFixture("links_block_repos"))
+	checkLinkRuns(t, srv, before,
+		runs{[]string{"block", "acme/api#7", "--by", "3,acme/api#8"}, render.ExitOK, 2, "block_other_repo"},
+		runs{[]string{"block", "https://github.com/acme/api/issues/7", "--by", "Trum-ok/gh-dojo#3", "--by", "acme/api#8", "--json"},
+			render.ExitOK, 1, "block_other_repo_json"},
+	)
+}
+
 func TestUnblock(t *testing.T) {
 	srv, before := withLinksApp(t, verbFixture("links_unblock"))
 	checkLinkRuns(t, srv, before,

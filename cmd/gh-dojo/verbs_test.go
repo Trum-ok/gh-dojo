@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/Trum-ok/gh-dojo/internal/config"
@@ -81,7 +82,10 @@ func withSession(t *testing.T, id string) {
 
 // fakeBackend serves issues from memory and records what it applies.
 type fakeBackend struct {
-	issues    map[int]workflow.Issue
+	issues map[int]workflow.Issue // in acme/shop, the default repository
+	// others are issues outside acme/shop by "owner/name#N"; Display and
+	// DefaultRepo are filled as the GitHub backend fills them.
+	others    map[string]workflow.Issue
 	applyErr  error
 	applyErrs map[int]error // by issue number, for batches
 	confirmed map[int]int   // with applyErrs: how many ops GitHub confirmed first
@@ -90,25 +94,34 @@ type fakeBackend struct {
 	applied   []*workflow.Plan
 }
 
-func (f *fakeBackend) ReadIssue(_ context.Context, _ config.Verb, n int, _ workflow.Args) (workflow.Issue, error) {
+// fakeRepo is the default repository of fakeBackend.
+var fakeRepo = issue.Repo{Owner: "acme", Name: "shop"}
+
+func (f *fakeBackend) ReadIssue(_ context.Context, _ config.Verb, ref issue.Ref, _ workflow.Args) (workflow.Issue, error) {
 	f.reads++
-	return f.issue(n)
+	return f.issue(ref)
 }
 
-func (f *fakeBackend) issue(n int) (workflow.Issue, error) {
-	is, ok := f.issues[n]
+func (f *fakeBackend) issue(ref issue.Ref) (workflow.Issue, error) {
+	ref = ref.In(fakeRepo)
+	is, ok := f.issues[ref.Number]
+	if !ref.Same(issue.Ref{Repo: fakeRepo, Number: ref.Number}) {
+		key := ref.Repo.String() + "#" + strconv.Itoa(ref.Number)
+		is, ok = f.others[key]
+		is.Display, is.DefaultRepo = key, fakeRepo.String()
+	}
 	if !ok {
-		return workflow.Issue{}, render.NotFound("issue #%d not found in acme/shop", n)
+		return workflow.Issue{}, render.NotFound("issue #%d not found in %s", ref.Number, ref.Repo)
 	}
 	return is, nil
 }
 
-func (f *fakeBackend) ReadIssues(_ context.Context, _ config.Verb, ns []int, _ workflow.Args) ([]IssueRead, error) {
+func (f *fakeBackend) ReadIssues(_ context.Context, _ config.Verb, refs []issue.Ref, _ workflow.Args) ([]IssueRead, error) {
 	f.reads++
-	out := make([]IssueRead, len(ns))
-	for i, n := range ns {
-		out[i].Number = n
-		out[i].Issue, out[i].Err = f.issue(n)
+	out := make([]IssueRead, len(refs))
+	for i, ref := range refs {
+		out[i].Ref = ref.In(fakeRepo)
+		out[i].Issue, out[i].Err = f.issue(ref)
 	}
 	return out, nil
 }
@@ -127,7 +140,7 @@ func (f *fakeBackend) Apply(_ context.Context, p *workflow.Plan) ([]workflow.Op,
 
 func (f *fakeBackend) Reset() error { return nil }
 
-func (f *fakeBackend) Repo() (issue.Repo, error) { return issue.Repo{Owner: "acme", Name: "shop"}, nil }
+func (f *fakeBackend) Repo() (issue.Repo, error) { return fakeRepo, nil }
 
 func withBackend(t *testing.T, f *fakeBackend) {
 	t.Helper()

@@ -1,0 +1,7 @@
+code: 0
+--- stdout
+#12 Ready → Done, closed as completed
+other/repo#3 Ready → Done, closed as completed
+#3 Ready → Done, closed as completed
+3 of 3 done
+--- stderr

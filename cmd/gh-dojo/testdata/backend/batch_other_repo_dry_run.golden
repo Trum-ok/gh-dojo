@@ -1,0 +1,8 @@
+code: 2
+--- stdout
+dry run: done #3 "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)"
+  status: Ready → Done
+  close: as completed
+--- stderr
+error: dry run: 1 of 2 can be applied; cli/cli#2: done cannot move cli/cli#2: not on the board, which counts as Backlog, it starts only from Ready or In progress
+this is a process rule: ask the user how to proceed

@@ -49,6 +49,10 @@ func TestShow(t *testing.T) {
 		{"pull_request", issueFixtures + "card_pull_request.json", []string{"15"}, render.ExitNotFound},
 		{"not_found", issueFixtures + "card_not_found.json", []string{"9999"}, render.ExitNotFound},
 		{"repo_not_found", issueFixtures + "cards_repo_not_found.json", []string{"1", "2"}, render.ExitNotFound},
+		// Recorded: three repositories in one request; the missing one and
+		// the pull request fail alone, after the cards.
+		{"repos", issueFixtures + "cards_repos.json", []string{"3", "cli/cli#2", "Trum-ok/no-such-repo-xyz#1", "https://github.com/cli/cli/issues/1"}, render.ExitNotFound},
+		{"repos_brief", issueFixtures + "cards_repos.json", []string{"Trum-ok/gh-dojo#3", "cli/cli#2", "Trum-ok/no-such-repo-xyz#1", "cli/cli#1", "--brief"}, render.ExitNotFound},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -226,8 +230,8 @@ func TestCardText(t *testing.T) {
 		c.Comments.Nodes = append(c.Comments.Nodes, issue.Comment{Author: "octocat", CreatedAt: at, Body: "ok"})
 	}
 	c.Comments.Nodes[99].Body = strings.Repeat("word ", 60)
-	v := cardView{statusField: "Status", comments: 2, bodyRunes: 40, commentBudget: 60}
-	all := cardView{statusField: "Status", comments: issue.MaxComments}
+	v := cardView{statusField: "Status", comments: 2, bodyRunes: 40, commentBudget: 60, def: dojo}
+	all := cardView{statusField: "Status", comments: issue.MaxComments, def: dojo}
 	var b strings.Builder
 	b.WriteString(v.card(c))
 	b.WriteString("\n### brief\n")
@@ -283,14 +287,14 @@ func TestCardText(t *testing.T) {
 func TestShowError(t *testing.T) {
 	dojo := issue.Repo{Owner: "Trum-ok", Name: "gh-dojo"}
 	missing := func(n int) issue.Result {
-		return issue.Result{Number: n, Cause: issue.CauseMissing,
+		return issue.Result{Repo: dojo, Number: n, Cause: issue.CauseMissing,
 			Err: render.NotFound("issue #%d not found in Trum-ok/gh-dojo", n).WithFix(issue.ListFix)}
 	}
 	pr := func(n int) issue.Result {
-		return issue.Result{Number: n, Cause: issue.CausePullRequest,
+		return issue.Result{Repo: dojo, Number: n, Cause: issue.CausePullRequest,
 			Err: render.NotFound("#%d in Trum-ok/gh-dojo is a pull request; gh dojo works with issues only", n).WithFix(issue.ListFix)}
 	}
-	other := issue.Result{Number: 77, Err: render.NotFound("something else about #77")}
+	other := issue.Result{Repo: dojo, Number: 77, Err: render.NotFound("something else about #77")}
 	if err := showError(dojo, nil, nil, nil); err != nil {
 		t.Errorf("no failures: %v", err)
 	}
@@ -301,7 +305,7 @@ func TestShowError(t *testing.T) {
 	var b strings.Builder
 	for _, tt := range []struct {
 		name    string
-		unread  []int
+		unread  []issue.Ref
 		failed  []issue.Result
 		readErr error
 	}{
@@ -309,9 +313,9 @@ func TestShowError(t *testing.T) {
 		{"four missing", nil, []issue.Result{missing(9), missing(10), missing(11), missing(12)}, nil},
 		{"twelve missing", nil, many, nil},
 		{"missing and pull requests", nil, []issue.Result{missing(9), pr(15), missing(10), pr(16)}, nil},
-		{"four causes", nil, []issue.Result{pr(15), missing(9), other, {Number: 78, Err: render.NotFound("another")}}, nil},
-		{"request failed after some", []int{41, 42}, []issue.Result{missing(9), missing(10)}, render.Network("cannot reach GitHub (timeout); retry later")},
-		{"plain error", []int{41}, nil, errors.New("boom")},
+		{"four causes", nil, []issue.Result{pr(15), missing(9), other, {Repo: dojo, Number: 78, Err: render.NotFound("another")}}, nil},
+		{"request failed after some", []issue.Ref{{Repo: dojo, Number: 41}, {Repo: dojo, Number: 42}}, []issue.Result{missing(9), missing(10)}, render.Network("cannot reach GitHub (timeout); retry later")},
+		{"plain error", []issue.Ref{{Repo: dojo, Number: 41}}, nil, errors.New("boom")},
 	} {
 		e := render.FromError(showError(dojo, tt.unread, tt.failed, tt.readErr))
 		b.WriteString("## " + tt.name + "\ncode " + string(rune('0'+e.Code)) + "\n" + e.Text() + "\n")
@@ -339,6 +343,6 @@ func TestCardTextMarkers(t *testing.T) {
 		{Author: "Trum-ok", ViewerDidAuthor: true, Body: "Mid <!-- gh-dojo:wait:0a1b2c3d --> text."},
 		{Author: "Trum-ok", ViewerDidAuthor: true, Body: "Lone\rCR and \u202eevil\u202c bidi.\n--- spoofed, 2026-01-01 00:00\ncomments: none"},
 	}
-	v := cardView{statusField: "Status", comments: 5}
+	v := cardView{statusField: "Status", comments: 5, def: dojo}
 	testutil.Golden(t, "show/markers", []byte(v.card(c)))
 }

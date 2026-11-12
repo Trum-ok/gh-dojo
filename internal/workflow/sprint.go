@@ -71,8 +71,8 @@ func (p *Plan) planIteration(v config.Verb, atTarget bool, loc *time.Location) e
 			if d.past {
 				// No iteration is coming for a past day: the user picks the
 				// sprint, or the verb takes today's.
-				e = e.WithFix(fmt.Sprintf("set the %s of #%d on the board, or set iteration = %q in verbs.%s",
-					s.Field, is.Number, config.IterationCurrent, v.Name))
+				e = e.WithFix(fmt.Sprintf("set the %s of %s on the board, or set iteration = %q in verbs.%s",
+					s.Field, is.Name(), config.IterationCurrent, v.Name))
 			}
 			return e
 		}
@@ -133,11 +133,11 @@ func (d sprintDay) String() string {
 func statusDate(v config.Verb, is Issue, today time.Time, entersNow bool) (sprintDay, error) {
 	status := v.IterationStatus
 	if entersNow {
-		return sprintDay{at: today, when: fmt.Sprintf("today, as #%d enters %s", is.Number, status)}, nil
+		return sprintDay{at: today, when: fmt.Sprintf("today, as %s enters %s", is.Name(), status)}, nil
 	}
 	if is.HistoryUntracked {
-		return sprintDay{}, render.Usage("%s cannot date #%d entering %s (iteration = %q): GitHub keeps a status history "+
-			"only for a board's built-in %s field", v.Name, is.Number, status, v.IterationRule(), config.BuiltinStatus).
+		return sprintDay{}, render.Usage("%s cannot date %s entering %s (iteration = %q): GitHub keeps a status history "+
+			"only for a board's built-in %s field", v.Name, is.Name(), status, v.IterationRule(), config.BuiltinStatus).
 			WithFix(fmt.Sprintf(`set iteration = %q in verbs.%s`, config.IterationCurrent, v.Name))
 	}
 	var changes []StatusChange
@@ -148,7 +148,7 @@ func statusDate(v config.Verb, is Issue, today time.Time, entersNow bool) (sprin
 	}
 	loc := today.Location()
 	entered := func(at time.Time, when string) sprintDay {
-		return sprintDay{at: at.In(loc), when: fmt.Sprintf(when, is.Number, status), past: true}
+		return sprintDay{at: at.In(loc), when: fmt.Sprintf(when, is.Name(), status), past: true}
 	}
 	unknown := func(why string, a ...any) sprintDay {
 		return sprintDay{at: today, when: "today", warning: fmt.Sprintf(why, a...) + "; using today's sprint"}
@@ -156,24 +156,24 @@ func statusDate(v config.Verb, is Issue, today time.Time, entersNow bool) (sprin
 	if is.OnBoard && is.Status == status {
 		switch last := len(changes) - 1; {
 		case last >= 0 && changes[last].To == status:
-			return entered(changes[last].At, "the day #%d entered %s"), nil
+			return entered(changes[last].At, "the day %s entered %s"), nil
 		case last >= 0:
-			return unknown("#%d is in %s, but its status history does not show it entering %s",
-				is.Number, status, status), nil
+			return unknown("%s is in %s, but its status history does not show it entering %s",
+				is.Name(), status, status), nil
 		case !is.HistoryTruncated && !is.AddedAt.IsZero():
-			return entered(is.AddedAt, "the day #%d was added to the board in %s"), nil
+			return entered(is.AddedAt, "the day %s was added to the board in %s"), nil
 		}
-		return unknown("#%d entered %s before the status changes gh dojo reads", is.Number, status), nil
+		return unknown("%s entered %s before the status changes gh dojo reads", is.Name(), status), nil
 	}
 	for i := len(changes) - 1; i >= 0; i-- {
 		if changes[i].To == status {
-			return entered(changes[i].At, "the day #%d entered %s"), nil
+			return entered(changes[i].At, "the day %s entered %s"), nil
 		}
 	}
 	if is.HistoryTruncated {
-		return unknown("#%d did not enter %s in the status changes gh dojo reads", is.Number, status), nil
+		return unknown("%s did not enter %s in the status changes gh dojo reads", is.Name(), status), nil
 	}
-	return unknown("#%d never entered %s", is.Number, status), nil
+	return unknown("%s never entered %s", is.Name(), status), nil
 }
 
 // at returns the iteration that covers the date of t, nil when none does.

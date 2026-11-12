@@ -1,0 +1,6 @@
+code: 1
+--- stdout
+--- stderr
+error: --repo "acme" is not in board.repos: gh dojo new creates issues only in the board's repositories
+allowed: Trum-ok/gh-dojo, acme/api
+fix: pass one of board.repos as owner/repo

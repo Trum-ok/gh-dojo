@@ -14,6 +14,7 @@ code: 2
   "issues": [
     {
       "number": 4,
+      "repo": "acme/shop",
       "title": "In backlog",
       "outcome": "failed",
       "planned": [],

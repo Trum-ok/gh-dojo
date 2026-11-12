@@ -105,7 +105,7 @@ func TestReadLookupLinks(t *testing.T) {
 // TestReadLinks reads what gh dojo block needs in one request.
 func TestReadLinks(t *testing.T) {
 	srv := graphtest.New(t, fixture("links_3"))
-	target, links, err := issue.ReadLinks(context.Background(), srv.Client(), dojo, 3, links3[:2], "--by")
+	target, links, err := issue.ReadLinks(context.Background(), srv.Client(), dojo, 3, dojo, links3[:2], "--by")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,13 +122,13 @@ func TestReadLinks(t *testing.T) {
 	}
 
 	// A missing blocker is exit code 3 naming it, after the same one request.
-	_, _, err = issue.ReadLinks(context.Background(), srv.Client(), dojo, 3, links3, "--by")
+	_, _, err = issue.ReadLinks(context.Background(), srv.Client(), dojo, 3, dojo, links3, "--by")
 	if got := render.FromError(err); got.Code != render.ExitNotFound ||
 		got.What != "--by #9999, Trum-ok/no-such-repo#1: no such issue, or the token cannot see it" {
 		t.Errorf("missing links: %d %q", got.Code, got.What)
 	}
 	// A missing target is exit code 3 about the target.
-	_, _, err = issue.ReadLinks(context.Background(), srv.Client(), dojo, 9998, links3[:1], "--by")
+	_, _, err = issue.ReadLinks(context.Background(), srv.Client(), dojo, 9998, dojo, links3[:1], "--by")
 	if got := render.FromError(err); got.Code != render.ExitNotFound || got.What != "issue #9998 not found in Trum-ok/gh-dojo" {
 		t.Errorf("missing target: %d %q", got.Code, got.What)
 	}

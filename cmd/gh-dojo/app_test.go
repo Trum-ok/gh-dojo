@@ -135,7 +135,7 @@ func TestAppCardWarmCache(t *testing.T) {
 	before := srv.Requests()
 
 	a := newApp() // a new run
-	card, err := a.Card(ctx, 3, 0)
+	card, err := a.Card(ctx, issue.Ref{Number: 3}, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +154,7 @@ func TestAppCardWarmCache(t *testing.T) {
 func TestAppCardColdCache(t *testing.T) {
 	withConfig(t, dojoConfig)
 	srv := withApp(t, boardFixture, card3Fixture)
-	if _, err := newApp().Card(context.Background(), 3, 0); err != nil {
+	if _, err := newApp().Card(context.Background(), issue.Ref{Number: 3}, 0); err != nil {
 		t.Fatal(err)
 	}
 	if n := srv.Requests(); n != 2 {
@@ -165,7 +165,7 @@ func TestAppCardColdCache(t *testing.T) {
 func TestAppBoardMismatch(t *testing.T) {
 	withConfig(t, dojoConfig+"\n[verbs.start]\nto = \"In progres\"\n")
 	srv := withApp(t, boardFixture)
-	_, err := newApp().Card(context.Background(), 3, 0)
+	_, err := newApp().Card(context.Background(), issue.Ref{Number: 3}, 0)
 	assertCode(t, err, render.ExitUsage, "app/board_mismatch")
 	if n := srv.Requests(); n != 1 {
 		t.Errorf("requests = %d, want 1: no card read after a bad config", n)
@@ -220,7 +220,7 @@ func TestAppCardResolvesRepoFirst(t *testing.T) {
 		Client: &q, Loader: board.NewLoader(&q),
 		CurrentRepo: func() (string, error) { return "", errors.New("no git remote") },
 	}
-	_, err := a.Card(context.Background(), 3, 0)
+	_, err := a.Card(context.Background(), issue.Ref{Number: 3}, 0)
 	if render.FromError(err).Code != render.ExitUsage {
 		t.Errorf("err = %v, want a config error", err)
 	}
@@ -247,7 +247,7 @@ func TestAppCardStatusByFieldID(t *testing.T) {
 	// to Stage since. The card's status is matched by the field's ID.
 	withConfig(t, dojoConfig)
 	srv := withApp(t, boardFixture, renamedStatusFixture(t))
-	card, err := newApp().Card(context.Background(), 3, 0)
+	card, err := newApp().Card(context.Background(), issue.Ref{Number: 3}, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -333,7 +333,7 @@ func TestAppRepoGHRepo(t *testing.T) {
 func TestAppMissingConfig(t *testing.T) {
 	// TestMain's config dir has no dojo.toml; an App without a client shows
 	// nothing is sent.
-	_, err := (&App{}).Card(context.Background(), 3, 0)
+	_, err := (&App{}).Card(context.Background(), issue.Ref{Number: 3}, 0)
 	if render.FromError(err).Code != render.ExitUsage {
 		t.Errorf("err = %v, want a config error", err)
 	}
@@ -345,7 +345,7 @@ func TestWorkflowIssue(t *testing.T) {
 		Item: &issue.Item{ID: "PVTI_1", Status: "Ready"},
 	}
 	card.Comments.Nodes = []issue.Comment{{Body: "a"}, {Body: "b", ViewerDidAuthor: true}}
-	is := workflowIssue(card)
+	is := workflowIssue(card, issue.Repo{})
 	if is.Number != 42 || is.Title != "Fix login" || !is.Closed || !is.OnBoard || is.Status != "Ready" || is.Ref != card {
 		t.Errorf("issue = %+v", is)
 	}
@@ -356,10 +356,10 @@ func TestWorkflowIssue(t *testing.T) {
 		t.Errorf("archived: %+v", is)
 	}
 	card.Item.Archived = true
-	if is := workflowIssue(card); !is.Archived {
+	if is := workflowIssue(card, issue.Repo{}); !is.Archived {
 		t.Errorf("archived item: %+v", is)
 	}
-	if is := workflowIssue(&issue.Card{Number: 1, State: issue.StateOpen}); is.OnBoard || is.Status != "" || is.Closed {
+	if is := workflowIssue(&issue.Card{Number: 1, State: issue.StateOpen}, issue.Repo{}); is.OnBoard || is.Status != "" || is.Closed {
 		t.Errorf("not on board: %+v", is)
 	}
 }

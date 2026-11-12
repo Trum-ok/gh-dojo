@@ -140,10 +140,18 @@ also be authorized for it.
 | [`agent install`](#agent-install) | Write the process into a skill or `AGENTS.md` section for agents |
 | [`<verb>`](#process-verbs) | The project's process verbs, from the config (`start`, `wait`, …) |
 
-Issue numbers are written `42` or `#42` and refer to the default repository
-(see [`board.repos`](#board)). Every command prints its usage with `--help`
-and takes `--json`, `--jq` and `--template` ([JSON output](#json-output)).
-Flags go before a `--`: anything after it is an argument.
+Issues are written `42` or `#42` for the default repository (the first of
+[`board.repos`](#board)), and `owner/repo#42` or the issue's URL for any
+other: in a verb, a batch, `show`, `comment`, both sides of `block` and
+`unblock`, `wait --by` and `new --blocked-by`. A repository outside
+`board.repos` is accepted too, since the command names it; a verb adds its
+issue to the board like any other. Output names an issue of the default
+repository `#42` and any other `owner/repo#42`, in the text and in the
+JSON's references alike (`ref`, `changed`, `blocked_by`, the `issue` of
+`add_blocked_by`); every issue in the JSON also has its `repo`. Every command
+prints its usage with `--help` and takes `--json`, `--jq` and `--template`
+([JSON output](#json-output)). Flags go before a `--`: anything after it is
+an argument.
 
 ### show
 
@@ -168,8 +176,9 @@ share 1500. `--full` prints them whole. `--brief` prints three lines per
 issue: title; state, status, sprint, milestone, labels and assignees;
 blockers and counts.
 
-Several numbers are read in one request (up to 20 issues per request). A
-missing issue or a pull request number is reported after the others are
+Several issues are read in one request (up to 20 issues per request), from
+any repositories: `gh dojo show 42 acme/api#7`. A missing issue, a pull
+request number or a missing repository is reported after the others are
 printed, with exit code 3.
 
 ### list
@@ -233,7 +242,7 @@ code 1).
 ### new
 
 ```sh
-gh dojo new <title> [--type T] [--area A]... [--label L]... [--milestone M] [--blocked-by N]... [--body TEXT | --body-file FILE]
+gh dojo new <title> [--type T] [--area A]... [--label L]... [--milestone M] [--blocked-by N]... [--repo owner/repo] [--body TEXT | --body-file FILE]
 ```
 
 Creates an issue, labels it, adds it to the board and sets the initial status
@@ -246,6 +255,11 @@ Creates an issue, labels it, adds it to the board and sets the initial status
   (ignoring case);
 - `--blocked-by 17` marks it blocked by #17 (repeatable, or comma-separated;
   `owner/repo#17` or a URL for another repository);
+- `--repo acme/api` creates it in another repository of
+  [`board.repos`](#board) than the first: its labels, milestones and repeat
+  check are that repository's, the issue is named `acme/api#15`, and a bare
+  `--blocked-by` number is still in the default repository. A repository
+  not in `board.repos` is refused (exit code 1, listing them);
 - `--body-file -` reads the body from stdin. A title starting with `-` goes
   after `--`: `gh dojo new --type bug -- "-v is ignored"`.
 
@@ -285,8 +299,8 @@ gh dojo unblock <N> --by <M>...
 ```
 
 Marks issue N blocked by the issues `--by` names, or removes those links,
-without changing its status. `--by` takes `12`, `"#12"`, `owner/repo#12` or
-the issue's URL; repeat it or separate them with commas. A link already
+without changing its status. N and `--by` take `12`, `"#12"`, `owner/repo#12`
+or the issue's URL; repeat `--by` or separate the issues with commas. A link already
 there (`block`) or already gone (`unblock`) is not an error, and the line
 says so. An issue that does not exist, or a pull request, fails before
 anything is written (exit code 3); an issue cannot block itself, nor an
@@ -297,6 +311,8 @@ $ gh dojo block 42 --by 17,18
 #42 blocked by #18, already blocked by #17
 $ gh dojo unblock 42 --by 17
 #42 no longer blocked by #17
+$ gh dojo block acme/api#7 --by 42
+acme/api#7 blocked by #42
 ```
 
 Verbs check and add the same links: see [`blockers`](#checks).
@@ -634,7 +650,7 @@ disabled = true              # drop a verb that the preset defines
 |------------|----------|---------|
 | `owner`    | yes      | User or organization login that owns the project; which one is detected |
 | `project`  | yes      | Project number from its URL, 1 or greater |
-| `repos`    | no       | `owner/name` list; the first is the default repo for issue numbers and `new`. Empty: the current repo (`GH_REPO`, else the git remote) |
+| `repos`    | no       | `owner/name` list; the first is the default repo for bare issue numbers and `new`, the others are reached with `owner/repo#N` and `new --repo`. Empty: the current repo (`GH_REPO`, else the git remote) |
 | `assignee` | no       | Who a verb with `assign = true` assigns: `"@me"` (the authenticated user) or a login |
 | `timezone` | no       | An IANA time zone, like `"Europe/Moscow"`; UTC when not set. The [`iteration`](#effects) effect, `list --sprint current`, `next --sprint current` and `doctor` take today, and the day an issue entered a status, as dates in it |
 
@@ -998,9 +1014,11 @@ fix: gh auth refresh -s project
 ### Several issues at once
 
 A verb with `batch = true` takes several issue numbers; other verbs take
-exactly one and say which verbs take several. A number given twice counts
-once. The cards are read in one request per 20 issues, with the label, user
-and `--by` lookups once in each; then each issue is checked, planned and
+exactly one and say which verbs take several. An issue given twice counts
+once (`12` and `acme/shop#12` too, in the default repository acme/shop).
+The cards are read in one request per 20 issues, from any repositories
+(`gh dojo done 12 acme/api#3`), with the label, user and `--by` lookups once
+in each (labels and users once per repository); then each issue is checked, planned and
 written on its own, with its own mutation, so a lost answer or a refusal
 touches that issue alone. An issue that fails is skipped and the others go
 on. An error that would fail every write alike (the token rejected or missing
@@ -1037,9 +1055,10 @@ The run's exit code is the first that applies:
 
 Here it is 5: the re-run finishes #21 and then ends with the refusal of #17
 (code 2). Whatever the code, the error names the issues a re-run may finish.
-Bad arguments or flags, a config error and a label to add that the
+Bad arguments or flags, a config error and a label to add that the default
 repository does not have fail the whole command, with nothing written (code
-1); so does an issue `--by` names that does not exist (code 3).
+1); so does an issue `--by` names that does not exist (code 3). A label
+missing in another repository fails only that repository's issues.
 
 ### JSON output
 
@@ -1115,11 +1134,11 @@ The schemas, by command, after `schema_version` and `error`:
 
 | Command | Top-level fields |
 |---------|------------------|
-| `show` | `brief` (`--brief`: every card's `history` and `comments` are `[]`, `body` `null`), `issues`: cards; `failed`: `[{number, error}]` for numbers not shown; `warnings` |
+| `show` | `brief` (`--brief`: every card's `history` and `comments` are `[]`, `body` `null`), `issues`: cards; `failed`: `[{number, repo, error}]` for issues not shown; `warnings` |
 | card | `number`, `repo`, `url`, `title`, `state` (`open`/`closed`), `state_reason` (`completed`, `not_planned`, `duplicate`, `reopened` or `null`), `author`, `created_at`, `closed_at`, `incomplete` (GitHub withheld part of it); `board`: `{on_board, unknown_reason, status, status_unknown, archived, fields: [{name, value}], fields_truncated}`; `sprint`: `null` without `fields.sprint`, else `{field, iteration: {title, start_date, end_date, duration_days} or null, unknown_reason}`; `milestone`: `{title, due_on}` or `null`; `labels`, `assignees` with `labels_total`, `assignees_total`; `blocked_by`, `blocking`: `[{ref, repo, number, title, state, on_board, status, archived, status_unknown_reason, resolved}]` with `blocked_by_total`, `blocking_total`, `unresolved_blockers`; `history`: `[{at, from, to, actor, automated}]` with `history_truncated`, `history_untracked`; `body`: `{text, cut, length}`; `comments`: `[{author, created_at, text, cut, length}]` with `comments_total` |
 | `list` | `sprint_filter` (`null` without `--sprint`, `"none"` for issues without a sprint, `"iteration"` for those in `sprint`), `sprint` (the `--sprint` iteration or `null`), `issues`: `[{repo, number, title, state, status, labels, labels_total, assignees, assignees_total}]` in the printed order, cut to `--limit`; `matched` (before `--limit`), `unchecked`, `hidden`, `filtered`, `skipped`: `{draft_issues, pull_requests, unseen}`, `incomplete`, `warnings` |
 | `next` | as `list`, each issue with `unresolved_blockers`: `[{ref, repo, number, on_board, status, archived, status_unknown_reason}]` (empty unless `--all`) and `unread_blockers` (blockers the token cannot read, unresolved); `matched`: issues to show before `--limit` (with `--all`, the blocked ones too); `hidden`: blocked issues left out (0 with `--all`); `incomplete`: GitHub withheld part of an issue to show or hide, or of its blockers |
-| verbs | `verb`, `repo`, `dry_run`, `issues`: `[{number, title, outcome, planned, applied, in_place, needs_yes, warnings, error}]` in argument order (`title` `null` when the issue was not read), `summary`: `{total, done, written, failed, not_attempted}` |
+| verbs | `verb`, `repo` (the default repository), `dry_run`, `issues`: `[{number, repo, title, outcome, planned, applied, in_place, needs_yes, warnings, error}]` in argument order (`title` `null` when the issue was not read), `summary`: `{total, done, written, failed, not_attempted}` |
 | `new` | `number`, `repo`, `title`, `created` (`false`: resumed), `labels`, `status`, `status_set`, `unarchived`, `milestone` (`{title, due_on}` or `null`), `milestone_set`, `blocked_by`, `already_blocked_by` |
 | `comment` | `number`, `repo`, `posted` (`false`: already the last comment) |
 | `block`, `unblock` | `number`, `repo`, `action`, `changed`, `unchanged`, `missed` |

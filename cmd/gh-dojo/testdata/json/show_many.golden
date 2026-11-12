@@ -242,6 +242,7 @@ code: 3
   "failed": [
     {
       "number": 9999,
+      "repo": "Trum-ok/gh-dojo",
       "error": {
         "exit_code": 3,
         "message": "issue #9999 not found in Trum-ok/gh-dojo",

@@ -49,10 +49,14 @@ title; state, status, sprint, milestone, labels, assignees; blockers and
 counts.
 It takes neither --comments nor --full.
 
-Several numbers are read in one request (up to ` + strconv.Itoa(issue.MaxBatch) + ` issues per request).
-A missing issue or a pull request number is reported after the others are
-printed, with exit code 3.`,
-		Example: "  gh dojo show 42\n  gh dojo show 42 43 57 --brief\n  gh dojo show 42 --comments all",
+An issue is 42, "#42" (the default repository, board.repos[0]),
+owner/repo#42 or its URL; an issue outside the default repository is
+printed as owner/repo#42, and so are its links.
+
+Several issues are read in one request (up to ` + strconv.Itoa(issue.MaxBatch) + ` issues per request),
+from any repositories. A missing issue or a pull request number is
+reported after the others are printed, with exit code 3.`,
+		Example: "  gh dojo show 42\n  gh dojo show 42 43 57 --brief\n  gh dojo show acme/api#7\n  gh dojo show 42 --comments all",
 		Args:    showArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if brief {
@@ -63,28 +67,25 @@ printed, with exit code 3.`,
 					}
 				}
 			}
-			var ns []int
-			for _, a := range args {
-				n, _ := parseIssue(a) // validated by showArgs
-				if !slices.Contains(ns, n) {
-					ns = append(ns, n)
-				}
-			}
 			app := newApp()
 			cfg, err := app.Config()
 			if err != nil {
 				return err
 			}
+			repo, err := app.Repo()
+			if err != nil {
+				return err
+			}
+			refs := argRefs(args, repo) // validated by showArgs
 			shown := int(comments)
 			// The window read is at least the one verbs read, so show and
 			// verbs send the same request for the default flags.
 			window := min(max(shown, issue.DefaultComments), issue.MaxComments)
-			res, readErr := app.Cards(cmd.Context(), ns, window)
+			res, readErr := app.Cards(cmd.Context(), refs, window)
 			if readErr != nil && len(res) == 0 {
 				return readErr
 			}
-			repo, _ := app.Repo() // Cards resolved it already
-			v := cardView{statusField: cfg.StatusField(), resolved: cfg.Statuses.Resolved, comments: shown}
+			v := cardView{statusField: cfg.StatusField(), resolved: cfg.Statuses.Resolved, comments: shown, def: repo}
 			v.sprintField, v.sprintFieldID = showSprint(cmd.Context(), app, cfg)
 			if !full {
 				v.bodyRunes, v.commentBudget = maxBodyRunes, commentBudgetRunes
@@ -98,7 +99,7 @@ printed, with exit code 3.`,
 					cards = append(cards, r.Card)
 				}
 			}
-			unread := ns[len(res):]
+			unread := refs[len(res):]
 			text := func(w io.Writer) {
 				for i, c := range cards {
 					switch {
@@ -145,15 +146,15 @@ func resolvedHelp() string {
 // cardSeparator separates full cards of several issues.
 var cardSeparator = strings.Repeat("=", 40)
 
-// showArgs accepts one or more issue numbers.
+// showArgs accepts one or more issues.
 func showArgs(cmd *cobra.Command, args []string) error {
 	help := cmd.CommandPath() + " --help"
 	if len(args) == 0 {
 		return render.Usage("%s needs an issue number, like %s", cmd.Name(), issueExamples).WithFix(help)
 	}
 	for _, a := range args {
-		if _, ok := parseIssue(a); !ok {
-			return render.Usage("%q is not an issue number; pass numbers like %s", a, issueExamples).WithFix(help)
+		if _, ok := parseRef(a); !ok {
+			return render.Usage("%q is not an issue number; pass issues like %s", a, issueExamples).WithFix(help)
 		}
 	}
 	return nil
@@ -190,32 +191,39 @@ func (c *commentsFlag) Type() string { return "N|all" }
 
 // showError reports what show could not print, after the cards it could:
 // issues left unread by a failed request, then the issues that failed
-// alone, grouped by cause ("issues #9, #10 not found in owner/repo"). The
-// first line decides the exit code and the fix line; the fix of every
-// other cause stays on its own line, unless it is that same fix.
-func showError(repo issue.Repo, unread []int, failed []issue.Result, readErr error) error {
+// alone, grouped by cause and repository ("issues #9, #10 not found in
+// owner/repo"); repo is the default repository, which issues are named
+// relative to. The first line decides the exit code and the fix line; the
+// fix of every other cause stays on its own line, unless it is that same
+// fix.
+func showError(repo issue.Repo, unread []issue.Ref, failed []issue.Result, readErr error) error {
 	type group struct {
 		cause issue.Cause
-		ns    []int
+		repo  issue.Repo
+		refs  []issue.Ref
 		err   *render.Error
 	}
 	var groups []*group
 	for _, r := range failed {
-		i := slices.IndexFunc(groups, func(g *group) bool { return r.Cause != "" && g.cause == r.Cause })
+		i := slices.IndexFunc(groups, func(g *group) bool {
+			return r.Cause != "" && g.cause == r.Cause && strings.EqualFold(g.repo.String(), r.Repo.String())
+		})
 		if i < 0 {
-			groups = append(groups, &group{cause: r.Cause, err: render.FromError(r.Err)})
+			groups = append(groups, &group{cause: r.Cause, repo: r.Repo, err: render.FromError(r.Err)})
 			i = len(groups) - 1
 		}
-		groups[i].ns = append(groups[i].ns, r.Number)
+		groups[i].refs = append(groups[i].refs, r.Ref())
 	}
 	what := func(g *group) string {
 		switch {
-		case len(g.ns) == 1:
+		case len(g.refs) == 1:
 			return g.err.What
 		case g.cause == issue.CauseMissing:
-			return fmt.Sprintf("issues %s not found in %s", issueRefs(g.ns), repo)
+			return fmt.Sprintf("issues %s not found in %s", refNames(g.refs, repo), g.repo)
 		case g.cause == issue.CausePullRequest:
-			return fmt.Sprintf("%s in %s are pull requests; gh dojo works with issues only", issueRefs(g.ns), repo)
+			return fmt.Sprintf("%s in %s are pull requests; gh dojo works with issues only", refNames(g.refs, repo), g.repo)
+		case g.cause == issue.CauseNoRepo:
+			return refNames(g.refs, repo) + ": " + g.err.What
 		}
 		return g.err.What
 	}
@@ -224,7 +232,7 @@ func showError(repo issue.Repo, unread []int, failed []issue.Result, readErr err
 	var first *render.Error
 	if readErr != nil {
 		first = render.FromError(readErr)
-		lines = append(lines, issueRefs(unread)+" not read: "+first.What)
+		lines = append(lines, refNames(unread, repo)+" not read: "+first.What)
 	}
 	for _, g := range groups {
 		line := what(g)
@@ -246,20 +254,4 @@ func showError(repo issue.Repo, unread []int, failed []issue.Result, readErr err
 	out := *first
 	out.What = strings.Join(lines, "\n")
 	return &out
-}
-
-// maxErrorRefs is how many issue numbers an error line names.
-const maxErrorRefs = 10
-
-// issueRefs lists issue numbers as "#9, #10", naming at most maxErrorRefs.
-func issueRefs(ns []int) string {
-	refs := make([]string, 0, min(len(ns), maxErrorRefs))
-	for _, n := range ns[:min(len(ns), maxErrorRefs)] {
-		refs = append(refs, "#"+strconv.Itoa(n))
-	}
-	s := strings.Join(refs, ", ")
-	if n := len(ns) - len(refs); n > 0 {
-		s += fmt.Sprintf(" and %d more", n)
-	}
-	return s
 }

@@ -2,6 +2,9 @@ code: 0
 --- stdout
 Comment on an issue without changing its status.
 
+The issue is 42, "#42" (the default repository, board.repos[0]),
+owner/repo#42 or its URL.
+
 The text comes from the second argument or from --body-file (a file, or - for
 stdin), exactly one of them; empty text is an error. Use --body-file - for
 long or multi-line text. Text starting with - goes after --, and every flag

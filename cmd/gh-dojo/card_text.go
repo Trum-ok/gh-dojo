@@ -62,7 +62,10 @@ type cardView struct {
 	// node ID, which finds the value even if the field was renamed.
 	sprintField, sprintFieldID string
 	resolved                   []string // statuses.resolved: an open blocker in these no longer blocks
-	comments                   int      // how many of the latest comments to print
+	// def is the default repository: an issue outside it, the card's own
+	// or a linked one, is named owner/repo#N.
+	def      issue.Repo
+	comments int // how many of the latest comments to print
 	// bodyRunes cuts the description and commentBudget is shared by the
 	// comments shown (see commentRunes); 0 prints them whole.
 	bodyRunes, commentBudget int
@@ -73,7 +76,7 @@ func (v cardView) card(c *issue.Card) string {
 	var b strings.Builder
 	line := func(format string, a ...any) { fmt.Fprintf(&b, format+"\n", a...) }
 
-	line("#%d %s", c.Number, singleLine(c.Title))
+	line("%s %s", c.Ref().String(v.def), singleLine(c.Title))
 	line("state: %s, opened %s by %s", cardState(c), cardDay(c.CreatedAt), cardLogin(c.Author))
 	line("board: %s", v.board(c, true))
 	if v.sprintField != "" {
@@ -83,7 +86,7 @@ func (v cardView) card(c *issue.Card) string {
 	line("labels: %s", cardNames(c.Labels))
 	line("assignees: %s", cardNames(c.Assignees))
 	v.writeBlockers(&b, c)
-	writeBlocking(&b, c)
+	writeBlocking(&b, c, v.def)
 	if c.OnBoard() || c.BoardUnknown && len(c.History) > 0 {
 		writeHistory(&b, c)
 	}
@@ -112,7 +115,7 @@ func (v cardView) card(c *issue.Card) string {
 // labels, assignees; blockers and counts. A fourth notes a partly hidden card.
 func (v cardView) brief(c *issue.Card) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "#%d %s\n", c.Number, singleLine(c.Title))
+	fmt.Fprintf(&b, "%s %s\n", c.Ref().String(v.def), singleLine(c.Title))
 	fmt.Fprintf(&b, "%s · %s", cardState(c), v.board(c, false))
 	if v.sprintField != "" {
 		fmt.Fprintf(&b, " · sprint: %s", v.sprint(c))
@@ -129,7 +132,7 @@ func (v cardView) brief(c *issue.Card) string {
 	case len(unresolved) > 0:
 		refs := make([]string, 0, maxBriefRefs)
 		for _, l := range unresolved[:min(len(unresolved), maxBriefRefs)] {
-			refs = append(refs, l.Ref(c.Repo))
+			refs = append(refs, linkRef(c, l, v.def))
 		}
 		blocked = fmt.Sprintf("blocked by %d unresolved (%s", len(unresolved), strings.Join(refs, ", "))
 		if n := len(unresolved) - len(refs); n > 0 {
@@ -277,19 +280,19 @@ func (v cardView) writeBlockers(b *strings.Builder, c *issue.Card) {
 	}
 	writeLinks(b, "blocked by", c.BlockedBy, counts)
 	for _, l := range unresolved {
-		writeLink(b, l, c.Repo, linkPlace(l))
+		writeLink(b, l, linkRef(c, l, v.def), linkPlace(l))
 	}
 	for _, l := range done {
-		writeLink(b, l, c.Repo, linkPlace(l)+", resolved")
+		writeLink(b, l, linkRef(c, l, v.def), linkPlace(l)+", resolved")
 	}
 	for _, l := range closed {
-		writeLink(b, l, c.Repo, "closed")
+		writeLink(b, l, linkRef(c, l, v.def), "closed")
 	}
 }
 
 // writeBlocking writes the issues this one blocks, one per line, open ones
-// first.
-func writeBlocking(b *strings.Builder, c *issue.Card) {
+// first, named relative to def.
+func writeBlocking(b *strings.Builder, c *issue.Card, def issue.Repo) {
 	var open, closed []issue.Link
 	for _, l := range c.Blocking.Nodes {
 		if l.Closed() {
@@ -307,10 +310,10 @@ func writeBlocking(b *strings.Builder, c *issue.Card) {
 	}
 	writeLinks(b, "blocking", c.Blocking, counts)
 	for _, l := range open {
-		writeLink(b, l, c.Repo, linkPlace(l))
+		writeLink(b, l, linkRef(c, l, def), linkPlace(l))
 	}
 	for _, l := range closed {
-		writeLink(b, l, c.Repo, "closed")
+		writeLink(b, l, linkRef(c, l, def), "closed")
 	}
 }
 
@@ -347,10 +350,10 @@ func writeLinks(b *strings.Builder, label string, p graph.Page[issue.Link], coun
 	fmt.Fprintf(b, "%s: %s\n", label, strings.Join(counts, ", "))
 }
 
-// writeLink writes a linked issue on its own line, with what to say about
-// it (its board status, closed) in parentheses unless empty.
-func writeLink(b *strings.Builder, l issue.Link, repo issue.Repo, about string) {
-	fmt.Fprintf(b, "  %s %s", l.Ref(repo), clipRunes(singleLine(l.Title), maxLinkTitleRunes))
+// writeLink writes a linked issue, named ref, on its own line, with what
+// to say about it (its board status, closed) in parentheses unless empty.
+func writeLink(b *strings.Builder, l issue.Link, ref, about string) {
+	fmt.Fprintf(b, "  %s %s", ref, clipRunes(singleLine(l.Title), maxLinkTitleRunes))
 	if about = singleLine(about); about != "" {
 		fmt.Fprintf(b, " (%s)", about)
 	}

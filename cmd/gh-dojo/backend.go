@@ -30,42 +30,43 @@ import (
 // each.
 type githubBackend struct {
 	app   *App
-	added map[int]string // issue number → board item added in this run
+	added map[string]string // refKey of an issue → board item added in this run
 }
 
-func (b *githubBackend) ReadIssue(ctx context.Context, v config.Verb, n int, a workflow.Args) (workflow.Issue, error) {
-	res, err := b.ReadIssues(ctx, v, []int{n}, a)
+func (b *githubBackend) ReadIssue(ctx context.Context, v config.Verb, ref issue.Ref, a workflow.Args) (workflow.Issue, error) {
+	res, err := b.ReadIssues(ctx, v, []issue.Ref{ref}, a)
 	if err != nil {
 		return workflow.Issue{}, err
 	}
 	return res[0].Issue, res[0].Err
 }
 
-// ReadIssues reads the cards of ns with the lookups of v once per request
-// (see issue.ReadAll): for one number, the request ReadIssue sends.
-func (b *githubBackend) ReadIssues(ctx context.Context, v config.Verb, ns []int, a workflow.Args) ([]IssueRead, error) {
-	lookup := verbLookup(v)
-	var refs []issue.Ref // the issues --by names, for blockers = "link"
-	var repo issue.Repo
-	if v.Blockers == config.BlockersLink && a.HasBy {
-		var err error
-		if repo, err = b.app.Repo(); err != nil {
-			return nil, err
-		}
-		if refs, err = byRefs(v, a.By, repo, 0); err != nil {
-			return nil, err
-		}
-		lookup.Links = issue.Links(refs)
+// ReadIssues reads the cards of refs with the lookups of v once per
+// request (see issue.ReadRefs): for one issue, the request ReadIssue
+// sends.
+func (b *githubBackend) ReadIssues(ctx context.Context, v config.Verb, refs []issue.Ref, a workflow.Args) ([]IssueRead, error) {
+	def, err := b.app.Repo()
+	if err != nil {
+		return nil, err
 	}
-	out := make([]IssueRead, len(ns))
-	var read []int
-	for i, n := range ns {
-		out[i].Number = n
-		if slices.ContainsFunc(refs, func(r issue.Ref) bool { return r.Same(issue.Ref{Repo: repo, Number: n}) }) {
-			out[i].Err = selfBlock(n, v.Name+" --by")
+	lookup := verbLookup(v)
+	var bys []issue.Ref // the issues --by names, for blockers = "link"
+	if v.Blockers == config.BlockersLink && a.HasBy {
+		if bys, err = byRefs(v, a.By, def, issue.Ref{}); err != nil {
+			return nil, err
+		}
+		lookup.Links = issue.Links(bys)
+	}
+	out := make([]IssueRead, len(refs))
+	var read []issue.Ref
+	for i, ref := range refs {
+		ref = ref.In(def)
+		out[i].Ref = ref
+		if slices.ContainsFunc(bys, ref.Same) {
+			out[i].Err = selfBlock(ref, def, v.Name+" --by")
 			continue
 		}
-		read = append(read, n)
+		read = append(read, ref)
 	}
 	if len(read) == 0 {
 		return out, nil
@@ -74,28 +75,28 @@ func (b *githubBackend) ReadIssues(ctx context.Context, v config.Verb, ns []int,
 	if err != nil && len(results) == 0 {
 		return nil, err
 	}
-	byNumber := make(map[int]issue.Result, len(results))
+	byRef := make(map[string]issue.Result, len(results))
 	for _, r := range results {
-		byNumber[r.Number] = r
+		byRef[refKey(r.Ref())] = r
 	}
 	for i := range out {
 		r := &out[i]
 		if r.Err != nil {
 			continue
 		}
-		res, ok := byNumber[r.Number]
+		res, ok := byRef[refKey(r.Ref)]
 		switch {
 		case !ok && err != nil:
 			r.Err = err // not read: a later request failed
 			continue
 		case !ok:
-			r.Err = render.Internal("#%d was not read", r.Number)
+			r.Err = render.Internal("%s was not read", r.Ref.String(def))
 			continue
 		case res.Err != nil:
 			r.Err = res.Err
 			continue
 		}
-		is, failed, err := b.workflowIssue(ctx, v, lookup, res.Card)
+		is, failed, err := b.workflowIssue(ctx, v, lookup, res.Card, def)
 		if err != nil {
 			return nil, err
 		}
@@ -109,18 +110,20 @@ func (b *githubBackend) ReadIssues(ctx context.Context, v config.Verb, ns []int,
 // not be read, a label to remove is spelled another way on it, or an issue
 // --by names is this one or blocked by it. err fails every issue: what v
 // needs is missing for all of them (a label to add, the assignee, a --by
-// issue), or the config or the board schema is wrong.
-func (b *githubBackend) workflowIssue(ctx context.Context, v config.Verb, lookup issue.Lookup, card *issue.Card) (is workflow.Issue, failed, err error) {
-	if err := statusUnknown(card); err != nil {
+// issue), or the config or the board schema is wrong. A label or an
+// assignee is looked up per repository, so one missing in a repository
+// other than the default, def, fails only that issue.
+func (b *githubBackend) workflowIssue(ctx context.Context, v config.Verb, lookup issue.Lookup, card *issue.Card, def issue.Repo) (is workflow.Issue, failed, err error) {
+	if err := statusUnknown(card, def); err != nil {
 		return workflow.Issue{}, err, nil
 	}
 	if err := b.checkFound(ctx, v, lookup, card); err != nil {
-		if lookupMissing(v, lookup, card.Found) {
+		if lookupMissing(v, lookup, card.Found) && card.Ref().Same(issue.Ref{Repo: def, Number: card.Number}) {
 			return workflow.Issue{}, nil, err
 		}
 		return workflow.Issue{}, err, nil
 	}
-	is = workflowIssue(card)
+	is = workflowIssue(card, def)
 	if card.Found != nil {
 		for _, name := range v.RemoveLabels {
 			if card.Found.Labels[name] == "" {
@@ -136,10 +139,10 @@ func (b *githubBackend) workflowIssue(ctx context.Context, v config.Verb, lookup
 		if err != nil {
 			return workflow.Issue{}, nil, err
 		}
-		is.Unresolved, is.UnreadBlockers = unresolvedBlockers(card, cfg.Statuses.Resolved)
+		is.Unresolved, is.UnreadBlockers = unresolvedBlockers(card, cfg.Statuses.Resolved, def)
 	}
 	if len(lookup.Links) > 0 {
-		if is.ByIssues, failed, err = byIssues(v, card); failed != nil || err != nil {
+		if is.ByIssues, failed, err = byIssues(v, card, def); failed != nil || err != nil {
 			return workflow.Issue{}, failed, err
 		}
 	}
@@ -157,12 +160,12 @@ func lookupMissing(v config.Verb, l issue.Lookup, f *issue.Found) bool {
 		l.User != "" && f.User == nil || l.Viewer && f.Viewer == nil
 }
 
-// byRefs parses --by of a verb with blockers = "link" for issue n: issues
-// to link (see splitRefs), or none for free text, which only fills the
-// comment. Issues and text mixed are exit code 1: linking some and not
-// others would be a guess. n is 0 for a batch, which checks each issue
-// against the refs itself.
-func byRefs(v config.Verb, by string, def issue.Repo, n int) ([]issue.Ref, error) {
+// byRefs parses --by of a verb with blockers = "link" for issue target:
+// issues to link (see splitRefs), a bare number in def, or none for free
+// text, which only fills the comment. Issues and text mixed are exit code
+// 1: linking some and not others would be a guess. target is zero for a
+// batch, which checks each issue against the refs itself.
+func byRefs(v config.Verb, by string, def issue.Repo, target issue.Ref) ([]issue.Ref, error) {
 	refs, text := splitRefs([]string{by}, def)
 	switch {
 	case len(refs) == 0:
@@ -173,8 +176,8 @@ func byRefs(v config.Verb, by string, def issue.Repo, n int) ([]issue.Ref, error
 			WithFix("gh dojo " + v.Name + " --help")
 	}
 	for _, r := range refs {
-		if r.Same(issue.Ref{Repo: def, Number: n}) {
-			return nil, selfBlock(n, v.Name+" --by")
+		if target.Number > 0 && r.Same(target) {
+			return nil, selfBlock(target, def, v.Name+" --by")
 		}
 	}
 	return refs, nil
@@ -184,8 +187,9 @@ func byRefs(v config.Verb, by string, def issue.Repo, n int) ([]issue.Ref, error
 // a missing one is exit code 3 (err, the same for every issue), one that
 // is the card's issue or would close a cycle exit code 1 (failed, this
 // issue's alone); a pull request is kept, to be named in the comment but
-// not linked.
-func byIssues(v config.Verb, card *issue.Card) (out []workflow.ByIssue, failed, err error) {
+// not linked. Each is named relative to def, and mentioned in the comment
+// relative to the card's repository.
+func byIssues(v config.Verb, card *issue.Card, def issue.Repo) (out []workflow.ByIssue, failed, err error) {
 	var links []*issue.Linked
 	if card.Found != nil {
 		links = card.Found.Links
@@ -199,52 +203,56 @@ func byIssues(v config.Verb, card *issue.Card) (out []workflow.ByIssue, failed, 
 			issues = append(issues, l)
 		}
 	}
-	if err := issue.LinksError("--by", issues, card.Repo); err != nil {
+	if err := issue.LinksError("--by", issues, def); err != nil {
 		return nil, nil, err
 	}
 	out = make([]workflow.ByIssue, 0, len(links))
 	for _, l := range links {
-		ref := l.Ref.String(card.Repo)
+		ref := l.Ref.String(def)
+		mention := l.Ref.String(card.Repo)
 		switch {
 		case l.PullRequest:
-			out = append(out, workflow.ByIssue{Ref: ref, PullRequest: true})
+			out = append(out, workflow.ByIssue{Ref: ref, Mention: mention, PullRequest: true})
 			continue
 		case l.ID == card.ID:
-			return nil, selfBlock(card.Number, v.Name+" --by"), nil
+			return nil, selfBlock(card.Ref(), def, v.Name+" --by"), nil
 		case l.BlockedBy(card.ID):
-			return nil, cycleError(card.Number, ref, v.Name+" --by"), nil
+			return nil, cycleError(card.Ref(), def, ref, v.Name+" --by"), nil
 		}
-		out = append(out, workflow.ByIssue{Ref: ref, Blocks: l.Blocks(card.ID)})
+		out = append(out, workflow.ByIssue{Ref: ref, Mention: mention, Blocks: l.Blocks(card.ID)})
 	}
 	return out, nil, nil
 }
 
 // selfBlock is the error for an issue named as its own blocker by flag.
-func selfBlock(n int, flag string) error {
-	return render.Usage("%s names #%d itself; an issue cannot block itself", flag, n).
-		WithFix(fmt.Sprintf("pass the issues that block #%d, not #%d itself", n, n))
+func selfBlock(target issue.Ref, def issue.Repo, flag string) error {
+	name := target.String(def)
+	return render.Usage("%s names %s itself; an issue cannot block itself", flag, name).
+		WithFix(fmt.Sprintf("pass the issues that block %s, not %s itself", name, name))
 }
 
-// cycleError is the error for a blocker ref of issue n that n already
-// blocks, named by flag: linking it would close a cycle, which GitHub
-// refuses. Nothing is written; gh dojo show lists n's links both ways.
-func cycleError(n int, ref, flag string) error {
-	return render.Usage("%s %s: #%d already blocks %s, so %s cannot block #%d too (a cycle)", flag, ref, n, ref, ref, n).
-		WithFix(fmt.Sprintf("gh dojo show %d", n))
+// cycleError is the error for a blocker ref of issue target that target
+// already blocks, named by flag: linking it would close a cycle, which
+// GitHub refuses. Nothing is written; gh dojo show lists target's links
+// both ways.
+func cycleError(target issue.Ref, def issue.Repo, ref, flag string) error {
+	name := target.String(def)
+	return render.Usage("%s %s: %s already blocks %s, so %s cannot block %s too (a cycle)", flag, ref, name, ref, ref, name).
+		WithFix("gh dojo show " + target.Arg(def))
 }
 
 // unresolvedBlockers returns the card's blockers that still block (see
 // issue.Card.UnresolvedBlockers), each with where it stands as show says
 // it, but without why a status was not read (show has it), and how many
-// blockers were not read at all.
-func unresolvedBlockers(c *issue.Card, resolved []string) ([]workflow.Blocker, int) {
+// blockers were not read at all. They are named relative to def.
+func unresolvedBlockers(c *issue.Card, resolved []string, def issue.Repo) ([]workflow.Blocker, int) {
 	var out []workflow.Blocker
 	for _, l := range c.UnresolvedBlockers(resolved) {
 		place := linkPlace(l)
 		if l.StatusUnknown != "" {
 			place = "status not read"
 		}
-		out = append(out, workflow.Blocker{Ref: l.Ref(c.Repo), Place: place})
+		out = append(out, workflow.Blocker{Ref: linkRef(c, l, def), Place: place})
 	}
 	return out, max(0, c.BlockedBy.TotalCount-len(c.BlockedBy.Nodes))
 }
@@ -426,7 +434,7 @@ func assignableUsers(ctx context.Context, q graph.Querier, repo issue.Repo) ([]s
 // statusUnknown refuses a card whose board membership or status could not
 // be read: planning from "not on the board" or "no status" would check
 // from against an assumed initial status and might add a second item.
-func statusUnknown(c *issue.Card) error {
+func statusUnknown(c *issue.Card, def issue.Repo) error {
 	var e *render.Error
 	switch {
 	case c.BoardUnknown:
@@ -434,9 +442,9 @@ func statusUnknown(c *issue.Card) error {
 		if reason == "" {
 			reason = "GitHub did not return all of its projects"
 		}
-		e = render.Network("cannot tell whether #%d is on the board: %s", c.Number, reason)
+		e = render.Network("cannot tell whether %s is on the board: %s", c.Ref().String(def), reason)
 	case c.StatusUnknown():
-		e = render.Network("cannot read the status of #%d on the board", c.Number)
+		e = render.Network("cannot read the status of %s on the board", c.Ref().String(def))
 	default:
 		return nil
 	}
@@ -462,7 +470,7 @@ func (b *githubBackend) Repo() (issue.Repo, error) { return b.app.Repo() }
 func (b *githubBackend) Apply(ctx context.Context, p *workflow.Plan) ([]workflow.Op, error) {
 	card, ok := p.Issue.Ref.(*issue.Card)
 	if !ok || card == nil {
-		return nil, render.Internal("the plan of #%d has no issue card to apply it to", p.Issue.Number)
+		return nil, render.Internal("the plan of %s has no issue card to apply it to", p.Issue.Name())
 	}
 	ids, err := b.ids(ctx, p, card)
 	if err != nil {
@@ -476,7 +484,7 @@ func (b *githubBackend) Apply(ctx context.Context, p *workflow.Plan) ([]workflow
 		m, err := effects.Build(batch, ids)
 		switch {
 		case err != nil && len(done) == 0:
-			return nil, render.Internal("cannot build the mutation for #%d", p.Issue.Number).WithCause(err)
+			return nil, render.Internal("cannot build the mutation for %s", p.Issue.Name()).WithCause(err)
 		case err != nil:
 			// An earlier mutation answered without an ID this one needs,
 			// such as the new board item.
@@ -489,7 +497,7 @@ func (b *githubBackend) Apply(ctx context.Context, p *workflow.Plan) ([]workflow
 		done = append(done, ok...)
 		if item := m.ItemID(data, ""); item != "" {
 			ids.Item = item
-			b.remember(card.Number, item)
+			b.remember(card.Ref(), item)
 		}
 		switch {
 		case len(missed) == 0 && err != nil:
@@ -507,13 +515,13 @@ func (b *githubBackend) Apply(ctx context.Context, p *workflow.Plan) ([]workflow
 // sent, so they are known not to have happened.
 var errNotSent = errors.New("not sent")
 
-// remember keeps the board item this run added for issue n: a re-read
+// remember keeps the board item this run added for issue ref: a re-read
 // right after the write may not show it yet.
-func (b *githubBackend) remember(n int, item string) {
+func (b *githubBackend) remember(ref issue.Ref, item string) {
 	if b.added == nil {
-		b.added = map[int]string{}
+		b.added = map[string]string{}
 	}
-	b.added[n] = item
+	b.added[refKey(ref)] = item
 }
 
 // ids collects the node IDs the plan's ops need: the issue's from its card,
@@ -526,16 +534,20 @@ func (b *githubBackend) ids(ctx context.Context, p *workflow.Plan, card *issue.C
 	}
 	ids := effects.IDs{Project: s.ID, Issue: card.ID, Item: card.ItemID()}
 	if ids.Item == "" {
-		ids.Item = b.added[card.Number]
+		ids.Item = b.added[refKey(card.Ref())]
 	}
 	if err := b.fieldIDs(s, p.Ops, &ids); err != nil {
 		return effects.IDs{}, err
 	}
 	if f := card.Found; f != nil {
+		def, err := b.app.Repo()
+		if err != nil {
+			return effects.IDs{}, err
+		}
 		ids.Blockers = map[string]string{}
 		for _, l := range f.Links {
 			if l.ID != "" {
-				ids.Blockers[l.Ref.String(card.Repo)] = l.ID
+				ids.Blockers[l.Ref.String(def)] = l.ID // as workflow.AddBlockedBy names it
 			}
 		}
 		ids.Labels = f.Labels

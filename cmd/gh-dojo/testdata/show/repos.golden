@@ -1,0 +1,107 @@
+code: 3
+--- stdout
+#3 Конфиг: загрузка и валидация .github/dojo.toml (internal/config)
+state: open, opened 2026-11-11 by Trum-ok
+board: Ready · Size: M
+milestone: v0.0 — самохостинг
+labels: none
+assignees: none
+blocked by: none unresolved (2 resolved)
+  #2 Коды выхода и короткие ошибки (internal/render) (Ready, resolved)
+  #1 Каркас: Go-модуль, cobra и установка как расширение gh (Ready, resolved)
+blocking: 5 open
+  #11 Глаголы из конфига: проверки и план эффектов (internal/workflow) (Ready)
+  #8 Команда list (Ready)
+  #7 Команда show <N>… (Ready)
+  #6 Сверка конфига с доской (Ready)
+  #4 Пресет kanban через embed.FS (Ready)
+status history:
+  2026-11-11 18:19 no status → Backlog (automation)
+  2026-11-11 18:42 Backlog → In progress by Trum-ok
+  2026-11-11 19:02 In progress → Ready by Trum-ok
+
+description:
+  ## Зачем
+  Процесс проекта — данные в конфиге, а не код. Все команды читают конфиг.
+
+  ## Что сделать
+  - Поиск `.github/dojo.toml` вверх от текущей папки.
+  - Разбор `version`, `preset`, `[board]` (owner, project, repos, assignee), `[fields]` (`status` обязателен), `[session]` (env, link), `[verbs.*]`.
+  - Для глаголов в v0.0: `when`, `to`, `from`, `require`, `require_one_of`, `comment` (шаблон). Остальные ключи из спеки распознаются, но дают понятную ошибку «не поддерживается в этой версии», а не молча игнорируются.
+  - Ошибки валидации — код 1, с указанием ключа и допустимых значений.
+  - Сверка с доской — отдельная задача.
+
+  ## Готово, когда
+  - Пример конфига из спеки (без неподдерживаемых ключей) загружается.
+  - Тесты на отсутствие файла, неизвестный ключ, пустой `fields.status`, глагол без `when`.
+
+  Спека: `docs/spec.md`: «Модель и конфиг».
+
+comments: none
+
+========================================
+cli/cli#2 Reimagine how the app determines its context
+state: closed (completed) 2019-11-13, opened 2019-10-07 by mislav
+board: not on the board (a verb adds it)
+milestone: none
+labels: none
+assignees: none
+blocked by: none
+blocking: none
+
+description:
+  The app currently determines the context it's operating under from several sources:
+
+  - the filesystem (e.g. current directory name)
+  - app config file (currently `~/.config/hub` in YAML format)
+  - environment variables (e.g. `GH_REPO`, `GITHUB_TOKEN`, etc.)
+  - git config (via `git config` & `git remote -v`, sources: `.git/config` & `~/.gitconfig`)
+  - git tree (e.g. current branch, current commit SHA)
+  - SSH config (sources: `~/.ssh/config` & `/etc/ssh_config`) - resolves SSH aliases for hostnames listed under git remotes
+  - GitHub API (e.g. info about the current repo)
+
+  When something like `gh pr create` gets run, quite a lot happens under the hood. For example:
+  1. Current GitHub user and OAuth token are obtained from app config;
+  1. The list of git remotes gets queried and parsed;
+  2. The "main" remote (i.e. one pointing to the canonical GitHub repo) is determined by searching for the first one in this list: `upstream`, `github`, `origin`;
+  3. The base branch is determined via `git symbolic-ref refs/remotes/<REMOTE>/HEAD` (alternatively, by querying repo information via API);
+  4. The head branch is determined by looking at the push target for the current branch:
+     - explicit upstream branch configuration is first looked up;
+     - otherwise, the first remote that has a same-named tracking branch is the likely push target;
+     - otherwise, assume the branch isn't pushed yet, so determine the first remote that points to a GitHub project that the current user has write capabilities to;
+     - if such a remote doesn't exist, create one by forking;
+  5. A person's preferred text editor is looked up for authoring PR description text;
+  6. PR creation operation proceeds.
+
+  To facilitate all these lookups, the current codebase has a loose system of mapping one piece of information to another. For example:
+  - current git repo 👉 default ("base") branch
+  - current git repo 👉 "main" remote
+  - git remote 👉 GitHub repository (a.k.a. "project") it maps to
+  - tracking branch 👉 git remote it belongs to …
+  [cut: 1998 of 3679 characters shown; --full prints all]
+
+comments (4):
+--- vilmibm, 2019-11-13 18:28
+  @mislav I feel like the spirit of this issue has largely been accomplished, does closing it make sense?
+--- mislav, 2019-11-13 19:03
+  Sure, good call!
+
+  There is definitely follow-up items I want to do around this, such as rename the `context` package to something different to reduce ambiguity with Go stdlib "context" package, which we might also be using in the future.
+--- alejandroortega23059-cloud, 2026-05-31 21:37
+  > The app currently determines the context it's operating under from several sources:
+  > 
+  > * the filesystem (e.g. current directory name)
+  > * app config file (currently `~/.config/hub` in YAML format)
+  > * environment variables (e.g. `GH_REPO`, `GITHUB_TOKEN`, etc.)
+  > * git config (via `git config` & `git remote -v`, sources: `.git/config` & `~/.gitconfig`)
+  > * git tree (e.g. current branch, current commit SHA)
+  > * SSH config (sources: `~/.ssh/config` & `/etc/ssh_config`) - resolves SSH aliases for hostnames listed under git remotes
+  > * GitHub API (e.g. info about the current repo)
+  > …
+  [cut: 589 of 3766 characters shown; --full prints all]
+--- m74278803-cmyk, 2026-06-01 02:25
+  #13557 <img width="750" height="255" alt="Image" src="https://github.com/user-attachments/assets/0cdd9fcd-297e-4af0-a739-1b228bf858eb" />
+--- stderr
+error: repository Trum-ok/no-such-repo-xyz not found, or the token cannot see it
+#1 in cli/cli is a pull request; gh dojo works with issues only (fix: gh dojo list)
+fix: gh repo view Trum-ok/no-such-repo-xyz

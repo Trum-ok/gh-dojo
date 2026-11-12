@@ -14,6 +14,7 @@ code: 5
   "issues": [
     {
       "number": 42,
+      "repo": "acme/shop",
       "title": "Fix the checkout total",
       "outcome": "partial",
       "planned": [

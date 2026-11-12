@@ -66,6 +66,7 @@ func TestDescribe(t *testing.T) {
 		code   render.Code
 	}{
 		{"kanban", dojoConfig, render.ExitOK},
+		{"repos", reposConfig, render.ExitOK}, // a bare number is in the first
 		{"sprints", sprintsPresetConfig, render.ExitOK},
 		{"custom", customConfig, render.ExitOK},
 		{"no_preset", noPresetConfig, render.ExitOK},

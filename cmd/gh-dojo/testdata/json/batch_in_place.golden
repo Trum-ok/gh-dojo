@@ -9,6 +9,7 @@ code: 0
   "issues": [
     {
       "number": 2,
+      "repo": "acme/shop",
       "title": null,
       "outcome": "applied",
       "planned": [
@@ -40,6 +41,7 @@ code: 0
     },
     {
       "number": 3,
+      "repo": "acme/shop",
       "title": null,
       "outcome": "unchanged",
       "planned": [],

@@ -97,8 +97,8 @@ func listArgs(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return nil
 	}
-	if n, ok := parseIssue(args[0]); ok {
-		return render.Usage("list takes no arguments; to see one issue: gh dojo show %d", n)
+	if ref, ok := parseRef(args[0]); ok {
+		return render.Usage("list takes no arguments; to see one issue: gh dojo show %s", ref.Arg(issue.Repo{}))
 	}
 	return render.Usage("list takes no arguments").WithFix(cmd.CommandPath() + " --help")
 }
@@ -543,7 +543,7 @@ func statusName(s string) string {
 // maxLineLabels labels.
 func itemLine(it board.Item, repo string) string {
 	var b strings.Builder
-	if it.Repo != repo || repo == "" {
+	if !strings.EqualFold(it.Repo, repo) || repo == "" {
 		b.WriteString(it.Repo)
 	}
 	b.WriteString("#" + strconv.Itoa(it.Number) + " ")

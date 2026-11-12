@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/Trum-ok/gh-dojo/internal/issue"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/Trum-ok/gh-dojo/internal/workflow"
 	"github.com/spf13/cobra"
@@ -30,6 +31,9 @@ func newCommentCmd() (*cobra.Command, error) {
 		Short: "Comment on an issue without changing its status",
 		Long: `Comment on an issue without changing its status.
 
+The issue is 42, "#42" (the default repository, board.repos[0]),
+owner/repo#42 or its URL.
+
 The text comes from the second argument or from --body-file (a file, or - for
 stdin), exactly one of them; empty text is an error. Use --body-file - for
 long or multi-line text. Text starting with - goes after --, and every flag
@@ -45,12 +49,12 @@ text after someone else's comment is posted.`,
   gh dojo comment 42 --json -- "-1, still broken"`,
 		Args: commentArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			n, _ := parseIssue(args[0]) // validated by commentArgs
+			ref, _ := parseRef(args[0]) // validated by commentArgs
 			text, err := commentText(cmd, args[1:], bodyFile)
 			if err != nil {
 				return err
 			}
-			res, err := runComment(cmd, n, text)
+			res, err := runComment(cmd, ref, text)
 			if err != nil {
 				return err
 			}
@@ -103,6 +107,8 @@ type commentResult struct {
 	Repo   string `json:"repo"`
 	// Posted is false when the issue's last comment was this one already.
 	Posted bool `json:"posted"`
+
+	name string // "#42", or "owner/repo#42" outside the default repository
 }
 
 // write prints the confirmation line: "#42 comment left".
@@ -111,26 +117,30 @@ func (r *commentResult) write(w io.Writer) {
 	if r.Posted {
 		effect = workflow.AddComment{}.Effect()
 	}
-	fmt.Fprintln(w, render.Confirm(fmt.Sprintf("#%d", r.Number), "", effect))
+	fmt.Fprintln(w, render.Confirm(r.name, "", effect))
 }
 
-// runComment posts text on issue n unless the issue's last comment is the
+// runComment posts text on issue ref unless the issue's last comment is the
 // viewer's with the same text (marker). Requests: the card (one with a
 // warm schema cache) and addComment.
 //
 // Unlike a verb's comment (workflow.AlreadyPosted, the latest gh-dojo
 // comment), only the very last comment counts: a plain comment repeated on
 // purpose after others replied is posted.
-func runComment(cmd *cobra.Command, n int, text string) (*commentResult, error) {
+func runComment(cmd *cobra.Command, ref issue.Ref, text string) (*commentResult, error) {
 	ctx := cmd.Context()
 	a := newApp()
-	card, err := a.Card(ctx, n, 0)
+	card, err := a.Card(ctx, ref, 0)
 	if err != nil {
 		return nil, err
 	}
-	res := &commentResult{Number: n, Repo: card.Repo.String()}
+	def, err := a.Repo() // Card resolved it already
+	if err != nil {
+		return nil, err
+	}
+	res := &commentResult{Number: card.Number, Repo: card.Repo.String(), name: card.Ref().String(def)}
 	post := workflow.AddComment{Body: text, Marker: workflow.Marker(commentMarkerVerb, text)}
-	if comments := workflowIssue(card).Comments; len(comments) > 0 &&
+	if comments := workflowIssue(card, def).Comments; len(comments) > 0 &&
 		workflow.AlreadyPosted(comments[len(comments)-1:], post.Marker) {
 		return res, nil
 	}

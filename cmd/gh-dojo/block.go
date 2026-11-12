@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/Trum-ok/gh-dojo/internal/effects"
@@ -37,8 +36,9 @@ func newLinkCmd(add bool) *cobra.Command {
 	name, short, long := "block", "Mark an issue blocked by other issues, without changing its status",
 		`Mark issue N blocked by the issues --by names, without changing its status.
 
---by takes 12, "#12", owner/repo#12 or the issue's URL; repeat it, or
-separate them with commas. A link already there is not an error: the line
+N and --by take 12, "#12" (the default repository, board.repos[0]),
+owner/repo#12 or the issue's URL; repeat --by, or separate the issues
+with commas. A link already there is not an error: the line
 says "already". An issue that does not exist, or a pull request, fails
 before anything is written (exit code 3); so does, with exit code 1, a
 blocker that N already blocks: GitHub refuses cycles.
@@ -47,14 +47,16 @@ A blocker stops blocking once it is closed or in a resolved status
 (statuses.resolved); a verb with blockers = "warn" or "deny" checks that,
 and gh dojo show lists the unresolved blockers first.`
 	example := `  gh dojo block 42 --by 17
-  gh dojo block 42 --by 17,18 --by acme/api#7`
+  gh dojo block 42 --by 17,18 --by acme/api#7
+  gh dojo block acme/api#7 --by 42`
 	if !add {
 		name, short, long = "unblock", "Remove blocked-by links of an issue, without changing its status",
 			`Remove the blocked-by links between issue N and the issues --by names,
 without changing its status.
 
---by takes 12, "#12", owner/repo#12 or the issue's URL; repeat it, or
-separate them with commas. A link already gone is not an error: the line
+N and --by take 12, "#12" (the default repository, board.repos[0]),
+owner/repo#12 or the issue's URL; repeat --by, or separate the issues
+with commas. A link already gone is not an error: the line
 says "already". An issue that does not exist fails before anything is
 written (exit code 3).`
 		example = `  gh dojo unblock 42 --by 17`
@@ -66,8 +68,8 @@ written (exit code 3).`
 		Example: example,
 		Args:    issueArg,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			n, _ := parseIssue(args[0]) // validated by issueArg
-			res, err := runLinks(cmd, add, n, bys)
+			ref, _ := parseRef(args[0]) // validated by issueArg
+			res, err := runLinks(cmd, add, ref, bys)
 			if res == nil { // nothing done
 				return err
 			}
@@ -102,60 +104,63 @@ func splitRefs(values []string, def issue.Repo) (refs []issue.Ref, text []string
 }
 
 // parseBlockers parses the values of a flag (--by, --blocked-by) naming
-// blocking issues: repeated, or comma-separated (see splitRefs). n itself
-// (in def) is refused: an issue cannot block itself (n 0 skips that
-// check). Errors are exit code 1 with help as the fix; none means no
-// issue was named.
-func parseBlockers(values []string, flag string, def issue.Repo, n int, help string) ([]issue.Ref, error) {
+// blocking issues, a bare number in def: repeated, or comma-separated (see
+// splitRefs). target itself is refused: an issue cannot block itself (a
+// zero target skips that check). Errors are exit code 1 with help as the
+// fix; none means no issue was named.
+func parseBlockers(values []string, flag string, def issue.Repo, target issue.Ref, help string) ([]issue.Ref, error) {
 	refs, text := splitRefs(values, def)
 	if len(text) > 0 {
 		return nil, render.Usage("--%s %q is not an issue: pass %s", flag, text[0], issue.RefExamples).
 			WithFix(help)
 	}
 	for _, ref := range refs {
-		if n > 0 && ref.Same(issue.Ref{Repo: def, Number: n}) {
-			return nil, selfBlock(n, "--"+flag)
+		if target.Number > 0 && ref.Same(target) {
+			return nil, selfBlock(target, def, "--"+flag)
 		}
 	}
 	return refs, nil
 }
 
 // runLinks adds (block) or removes (unblock) the blocked-by links between
-// issue n and the issues bys names, and returns what it did, also with
+// issue ref and the issues bys names, and returns what it did, also with
 // the error of a partial write; its confirmation line reads:
 //
 //	#42 blocked by #17 and acme/api#7, already blocked by #18
-//	#42 no longer blocked by #17, already not blocked by #18
-func runLinks(cmd *cobra.Command, add bool, n int, bys []string) (*linksResult, error) {
+//	acme/api#7 no longer blocked by #17, already not blocked by #18
+func runLinks(cmd *cobra.Command, add bool, ref issue.Ref, bys []string) (*linksResult, error) {
 	help := cmd.CommandPath() + " --help"
+	arg := ref.Arg(issue.Repo{}) // as given
 	noBy := func() error {
-		return render.Usage("%s needs --%s with the blocking issue, like: gh dojo %s %d --%s 17",
-			cmd.Name(), byFlag, cmd.Name(), n, byFlag).WithFix(help)
+		return render.Usage("%s needs --%s with the blocking issue, like: gh dojo %s %s --%s 17",
+			cmd.Name(), byFlag, cmd.Name(), arg, byFlag).WithFix(help)
 	}
 	if len(bys) == 0 {
 		return nil, noBy()
 	}
 	ctx := cmd.Context()
 	a := newApp()
-	repo, err := a.Repo()
+	repo, err := a.Repo() // the default repository
 	if err != nil {
 		return nil, err
 	}
-	refs, err := parseBlockers(bys, byFlag, repo, n, help)
+	ref = ref.In(repo)
+	refs, err := parseBlockers(bys, byFlag, repo, ref, help)
 	if err != nil {
 		return nil, err
 	}
 	if len(refs) == 0 {
 		return nil, noBy() // --by "" or --by ","
 	}
-	target, links, err := issue.ReadLinks(ctx, a.Client, repo, n, refs, "--"+byFlag)
+	name := ref.String(repo)
+	target, links, err := issue.ReadLinks(ctx, a.Client, ref.Repo, ref.Number, repo, refs, "--"+byFlag)
 	if err != nil {
 		return nil, err
 	}
 	var change, same []*issue.Linked
 	for _, l := range links {
 		if l.ID == target.ID {
-			return nil, selfBlock(n, "--"+byFlag)
+			return nil, selfBlock(ref, repo, "--"+byFlag)
 		}
 		if target.BlockedBy(l) == add {
 			same = append(same, l)
@@ -165,13 +170,13 @@ func runLinks(cmd *cobra.Command, add bool, n int, bys []string) (*linksResult, 
 	}
 	for _, l := range change {
 		if add && l.BlockedBy(target.ID) {
-			return nil, cycleError(n, l.Ref.String(repo), "--"+byFlag)
+			return nil, cycleError(ref, repo, l.Ref.String(repo), "--"+byFlag)
 		}
 	}
-	line := func(done []*issue.Linked) string { return linksConfirm(add, n, repo, done, same) }
+	line := func(done []*issue.Linked) string { return linksConfirm(add, name, repo, done, same) }
 	result := func(done, missed []*issue.Linked, err error) *linksResult {
 		return &linksResult{
-			Number: n, Repo: repo.String(), Action: cmd.Name(),
+			Number: ref.Number, Repo: ref.Repo.String(), Action: cmd.Name(),
 			Changed: refList(done, repo), Unchanged: refList(same, repo), Missed: refList(missed, repo),
 			line: line(done), err: err,
 		}
@@ -200,8 +205,8 @@ func runLinks(cmd *cobra.Command, add bool, n int, bys []string) (*linksResult, 
 	case len(missed) == 0:
 	case graph.IsCycle(err):
 		// A cycle through other issues: re-running cannot help.
-		what := "GitHub refused to mark #" + strconv.Itoa(n) + " blocked by " + joinRefs(missed, repo) + ": it would make a dependency cycle"
-		e := render.Usage("%s", what).WithFix(fmt.Sprintf("gh dojo show %d", n)).WithCause(err)
+		what := "GitHub refused to mark " + name + " blocked by " + joinRefs(missed, repo) + ": it would make a dependency cycle"
+		e := render.Usage("%s", what).WithFix("gh dojo show " + ref.Arg(repo)).WithCause(err)
 		if len(done) == 0 {
 			return nil, e
 		}
@@ -234,11 +239,12 @@ func runLinks(cmd *cobra.Command, add bool, n int, bys []string) (*linksResult, 
 // has it too, with the links missed and the error.
 type linksResult struct {
 	Number int    `json:"number"`
-	Repo   string `json:"repo"`
+	Repo   string `json:"repo"`   // the issue's repository
 	Action string `json:"action"` // block or unblock
 	// Changed are the blockers linked (block) or unlinked (unblock) now,
 	// Unchanged those already as asked, Missed those a partial write left
-	// as they were (see the top-level "error").
+	// as they were (see the top-level "error"); "#12" in the default
+	// repository, else "owner/name#12".
 	Changed   []string `json:"changed"`
 	Unchanged []string `json:"unchanged"`
 	Missed    []string `json:"missed"`
@@ -255,7 +261,7 @@ func (r *linksResult) write(w io.Writer) {
 	}
 }
 
-// refList is the refs of links, "#12" or "owner/name#12".
+// refList is the refs of links, "#12" in repo or "owner/name#12".
 func refList(links []*issue.Linked, repo issue.Repo) []string {
 	out := []string{}
 	for _, l := range links {
@@ -288,9 +294,10 @@ func linksMutation(add bool, n int) string {
 	return "mutation " + op + "(" + strings.Join(decls, ", ") + ") {\n" + strings.Join(fields, "\n") + "\n}"
 }
 
-// linksConfirm is the line of block (add) or unblock for issue n: the
-// links changed (done), then those found as asked already (same).
-func linksConfirm(add bool, n int, repo issue.Repo, done, same []*issue.Linked) string {
+// linksConfirm is the line of block (add) or unblock for the issue name
+// names: the links changed (done), then those found as asked already
+// (same), named relative to repo.
+func linksConfirm(add bool, name string, repo issue.Repo, done, same []*issue.Linked) string {
 	var parts []string
 	switch {
 	case len(done) > 0 && add:
@@ -304,7 +311,7 @@ func linksConfirm(add bool, n int, repo issue.Repo, done, same []*issue.Linked) 
 	case len(same) > 0:
 		parts = append(parts, "already not blocked by "+joinRefs(same, repo))
 	}
-	return render.Confirm(fmt.Sprintf("#%d", n), "", parts...)
+	return render.Confirm(name, "", parts...)
 }
 
 // joinRefs lists linked issues as "#12", "#12 and #13", "#12, #13 and #14".

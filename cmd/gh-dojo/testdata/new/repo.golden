@@ -1,0 +1,4 @@
+code: 0
+--- stdout
+acme/api#15 "Fix login redirect" created, labels bug, area:cli, no status → Backlog
+--- stderr

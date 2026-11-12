@@ -1,0 +1,6 @@
+code: 2
+--- stdout
+#12 Ready → Done, closed as completed
+--- stderr
+error: 1 of 4 done; other/repo#4: done cannot move other/repo#4 from Backlog, it starts only from Ready or In progress; also not done: other/repo#6, other/repo#9
+this is a process rule: ask the user how to proceed

@@ -121,16 +121,17 @@ func (a *App) Repo() (issue.Repo, error) {
 	return issue.ParseRepo(name)
 }
 
-// Card reads issue n of the default repository with its item on the board:
-// one GraphQL request with a warm schema cache. comments is how many of
-// the latest comments to read; 0 means issue.DefaultComments. A missing
-// issue is exit code 3. The repository is resolved first, so a config
-// without one sends no request.
+// Card reads issue ref with its item on the board: one GraphQL request
+// with a warm schema cache. A ref without a repository (a bare number) is
+// in the default repository. comments is how many of the latest comments
+// to read; 0 means issue.DefaultComments. A missing issue is exit code 3.
+// The default repository is resolved first, so a config without one sends
+// no request.
 //
 // The status is matched by the status field's ID from the schema, so a
 // field renamed since the schema was cached still reads right.
-func (a *App) Card(ctx context.Context, n, comments int) (*issue.Card, error) {
-	res, err := a.Cards(ctx, []int{n}, comments) // one number: issue.Read's request
+func (a *App) Card(ctx context.Context, ref issue.Ref, comments int) (*issue.Card, error) {
+	res, err := a.Cards(ctx, []issue.Ref{ref}, comments) // one issue: issue.Read's request
 	if err != nil {
 		return nil, err
 	}
@@ -140,18 +141,18 @@ func (a *App) Card(ctx context.Context, n, comments int) (*issue.Card, error) {
 	return res[0].Card, nil
 }
 
-// Cards reads issues ns of the default repository like Card: one request
-// per issue.MaxBatch issues with a warm schema cache (for a single issue,
-// the request Card sends). A missing issue or a pull request number fails
-// only its own issue.Result; see issue.ReadAll.
-func (a *App) Cards(ctx context.Context, ns []int, comments int) ([]issue.Result, error) {
-	return a.cards(ctx, ns, comments, issue.Lookup{})
+// Cards reads issues refs like Card: one request per issue.MaxBatch
+// issues with a warm schema cache, whatever their repositories (for a
+// single issue, the request Card sends). A missing issue or a pull request
+// number fails only its own issue.Result; see issue.ReadRefs.
+func (a *App) Cards(ctx context.Context, refs []issue.Ref, comments int) ([]issue.Result, error) {
+	return a.cards(ctx, refs, comments, issue.Lookup{})
 }
 
-// cards reads issues ns like Cards, with what lookup names (labels, an
+// cards reads issues refs like Cards, with what lookup names (labels, an
 // assignable user, the viewer, linked issues) once per request:
 // card.Found.
-func (a *App) cards(ctx context.Context, ns []int, comments int, lookup issue.Lookup) ([]issue.Result, error) {
+func (a *App) cards(ctx context.Context, refs []issue.Ref, comments int, lookup issue.Lookup) ([]issue.Result, error) {
 	repo, err := a.Repo()
 	if err != nil {
 		return nil, err
@@ -168,7 +169,7 @@ func (a *App) cards(ctx context.Context, ns []int, comments int, lookup issue.Lo
 	if f, err := s.Field(req.StatusField); err == nil { // Schema checked it
 		req.StatusFieldID = f.ID
 	}
-	return issue.ReadAll(ctx, a.Client, req, ns)
+	return issue.ReadRefs(ctx, a.Client, req, refs)
 }
 
 // workflowIssue is the state workflow plans with. Ref keeps the card, so an
@@ -179,10 +180,12 @@ func (a *App) cards(ctx context.Context, ns []int, comments int, lookup issue.Lo
 // workflow.Issue cannot say "unknown": when card.StatusUnknown() (board
 // membership or status could not be read) it shows the issue off the board
 // or without a status, so check that before planning. An archived item
-// (card.Archived()) is OnBoard.
-func workflowIssue(c *issue.Card) workflow.Issue {
+// (card.Archived()) is OnBoard. An issue outside def, the default
+// repository, is named owner/repo#N.
+func workflowIssue(c *issue.Card, def issue.Repo) workflow.Issue {
 	is := workflow.Issue{
 		Number:    c.Number,
+		Display:   c.Ref().String(def),
 		Title:     c.Title,
 		Closed:    c.Closed(),
 		OnBoard:   c.OnBoard(),
@@ -193,6 +196,9 @@ func workflowIssue(c *issue.Card) workflow.Issue {
 		Ref:       c,
 		// With Lookup.AllLabels the window is GitHub's own limit per issue.
 		LabelsTruncated: c.Labels.TotalCount > len(c.Labels.Nodes),
+	}
+	if !c.Ref().Same(issue.Ref{Repo: def, Number: c.Number}) && def != (issue.Repo{}) {
+		is.DefaultRepo = def.String()
 	}
 	if c.Closed() && c.StateReason != "REOPENED" {
 		// COMPLETED, NOT_PLANNED, DUPLICATE: the config's close reasons.

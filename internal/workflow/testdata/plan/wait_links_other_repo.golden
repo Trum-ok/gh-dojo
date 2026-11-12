@@ -1,0 +1,6 @@
+dry run: wait acme/api#42 "Rate limit the export"
+  status: In progress → Waiting
+  blocked by: #12 and acme/api#7
+  comment: "Waiting for acme/shop#12, #7."
+confirm: acme/api#42 In progress → Waiting, blocked by #12 and acme/api#7, comment left
+post: "Waiting for acme/shop#12, #7.\n\n<!-- gh-dojo:wait:330f00cd -->"

@@ -1,0 +1,6 @@
+code: 0
+--- stdout
+dry run: wait other/repo#5 "Export retries"
+  status: In progress → Waiting
+  comment: "Waiting for acme/shop#12."
+--- stderr

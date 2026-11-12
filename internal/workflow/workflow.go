@@ -27,8 +27,17 @@ import (
 // Issue is the state of an issue that a reader fetches before planning.
 type Issue struct {
 	Number int
-	Title  string // shown in the dry run only
-	Closed bool
+	// Display names the issue in every message and line of the plan:
+	// "owner/repo#42" for an issue outside the default repository; ""
+	// reads "#42" (see Name).
+	Display string
+	// DefaultRepo is the default repository, "owner/repo", for an issue
+	// outside it: a bare number given to --by names an issue there, so the
+	// comment names it as "owner/repo#12" (GitHub would read "#12" in the
+	// issue's own repository). "" for an issue in the default repository.
+	DefaultRepo string
+	Title       string // shown in the dry run only
+	Closed      bool
 	// StateReason is why a closed issue was closed, as a config close
 	// reason (config.CloseCompleted, ...); "" when open or unknown.
 	StateReason string
@@ -118,6 +127,17 @@ type Issue struct {
 	Ref any
 }
 
+// Name is how messages name the issue: Display, else "#42".
+func (is Issue) Name() string {
+	if is.Display != "" {
+		return is.Display
+	}
+	return "#" + strconv.Itoa(is.Number)
+}
+
+// arg is the issue as a command-line argument: "42", or "owner/repo#42".
+func (is Issue) arg() string { return strings.TrimPrefix(is.Name(), "#") }
+
 // Sprint is the board's sprint field and the item's value of it.
 type Sprint struct {
 	Field string // the board name of the iteration field
@@ -139,7 +159,7 @@ type StatusChange struct {
 // Blocker is an unresolved blocker of an issue, as the blockers check
 // names it.
 type Blocker struct {
-	Ref   string // "#12", or "owner/repo#12" in another repository
+	Ref   string // "#12", or "owner/repo#12" outside the default repository
 	Place string // where it stands: "In progress", "not on the board", "status not read: ..."
 }
 
@@ -147,7 +167,11 @@ func (b Blocker) String() string { return b.Ref + " (" + b.Place + ")" }
 
 // ByIssue is an issue --by names for the blockers = "link" effect.
 type ByIssue struct {
-	Ref string // "#12", or "owner/repo#12" in another repository
+	Ref string // "#12", or "owner/repo#12" outside the default repository
+	// Mention is how the comment names it, as GitHub links it from the
+	// issue: "#12" in the issue's own repository, else "owner/repo#12";
+	// "" reads Ref.
+	Mention string
 	// Blocks reports that it blocks the issue already: the link is in
 	// place.
 	Blocks bool
@@ -232,8 +256,9 @@ func NormalizeBy(s string) string {
 	return s
 }
 
-// CheckArgs validates the arguments of verb v for the issue numbers (all
-// of them in the example command of the error). It needs no issue state,
+// CheckArgs validates the arguments of verb v for the issues, given as
+// command-line arguments ("42", "owner/repo#42"), all of them in the
+// example command of the error. It needs no issue state,
 // so callers run it before reading the issue. Errors have exit code 1:
 //
 //   - --comment or --by given while the verb's comment template does not use it;
@@ -241,7 +266,7 @@ func NormalizeBy(s string) string {
 //   - an argument of require, or all of require_one_of, missing or blank.
 //
 // A missing --yes is not an argument error: Plan sets Plan.NeedsYes.
-func CheckArgs(v config.Verb, a Args, numbers ...int) error {
+func CheckArgs(v config.Verb, a Args, issues ...string) error {
 	var accepted []string
 	for _, arg := range config.Args() {
 		if v.Uses(arg) {
@@ -254,13 +279,13 @@ func CheckArgs(v config.Verb, a Args, numbers ...int) error {
 		}
 		if len(accepted) == 0 {
 			return render.Usage("%s does not use %s; it takes no arguments besides the issue number", v.Name, flag(arg)).
-				WithFix(Example(v, numbers...))
+				WithFix(Example(v, issues...))
 		}
 		return render.Usage("%s does not use %s", v.Name, flag(arg)).
-			WithAllowed(accepted...).WithFix(Example(v, numbers...))
+			WithAllowed(accepted...).WithFix(Example(v, issues...))
 	}
 	if a.Yes && !v.Confirm {
-		return render.Usage("%s does not take --yes: it needs no confirmation", v.Name).WithFix(Example(v, numbers...))
+		return render.Usage("%s does not take --yes: it needs no confirmation", v.Name).WithFix(Example(v, issues...))
 	}
 
 	var missing []string
@@ -292,19 +317,16 @@ func CheckArgs(v config.Verb, a Args, numbers ...int) error {
 	if blank {
 		what += " (blank values do not count)"
 	}
-	return render.Usage("%s", what).WithFix(Example(v, numbers...))
+	return render.Usage("%s", what).WithFix(Example(v, issues...))
 }
 
-// Example returns a command that runs v on the issue numbers with
-// placeholders for the arguments it requires: all of require, the first of
-// require_one_of.
+// Example returns a command that runs v on the issues, given as
+// command-line arguments ("42", "owner/repo#42"), with placeholders for
+// the arguments it requires: all of require, the first of require_one_of.
 //
 //	gh dojo wait 42 --by "<#N or name>"
-func Example(v config.Verb, numbers ...int) string {
-	parts := []string{"gh dojo", v.Name}
-	for _, n := range numbers {
-		parts = append(parts, strconv.Itoa(n))
-	}
+func Example(v config.Verb, issues ...string) string {
+	parts := append([]string{"gh dojo", v.Name}, issues...)
 	args := slices.Clone(v.Require)
 	if len(v.RequireOneOf) > 0 {
 		args = append(args, v.RequireOneOf[0])
@@ -372,7 +394,7 @@ func join(items []string, conj string) string {
 // plan is not empty: a repeat with nothing left to do needs no go-ahead.
 // Call Plan.Unconfirmed before applying.
 func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
-	if err := CheckArgs(v, a, is.Number); err != nil {
+	if err := CheckArgs(v, a, is.arg()); err != nil {
 		return nil, err
 	}
 	if !is.OnBoard {
@@ -380,8 +402,8 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 		is.Archived = false
 	}
 	if is.Closed && !e.runsOnClosed(v) {
-		return nil, render.Denied("#%d is closed; %s works only on open issues\n"+
-			"this is a process rule: ask the user what to do with #%d", is.Number, v.Name, is.Number)
+		return nil, render.Denied("%s is closed; %s works only on open issues\n"+
+			"this is a process rule: ask the user what to do with %s", is.Name(), v.Name, is.Name())
 	}
 	p := &Plan{Verb: v.Name, Issue: is, Target: v.To}
 	atTarget := v.To != "" && is.Status == v.To
@@ -402,8 +424,8 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 	moves := v.To != "" && !atTarget
 	if is.Closed && moves && slices.Contains(e.Final, v.To) &&
 		(is.StateReason == config.CloseNotPlanned || is.StateReason == config.CloseDuplicate) {
-		p.Warnings = append(p.Warnings, fmt.Sprintf("#%d is closed as %s; moving to %s anyway",
-			is.Number, ReasonText(is.StateReason), v.To))
+		p.Warnings = append(p.Warnings, fmt.Sprintf("%s is closed as %s; moving to %s anyway",
+			is.Name(), ReasonText(is.StateReason), v.To))
 	}
 	switch {
 	case !is.OnBoard && !v.OnlyClearsSprint():
@@ -451,10 +473,16 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 	}
 
 	by := NormalizeBy(a.By)
+	if is.DefaultRepo != "" && byNumberRE.MatchString(strings.TrimSpace(a.By)) {
+		by = is.DefaultRepo + by // "#12" would name an issue of the issue's own repository
+	}
 	if v.Blockers == config.BlockersLink && len(is.ByIssues) > 0 {
 		refs := make([]string, len(is.ByIssues))
 		for i, b := range is.ByIssues {
 			refs[i] = b.Ref
+			if b.Mention != "" {
+				refs[i] = b.Mention
+			}
 			switch {
 			case b.PullRequest:
 				p.Warnings = append(p.Warnings, b.Ref+" is a pull request: not linked")
@@ -577,15 +605,15 @@ func (p *Plan) checkBlockers(v config.Verb) error {
 	}
 	list := strings.Join(names, ", ")
 	if v.Blockers == config.BlockersWarn {
-		p.Warnings = append(p.Warnings, fmt.Sprintf("#%d has unresolved blockers: %s", is.Number, list))
+		p.Warnings = append(p.Warnings, fmt.Sprintf("%s has unresolved blockers: %s", is.Name(), list))
 		return nil
 	}
 	action := "move"
 	if v.To == "" {
 		action = "run on"
 	}
-	return render.Denied("%s cannot %s #%d while it has unresolved blockers: %s\n"+
-		"this is a process rule: ask the user how to proceed", v.Name, action, is.Number, list)
+	return render.Denied("%s cannot %s %s while it has unresolved blockers: %s\n"+
+		"this is a process rule: ask the user how to proceed", v.Name, action, is.Name(), list)
 }
 
 // checkFrom refuses an issue whose status is not in v.From.
@@ -612,9 +640,9 @@ func (e *Engine) checkFrom(v config.Verb, is Issue) error {
 	}
 	// No fix line and no allowed line: a refusal ends with asking the user,
 	// never with a command that works around the process.
-	return render.Denied("%s cannot move #%d%s; it starts only from %s\n"+
+	return render.Denied("%s cannot move %s%s; it starts only from %s\n"+
 		"this is a process rule: ask the user how to proceed",
-		v.Name, is.Number, from, join(v.From, "or"))
+		v.Name, is.Name(), from, join(v.From, "or"))
 }
 
 // runsOnClosed reports whether v may run on a closed issue: its target

@@ -9,6 +9,7 @@ code: 0
   "issues": [
     {
       "number": 43,
+      "repo": "acme/shop",
       "title": "Pay with gift cards",
       "outcome": "planned",
       "planned": [

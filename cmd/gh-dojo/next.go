@@ -57,8 +57,8 @@ func nextArgs(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return nil
 	}
-	if n, ok := parseIssue(args[0]); ok {
-		return render.Usage("next takes no arguments; to see one issue: gh dojo show %d", n)
+	if ref, ok := parseRef(args[0]); ok {
+		return render.Usage("next takes no arguments; to see one issue: gh dojo show %s", ref.Arg(issue.Repo{}))
 	}
 	return render.Usage("next takes no arguments").WithFix(cmd.CommandPath() + " --help")
 }
@@ -126,7 +126,7 @@ type nextBlocker struct {
 
 // ref is "#12", or "owner/name#12" outside repo.
 func (b nextBlocker) ref(repo string) string {
-	if b.Repo != repo || repo == "" {
+	if !strings.EqualFold(b.Repo, repo) || repo == "" {
 		return b.Repo + "#" + strconv.Itoa(b.Number)
 	}
 	return "#" + strconv.Itoa(b.Number)

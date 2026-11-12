@@ -11,7 +11,7 @@ import (
 // verbResult is a verb's JSON.
 type verbResult struct {
 	Verb    string      `json:"verb"`
-	Repo    *string     `json:"repo"` // owner/name of the issues; null when not known
+	Repo    *string     `json:"repo"` // owner/name of the default repository; null when not known
 	DryRun  bool        `json:"dry_run"`
 	Issues  []verbIssue `json:"issues"` // in the order of the arguments
 	Summary verbSummary `json:"summary"`
@@ -45,6 +45,7 @@ const (
 
 type verbIssue struct {
 	Number  int     `json:"number"`
+	Repo    string  `json:"repo"`  // owner/name of the issue, which may differ from the default one
 	Title   *string `json:"title"` // null when the issue was not read
 	Outcome string  `json:"outcome"`
 	// Planned are the ops to apply, Applied the ones GitHub confirmed (none
@@ -216,7 +217,7 @@ func verbJSON(v, repo string, dry bool, items []*batchItem) verbResult {
 // json is the issue's part of a verb's JSON.
 func (it *batchItem) json(dry bool) verbIssue {
 	out := verbIssue{
-		Number: it.n, Outcome: outcomeFailed, Planned: []jsonOp{}, Applied: []jsonOp{}, InPlace: []jsonOp{},
+		Number: it.ref.Number, Repo: it.ref.Repo.String(), Outcome: outcomeFailed, Planned: []jsonOp{}, Applied: []jsonOp{}, InPlace: []jsonOp{},
 		Warnings: []string{}, Error: errorJSON(it.err),
 	}
 	if it.read != nil {

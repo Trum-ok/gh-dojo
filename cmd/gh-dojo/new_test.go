@@ -82,6 +82,49 @@ func TestNewSuccess(t *testing.T) {
 	}
 }
 
+// reposConfig has a second repository, acme/api, on the gh-dojo board.
+var reposConfig = strings.Replace(dojoConfig, `repos = ["Trum-ok/gh-dojo"]`, `repos = ["Trum-ok/gh-dojo", "acme/api"]`, 1)
+
+// TestNewRepo: --repo creates the issue in another repository of
+// board.repos, with the same requests as the default one, and names it
+// acme/api#15. A repository outside board.repos is refused before any
+// request (newApp is noApp), listing them.
+func TestNewRepo(t *testing.T) {
+	for _, tt := range []struct{ name, golden string }{{"text", "new/repo"}, {"json", "json/new_repo"}} {
+		t.Run(tt.name, func(t *testing.T) {
+			withConfig(t, reposConfig)
+			srv := withApp(t, boardFixture, "testdata/graphql/new_repo.json")
+			before := warmSchema(t, srv)
+			args := append(slices.Clone(newFixArgs), "--repo", "ACME/api")
+			if tt.name == "json" {
+				args = append(args, "--json")
+			}
+			code, out := runOut(args...)
+			testutil.Golden(t, tt.golden, out)
+			if code != render.ExitOK {
+				t.Errorf("code = %d", code)
+			}
+			if n := srv.Requests() - before; n != 4 {
+				t.Errorf("requests with a warm schema = %d, want 4", n)
+			}
+		})
+	}
+	for _, tt := range []struct{ name, config, repo string }{
+		{"repo_unknown", reposConfig, "acme/web"},
+		{"repo_malformed", reposConfig, "acme"},
+		{"repo_no_repos", strings.Replace(dojoConfig, `repos = ["Trum-ok/gh-dojo"]`, "", 1), "acme/api"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			withConfig(t, tt.config)
+			code, out := runOut("new", "Fix login redirect", "--repo", tt.repo)
+			testutil.Golden(t, "new/"+tt.name, out)
+			if code != render.ExitUsage {
+				t.Errorf("code = %d", code)
+			}
+		})
+	}
+}
+
 func TestNewBodyFromStdin(t *testing.T) {
 	withConfig(t, dojoConfig)
 	withApp(t, boardFixture, newSuccessFixture) // the same body, so the same CreateIssue variables

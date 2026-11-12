@@ -253,9 +253,9 @@ func (p *Plan) Unconfirmed() error {
 	if !p.NeedsYes {
 		return nil
 	}
-	return render.Denied("%s needs the user's go-ahead for #%d (would be: %s)\n"+
+	return render.Denied("%s needs the user's go-ahead for %s (would be: %s)\n"+
 		"this is the user's decision: ask the user, and re-run with --yes only if they agree",
-		p.Verb, p.Issue.Number, strings.Join(p.lines(false), ", "))
+		p.Verb, p.Issue.Name(), strings.Join(p.lines(false), ", "))
 }
 
 // lines returns one entry per effect, in a fixed order: board, reopen,
@@ -390,7 +390,7 @@ func (p *Plan) lines(dry bool) []string {
 //	  comment: "Started. Session: claude://claude.ai/epitaxy/abc"
 func (p *Plan) DryRun() string {
 	var b strings.Builder
-	b.WriteString(render.Confirm(fmt.Sprintf("dry run: %s #%d", p.Verb, p.Issue.Number), p.Issue.Title))
+	b.WriteString(render.Confirm(fmt.Sprintf("dry run: %s %s", p.Verb, p.Issue.Name()), p.Issue.Title))
 	lines := p.lines(true)
 	if len(lines) == 0 {
 		lines = []string{noChanges}
@@ -416,7 +416,7 @@ func (p *Plan) Confirm() string {
 	if len(effects) == 0 {
 		effects = []string{noChanges}
 	}
-	return render.Confirm(fmt.Sprintf("#%d", p.Issue.Number), "", effects...)
+	return render.Confirm(p.Issue.Name(), "", effects...)
 }
 
 // markerRE matches the hidden marker gh-dojo puts at the end of a verb's

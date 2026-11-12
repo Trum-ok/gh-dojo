@@ -203,6 +203,9 @@ func (c *Card) Status() string {
 	return c.Item.Status
 }
 
+// Ref names the issue: its repository and number.
+func (c *Card) Ref() Ref { return Ref{Repo: c.Repo, Number: c.Number} }
+
 // UnresolvedBlockers returns the blockers that still block: open, and not
 // in one of the resolved statuses (config statuses.resolved) on the board,
 // or with a status that could not be read (Link.StatusUnknown). Blocker

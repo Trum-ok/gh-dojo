@@ -262,9 +262,14 @@ func (p *process) text() string {
 		take = "Find an issue to take with gh dojo next (" + *p.Statuses.Initial +
 			" or no status, no unresolved blockers);\nread it with gh dojo show <N>.\n"
 	}
-	sections := []string{fmt.Sprintf("%s: board %s, issues in %s.\n%s"+
-		"Run a verb as gh dojo <verb> <N>; --dry-run shows its plan first.\n"+
-		"Every command takes --json (schema_version 1), --jq and --template, as gh does.", head, p.Board, issues, take)}
+	run := "Run a verb as gh dojo <verb> <N>; --dry-run shows its plan first."
+	if len(p.Repos) > 1 {
+		// Several repositories: say which one a bare number is in.
+		run = fmt.Sprintf("Run a verb as gh dojo <verb> <N>, N in %s, or owner/repo#N in another repository;\n"+
+			"--dry-run shows its plan first; gh dojo new --repo owner/repo creates in another one.", p.Repos[0])
+	}
+	sections := []string{fmt.Sprintf("%s: board %s, issues in %s.\n%s%s\n"+
+		"Every command takes --json (schema_version 1), --jq and --template, as gh does.", head, p.Board, issues, take, run)}
 
 	if len(p.Verbs) == 0 {
 		sections = append(sections, "No verbs: add them under [verbs] in "+p.Config+".")

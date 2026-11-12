@@ -7,9 +7,7 @@ import (
 	"io"
 	"os"
 	"reflect"
-	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -73,30 +71,29 @@ var getenv = os.Getenv
 // schema ID, also dropping what Apply confirmed in case the re-read lags
 // behind it; after a partial failure the agent re-runs the command.
 type Backend interface {
-	// ReadIssue returns the state of issue n in the default repo for verb
-	// v, filled as workflow.Issue documents (comments with viewerDidAuthor,
+	// ReadIssue returns the state of issue ref for verb v, filled as workflow.Issue documents (comments with viewerDidAuthor,
 	// labels, assignees, and the viewer when v assigns @me), with a render
 	// error on failure (render.NotFound for a missing issue; a config error
 	// for a label of v to add that is missing in the repo, a label spelled
 	// in another case than the repo's, or an assignee who cannot be
-	// assigned). The default repo comes from the app wiring:
-	// board.repos[0], or the git remote of the current directory.
+	// assigned). The issue's repository is ref's, which a caller resolves
+	// with Repo for a bare number.
 	//
 	// For a verb with blockers = "warn" or "deny" it fills the unresolved
 	// blockers; for blockers = "link" with --by naming issues (a), those
 	// issues (workflow.Issue.ByIssues), with exit code 3 when one does not
 	// exist, and 1 when one is the issue itself, would close a cycle, or
 	// --by mixes issues and text.
-	ReadIssue(ctx context.Context, v config.Verb, n int, a workflow.Args) (workflow.Issue, error)
-	// ReadIssues reads issues ns like ReadIssue, for a verb with batch =
-	// true: one request per issue.MaxBatch issues, with what v looks up
-	// read once in each. It returns one IssueRead per number, in order; an
+	ReadIssue(ctx context.Context, v config.Verb, ref issue.Ref, a workflow.Args) (workflow.Issue, error)
+	// ReadIssues reads issues refs like ReadIssue, for a verb with batch =
+	// true: one request per issue.MaxBatch issues, of any repositories,
+	// with what v looks up read once in each. It returns one IssueRead per number, in order; an
 	// issue that fails alone (not found, a pull request, its board place
 	// or sprint not read, the issue --by names) has its own Err. err fails them all:
 	// a config error of v (a label to add missing in the repo) or a
 	// request that read nothing. A request that fails after earlier ones
 	// read their issues is the Err of each issue it did not read.
-	ReadIssues(ctx context.Context, v config.Verb, ns []int, a workflow.Args) ([]IssueRead, error)
+	ReadIssues(ctx context.Context, v config.Verb, refs []issue.Ref, a workflow.Args) ([]IssueRead, error)
 	// Apply applies every op of a non-empty plan, finding the issue's node
 	// IDs in p.Issue.Ref. It returns the ops GitHub confirmed, also with an
 	// error: the rest of p.Ops did not take effect, or their outcome is
@@ -104,7 +101,8 @@ type Backend interface {
 	// runVerb reports a partial write (exit code 5); errors keep their
 	// cause, so board.IsStale tells a rejected schema ID.
 	Apply(ctx context.Context, p *workflow.Plan) ([]workflow.Op, error)
-	// Repo is the default repository, where ReadIssue reads, for the JSON.
+	// Repo is the default repository: where a bare number is, and what
+	// output names issues relative to.
 	Repo() (issue.Repo, error)
 	// Reset drops the cached board schema after GitHub rejected one of its
 	// IDs, so the next ReadIssue and Apply use a fresh one.
@@ -114,9 +112,9 @@ type Backend interface {
 // IssueRead is one issue of ReadIssues: its state, or why it cannot be
 // planned.
 type IssueRead struct {
-	Number int
-	Issue  workflow.Issue
-	Err    error
+	Ref   issue.Ref
+	Issue workflow.Issue
+	Err   error
 }
 
 // newBackend returns the backend for cfg: GitHub through one App per run,
@@ -153,11 +151,11 @@ func newVerbCmd(cfg *config.Config, v config.Verb) *cobra.Command {
 		RunE: func(cmd *cobra.Command, posArgs []string) error {
 			args.HasComment = cmd.Flags().Changed(config.ArgComment)
 			args.HasBy = cmd.Flags().Changed(config.ArgBy)
-			ns := issueNumbers(posArgs) // validated by issueArgs
-			if len(ns) == 1 {
-				return runVerb(cmd, cfg, v, ns[0], args, dryRun)
+			refs := argRefs(posArgs, issue.Repo{}) // validated by issueArgs
+			if len(refs) == 1 {
+				return runVerb(cmd, cfg, v, refs[0], args, dryRun)
 			}
-			return runBatch(cmd, cfg, v, ns, args, dryRun)
+			return runBatch(cmd, cfg, v, refs, args, dryRun)
 		},
 	}
 	f := cmd.Flags()
@@ -186,18 +184,23 @@ func newVerbCmd(cfg *config.Config, v config.Verb) *cobra.Command {
 // bad arguments or the network, is the command's alone; once the issue
 // was read (or found missing), its JSON is a verb result for it, as for
 // one issue of a batch, also when it is refused (outcome "failed").
-func runVerb(cmd *cobra.Command, cfg *config.Config, v config.Verb, n int, args workflow.Args, dryRun bool) error {
-	if err := workflow.CheckArgs(v, args, n); err != nil {
+func runVerb(cmd *cobra.Command, cfg *config.Config, v config.Verb, ref issue.Ref, args workflow.Args, dryRun bool) error {
+	if err := workflow.CheckArgs(v, args, ref.Arg(issue.Repo{})); err != nil {
 		return err
 	}
 	be, err := newBackend(cfg)
 	if err != nil {
 		return err
 	}
+	def, err := be.Repo()
+	if err != nil {
+		return err
+	}
+	ref = ref.In(def)
 	ctx := cmd.Context()
 	engine := workflow.New(cfg)
 	engine.Getenv = getenv
-	it, err := readPlanFresh(ctx, be, engine, v, n, args)
+	it, err := readPlanFresh(ctx, be, engine, v, ref, args)
 	if err != nil {
 		return err
 	}
@@ -219,7 +222,7 @@ func runVerb(cmd *cobra.Command, cfg *config.Config, v config.Verb, n int, args 
 	if it.err = plan.Unconfirmed(); it.err != nil {
 		return emitResult(cmd, verbJSON(v.Name, repo, false, []*batchItem{it}), none, it.err)
 	}
-	it.err = run.applyFresh(ctx, be, func() (*workflow.Plan, error) { return readPlan(ctx, be, engine, v, n, args) })
+	it.err = run.applyFresh(ctx, be, func() (*workflow.Plan, error) { return readPlan(ctx, be, engine, v, ref, args) })
 	// A partial write prints what it applied as JSON; its text is the error.
 	return emitWrite(cmd, verbJSON(v.Name, repo, false, []*batchItem{it}), func(w io.Writer) {
 		if it.err == nil {
@@ -333,7 +336,7 @@ func (r *verbRun) partial(missed []workflow.Op, cause, err error) error {
 	if graph.IsCycle(err) {
 		// Re-running cannot help: the link makes a cycle through other issues.
 		return render.Usage("%s; %s: %s", r.applied().Confirm(), missedWords(missed), reason(err)).
-			WithFix(fmt.Sprintf("gh dojo show %d", r.first.Issue.Number)).WithCause(err)
+			WithFix("gh dojo show " + strings.TrimPrefix(r.first.Issue.Name(), "#")).WithCause(err)
 	}
 	e := render.FromError(err)
 	next := "re-run the same command"
@@ -411,9 +414,9 @@ func hasKind(ops []workflow.Op, op workflow.Op) bool {
 	return slices.ContainsFunc(ops, func(o workflow.Op) bool { return reflect.TypeOf(o) == reflect.TypeOf(op) })
 }
 
-// readPlan reads issue n and plans verb v on it.
-func readPlan(ctx context.Context, be Backend, e *workflow.Engine, v config.Verb, n int, args workflow.Args) (*workflow.Plan, error) {
-	is, err := be.ReadIssue(ctx, v, n, args)
+// readPlan reads issue ref and plans verb v on it.
+func readPlan(ctx context.Context, be Backend, e *workflow.Engine, v config.Verb, ref issue.Ref, args workflow.Args) (*workflow.Plan, error) {
+	is, err := be.ReadIssue(ctx, v, ref, args)
 	if err != nil {
 		return nil, err
 	}
@@ -426,7 +429,7 @@ type schemaCacher interface {
 	SchemaCached() bool
 }
 
-// readPlanFresh reads issue n as runBatch reads each issue and plans v
+// readPlanFresh reads issue ref as runBatch reads each issue and plans v
 // on it, once more with a fresh board schema when the one used came from
 // the cache and may explain the failure (board.IsStale): say, no
 // iteration for today, added on the board since the schema was cached.
@@ -435,8 +438,8 @@ type schemaCacher interface {
 // err fails the command, with nothing read (the network, a config error
 // of v); the issue's own failure (not found, a refusal) is the item's
 // err, with read set once the issue was read.
-func readPlanFresh(ctx context.Context, be Backend, e *workflow.Engine, v config.Verb, n int, args workflow.Args) (*batchItem, error) {
-	it, err := readPlanItem(ctx, be, e, v, n, args)
+func readPlanFresh(ctx context.Context, be Backend, e *workflow.Engine, v config.Verb, ref issue.Ref, args workflow.Args) (*batchItem, error) {
+	it, err := readPlanItem(ctx, be, e, v, ref, args)
 	failed := err
 	if err == nil {
 		failed = it.err
@@ -447,19 +450,19 @@ func readPlanFresh(ctx context.Context, be Backend, e *workflow.Engine, v config
 	if be.Reset() != nil {
 		return it, err
 	}
-	return readPlanItem(ctx, be, e, v, n, args)
+	return readPlanItem(ctx, be, e, v, ref, args)
 }
 
 // readPlanItem is one try of readPlanFresh.
-func readPlanItem(ctx context.Context, be Backend, e *workflow.Engine, v config.Verb, n int, args workflow.Args) (*batchItem, error) {
-	reads, err := be.ReadIssues(ctx, v, []int{n}, args)
+func readPlanItem(ctx context.Context, be Backend, e *workflow.Engine, v config.Verb, ref issue.Ref, args workflow.Args) (*batchItem, error) {
+	reads, err := be.ReadIssues(ctx, v, []issue.Ref{ref}, args)
 	if err != nil {
 		return nil, err
 	}
 	if len(reads) != 1 {
-		return nil, render.Internal("read %d issues for #%d", len(reads), n)
+		return nil, render.Internal("read %d issues for %s", len(reads), ref.String(issue.Repo{}))
 	}
-	it := &batchItem{n: n}
+	it := &batchItem{ref: ref}
 	if r := reads[0]; r.Err != nil {
 		it.fail(r.Err)
 	} else if p, err := e.Plan(v, r.Issue, args); err != nil {
@@ -472,22 +475,6 @@ func readPlanItem(ctx context.Context, be Backend, e *workflow.Engine, v config.
 	return it, nil
 }
 
-var issueRE = regexp.MustCompile(`^#?[1-9][0-9]*$`)
-
-// parseIssue parses an issue number, "42" or "#42", up to GitHub's maximum
-// (a GraphQL Int, 2^31-1).
-func parseIssue(s string) (int, bool) {
-	if !issueRE.MatchString(s) {
-		return 0, false
-	}
-	n, err := strconv.ParseInt(strings.TrimPrefix(s, "#"), 10, 32)
-	return int(n), err == nil
-}
-
-// issueExamples shows how to pass an issue number. A bare #42 is a comment
-// in the shell, so the # form is quoted.
-const issueExamples = `42 or "#42"`
-
 // issueArg accepts exactly one issue number.
 func issueArg(cmd *cobra.Command, args []string) error {
 	help := cmd.CommandPath() + " --help"
@@ -498,7 +485,7 @@ func issueArg(cmd *cobra.Command, args []string) error {
 		return render.Usage("%s takes one issue number, got %d; several at once are not supported yet",
 			cmd.Name(), len(args)).WithFix(help)
 	}
-	if _, ok := parseIssue(args[0]); !ok {
+	if _, ok := parseRef(args[0]); !ok {
 		return render.Usage("%q is not an issue number; pass one like %s", args[0], issueExamples).WithFix(help)
 	}
 	return nil
@@ -516,11 +503,11 @@ func issueArgs(cfg *config.Config, v config.Verb) cobra.PositionalArgs {
 			return render.Usage("%s needs an issue number, like %s", cmd.Name(), issueExamples).WithFix(help)
 		}
 		for _, a := range args {
-			if _, ok := parseIssue(a); !ok {
+			if _, ok := parseRef(a); !ok {
 				return render.Usage("%q is not an issue number; pass one like %s", a, issueExamples).WithFix(help)
 			}
 		}
-		if n := len(issueNumbers(args)); n > 1 && !v.Batch {
+		if n := len(argRefs(args, issue.Repo{})); n > 1 && !v.Batch {
 			return render.Usage("%s takes one issue number, got %d; several at once need batch = true in verbs.%s%s",
 				cmd.Name(), n, v.Name, batchVerbsNote(cfg)).
 				WithFix(fmt.Sprintf("run %s once per issue", cmd.CommandPath()))
@@ -542,17 +529,6 @@ func batchVerbsNote(cfg *config.Config) string {
 		return ""
 	}
 	return "\nverbs that take several: " + strings.Join(names, ", ")
-}
-
-// issueNumbers parses the validated issue arguments, dropping repeats.
-func issueNumbers(args []string) []int {
-	var ns []int
-	for _, a := range args {
-		if n, ok := parseIssue(a); ok && !slices.Contains(ns, n) {
-			ns = append(ns, n)
-		}
-	}
-	return ns
 }
 
 // verbHelp is the long help of a verb: its when line, then what it checks,

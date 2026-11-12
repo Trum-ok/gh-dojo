@@ -212,12 +212,16 @@ type newOptions struct {
 	// they name, parsed before any request.
 	BlockedBy []string
 	Blockers  []issue.Ref
+	// Repo is the repository of --repo, one of board.repos; zero for the
+	// default one.
+	Repo issue.Repo
 }
 
 func newNewCmd() (*cobra.Command, error) {
 	var (
 		o        newOptions
 		bodyFile string
+		repoName string
 	)
 	cmd := &cobra.Command{
 		Use:   "new <title>",
@@ -226,6 +230,7 @@ func newNewCmd() (*cobra.Command, error) {
 		Example: `  gh dojo new "Fix login redirect" --type bug --area cli
   gh dojo new "Support org boards" --label enhancement --body-file - < notes.md
   gh dojo new "Release v1.2" --milestone v1.2 --blocked-by 17 --blocked-by 18
+  gh dojo new "Rate limit the export" --repo acme/api --type bug
   gh dojo new --type bug -- "-v is ignored by list"`,
 		Args: newArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -259,13 +264,18 @@ func newNewCmd() (*cobra.Command, error) {
 			if err := checkNewFlags(cfg, o); err != nil {
 				return err // before any request
 			}
+			if f.Changed("repo") {
+				if o.Repo, err = newRepo(cfg, repoName); err != nil {
+					return err // before any request
+				}
+			}
 			a := newApp()
 			if len(o.BlockedBy) > 0 {
 				repo, err := a.Repo()
 				if err != nil {
 					return err
 				}
-				if o.Blockers, err = parseBlockers(o.BlockedBy, "blocked-by", repo, 0, cmd.CommandPath()+" --help"); err != nil {
+				if o.Blockers, err = parseBlockers(o.BlockedBy, "blocked-by", repo, issue.Ref{}, cmd.CommandPath()+" --help"); err != nil {
 					return err // before any request
 				}
 			}
@@ -291,7 +301,32 @@ func newNewCmd() (*cobra.Command, error) {
 	f.StringVar(&bodyFile, bodyFileFlag, "", "read the body from `file`; - reads stdin")
 	f.StringArrayVar(&o.BlockedBy, "blocked-by", nil,
 		"the blocking `issue`: 12, \"#12\", owner/repo#12 or its URL; repeatable, or comma-separated")
+	f.StringVar(&repoName, "repo", "", "create the issue in `owner/repo`, one of board.repos (default: the first)")
 	return cmd, nil
+}
+
+// newRepo checks --repo, without a request: a repository of board.repos,
+// as the config spells it. Any other is exit code 1 with board.repos as
+// the allowed values; so is any --repo with board.repos empty, where the
+// current repository is the only one.
+func newRepo(cfg *config.Config, name string) (issue.Repo, error) {
+	name = strings.TrimSpace(name)
+	for _, r := range cfg.Board.Repos {
+		if strings.EqualFold(r, name) {
+			return issue.ParseRepo(r)
+		}
+	}
+	add := fmt.Sprintf("add %q to repos under [board] in %s", name, cfg.Display)
+	if len(cfg.Board.Repos) == 0 {
+		return issue.Repo{}, render.Usage("--repo %q: board.repos is empty, so gh dojo new creates issues only in the current repository", name).
+			WithFix("drop --repo, or " + add)
+	}
+	fix := "pass one of board.repos, or " + add
+	if _, err := issue.ParseRepo(name); err != nil {
+		fix = "pass one of board.repos as owner/repo"
+	}
+	return issue.Repo{}, render.Usage("--repo %q is not in board.repos: gh dojo new creates issues only in the board's repositories", name).
+		WithAllowed(cfg.Board.Repos...).WithFix(fix)
 }
 
 // newTypeUsage is the help of --type, for this project when the config
@@ -361,6 +396,12 @@ after it is taken as the title: gh dojo new --type bug -- "-v is ignored".
 owner/repo#12 or the issue's URL; repeatable, or comma-separated). An issue
 that does not exist, or a pull request, fails before anything is created
 (exit code 3).
+
+--repo owner/repo creates the issue in another repository of board.repos
+than the default one (board.repos[0]); labels, milestones and the repeat
+check are that repository's, and the issue is named owner/repo#N. A bare
+number in --blocked-by is still in the default repository. A repository
+not in board.repos is exit code 1, listing them.
 
 A repeat is safe: the body ends with a hidden marker of the title, and a run
 that finds it on one of the repo's 20 newest open issues, written by you,
@@ -470,7 +511,7 @@ func (r *newRun) result() newResult {
 		Number: r.number, Repo: r.repo.String(), Title: singleLine(title), Created: !r.resumed,
 		Labels: orEmpty(r.labels), Status: orNull(r.status), StatusSet: r.statusSet, Unarchived: r.unarchived,
 		Milestone: r.milestone.json(), MilestoneSet: r.milestoneSet,
-		BlockedBy: refList(r.linked, r.repo), AlreadyBlockedBy: refList(r.linkedFound, r.repo),
+		BlockedBy: refList(r.linked, r.def), AlreadyBlockedBy: refList(r.linkedFound, r.def),
 	}
 }
 
@@ -524,7 +565,8 @@ type newRun struct {
 	milestoneSet  bool          // set to --milestone now
 	milestoneKept string        // the --milestone not applied: a resumed issue had another
 
-	repo        issue.Repo      // the default repository, for the refs of links
+	repo        issue.Repo      // the issue's repository: --repo, or the default one
+	def         issue.Repo      // the default repository, which output names issues relative to
 	linked      []*issue.Linked // blocked-by links added now
 	linkedFound []*issue.Linked // blocked-by links a resumed issue had already
 }
@@ -544,9 +586,13 @@ func (r *newRun) run(ctx context.Context) error {
 		return err
 	}
 	r.schemaCached = s.Cached
-	repo, err := r.Repo()
+	def, err := r.Repo()
 	if err != nil {
 		return err
+	}
+	repo := def
+	if r.opts.Repo != (issue.Repo{}) {
+		repo = r.opts.Repo
 	}
 	statusField, err := s.Field(r.cfg.StatusField())
 	if err != nil {
@@ -561,7 +607,7 @@ func (r *newRun) run(ctx context.Context) error {
 		r.noInitial = true
 	}
 
-	r.repo = repo
+	r.repo, r.def = repo, def
 	nc, err := readNewContext(ctx, r.Client, repo, statusField.Name, r.opts.Blockers)
 	if err != nil {
 		return err
@@ -576,7 +622,7 @@ func (r *newRun) run(ctx context.Context) error {
 			return err
 		}
 	}
-	if err := issue.LinksError("--blocked-by", nc.Links, repo); err != nil {
+	if err := issue.LinksError("--blocked-by", nc.Links, def); err != nil {
 		return err
 	}
 	for _, l := range labels {
@@ -589,9 +635,9 @@ func (r *newRun) run(ctx context.Context) error {
 		for _, l := range nc.Links {
 			switch {
 			case l.ID == found.ID:
-				return selfBlock(found.Number, "--blocked-by")
+				return selfBlock(issue.Ref{Repo: repo, Number: found.Number}, def, "--blocked-by")
 			case l.BlockedBy(found.ID):
-				return cycleError(found.Number, l.Ref.String(repo), "--blocked-by")
+				return cycleError(issue.Ref{Repo: repo, Number: found.Number}, def, l.Ref.String(def), "--blocked-by")
 			}
 		}
 		r.resumed = true
@@ -603,7 +649,7 @@ func (r *newRun) run(ctx context.Context) error {
 		if found = r.recheck(ctx, repo, statusField.Name, marker, s.ID); found == nil {
 			return err
 		}
-		r.warnings = append(r.warnings, fmt.Sprintf("GitHub's answer to creating the issue was lost; found #%d on a re-read", found.Number))
+		r.warnings = append(r.warnings, fmt.Sprintf("GitHub's answer to creating the issue was lost; found %s on a re-read", issue.Ref{Repo: repo, Number: found.Number}.String(def)))
 	}
 	var missing []string // label IDs the found issue lacks
 	setMilestone := false
@@ -735,7 +781,7 @@ func (r *newRun) finish(ctx context.Context, projectID, fieldID string, initial 
 		}
 	}
 	if len(missed) > 0 {
-		steps = append(steps, "marking it blocked by "+joinRefs(missed, r.repo))
+		steps = append(steps, "marking it blocked by "+joinRefs(missed, r.def))
 	}
 	switch {
 	case len(steps) == 0 && err != nil:
@@ -782,7 +828,7 @@ func (r *newRun) addToBoard(ctx context.Context, projectID, statusField string) 
 	if it.Status != nil {
 		r.status = it.Status.Name
 	}
-	r.warnings = append(r.warnings, fmt.Sprintf("GitHub refused adding #%d to the board, but a re-read found it there", r.number))
+	r.warnings = append(r.warnings, fmt.Sprintf("GitHub refused adding %s to the board, but a re-read found it there", r.name()))
 	return nil
 }
 
@@ -917,17 +963,21 @@ func (r *newRun) confirm() string {
 		effects = append(effects, "on the board with no status (statuses.initial is not set)")
 	}
 	if len(r.linked) > 0 {
-		effects = append(effects, "blocked by "+joinRefs(r.linked, r.repo))
+		effects = append(effects, "blocked by "+joinRefs(r.linked, r.def))
 	}
 	if len(r.linkedFound) > 0 {
-		effects = append(effects, "already blocked by "+joinRefs(r.linkedFound, r.repo))
+		effects = append(effects, "already blocked by "+joinRefs(r.linkedFound, r.def))
 	}
 	title := r.title
 	if title == "" {
 		title = r.opts.Title
 	}
-	return render.Confirm(fmt.Sprintf("#%d", r.number), title, effects...)
+	return render.Confirm(r.name(), title, effects...)
 }
+
+// name is how output names the issue: "#57", or "owner/repo#57" outside
+// the default repository.
+func (r *newRun) name() string { return issue.Ref{Repo: r.repo, Number: r.number}.String(r.def) }
 
 // partial is the exit-code-5 error of a run that stopped after the issue
 // existed: what failed, why, and that re-running finishes it. A cause with
@@ -948,14 +998,14 @@ func (r *newRun) partial(err error) error {
 	why, _, _ := strings.Cut(e.What, "\n")
 	if graph.IsCycle(cause) {
 		// Re-running cannot help: the links make a cycle through other issues.
-		return render.Usage("#%d %s, but %s\n%s", r.number, what, step, why).
-			WithFix(fmt.Sprintf("gh dojo show %d", r.number)).WithCause(err)
+		return render.Usage("%s %s, but %s\n%s", r.name(), what, step, why).
+			WithFix("gh dojo show " + strings.TrimPrefix(r.name(), "#")).WithCause(err)
 	}
-	fix := fmt.Sprintf("re-run the same gh dojo new command: it finds #%d and finishes it", r.number)
+	fix := fmt.Sprintf("re-run the same gh dojo new command: it finds %s and finishes it", r.name())
 	if e.Fix != "" && e.Fix != render.InternalFix {
 		fix = e.Fix + "; then re-run the same gh dojo new command"
 	}
-	return render.Partial("#%d %s, but %s\n%s", r.number, what, step, why).WithFix(fix).WithCause(err)
+	return render.Partial("%s %s, but %s\n%s", r.name(), what, step, why).WithFix(fix).WithCause(err)
 }
 
 // newContext is what newContextQuery read.

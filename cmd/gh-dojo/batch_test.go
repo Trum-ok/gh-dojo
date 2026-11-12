@@ -16,6 +16,7 @@ import (
 	"github.com/Trum-ok/gh-dojo/internal/board"
 	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/graph"
+	"github.com/Trum-ok/gh-dojo/internal/issue"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/Trum-ok/gh-dojo/internal/testutil"
 	"github.com/Trum-ok/gh-dojo/internal/workflow"
@@ -44,6 +45,17 @@ func TestBatchNetwork(t *testing.T) {
 		runs{[]string{"done", "3", "7", "9"}, render.ExitPartial, 4, "batch_network"},
 		runs{[]string{"done", "3", "7", "9"}, render.ExitOK, 2, "batch_network_rerun"},
 		runs{[]string{"done", "3", "7", "9"}, render.ExitOK, 1, "batch_network_repeat"},
+	)
+}
+
+// TestBatchOtherRepo: issues of the default repository and of cli/cli are
+// read in one request, as for one repository (spec F12: the requests of a
+// verb do not grow). cli/cli#2 is not on the board, so done refuses it.
+func TestBatchOtherRepo(t *testing.T) {
+	srv, before := withWarmVerbApp(t, verbFixture("batch_done_repos"))
+	checkRuns(t, srv, before,
+		runs{[]string{"done", "3", "cli/cli#2", "--dry-run"}, render.ExitDenied, 1, "batch_other_repo_dry_run"},
+		runs{[]string{"done", "3", "cli/cli#2", "--dry-run", "--json"}, render.ExitDenied, 1, "batch_other_repo_dry_run_json"},
 	)
 }
 
@@ -169,6 +181,52 @@ func TestBatchOutcomes(t *testing.T) {
 	}
 }
 
+// TestVerbsOtherRepo (spec F12): an issue of another repository goes by
+// owner/repo#N or its URL, alone or in a batch with the default
+// repository's (acme/shop, where a bare number is), and every line names
+// it so: the dry run, the confirmations, the summary, the warnings and
+// the JSON. A bare --by number on such an issue is mentioned as
+// acme/shop#12 in its comment.
+func TestVerbsOtherRepo(t *testing.T) {
+	shop := map[int]workflow.Issue{
+		3:  {Number: 3, Title: "Shop three", OnBoard: true, Status: "Ready"},
+		12: {Number: 12, Title: "Fix login", OnBoard: true, Status: "Ready"},
+	}
+	others := map[string]workflow.Issue{
+		"other/repo#3": {Number: 3, Title: "Export rate limit", OnBoard: true, Status: "Ready"},
+		"other/repo#4": {Number: 4, Title: "Export docs", OnBoard: true, Status: "Backlog"},
+		"other/repo#5": {Number: 5, Title: "Export retries", OnBoard: true, Status: "In progress"},
+		"other/repo#6": {Number: 6, Title: "Export auth", Closed: true, StateReason: "not_planned"},
+	}
+	for _, tt := range []struct {
+		name    string
+		args    []string
+		code    render.Code
+		applied int
+	}{
+		{"dry_run", []string{"done", "12", "other/repo#3", "--dry-run"}, render.ExitOK, 0},
+		{"dry_run_json", []string{"done", "12", "other/repo#3", "--dry-run", "--json"}, render.ExitOK, 0},
+		{"done", []string{"done", "12", "other/repo#3", "3"}, render.ExitOK, 3},
+		// The summary names other/repo's issues in full, #12 is acme/shop's.
+		{"refused", []string{"done", "other/repo#4", "12", "https://github.com/other/repo/issues/9", "other/repo#6"}, render.ExitDenied, 1},
+		// 12 and acme/shop#12 are one issue: the single-issue run.
+		{"same", []string{"done", "12", "acme/shop#12"}, render.ExitOK, 1},
+		{"one", []string{"start", "other/repo#4", "--dry-run"}, render.ExitOK, 0},
+		{"wait_by", []string{"wait", "other/repo#5", "--by", "12", "--dry-run"}, render.ExitOK, 0},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			withConfig(t, verbsConfig)
+			f := &fakeBackend{issues: shop, others: others}
+			withBackend(t, f)
+			code, out := runOut(tt.args...)
+			if code != tt.code || len(f.applied) != tt.applied || f.reads != 1 {
+				t.Errorf("exit code = %d, applied %d, reads %d; want %d, %d, 1\n%s", code, len(f.applied), f.reads, tt.code, tt.applied, out)
+			}
+			testutil.Golden(t, "verbs/other_repo_"+tt.name, out)
+		})
+	}
+}
+
 // TestBatchConfirm: a batch verb with confirm = "user" refuses every issue
 // that needs it without --yes, and --yes applies to all of them. An issue
 // with nothing left to do needs no go-ahead.
@@ -248,10 +306,10 @@ func (f *staleReadBackend) SchemaCached() bool { return f.resets == 0 }
 
 func (f *staleReadBackend) Reset() error { f.resets++; return nil }
 
-func (f *staleReadBackend) ReadIssues(ctx context.Context, v config.Verb, ns []int, a workflow.Args) ([]IssueRead, error) {
-	out, err := f.fakeBackend.ReadIssues(ctx, v, ns, a)
+func (f *staleReadBackend) ReadIssues(ctx context.Context, v config.Verb, refs []issue.Ref, a workflow.Args) ([]IssueRead, error) {
+	out, err := f.fakeBackend.ReadIssues(ctx, v, refs, a)
 	for i := range out {
-		if f.stale[out[i].Number] && f.resets == 0 {
+		if f.stale[out[i].Ref.Number] && f.resets == 0 {
 			out[i].Err = render.Usage("no iteration for today").WithCause(board.ErrUnknownIteration)
 		}
 	}

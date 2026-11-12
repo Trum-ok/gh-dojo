@@ -1,0 +1,9 @@
+code: 0
+--- stdout
+dry run: done #12 "Fix login"
+  status: Ready → Done
+  close: as completed
+dry run: done other/repo#3 "Export rate limit"
+  status: Ready → Done
+  close: as completed
+--- stderr

@@ -71,6 +71,19 @@ func (r Ref) String(def Repo) string {
 	return r.Repo.String() + "#" + strconv.Itoa(r.Number)
 }
 
+// Arg returns r as a command-line argument: "12" for an issue in def, else
+// "owner/name#12" (a # inside a word needs no quotes in the shell).
+func (r Ref) Arg(def Repo) string { return strings.TrimPrefix(r.String(def), "#") }
+
+// In returns r with def as its repository when it names none, as a bare
+// number does.
+func (r Ref) In(def Repo) Ref {
+	if r.Repo == (Repo{}) {
+		r.Repo = def
+	}
+	return r
+}
+
 // Same reports whether r and o name the same issue.
 func (r Ref) Same(o Ref) bool { return r.Number == o.Number && sameRepo(r.Repo, o.Repo) }
 
@@ -325,8 +338,9 @@ const (
 // need. Target.BlockedBy tells whether a link is in place, Linked.BlockedBy
 // whether adding it would close a cycle. A missing repository or issue, or a pull request number,
 // is exit code 3; so are missing or pull request refs (see LinksError,
-// with what naming them). The links come back in the order of refs.
-func ReadLinks(ctx context.Context, q graph.Querier, repo Repo, number int, refs []Ref, what string) (*Target, []*Linked, error) {
+// with what naming them, and their refs written relative to def, the
+// default repository). The links come back in the order of refs.
+func ReadLinks(ctx context.Context, q graph.Querier, repo Repo, number int, def Repo, refs []Ref, what string) (*Target, []*Linked, error) {
 	if number <= 0 {
 		return nil, nil, render.Usage("invalid issue number %d: want 1 or greater", number)
 	}
@@ -373,7 +387,7 @@ func ReadLinks(ctx context.Context, q graph.Querier, repo Repo, number int, refs
 	if derr != nil {
 		return nil, nil, render.Internal("cannot decode GitHub's answer").WithCause(derr)
 	}
-	if err := LinksError(what, links, repo); err != nil {
+	if err := LinksError(what, links, def); err != nil {
 		return nil, nil, err
 	}
 	is := resp.Repository.Issue

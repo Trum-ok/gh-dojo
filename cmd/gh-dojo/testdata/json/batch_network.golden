@@ -14,6 +14,7 @@ code: 5
   "issues": [
     {
       "number": 3,
+      "repo": "Trum-ok/gh-dojo",
       "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)",
       "outcome": "applied",
       "planned": [
@@ -45,6 +46,7 @@ code: 5
     },
     {
       "number": 7,
+      "repo": "Trum-ok/gh-dojo",
       "title": "Issue 7",
       "outcome": "failed",
       "planned": [
@@ -71,6 +73,7 @@ code: 5
     },
     {
       "number": 9,
+      "repo": "Trum-ok/gh-dojo",
       "title": "Issue 9",
       "outcome": "applied",
       "planned": [

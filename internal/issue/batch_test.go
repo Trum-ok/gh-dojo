@@ -27,7 +27,7 @@ func readAll(t *testing.T, file string, numbers ...int) ([]issue.Result, error) 
 func dumpResults(res []issue.Result) []byte {
 	var b strings.Builder
 	for _, r := range res {
-		fmt.Fprintf(&b, "== #%d\n", r.Number)
+		fmt.Fprintf(&b, "== %s\n", r.Ref().String(dojo))
 		if r.Err != nil {
 			e := render.FromError(r.Err)
 			fmt.Fprintf(&b, "code %d\n%s\n", e.Code, e.Text())
@@ -54,6 +54,64 @@ func TestReadAllRecorded(t *testing.T) {
 	}
 	if render.FromError(res[2].Err).Code != render.ExitNotFound || res[2].Cause != issue.CauseMissing {
 		t.Errorf("missing: %v", res[2].Err)
+	}
+}
+
+// TestReadRefsRepos reads issues of three repositories in one request:
+// gh-dojo #3, cli/cli #2 (an issue) and #1 (a pull request), and #1 of a
+// repository that does not exist, which fails alone. The bare #3 is in
+// the default repository.
+func TestReadRefsRepos(t *testing.T) {
+	srv := graphtest.New(t, fixture("cards_repos"))
+	cli := issue.Repo{Owner: "cli", Name: "cli"}
+	gone := issue.Repo{Owner: "Trum-ok", Name: "no-such-repo-xyz"}
+	res, err := issue.ReadRefs(context.Background(), srv.Client(), issue.Request{
+		Repo: dojo, Board: dojoBoard, StatusField: "Status",
+	}, []issue.Ref{{Number: 3}, {Repo: cli, Number: 2}, {Repo: gone, Number: 1}, {Repo: cli, Number: 1}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := srv.Requests(); n != 1 {
+		t.Errorf("requests = %d, want exactly 1", n)
+	}
+	testutil.Golden(t, "batch/cards_repos", dumpResults(res))
+	if len(res) != 4 || res[0].Card == nil || res[1].Card == nil {
+		t.Fatalf("results %+v", res)
+	}
+	if res[0].Card.Repo != dojo || res[0].Card.Number != 3 || res[1].Card.Repo != cli || res[1].Card.Number != 2 {
+		t.Errorf("cards %v, %v", res[0].Card.Ref(), res[1].Card.Ref())
+	}
+	if res[2].Cause != issue.CauseNoRepo || res[2].Repo != gone || !strings.Contains(res[2].Err.Error(), "no-such-repo-xyz not found") {
+		t.Errorf("missing repository: %+v", res[2])
+	}
+	if res[3].Cause != issue.CausePullRequest || res[3].Repo != cli {
+		t.Errorf("pull request: %+v", res[3])
+	}
+}
+
+// TestReadRefsQuery: one repository reads as a batch always did; issues
+// of another one go below its own aliased repository field, with the
+// lookups of a repository repeated there and the others once.
+func TestReadRefsQuery(t *testing.T) {
+	q := &firstQuery{}
+	req := dojoStatus
+	req.Lookup = issue.Lookup{Labels: []string{"blocked"}, Viewer: true}
+	acme := issue.Repo{Owner: "acme", Name: "api"}
+	_, _ = issue.ReadRefs(context.Background(), q, req, []issue.Ref{{Number: 1}, {Repo: acme, Number: 7}, {Repo: dojo, Number: 2}})
+	for _, want := range []string{
+		"$n2: Int!, $owner1: String!, $repo1: String!, $label0: String!",
+		"  repository(owner: $owner, name: $repo) {\n    i0: issueOrPullRequest(number: $n0) { ...card }\n    i2: issueOrPullRequest(number: $n2) { ...card }\n    label0:",
+		"  r1: repository(owner: $owner1, name: $repo1) {\n    i1: issueOrPullRequest(number: $n1) { ...card }\n    label0:",
+	} {
+		if strings.Count(q.query, want) != 1 {
+			t.Errorf("query has %d of %q, want 1:\n%s", strings.Count(q.query, want), want, q.query)
+		}
+	}
+	if strings.Count(q.query, "viewer { id login }") != 1 {
+		t.Errorf("viewer read %d times:\n%s", strings.Count(q.query, "viewer { id login }"), q.query)
+	}
+	if q.vars["owner1"] != "acme" || q.vars["repo1"] != "api" || q.vars["owner"] != "Trum-ok" || q.vars["n1"] != 7 {
+		t.Errorf("vars = %v", q.vars)
 	}
 }
 

@@ -1,0 +1,6 @@
+code: 1
+--- stdout
+--- stderr
+error: --repo "acme/web" is not in board.repos: gh dojo new creates issues only in the board's repositories
+allowed: Trum-ok/gh-dojo, acme/api
+fix: pass one of board.repos, or add "acme/web" to repos under [board] in .github/dojo.toml

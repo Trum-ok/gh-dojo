@@ -1,0 +1,5 @@
+dry run: wait acme/api#42 "Fix login redirect"
+  status: In progress → Waiting
+  comment: "Waiting for acme/shop#12."
+confirm: acme/api#42 In progress → Waiting, comment left
+post: "Waiting for acme/shop#12.\n\n<!-- gh-dojo:wait:3b5e872c -->"

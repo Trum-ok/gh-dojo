@@ -26,6 +26,7 @@ type showResult struct {
 // request, or not read.
 type showFailed struct {
 	Number int        `json:"number"`
+	Repo   string     `json:"repo"`
 	Error  *jsonError `json:"error"`
 }
 
@@ -119,7 +120,7 @@ type jsonMilestone struct {
 }
 
 type showLink struct {
-	Ref    string `json:"ref"` // "#12", or "owner/name#12" in another repository
+	Ref    string `json:"ref"` // "#12", or "owner/name#12" outside the default repository
 	Repo   string `json:"repo"`
 	Number int    `json:"number"`
 	Title  string `json:"title"`
@@ -159,16 +160,16 @@ type showComment struct {
 
 // result is show's JSON for the cards read, the ones that failed and
 // those left unread by readErr.
-func (v cardView) result(cards []*issue.Card, brief bool, failed []issue.Result, unread []int, readErr error) showResult {
+func (v cardView) result(cards []*issue.Card, brief bool, failed []issue.Result, unread []issue.Ref, readErr error) showResult {
 	out := showResult{Brief: brief, Issues: []showCard{}, Failed: []showFailed{}, Warnings: []string{}}
 	for _, c := range cards {
 		out.Issues = append(out.Issues, v.cardJSON(c, brief))
 	}
-	for _, n := range unread {
-		out.Failed = append(out.Failed, showFailed{Number: n, Error: errorJSON(readErr)})
+	for _, r := range unread {
+		out.Failed = append(out.Failed, showFailed{Number: r.Number, Repo: r.Repo.String(), Error: errorJSON(readErr)})
 	}
 	for _, r := range failed {
-		out.Failed = append(out.Failed, showFailed{Number: r.Number, Error: errorJSON(r.Err)})
+		out.Failed = append(out.Failed, showFailed{Number: r.Number, Repo: r.Repo.String(), Error: errorJSON(r.Err)})
 	}
 	return out
 }
@@ -278,7 +279,7 @@ func (v cardView) linksJSON(c *issue.Card, links []issue.Link) []showLink {
 			repo = c.Repo
 		}
 		out = append(out, showLink{
-			Ref: l.Ref(c.Repo), Repo: repo.String(), Number: l.Number, Title: singleLine(l.Title),
+			Ref: linkRef(c, l, v.def), Repo: repo.String(), Number: l.Number, Title: singleLine(l.Title),
 			State: strings.ToLower(l.State), OnBoard: l.OnBoard, Status: orNull(l.Status), Archived: l.Archived,
 			StatusUnknownReason: orNull(l.StatusUnknown), Resolved: l.Resolved(v.resolved),
 		})

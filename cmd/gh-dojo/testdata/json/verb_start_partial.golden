@@ -14,6 +14,7 @@ code: 5
   "issues": [
     {
       "number": 3,
+      "repo": "Trum-ok/gh-dojo",
       "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)",
       "outcome": "partial",
       "planned": [

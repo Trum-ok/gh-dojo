@@ -2,8 +2,9 @@ code: 0
 --- stdout
 Mark issue N blocked by the issues --by names, without changing its status.
 
---by takes 12, "#12", owner/repo#12 or the issue's URL; repeat it, or
-separate them with commas. A link already there is not an error: the line
+N and --by take 12, "#12" (the default repository, board.repos[0]),
+owner/repo#12 or the issue's URL; repeat --by, or separate the issues
+with commas. A link already there is not an error: the line
 says "already". An issue that does not exist, or a pull request, fails
 before anything is written (exit code 3); so does, with exit code 1, a
 blocker that N already blocks: GitHub refuses cycles.
@@ -18,6 +19,7 @@ Usage:
 Examples:
   gh dojo block 42 --by 17
   gh dojo block 42 --by 17,18 --by acme/api#7
+  gh dojo block acme/api#7 --by 42
 
 Flags:
       --by issue   the blocking issue: 12, "#12", owner/repo#12 or its URL; repeatable, or comma-separated

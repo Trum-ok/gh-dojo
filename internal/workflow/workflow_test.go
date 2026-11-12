@@ -156,6 +156,13 @@ func byIssue(is Issue, ref string, blocks bool) Issue {
 	return is
 }
 
+// otherRepo puts is in acme/api, outside the default repository acme/shop,
+// as the reader fills it.
+func otherRepo(is Issue) Issue {
+	is.Display, is.DefaultRepo = fmt.Sprintf("acme/api#%d", is.Number), "acme/shop"
+	return is
+}
+
 // byPR gives is a pull request --by names.
 func byPR(is Issue, ref string) Issue {
 	is.ByIssues = append(is.ByIssues, ByIssue{Ref: ref, PullRequest: true})
@@ -406,6 +413,18 @@ func TestPlan(t *testing.T) {
 		// Free text in --by: the reader names no issue, the comment alone.
 		{name: "wait_by_text_no_link", verb: "wait", hasOps: 2, args: Args{By: "the API team", HasBy: true},
 			issue: onBoard("In progress")},
+		// An issue outside the default repository (F12): every line names
+		// it acme/api#42; the links are named relative to the default
+		// repository, and mentioned in the comment as GitHub links them
+		// from acme/api.
+		{name: "wait_links_other_repo", verb: "wait", hasOps: 4, args: Args{By: "12, acme/api#7", HasBy: true},
+			issue: otherRepo(Issue{Number: 42, Title: "Rate limit the export", OnBoard: true, Status: "In progress",
+				ByIssues: []ByIssue{{Ref: "#12", Mention: "acme/shop#12"}, {Ref: "acme/api#7", Mention: "#7"}}})},
+		// A bare number in free --by: the default repository's issue.
+		{name: "wait_by_number_other_repo", verb: "wait", hasOps: 2, args: Args{By: "#12", HasBy: true},
+			issue: otherRepo(onBoard("In progress"))},
+		{name: "start_closed_other_repo", verb: "start", issue: otherRepo(Issue{Number: 42, Closed: true}),
+			code: render.ExitDenied},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -498,7 +517,7 @@ func TestExample(t *testing.T) {
 		"drop":  `gh dojo drop 7 --comment "<text>"`,
 	} {
 		v, _ := c.Verb(verb)
-		if got := Example(v, 7); got != want {
+		if got := Example(v, "7"); got != want {
 			t.Errorf("Example(%s) = %q, want %q", verb, got, want)
 		}
 	}

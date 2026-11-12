@@ -21,6 +21,12 @@ owner/repo#12 or the issue's URL; repeatable, or comma-separated). An issue
 that does not exist, or a pull request, fails before anything is created
 (exit code 3).
 
+--repo owner/repo creates the issue in another repository of board.repos
+than the default one (board.repos[0]); labels, milestones and the repeat
+check are that repository's, and the issue is named owner/repo#N. A bare
+number in --blocked-by is still in the default repository. A repository
+not in board.repos is exit code 1, listing them.
+
 A repeat is safe: the body ends with a hidden marker of the title, and a run
 that finds it on one of the repo's 20 newest open issues, written by you,
 finishes that issue (labels, milestone, board, status, blocked-by links)
@@ -41,6 +47,7 @@ Examples:
   gh dojo new "Fix login redirect" --type bug --area cli
   gh dojo new "Support org boards" --label enhancement --body-file - < notes.md
   gh dojo new "Release v1.2" --milestone v1.2 --blocked-by 17 --blocked-by 18
+  gh dojo new "Rate limit the export" --repo acme/api --type bug
   gh dojo new --type bug -- "-v is ignored by list"
 
 Flags:
@@ -51,6 +58,7 @@ Flags:
   -h, --help               help for new
       --label label        any existing repo label; repeatable
       --milestone title    an open milestone of the repo, by title
+      --repo owner/repo    create the issue in owner/repo, one of board.repos (default: the first)
       --type string        issue type: any repo label not starting with area:
 
 Global Flags:

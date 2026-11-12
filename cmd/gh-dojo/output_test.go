@@ -78,6 +78,7 @@ func TestShowJSON(t *testing.T) {
 		{"long_thread_3", "testdata/graphql/show_long_thread.json", []string{"42", "--comments", "3"}, render.ExitOK},
 		{"many", issueFixtures + "cards_3_7_9999.json", []string{"3", "7", "9999", "--brief"}, render.ExitNotFound},
 		{"not_found", issueFixtures + "card_not_found.json", []string{"9999"}, render.ExitNotFound},
+		{"repos", issueFixtures + "cards_repos.json", []string{"3", "cli/cli#2", "Trum-ok/no-such-repo-xyz#1", "cli/cli#1", "--brief"}, render.ExitNotFound},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			withConfig(t, dojoConfig)

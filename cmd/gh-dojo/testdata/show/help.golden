@@ -22,9 +22,13 @@ title; state, status, sprint, milestone, labels, assignees; blockers and
 counts.
 It takes neither --comments nor --full.
 
-Several numbers are read in one request (up to 20 issues per request).
-A missing issue or a pull request number is reported after the others are
-printed, with exit code 3.
+An issue is 42, "#42" (the default repository, board.repos[0]),
+owner/repo#42 or its URL; an issue outside the default repository is
+printed as owner/repo#42, and so are its links.
+
+Several issues are read in one request (up to 20 issues per request),
+from any repositories. A missing issue or a pull request number is
+reported after the others are printed, with exit code 3.
 
 Usage:
   gh dojo show <N>... [flags]
@@ -32,6 +36,7 @@ Usage:
 Examples:
   gh dojo show 42
   gh dojo show 42 43 57 --brief
+  gh dojo show acme/api#7
   gh dojo show 42 --comments all
 
 Flags:

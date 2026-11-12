@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: --repo "acme/api": board.repos is empty, so gh dojo new creates issues only in the current repository
+fix: drop --repo, or add "acme/api" to repos under [board] in .github/dojo.toml

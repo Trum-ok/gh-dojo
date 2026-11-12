@@ -1,0 +1,6 @@
+code: 0
+--- stdout
+dry run: start other/repo#4 "Export docs"
+  status: Backlog → In progress
+--- stderr
+warning: no agent session: DOJO_SESSION is not set, so no comment is left
