@@ -38,6 +38,20 @@ func TestItemsRecorded(t *testing.T) {
 	}
 }
 
+// TestItemsBlockersRecorded reads the gh-dojo board as recorded, with each
+// issue's blockers (next): still one request.
+func TestItemsBlockersRecorded(t *testing.T) {
+	srv := graphtest.New(t, fixture("items_dojo_blockers"))
+	items, err := board.ReadItemsWith(context.Background(), srv.Client(), dojoItemsBoard, "Status", board.ItemsOptions{Blockers: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := srv.Requests(); n != 1 {
+		t.Errorf("requests = %d, want 1", n)
+	}
+	testutil.Golden(t, "items/dojo_blockers", dumpItems(items))
+}
+
 // TestItemsPages reads a hand-crafted board of two pages with a draft, a
 // pull request, an item whose content the token cannot see, a null item,
 // assignees withheld below one issue's content, an issue repeated on page 2
@@ -78,6 +92,13 @@ func dumpItems(items *board.Items) []byte {
 		fmt.Fprintf(&b, "- %s#%d %s status=%q %q labels=%v/%d assignees=%v/%d\n",
 			it.Repo, it.Number, it.State, it.Status, it.Title,
 			it.Labels.Nodes, it.Labels.TotalCount, it.Assignees.Nodes, it.Assignees.TotalCount)
+		if it.BlockedBy.TotalCount > 0 {
+			fmt.Fprintf(&b, "  blocked by %d:", it.BlockedBy.TotalCount)
+			for _, bl := range it.BlockedBy.Nodes {
+				fmt.Fprintf(&b, " %s#%d %s", bl.Repo, bl.Number, bl.State)
+			}
+			b.WriteString("\n")
+		}
 	}
 	return []byte(b.String())
 }

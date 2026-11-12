@@ -1,0 +1,64 @@
+viewer: Trum-ok
+status field: PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ
+total: 42
+incomplete: false
+- Trum-ok/gh-dojo#1 OPEN status="Ready" "Каркас: Go-модуль, cobra и установка как расширение gh" labels=[]/0 assignees=[]/0
+- Trum-ok/gh-dojo#2 OPEN status="Ready" "Коды выхода и короткие ошибки (internal/render)" labels=[]/0 assignees=[]/0
+  blocked by 1: Trum-ok/gh-dojo#1 OPEN
+- Trum-ok/gh-dojo#3 OPEN status="Ready" "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)" labels=[]/0 assignees=[]/0
+  blocked by 2: Trum-ok/gh-dojo#2 OPEN Trum-ok/gh-dojo#1 OPEN
+- Trum-ok/gh-dojo#4 OPEN status="Ready" "Пресет kanban через embed.FS" labels=[]/0 assignees=[]/0
+  blocked by 1: Trum-ok/gh-dojo#3 OPEN
+- Trum-ok/gh-dojo#5 OPEN status="Ready" "GraphQL-клиент и схема доски с кэшем (internal/graph, internal/board)" labels=[]/0 assignees=[]/0
+  blocked by 2: Trum-ok/gh-dojo#2 OPEN Trum-ok/gh-dojo#1 OPEN
+- Trum-ok/gh-dojo#6 OPEN status="Ready" "Сверка конфига с доской" labels=[]/0 assignees=[]/0
+  blocked by 2: Trum-ok/gh-dojo#5 OPEN Trum-ok/gh-dojo#3 OPEN
+- Trum-ok/gh-dojo#7 OPEN status="Ready" "Команда show <N>…" labels=[]/0 assignees=[]/0
+  blocked by 3: Trum-ok/gh-dojo#3 OPEN Trum-ok/gh-dojo#2 OPEN Trum-ok/gh-dojo#5 OPEN
+- Trum-ok/gh-dojo#8 OPEN status="Ready" "Команда list" labels=[]/0 assignees=[]/0
+  blocked by 3: Trum-ok/gh-dojo#3 OPEN Trum-ok/gh-dojo#2 OPEN Trum-ok/gh-dojo#5 OPEN
+- Trum-ok/gh-dojo#9 OPEN status="Ready" "Команда new: issue + метки + доска + стартовый статус" labels=[]/0 assignees=[]/0
+  blocked by 2: Trum-ok/gh-dojo#2 OPEN Trum-ok/gh-dojo#6 OPEN
+- Trum-ok/gh-dojo#10 OPEN status="Ready" "Команда comment" labels=[]/0 assignees=[]/0
+  blocked by 2: Trum-ok/gh-dojo#2 OPEN Trum-ok/gh-dojo#5 OPEN
+- Trum-ok/gh-dojo#11 OPEN status="Ready" "Глаголы из конфига: проверки и план эффектов (internal/workflow)" labels=[]/0 assignees=[]/0
+  blocked by 2: Trum-ok/gh-dojo#4 OPEN Trum-ok/gh-dojo#3 OPEN
+- Trum-ok/gh-dojo#12 OPEN status="Ready" "Исполнение глагола: эффекты status и comment одной мутацией (internal/effects)" labels=[]/0 assignees=[]/0
+  blocked by 2: Trum-ok/gh-dojo#6 OPEN Trum-ok/gh-dojo#11 OPEN
+- Trum-ok/gh-dojo#13 OPEN status="Ready" "Доска и .github/dojo.toml для самого gh-dojo" labels=[]/0 assignees=[]/0
+  blocked by 2: Trum-ok/gh-dojo#6 OPEN Trum-ok/gh-dojo#4 OPEN
+- Trum-ok/gh-dojo#14 OPEN status="Ready" "Skill для агентов и переход на gh dojo (рубеж v0.0)" labels=[]/0 assignees=[]/0
+  blocked by 6: Trum-ok/gh-dojo#13 OPEN Trum-ok/gh-dojo#12 OPEN Trum-ok/gh-dojo#10 OPEN Trum-ok/gh-dojo#9 OPEN Trum-ok/gh-dojo#8 OPEN Trum-ok/gh-dojo#7 OPEN
+- Trum-ok/gh-dojo#15 OPEN status="Ready" "show/list: блокер в статусе Ready выглядит открытым" labels=[dogfood]/1 assignees=[]/0
+- Trum-ok/gh-dojo#16 OPEN status="Ready" "Ключ board.assignee принимается, но ничего не делает" labels=[dogfood]/1 assignees=[]/0
+- Trum-ok/gh-dojo#17 OPEN status="Ready" "new: сбой «adding it to board failed» сразу после createIssue" labels=[bug dogfood]/2 assignees=[]/0
+- Trum-ok/gh-dojo#18 OPEN status="Ready" "Подсказки «not found» отправляют агента в gh issue list" labels=[dogfood]/1 assignees=[]/0
+- Trum-ok/gh-dojo#19 OPEN status="Ready" "Справка: в корне нет кодов выхода и жизненного цикла, шаблоны с \\n" labels=[dogfood]/1 assignees=[]/0
+- Trum-ok/gh-dojo#20 OPEN status="Ready" "show не показывает milestone; поля из [fields] кроме status ни на что не влияют" labels=[dogfood]/1 assignees=[]/0
+- Trum-ok/gh-dojo#21 OPEN status="Ready" "start без сессии и без --comment молча не пишет комментарий и не предупреждает" labels=[bug dogfood]/2 assignees=[]/0
+- Trum-ok/gh-dojo#22 OPEN status="Ready" "Эффекты close и reopen, проверка confirm = \"user\" и --yes" labels=[enhancement]/1 assignees=[]/0
+- Trum-ok/gh-dojo#23 OPEN status="Ready" "Эффекты labels и assign (вернуть board.assignee)" labels=[enhancement]/1 assignees=[]/0
+- Trum-ok/gh-dojo#24 OPEN status="Ready" "Эффекты iteration и field, поле sprint, list --sprint" labels=[enhancement]/1 assignees=[]/0
+- Trum-ok/gh-dojo#25 OPEN status="Ready" "Пресет sprints" labels=[enhancement]/1 assignees=[]/0
+  blocked by 1: Trum-ok/gh-dojo#24 OPEN
+- Trum-ok/gh-dojo#26 OPEN status="Ready" "Блокеры: block/unblock, new --blocked-by, проверка blockers, эффект blockers" labels=[enhancement]/1 assignees=[]/0
+- Trum-ok/gh-dojo#27 OPEN status="Ready" "Несколько номеров в глаголе (batch = true)" labels=[enhancement]/1 assignees=[]/0
+- Trum-ok/gh-dojo#28 OPEN status="Ready" "--json, --jq и --template со стабильной схемой" labels=[enhancement]/1 assignees=[]/0
+- Trum-ok/gh-dojo#29 OPEN status="Ready" "Команда describe" labels=[enhancement]/1 assignees=[]/0
+- Trum-ok/gh-dojo#30 OPEN status="Ready" "Команда init" labels=[enhancement]/1 assignees=[]/0
+- Trum-ok/gh-dojo#31 OPEN status="Ready" "Команда doctor" labels=[enhancement]/1 assignees=[]/0
+- Trum-ok/gh-dojo#32 OPEN status="Ready" "Доски организаций: все команды на org-доске" labels=[enhancement]/1 assignees=[]/0
+- Trum-ok/gh-dojo#33 OPEN status="Ready" "Дистрибуция: gh-extension-precompile и CI на трёх ОС" labels=[enhancement]/1 assignees=[]/0
+- Trum-ok/gh-dojo#34 OPEN status="Backlog" "e2e обоих пресетов на доске-песочнице в CI" labels=[enhancement]/1 assignees=[]/0
+  blocked by 4: Trum-ok/gh-dojo#33 OPEN Trum-ok/gh-dojo#30 OPEN Trum-ok/gh-dojo#26 OPEN Trum-ok/gh-dojo#25 OPEN
+- Trum-ok/gh-dojo#35 OPEN status="Ready" "README и пример конфига для v0.1" labels=[enhancement]/1 assignees=[]/0
+  blocked by 2: Trum-ok/gh-dojo#25 OPEN Trum-ok/gh-dojo#28 OPEN
+- Trum-ok/gh-dojo#36 OPEN status="Ready" "new: нет --milestone; флаги до -- не описаны в справке" labels=[dogfood]/1 assignees=[]/0
+- Trum-ok/gh-dojo#37 CLOSED status="Done" "Песочница: живая проверка эффектов v0.1" labels=[enhancement]/1 assignees=[Trum-ok]/1
+- Trum-ok/gh-dojo#38 OPEN status="In progress" "Несколько репозиториев: owner/repo#N во всех командах, new --repo" labels=[enhancement]/1 assignees=[]/0
+- Trum-ok/gh-dojo#39 OPEN status="In progress" "Команда next" labels=[enhancement]/1 assignees=[]/0
+- Trum-ok/gh-dojo#40 OPEN status="In progress" "agent install: skill и AGENTS.md из конфига, --check в CI" labels=[enhancement]/1 assignees=[]/0
+- Trum-ok/gh-dojo#41 OPEN status="Backlog" "Команда release: задачи релиза через PR и коммиты" labels=[enhancement]/1 assignees=[]/0
+  blocked by 1: Trum-ok/gh-dojo#38 OPEN
+- Trum-ok/gh-dojo#42 OPEN status="Backlog" "Рубеж v0.2: пример своего флоу только конфигом" labels=[documentation]/1 assignees=[]/0
+  blocked by 1: Trum-ok/gh-dojo#40 OPEN

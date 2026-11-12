@@ -107,19 +107,40 @@ func runList(cmd *cobra.Command, o *listOpts) error {
 	if o.limit < 1 {
 		return render.Usage("invalid --limit %d: want 1 or greater", o.limit).WithFix(cmd.CommandPath() + " --help")
 	}
-	ctx := cmd.Context()
 	a := newApp()
 	cfg, err := a.Config()
 	if err != nil {
 		return err
 	}
-	s, err := a.Schema(ctx)
+	field, items, warnings, err := readBoard(cmd, a, cfg, o, false)
 	if err != nil {
 		return err
 	}
-	// A cached schema may be out of date: a status added or renamed since,
-	// or the status field renamed. It is re-read once, which also surfaces
-	// the config error when the config no longer matches the board.
+	repo := ""
+	if r, err := a.Repo(); err == nil { // only shortens refs; list works without it
+		repo = r.String()
+	}
+	l := buildList(cfg, field.OptionNames(), items, o)
+	res := l.result(o, items)
+	res.Warnings = orEmpty(warnings)
+	return emit(cmd, res, func(w io.Writer) { l.write(w, repo, cfg, o) })
+}
+
+// readBoard reads the board's items for list and next: the schema, the
+// --status and --sprint of o checked against it, every item in board order
+// (with its sprint for --sprint, and its blockers when blockers is set),
+// then --label checked against the items. Warnings about the read are
+// printed on stderr and returned for the JSON.
+//
+// A cached schema may be out of date: a status added or renamed since, or
+// the status field renamed. It is re-read once, which also surfaces the
+// config error when the config no longer matches the board.
+func readBoard(cmd *cobra.Command, a *App, cfg *config.Config, o *listOpts, blockers bool) (*board.Field, *board.Items, []string, error) {
+	ctx := cmd.Context()
+	s, err := a.Schema(ctx)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 	refreshed := false
 	refresh := func() (*board.Field, error) {
 		refreshed = true
@@ -136,25 +157,25 @@ func runList(cmd *cobra.Command, o *listOpts) error {
 		field, err = refresh()
 	}
 	if err != nil {
-		return err
+		return nil, nil, nil, err
 	}
-	sprint := ""
+	opts := board.ItemsOptions{Blockers: blockers}
 	if o.sprint != "" {
-		sprint = cfg.SprintField()
+		opts.Sprint = cfg.SprintField()
 	}
-	items, err := board.ReadItemsSprint(ctx, a.Client, s, cfg.StatusField(), sprint)
+	items, err := board.ReadItemsWith(ctx, a.Client, s, cfg.StatusField(), opts)
 	if err != nil {
-		return err
+		return nil, nil, nil, err
 	}
 	if !refreshed && s.Cached && staleStatus(field, items) {
 		if field, err = refresh(); err != nil {
-			return err
+			return nil, nil, nil, err
 		}
 	}
 	if err := checkLabels(items, o.labels); err != nil {
-		return err
+		return nil, nil, nil, err
 	}
-	var warnings []string // on stderr and in the JSON
+	var warnings []string
 	if items.Incomplete {
 		warnings = append(warnings, "GitHub withheld parts of some board items from this token; their lines may be incomplete")
 	}
@@ -165,14 +186,7 @@ func runList(cmd *cobra.Command, o *listOpts) error {
 	for _, w := range warnings {
 		render.Warn(cmd.ErrOrStderr(), "%s", w)
 	}
-	repo := ""
-	if r, err := a.Repo(); err == nil { // only shortens refs; list works without it
-		repo = r.String()
-	}
-	l := buildList(cfg, field.OptionNames(), items, o)
-	res := l.result(o, items)
-	res.Warnings = orEmpty(warnings)
-	return emit(cmd, res, func(w io.Writer) { l.write(w, repo, cfg, o) })
+	return field, items, warnings, nil
 }
 
 // listResult is list's JSON: the issues printed, in the same order and
@@ -233,14 +247,19 @@ func (l *list) result(o *listOpts, items *board.Items) listResult {
 			if len(r.Issues) == o.limit {
 				return r
 			}
-			r.Issues = append(r.Issues, listIssue{
-				Repo: it.Repo, Number: it.Number, Title: singleLine(it.Title), State: strings.ToLower(it.State),
-				Status: orNull(it.Status), Labels: orEmpty(it.Labels.Nodes), LabelsTotal: max(it.Labels.TotalCount, len(it.Labels.Nodes)),
-				Assignees: orEmpty(it.Assignees.Nodes), AssigneesTotal: max(it.Assignees.TotalCount, len(it.Assignees.Nodes)),
-			})
+			r.Issues = append(r.Issues, listIssueOf(it))
 		}
 	}
 	return r
+}
+
+// listIssueOf is an issue of the board as list's JSON has it.
+func listIssueOf(it board.Item) listIssue {
+	return listIssue{
+		Repo: it.Repo, Number: it.Number, Title: singleLine(it.Title), State: strings.ToLower(it.State),
+		Status: orNull(it.Status), Labels: orEmpty(it.Labels.Nodes), LabelsTotal: max(it.Labels.TotalCount, len(it.Labels.Nodes)),
+		Assignees: orEmpty(it.Assignees.Nodes), AssigneesTotal: max(it.Assignees.TotalCount, len(it.Assignees.Nodes)),
+	}
 }
 
 // checkFilters validates --status and --sprint against the board (see

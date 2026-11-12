@@ -12,10 +12,13 @@ import (
 	"github.com/Trum-ok/gh-dojo/internal/render"
 )
 
-// Windows of itemsQuery: how many labels and assignees are read per issue.
+// Windows of itemsQuery: how many labels and assignees are read per issue,
+// and blockers with ItemsOptions.Blockers. GitHub allows an issue at most
+// 50 blockers, so BlockersWindow reads them all.
 const (
 	LabelsWindow    = 100
 	AssigneesWindow = 10
+	BlockersWindow  = 50
 )
 
 // itemsQuery reads one page of the board's items in board order (POSITION,
@@ -64,21 +67,54 @@ const (
 	ContentHidden      = ""
 )
 
-// sprintItemsQuery is itemsQuery that also reads each item's iteration of
-// the field named $sprint (ReadItemsSprint).
-var sprintItemsQuery = strings.NewReplacer(
+// sprintItems makes itemsQuery also read each item's iteration of the
+// field named $sprint (ItemsOptions.Sprint).
+var sprintItems = strings.NewReplacer(
 	"$status: String!, $cursor", "$status: String!, $sprint: String!, $cursor",
 	"      content {\n", "      sprint: fieldValueByName(name: $sprint) {\n"+
 		"        ... on ProjectV2ItemFieldIterationValue { iterationId title }\n"+
 		"      }\n      content {\n",
-).Replace(itemsQuery)
+)
+
+// blockerItems makes itemsQuery also read each issue's blockers
+// (ItemsOptions.Blockers): their number, state and repository, not their
+// board status, which the caller looks up among the board's items. It is
+// one more connection per issue, so the request count stays
+// ceil(items/100).
+var blockerItems = strings.NewReplacer(
+	"          assignees(first: 10) { totalCount nodes { login } }\n",
+	"          assignees(first: 10) { totalCount nodes { login } }\n"+
+		"          blockedBy(first: "+strconv.Itoa(BlockersWindow)+") { totalCount nodes { number state repository { nameWithOwner } } }\n",
+)
+
+// ItemsOptions are what ReadItemsWith reads beyond ReadItems, in the same
+// requests.
+type ItemsOptions struct {
+	// Sprint is the name of the sprint field: each item's iteration of it
+	// is read (Item.SprintID, Item.Sprint); "" reads none.
+	Sprint string
+	// Blockers reads each issue's blockers (Item.BlockedBy).
+	Blockers bool
+}
+
+// query is itemsQuery with what o reads.
+func (o ItemsOptions) query() string {
+	q := itemsQuery
+	if o.Sprint != "" {
+		q = sprintItems.Replace(q)
+	}
+	if o.Blockers {
+		q = blockerItems.Replace(q)
+	}
+	return q
+}
 
 // Item is a board item. Only issues have the issue fields set.
 type Item struct {
 	Type   string // ContentIssue, ContentPullRequest, ContentDraftIssue or ContentHidden
 	Status string // option name of the status field; "" when unset
 	// SprintID and Sprint are the ID and title of the item's iteration of
-	// the sprint field, read by ReadItemsSprint only; "" when unset.
+	// the sprint field, read with ItemsOptions.Sprint only; "" when unset.
 	SprintID, Sprint string
 
 	Repo      string // "owner/name"
@@ -87,6 +123,18 @@ type Item struct {
 	State     string // "OPEN" or "CLOSED"
 	Labels    graph.Page[string]
 	Assignees graph.Page[string]
+	// BlockedBy are the issues blocking it, read with ItemsOptions.Blockers
+	// only, up to BlockersWindow. TotalCount also counts the blockers the
+	// token cannot see, which are not in Nodes.
+	BlockedBy graph.Page[Blocker]
+}
+
+// Blocker is an issue that blocks a board item's issue. Its board status
+// is not read: look it up among the board's items.
+type Blocker struct {
+	Repo   string // "owner/name"
+	Number int
+	State  string // "OPEN" or "CLOSED"
 }
 
 // Items is the whole board, read by ReadItems.
@@ -112,20 +160,18 @@ type Items struct {
 // 100 per request, with statusField's value. A board that no longer exists
 // is exit code 3; network and auth problems keep graph's codes.
 func ReadItems(ctx context.Context, q graph.Querier, s *Schema, statusField string) (*Items, error) {
-	return ReadItemsSprint(ctx, q, s, statusField, "")
+	return ReadItemsWith(ctx, q, s, statusField, ItemsOptions{})
 }
 
-// ReadItemsSprint is ReadItems that also reads each item's iteration of
-// the field named sprintField (Item.SprintID, Item.Sprint), in the same
-// requests; "" reads none, as ReadItems.
-func ReadItemsSprint(ctx context.Context, q graph.Querier, s *Schema, statusField, sprintField string) (*Items, error) {
+// ReadItemsWith is ReadItems that also reads what o asks for, in the same
+// requests.
+func ReadItemsWith(ctx context.Context, q graph.Querier, s *Schema, statusField string, o ItemsOptions) (*Items, error) {
 	out := &Items{}
 	tq := &tolerant{q: q}
 	vars := map[string]any{"owner": s.Owner, "number": s.Number, "status": statusField}
-	query := itemsQuery
-	if sprintField != "" {
-		query = sprintItemsQuery
-		vars["sprint"] = sprintField
+	query := o.query()
+	if o.Sprint != "" {
+		vars["sprint"] = o.Sprint
 	}
 	first := true
 	page, err := graph.Paginate(ctx, tq, query, vars, 0, func(r *itemsResponse) *graph.Connection[*itemJSON] {
@@ -213,6 +259,16 @@ type itemJSON struct {
 				Login string `json:"login"`
 			} `json:"nodes"`
 		} `json:"assignees"`
+		BlockedBy struct {
+			TotalCount int `json:"totalCount"`
+			Nodes      []*struct {
+				Number     int    `json:"number"`
+				State      string `json:"state"`
+				Repository *struct {
+					NameWithOwner string `json:"nameWithOwner"`
+				} `json:"repository"`
+			} `json:"nodes"`
+		} `json:"blockedBy"`
 	} `json:"content"`
 }
 
@@ -251,6 +307,13 @@ func (n *itemJSON) item() Item {
 		if a != nil {
 			it.Assignees.Nodes = append(it.Assignees.Nodes, a.Login)
 		}
+	}
+	it.BlockedBy.TotalCount = c.BlockedBy.TotalCount
+	for _, b := range c.BlockedBy.Nodes {
+		if b == nil || b.Repository == nil {
+			continue // withheld from the token: counted, not read
+		}
+		it.BlockedBy.Nodes = append(it.BlockedBy.Nodes, Blocker{Repo: b.Repository.NameWithOwner, Number: b.Number, State: b.State})
 	}
 	return it
 }
