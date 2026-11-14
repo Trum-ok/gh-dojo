@@ -1,5 +1,5 @@
 {
-  "comment": "Recorded: issue #3 of Trum-ok/gh-dojo with four links in the card request: #2 (blocks #3), #26 (does not), #9999 (missing) and Trum-ok/no-such-repo#1 (no repository).",
+  "comment": "Recorded: issue #3 of Trum-ok/gh-dojo with four links in the card request: #2 (blocks #3), #26 (does not), #9999 (missing) and Trum-ok/no-such-repo#1 (no repository). Edited by hand (#52): the card query gained parent, subIssues and subIssuesSummary after this was recorded, and each card here got null, none and 0 of 0, as a read-only read of the issues answered on 2026-11-15; not re-recorded, since the issues have moved on (closed, Done) and the tests rely on the state recorded.",
   "interactions": [
     {
       "operation": "IssueCard",

@@ -1,5 +1,5 @@
 {
-  "comment": "Recorded: issue #3 of Trum-ok/gh-dojo on its own board (user Trum-ok, project 5): status Ready, blocked by 2, blocking 5, no comments.",
+  "comment": "Recorded: issue #3 of Trum-ok/gh-dojo on its own board (user Trum-ok, project 5): status Ready, blocked by 2, blocking 5, no comments. Edited by hand (#52): the card query gained parent, subIssues and subIssuesSummary after this was recorded, and each card here got null, none and 0 of 0, as a read-only read of the issues answered on 2026-11-15; not re-recorded, since the issues have moved on (closed, Done) and the tests rely on the state recorded.",
   "interactions": [
     {
       "operation": "IssueCard",
