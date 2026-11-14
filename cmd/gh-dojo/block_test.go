@@ -255,6 +255,49 @@ func TestNewBlockedByErrors(t *testing.T) {
 	)
 }
 
+// TestNewParent: --parent is read with the context and set by createIssue:
+// still 4 requests. A re-run finds the issue without a parent and adds it
+// alone; the next finds it there and writes nothing. One with another
+// parent keeps it, with a warning.
+func TestNewParent(t *testing.T) {
+	withConfig(t, dojoConfig)
+	for _, tt := range []struct {
+		fixture string
+		steps   []runs
+	}{
+		{"new_parent", []runs{{append(slices.Clone(newFixArgs), "--parent", "26"), render.ExitOK, 4, "new_parent"}}},
+		{"new_parent_resume", []runs{
+			{append(slices.Clone(newFixArgs), "--parent", "#26"), render.ExitOK, 2, "new_parent_resume"},
+			{append(slices.Clone(newFixArgs), "--parent", "https://github.com/Trum-ok/gh-dojo/issues/26"), render.ExitOK, 1, "new_parent_repeat"},
+		}},
+		{"new_parent_kept", []runs{
+			{append(slices.Clone(newFixArgs), "--parent", "26"), render.ExitOK, 1, "new_parent_kept"},
+			{append(slices.Clone(newFixArgs), "--parent", "26", "--json"), render.ExitOK, 1, "new_parent_kept_json"},
+		}},
+	} {
+		t.Run(tt.fixture, func(t *testing.T) {
+			srv := withApp(t, boardFixture, verbFixture(tt.fixture))
+			checkLinkRuns(t, srv, warmSchema(t, srv), tt.steps...)
+		})
+	}
+}
+
+// TestNewParentErrors: a missing parent or a pull request is exit 3 after
+// the one read, before anything is created; a value that is not one issue
+// is exit 1 without a request.
+func TestNewParentErrors(t *testing.T) {
+	withConfig(t, dojoConfig)
+	srv := withApp(t, boardFixture, verbFixture("new_parent_missing"))
+	before := warmSchema(t, srv)
+	checkLinkRuns(t, srv, before,
+		runs{append(slices.Clone(newFixArgs), "--parent", "9999"), render.ExitNotFound, 1, "new_parent_missing"},
+		runs{append(slices.Clone(newFixArgs), "--parent", "40"), render.ExitNotFound, 1, "new_parent_pull_request"},
+		runs{append(slices.Clone(newFixArgs), "--parent", "the epic"), render.ExitUsage, 0, "new_parent_not_issue"},
+		runs{append(slices.Clone(newFixArgs), "--parent", "26,27"), render.ExitUsage, 0, "new_parent_two"},
+		runs{append(slices.Clone(newFixArgs), "--parent", " "), render.ExitUsage, 0, "new_parent_empty"},
+	)
+}
+
 // TestUnblockFindsLinkByTarget: whether a link is in place comes from the
 // issue's own blockers, read whole, not from the issues the blocker blocks,
 // which may be more than are read.

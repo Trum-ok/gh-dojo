@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,11 +25,13 @@ import (
 // initial status.
 //
 // Requests with a warm schema cache: one read (newContextQuery: repo ID,
-// labels, open milestones, recent issues, and the --blocked-by issues),
-// createIssue (with its labels and milestone), addProjectV2ItemById, then
-// the status with the blocked-by links (addBlockedBy, aliased, in the same
-// mutation): four. Without statuses.initial and --blocked-by the last write
-// is skipped.
+// labels, open milestones, recent issues, and the --blocked-by and
+// --parent issues), createIssue (with its labels, milestone and parent),
+// addProjectV2ItemById, then the status with the blocked-by links
+// (addBlockedBy, aliased, in the same mutation): four. Without
+// statuses.initial and --blocked-by the last write is skipped. --parent
+// costs no request: createIssue takes the parent (parentIssueId), and only
+// a resumed issue without one gets addSubIssue, in that last mutation.
 //
 // The board item is added explicitly rather than with createIssue's
 // projectV2Ids: GitHub adds those asynchronously, so the createIssue answer
@@ -46,7 +49,8 @@ import (
 // again: missing labels are added, the --milestone is set if it has none (a
 // different one stays, with a warning), the issue is unarchived or put on
 // the board and, if it has no status, given the initial one; blocked-by
-// links it lacks are added. So filing an open
+// links it lacks are added, and so is the --parent if it has no parent (a
+// different one stays, with a warning). So filing an open
 // issue again with the same title within the window resumes it. An issue
 // that dropped out of the window (newDedupWindow newer open issues in the
 // repo, by anyone) or was closed is created again.
@@ -111,15 +115,27 @@ const newContextQuery = `query NewIssueContext($owner: String!, $repo: String!, 
 }`
 
 // newContextQueryWith is newContextQuery that also reads links, the
-// --blocked-by issues (see issue.Links); without links it is
-// newContextQuery itself.
-func newContextQueryWith(links issue.Links) string {
-	if len(links) == 0 {
-		return newContextQuery
+// --blocked-by and --parent issues (see issue.Links), and, with parent,
+// the parent of each recent issue, so a resumed one shows whether it has
+// one; without either it is newContextQuery itself.
+func newContextQueryWith(links issue.Links, parent bool) string {
+	q := newContextQuery
+	if parent {
+		q = strings.Replace(q, newIssueMilestone, newIssueMilestone+newIssueParent, 1)
 	}
-	q := strings.Replace(newContextQuery, "$window: Int!)", "$window: Int!"+links.Decls()+")", 1)
+	if len(links) == 0 {
+		return q
+	}
+	q = strings.Replace(q, "$window: Int!)", "$window: Int!"+links.Decls()+")", 1)
 	return strings.TrimSuffix(q, "}") + links.Fields() + "}"
 }
+
+// newIssueMilestone is the milestone of a recent issue in newContextQuery;
+// newIssueParent its parent, read after it for --parent.
+const (
+	newIssueMilestone = "        milestone { title dueOn }\n"
+	newIssueParent    = "        parent { id number repository { nameWithOwner } }\n"
+)
 
 // newLabelsQuery reads all repo labels; only needed past the first 100.
 const newLabelsQuery = `query RepoLabels($owner: String!, $repo: String!, $cursor: String) {
@@ -144,11 +160,11 @@ const newMilestonesQuery = `query RepoMilestones($owner: String!, $repo: String!
   }
 }`
 
-// newCreateMutation creates the issue with its labels and milestone ($milestone
-// omitted for none). It is put on the board by newAddToBoardMutation, not
-// projectV2Ids (see the top of the file).
-const newCreateMutation = `mutation CreateIssue($repo: ID!, $title: String!, $body: String!, $labels: [ID!], $milestone: ID) {
-  createIssue(input: {repositoryId: $repo, title: $title, body: $body, labelIds: $labels, milestoneId: $milestone}) {
+// newCreateMutation creates the issue with its labels, milestone and
+// parent ($milestone and $parent omitted for none). It is put on the board
+// by newAddToBoardMutation, not projectV2Ids (see the top of the file).
+const newCreateMutation = `mutation CreateIssue($repo: ID!, $title: String!, $body: String!, $labels: [ID!], $milestone: ID, $parent: ID) {
+  createIssue(input: {repositoryId: $repo, title: $title, body: $body, labelIds: $labels, milestoneId: $milestone, parentIssueId: $parent}) {
     issue { id number }
   }
 }`
@@ -212,6 +228,9 @@ type newOptions struct {
 	// they name, parsed before any request.
 	BlockedBy []string
 	Blockers  []issue.Ref
+	// Parent is the issue --parent names, parsed before any request; nil
+	// without --parent.
+	Parent *issue.Ref
 	// Repo is the repository of --repo, one of board.repos; zero for the
 	// default one.
 	Repo issue.Repo
@@ -222,6 +241,7 @@ func newNewCmd() (*cobra.Command, error) {
 		o        newOptions
 		bodyFile string
 		repoName string
+		parent   string
 	)
 	cmd := &cobra.Command{
 		Use:   "new <title>",
@@ -230,6 +250,7 @@ func newNewCmd() (*cobra.Command, error) {
 		Example: `  gh dojo new "Fix login redirect" --type bug --area cli
   gh dojo new "Support org boards" --label enhancement --body-file - < notes.md
   gh dojo new "Release v1.2" --milestone v1.2 --blocked-by 17 --blocked-by 18
+  gh dojo new "Document the export" --type documentation --parent 40
   gh dojo new "Rate limit the export" --repo acme/api --type bug
   gh dojo new --type bug -- "-v is ignored by list"`,
 		Args: newArgs,
@@ -270,13 +291,18 @@ func newNewCmd() (*cobra.Command, error) {
 				}
 			}
 			a := newApp()
-			if len(o.BlockedBy) > 0 {
+			if len(o.BlockedBy) > 0 || f.Changed(parentFlag) {
 				repo, err := a.Repo()
 				if err != nil {
 					return err
 				}
 				if o.Blockers, err = parseBlockers(o.BlockedBy, "blocked-by", repo, issue.Ref{}, cmd.CommandPath()+" --help"); err != nil {
 					return err // before any request
+				}
+				if f.Changed(parentFlag) {
+					if o.Parent, err = parseParent(parent, repo, cmd.CommandPath()+" --help"); err != nil {
+						return err // before any request
+					}
 				}
 			}
 			r, err := runNew(cmd.Context(), a, cfg, o, cmd.ErrOrStderr())
@@ -301,8 +327,29 @@ func newNewCmd() (*cobra.Command, error) {
 	f.StringVar(&bodyFile, bodyFileFlag, "", "read the body from `file`; - reads stdin")
 	f.StringArrayVar(&o.BlockedBy, "blocked-by", nil,
 		"the blocking `issue`: 12, \"#12\", owner/repo#12 or its URL; repeatable, or comma-separated")
+	f.StringVar(&parent, parentFlag, "", "make it a sub-issue of the parent `issue`: 12, \"#12\", owner/repo#12 or its URL")
 	f.StringVar(&repoName, "repo", "", "create the issue in `owner/repo`, one of board.repos (default: the first)")
 	return cmd, nil
+}
+
+// parentFlag is new's flag naming the parent issue.
+const parentFlag = "parent"
+
+// parseParent parses --parent: one issue (see splitRefs), a bare number in
+// def. Anything else is exit code 1 with help as the fix.
+func parseParent(value string, def issue.Repo, help string) (*issue.Ref, error) {
+	refs, text, err := splitRefs([]string{value}, def)
+	switch {
+	case err != nil:
+		return nil, err
+	case len(text) > 0:
+		return nil, render.Usage("--%s %q is not an issue: pass %s", parentFlag, text[0], issue.RefExamples).WithFix(help)
+	case len(refs) == 0:
+		return nil, render.Usage("--%s is empty: pass the parent issue, like --%s 12", parentFlag, parentFlag).WithFix(help)
+	case len(refs) > 1:
+		return nil, render.Usage("--%s %q names %d issues: an issue has one parent", parentFlag, strings.TrimSpace(value), len(refs)).WithFix(help)
+	}
+	return &refs[0], nil
 }
 
 // newRepo checks --repo, without a request: a repository of board.repos,
@@ -397,16 +444,22 @@ owner/repo#12 or the issue's URL; repeatable, or comma-separated). An issue
 that does not exist, or a pull request, fails before anything is created
 (exit code 3).
 
+--parent makes the new issue a sub-issue of another one (GitHub's
+sub-issues; 12, "#12", owner/repo#12 or the issue's URL), set as it is
+created. A parent that does not exist, or a pull request, fails before
+anything is created (exit code 3).
+
 --repo owner/repo creates the issue in another repository of board.repos
 than the default one (board.repos[0]); labels, milestones and the repeat
 check are that repository's, and the issue is named owner/repo#N. A bare
-number in --blocked-by is still in the default repository. A repository
-not in board.repos is exit code 1, listing them.
+number in --blocked-by and --parent is still in the default repository.
+A repository not in board.repos is exit code 1, listing them.
 
 A repeat is safe: the body ends with a hidden marker of the title, and a run
 that finds it on one of the repo's 20 newest open issues, written by you,
-finishes that issue (labels, milestone, board, status, blocked-by links)
-instead of creating another; a different milestone it already has is kept.
+finishes that issue (labels, milestone, board, status, blocked-by links,
+parent) instead of creating another; a different milestone or parent it
+already has is kept.
 So filing an open issue again with the same title (ignoring case and
 spacing) resumes it. If a run fails after creating the issue, it exits with
 code 5: run the same command again.`)
@@ -491,6 +544,11 @@ type newResult struct {
 	// a resumed issue had.
 	BlockedBy        []string `json:"blocked_by"`
 	AlreadyBlockedBy []string `json:"already_blocked_by"`
+	// Parent is the issue's parent, owner/name#12, null for none;
+	// ParentSet says this run made it a sub-issue of --parent. A resumed
+	// issue keeps a different parent it had.
+	Parent    *string `json:"parent"`
+	ParentSet bool    `json:"parent_set"`
 	// What stopped a run after the issue existed (exit code 5, or 1 for a
 	// dependency cycle) is the top-level "error": re-run the same command.
 }
@@ -498,7 +556,7 @@ type newResult struct {
 // wrote reports whether this run wrote anything: created the issue, or
 // finished one an earlier run created.
 func (r *newRun) wrote() bool {
-	return !r.resumed || r.added || r.statusSet || r.unarchived || r.milestoneSet || len(r.linked) > 0
+	return !r.resumed || r.added || r.statusSet || r.unarchived || r.milestoneSet || len(r.linked) > 0 || r.parentSet
 }
 
 // result is the run as JSON.
@@ -512,7 +570,16 @@ func (r *newRun) result() newResult {
 		Labels: orEmpty(r.labels), Status: orNull(r.status), StatusSet: r.statusSet, Unarchived: r.unarchived,
 		Milestone: r.milestone.json(), MilestoneSet: r.milestoneSet,
 		BlockedBy: refList(r.linked, r.def), AlreadyBlockedBy: refList(r.linkedFound, r.def),
+		Parent: r.parentJSON(), ParentSet: r.parentSet,
 	}
+}
+
+// parentJSON is the issue's parent in full, owner/name#12; nil for none.
+func (r *newRun) parentJSON() *string {
+	if r.parent == nil {
+		return nil
+	}
+	return orNull(fullRef(r.parent.In(r.def)))
 }
 
 // checkNewFlags rejects, without a request, a --type outside labels.types
@@ -569,6 +636,10 @@ type newRun struct {
 	def         issue.Repo      // the default repository, which output names issues relative to
 	linked      []*issue.Linked // blocked-by links added now
 	linkedFound []*issue.Linked // blocked-by links a resumed issue had already
+
+	parent     *issue.Ref // the issue's parent, nil for none or not known
+	parentSet  bool       // made a sub-issue of --parent now
+	parentKept *issue.Ref // the --parent not applied: a resumed issue had another
 }
 
 // newStepError says which write failed, as "setting status Backlog failed".
@@ -608,7 +679,7 @@ func (r *newRun) run(ctx context.Context) error {
 	}
 
 	r.repo, r.def = repo, def
-	nc, err := readNewContext(ctx, r.Client, repo, statusField.Name, r.opts.Blockers)
+	nc, err := readNewContext(ctx, r.Client, repo, statusField.Name, r.opts.Blockers, r.opts.Parent)
 	if err != nil {
 		return err
 	}
@@ -623,6 +694,9 @@ func (r *newRun) run(ctx context.Context) error {
 		}
 	}
 	if err := issue.LinksError("--blocked-by", nc.Links, def); err != nil {
+		return err
+	}
+	if err := parentError(nc.Parent, def); err != nil {
 		return err
 	}
 	for _, l := range labels {
@@ -640,8 +714,13 @@ func (r *newRun) run(ctx context.Context) error {
 				return cycleError(issue.Ref{Repo: repo, Number: found.Number}, def, l.Ref.String(def), "--blocked-by")
 			}
 		}
+		if p := nc.Parent; p != nil && p.ID == found.ID {
+			name := issue.Ref{Repo: repo, Number: found.Number}.String(def)
+			return render.Usage("--%s names %s itself; an issue cannot be its own parent", parentFlag, name).
+				WithFix("pass the issue " + name + " is a part of")
+		}
 		r.resumed = true
-	} else if err := r.create(ctx, nc.RepoID, withMarker(r.opts.Body, marker), labels, milestone); err != nil {
+	} else if err := r.create(ctx, nc.RepoID, withMarker(r.opts.Body, marker), labels, milestone, nc.Parent); err != nil {
 		if r.number != 0 || !errors.Is(err, graph.ErrUnknownOutcome) {
 			return err
 		}
@@ -653,6 +732,7 @@ func (r *newRun) run(ctx context.Context) error {
 	}
 	var missing []string // label IDs the found issue lacks
 	setMilestone := false
+	var addParent *issue.Linked // the --parent a found issue lacks
 	if found != nil {
 		r.number, r.id, r.title = found.Number, found.ID, found.title
 		r.itemID, r.archived, r.status = found.itemID, found.archived, found.status
@@ -673,6 +753,26 @@ func (r *newRun) run(ctx context.Context) error {
 			r.warnings = append(r.warnings, fmt.Sprintf(
 				"#%d already has milestone %q; kept it, --milestone %q not applied (to change it: gh issue edit %d -R %s --milestone %q)",
 				r.number, found.milestone.Title, milestone.Title, r.number, repo, milestone.Title))
+		}
+		// So does a parent, like the milestone.
+		if p := nc.Parent; p != nil {
+			r.parent = found.parent
+			switch {
+			case found.parentID == p.ID:
+			case found.parentID == "":
+				addParent = p
+			default:
+				r.parentKept = &p.Ref
+				// gh takes the parent's number in the issue's repository,
+				// else its URL.
+				arg := fmt.Sprintf("https://%s/%s/issues/%d", clientHost(), p.Ref.Repo, p.Ref.Number)
+				if p.Ref.Same(issue.Ref{Repo: repo, Number: p.Ref.Number}) {
+					arg = strconv.Itoa(p.Ref.Number)
+				}
+				r.warnings = append(r.warnings, fmt.Sprintf(
+					"%s is already a sub-issue of %s; kept it, --%s %s not applied (to move it: gh issue edit %d -R %s --parent %s)",
+					r.name(), r.parentName(found.parent), parentFlag, p.Ref.Arg(def), r.number, repo, arg))
+			}
 		}
 	}
 
@@ -714,8 +814,8 @@ func (r *newRun) run(ctx context.Context) error {
 			pending = append(pending, l)
 		}
 	}
-	if len(pending) > 0 {
-		return r.finish(ctx, s.ID, statusField.ID, initial, pending)
+	if len(pending) > 0 || addParent != nil {
+		return r.finish(ctx, s.ID, statusField.ID, initial, pending, addParent)
 	}
 	if initial != nil {
 		vars := map[string]any{"project": s.ID, "item": r.itemID, "field": statusField.ID, "option": initial.ID}
@@ -727,9 +827,10 @@ func (r *newRun) run(ctx context.Context) error {
 	return nil
 }
 
-// newFinishMutation sets the status (status) and adds n blocked-by links
-// of $issue, one aliased field each (see newRun.finish).
-func newFinishMutation(status bool, n int) string {
+// newFinishMutation sets the status (status), adds n blocked-by links of
+// $issue, one aliased field each, and makes $issue a sub-issue of $parent
+// (parent) (see newRun.finish).
+func newFinishMutation(status bool, n int, parent bool) string {
 	decls := []string{"$issue: ID!"}
 	var fields []string
 	if status {
@@ -741,21 +842,31 @@ func newFinishMutation(status bool, n int) string {
 		decls = append(decls, "$"+linkAlias(i)+": ID!")
 		fields = append(fields, "  "+linkAlias(i)+": "+effects.BlockedByField(true, "issue", linkAlias(i)))
 	}
+	if parent {
+		decls = append(decls, "$parent: ID!")
+		fields = append(fields, "  parent: addSubIssue(input: {issueId: $parent, subIssueId: $issue}) { issue { id } }")
+	}
 	return "mutation NewFinish(" + strings.Join(decls, ", ") + ") {\n" + strings.Join(fields, "\n") + "\n}"
 }
 
-// finish sets the status initial (nil leaves it alone) and adds the
-// blocked-by links in one mutation, the status first:
+// finish sets the status initial (nil leaves it alone), adds the
+// blocked-by links and makes the issue a sub-issue of parent (nil for
+// none) in one mutation, the status first:
 //
 //	mutation NewFinish($issue: ID!, $project: ID!, $item: ID!, $field: ID!, $option: String!, $link0: ID!) {
 //	  status: updateProjectV2ItemFieldValue(...) { projectV2Item { id } }
 //	  link0: addBlockedBy(input: {issueId: $issue, blockingIssueId: $link0}) { issue { id } }
+//	  parent: addSubIssue(input: {issueId: $parent, subIssueId: $issue}) { issue { id } }
 //	}
 //
-// What took effect is recorded (r.statusSet, r.linked) even when the rest
-// failed; an error after everything took effect is only a warning.
-func (r *newRun) finish(ctx context.Context, projectID, fieldID string, initial *board.Option, links []*issue.Linked) error {
+// What took effect is recorded (r.statusSet, r.linked, r.parentSet) even
+// when the rest failed; an error after everything took effect is only a
+// warning.
+func (r *newRun) finish(ctx context.Context, projectID, fieldID string, initial *board.Option, links []*issue.Linked, parent *issue.Linked) error {
 	vars := map[string]any{"issue": r.id}
+	if parent != nil {
+		vars["parent"] = parent.ID
+	}
 	for i, l := range links {
 		vars[linkAlias(i)] = l.ID
 	}
@@ -763,7 +874,7 @@ func (r *newRun) finish(ctx context.Context, projectID, fieldID string, initial 
 		vars["project"], vars["item"], vars["field"], vars["option"] = projectID, r.itemID, fieldID, initial.ID
 	}
 	var data map[string]json.RawMessage
-	err := r.Client.Mutate(ctx, newFinishMutation(initial != nil, len(links)), vars, &data)
+	err := r.Client.Mutate(ctx, newFinishMutation(initial != nil, len(links), parent != nil), vars, &data)
 	var steps []string
 	if initial != nil {
 		if raw, ok := data["status"]; ok && !isJSONNull(raw) {
@@ -782,6 +893,13 @@ func (r *newRun) finish(ctx context.Context, projectID, fieldID string, initial 
 	}
 	if len(missed) > 0 {
 		steps = append(steps, "marking it blocked by "+joinRefs(missed, r.def))
+	}
+	if parent != nil {
+		if raw, ok := data["parent"]; ok && !isJSONNull(raw) {
+			r.parent, r.parentSet = &parent.Ref, true
+		} else {
+			steps = append(steps, "making it a sub-issue of "+parent.Ref.String(r.def))
+		}
 	}
 	switch {
 	case len(steps) == 0 && err != nil:
@@ -881,17 +999,18 @@ func (r *newRun) recheck(ctx context.Context, repo issue.Repo, statusField, mark
 	if !recheckPause(ctx) {
 		return nil
 	}
-	nc, err := readNewContext(ctx, r.Client, repo, statusField, nil)
+	nc, err := readNewContext(ctx, r.Client, repo, statusField, nil, r.opts.Parent)
 	if err != nil {
 		return nil
 	}
 	return nc.find(marker, projectID)
 }
 
-// create sends createIssue, with milestone unless nil. On an error with the
-// issue in the payload (a part of the input GitHub refused) the issue
-// exists: r.number is set and the error is returned for a partial result.
-func (r *newRun) create(ctx context.Context, repoID, body string, labels []newLabel, milestone *newMilestone) error {
+// create sends createIssue, with milestone and parent unless nil. On an
+// error with the issue in the payload (a part of the input GitHub refused)
+// the issue exists: r.number is set and the error is returned for a
+// partial result.
+func (r *newRun) create(ctx context.Context, repoID, body string, labels []newLabel, milestone *newMilestone, parent *issue.Linked) error {
 	ids := make([]string, len(labels))
 	for i, l := range labels {
 		ids[i] = l.ID
@@ -910,6 +1029,9 @@ func (r *newRun) create(ctx context.Context, repoID, body string, labels []newLa
 	if milestone != nil {
 		vars["milestone"] = milestone.ID
 	}
+	if parent != nil {
+		vars["parent"] = parent.ID
+	}
 	err := r.Client.Mutate(ctx, newCreateMutation, vars, &out)
 	if out.Create == nil || out.Create.Issue == nil || out.Create.Issue.Number == 0 {
 		if err == nil {
@@ -920,14 +1042,28 @@ func (r *newRun) create(ctx context.Context, repoID, body string, labels []newLa
 	is := out.Create.Issue
 	r.number, r.id = is.Number, is.ID
 	if err != nil {
-		part := "labels"
+		parts := []string{"labels"}
 		if milestone != nil {
-			part = "labels or milestone"
+			parts = append(parts, "milestone")
 		}
-		return &newStepError{"GitHub refused part of the request (" + part + ")", err}
+		if parent != nil {
+			parts = append(parts, "parent")
+		}
+		return &newStepError{"GitHub refused part of the request (" + joinWords(parts, "or") + ")", err}
 	}
 	r.milestone, r.milestoneSet = milestone, milestone != nil
+	if parent != nil {
+		r.parent, r.parentSet = &parent.Ref, true
+	}
 	return nil
+}
+
+// joinWords lists words as "a", "a or b", "a, b or c".
+func joinWords(words []string, conj string) string {
+	if len(words) <= 1 {
+		return strings.Join(words, "")
+	}
+	return strings.Join(words[:len(words)-1], ", ") + " " + conj + " " + words[len(words)-1]
 }
 
 // confirm is the confirmation line of a finished run:
@@ -936,6 +1072,7 @@ func (r *newRun) create(ctx context.Context, repoID, body string, labels []newLa
 //	#57 "Fix login redirect" created, milestone v1.2, no status → Backlog, blocked by #12 and #13
 //	#57 "Fix login redirect" already created, labels bug, unarchived, Backlog (unchanged)
 //	#57 "Fix login redirect" already created, milestone v1.1 (kept, not v1.2), Backlog (unchanged)
+//	#57 "Fix login redirect" created, no status → Backlog, sub-issue of #40
 func (r *newRun) confirm() string {
 	effects := []string{"created"}
 	if r.resumed {
@@ -968,6 +1105,15 @@ func (r *newRun) confirm() string {
 	if len(r.linkedFound) > 0 {
 		effects = append(effects, "already blocked by "+joinRefs(r.linkedFound, r.def))
 	}
+	switch {
+	case r.opts.Parent == nil:
+	case r.parentKept != nil:
+		effects = append(effects, "sub-issue of "+r.parentName(r.parent)+" (kept, not "+r.parentKept.String(r.def)+")")
+	case r.parentSet:
+		effects = append(effects, "sub-issue of "+r.parentName(r.parent))
+	case r.parent != nil:
+		effects = append(effects, "already a sub-issue of "+r.parentName(r.parent))
+	}
 	title := r.title
 	if title == "" {
 		title = r.opts.Title
@@ -978,6 +1124,26 @@ func (r *newRun) confirm() string {
 // name is how output names the issue: "#57", or "owner/repo#57" outside
 // the default repository.
 func (r *newRun) name() string { return issue.Ref{Repo: r.repo, Number: r.number}.String(r.def) }
+
+// parentName names a parent issue as output names issues; "?" for nil.
+func (r *newRun) parentName(p *issue.Ref) string {
+	if p == nil {
+		return "?"
+	}
+	return p.String(r.def)
+}
+
+// parentError is the error for a --parent issue that cannot be a parent,
+// exit code 3: missing, or a pull request; nil for nil or an issue.
+func parentError(p *issue.Linked, def issue.Repo) error {
+	switch {
+	case p == nil:
+		return nil
+	case p.PullRequest:
+		return render.NotFound("--%s %s: a pull request, not an issue; only an issue can have sub-issues", parentFlag, p.Ref.String(def))
+	}
+	return issue.LinksError("--"+parentFlag, []*issue.Linked{p}, def)
+}
 
 // partial is the exit-code-5 error of a run that stopped after the issue
 // existed: what failed, why, and that re-running finishes it. A cause with
@@ -1019,6 +1185,8 @@ type newContext struct {
 	allMilestones []newMilestone // all of them, once read past the first page
 	// Links are the --blocked-by issues, in order (see issue.Links).
 	Links []*issue.Linked
+	// Parent is the --parent issue, read as a link; nil without --parent.
+	Parent *issue.Linked
 }
 
 type newLabel struct {
@@ -1070,16 +1238,29 @@ type newIssueJSON struct {
 			Name string `json:"name"`
 		} `json:"nodes"`
 	} `json:"labels"`
-	Milestone    *newMilestone `json:"milestone"`
+	Milestone *newMilestone `json:"milestone"`
+	// Parent is read with --parent only (newIssueParent).
+	Parent *struct {
+		ID         string `json:"id"`
+		Number     int    `json:"number"`
+		Repository *struct {
+			NameWithOwner string `json:"nameWithOwner"`
+		} `json:"repository"`
+	} `json:"parent"`
 	ProjectItems struct {
 		Nodes []*newItemJSON `json:"nodes"`
 	} `json:"projectItems"`
 }
 
 // readNewContext reads what new needs before writing, with the issues of
-// links (the --blocked-by ones): a missing one is issue.Linked.Missing,
-// not an error.
-func readNewContext(ctx context.Context, q graph.Querier, repo issue.Repo, statusField string, links issue.Links) (*newContext, error) {
+// blockers (the --blocked-by ones) and parent (--parent, nil for none) as
+// links, and with parent each recent issue's parent: a missing link is
+// issue.Linked.Missing, not an error.
+func readNewContext(ctx context.Context, q graph.Querier, repo issue.Repo, statusField string, blockers []issue.Ref, parent *issue.Ref) (*newContext, error) {
+	links := issue.Links(slices.Clone(blockers))
+	if parent != nil {
+		links = append(links, *parent) // the last one
+	}
 	var r *struct {
 		ID         string                         `json:"id"`
 		Labels     graph.Connection[newLabel]     `json:"labels"`
@@ -1091,7 +1272,7 @@ func readNewContext(ctx context.Context, q graph.Querier, repo issue.Repo, statu
 	vars := map[string]any{"owner": repo.Owner, "repo": repo.Name, "status": statusField, "window": newDedupWindow}
 	links.AddVars(vars)
 	var data map[string]json.RawMessage
-	err := q.Query(ctx, newContextQueryWith(links), vars, &data)
+	err := q.Query(ctx, newContextQueryWith(links, parent != nil), vars, &data)
 	if raw, ok := data["repository"]; ok {
 		if uerr := json.Unmarshal(raw, &r); uerr != nil {
 			return nil, render.Internal("cannot decode GitHub's answer").WithCause(uerr)
@@ -1113,6 +1294,9 @@ func readNewContext(ctx context.Context, q graph.Querier, repo issue.Repo, statu
 			return nil, render.Internal("cannot decode GitHub's answer").WithCause(err)
 		}
 	}
+	if parent != nil {
+		nc.Links, nc.Parent = nc.Links[:len(blockers)], nc.Links[len(blockers)]
+	}
 	return nc, nil
 }
 
@@ -1124,6 +1308,10 @@ type foundIssue struct {
 	Number             int
 	labels             []string
 	milestone          *newMilestone // nil for none
+	// parentID is the node ID of its parent, "" for none, and parent names
+	// it; read with --parent only.
+	parentID string
+	parent   *issue.Ref
 }
 
 // find returns the newest open issue the viewer wrote whose body ends with
@@ -1135,6 +1323,11 @@ func (nc *newContext) find(marker, projectID string) *foundIssue {
 			continue
 		}
 		f := &foundIssue{ID: is.ID, Number: is.Number, title: is.Title, milestone: is.Milestone}
+		if p := is.Parent; p != nil && p.ID != "" && p.Repository != nil {
+			if repo, err := issue.ParseRepo(p.Repository.NameWithOwner); err == nil {
+				f.parentID, f.parent = p.ID, &issue.Ref{Repo: repo, Number: p.Number}
+			}
+		}
 		for _, l := range is.Labels.Nodes {
 			if l != nil {
 				f.labels = append(f.labels, l.Name)

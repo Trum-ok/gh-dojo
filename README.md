@@ -141,7 +141,7 @@ also be authorized for it.
 | [`show`](#show) | Read issues: board status, sprint, blockers, history, description, comments |
 | [`list`](#list) | One line per open issue on the board, grouped by status |
 | [`next`](#next) | Issues to take: initial status, no unresolved blockers, in board order |
-| [`new`](#new) | Create an issue with labels, milestone and blockers, on the board, in the initial status |
+| [`new`](#new) | Create an issue with labels, milestone, blockers and parent, on the board, in the initial status |
 | [`comment`](#comment) | Comment without changing the status |
 | [`block`, `unblock`](#block-unblock) | Add or remove blocked-by links without changing the status |
 | [`init`](#init) | Write `.github/dojo.toml` for a board and check it |
@@ -260,7 +260,7 @@ code 1).
 ### new
 
 ```sh
-gh dojo new <title> [--type T] [--area A]... [--label L]... [--milestone M] [--blocked-by N]... [--repo owner/repo] [--body TEXT | --body-file FILE]
+gh dojo new <title> [--type T] [--area A]... [--label L]... [--milestone M] [--blocked-by N]... [--parent N] [--repo owner/repo] [--body TEXT | --body-file FILE]
 ```
 
 Creates an issue, labels it, adds it to the board and sets the initial status
@@ -273,17 +273,22 @@ Creates an issue, labels it, adds it to the board and sets the initial status
   (ignoring case);
 - `--blocked-by 17` marks it blocked by #17 (repeatable, or comma-separated;
   `owner/repo#17` or a URL for another repository);
+- `--parent 40` makes it a sub-issue of #40, set as it is created (no extra
+  request); [`show`](#show) lists a parent's sub-issues, and a verb with
+  [`sub_issues`](#checks) checks them. An existing issue becomes a sub-issue
+  with `gh issue edit 15 --parent 40`: gh-dojo has no command for it, since
+  the link changes no status;
 - `--repo acme/api` creates it in another repository of
   [`board.repos`](#board) than the first: its labels, milestones and repeat
   check are that repository's, the issue is named `acme/api#15`, and a bare
-  `--blocked-by` number is still in the default repository. A repository
+  `--blocked-by` or `--parent` number is still in the default repository. A repository
   not in `board.repos` is refused (exit code 1, listing them);
 - `--body-file -` reads the body from stdin. A title starting with `-` goes
   after `--`: `gh dojo new --type bug -- "-v is ignored"`.
 
 An unknown label or milestone fails before anything is created, listing the
-allowed values (exit code 1); so does a `--blocked-by` issue that does not
-exist, or a pull request (exit code 3).
+allowed values (exit code 1); so does a `--blocked-by` or `--parent` issue
+that does not exist, or a pull request (exit code 3).
 
 ```console
 $ gh dojo new "Fix login redirect" --type bug --area cli
@@ -292,9 +297,9 @@ $ gh dojo new "Fix login redirect" --type bug --area cli
 
 A repeat is safe: the body ends with a hidden marker of the title, and a run
 that finds it on one of the repository's 20 newest open issues written by
-you finishes that issue (labels, milestone, board, status, blocked-by links)
-instead of creating another; a different milestone it already has is kept,
-with a warning. If a run fails after creating the issue, it exits with code
+you finishes that issue (labels, milestone, board, status, blocked-by links,
+parent) instead of creating another; a different milestone or parent it
+already has is kept, with a warning. If a run fails after creating the issue, it exits with code
 5: run the same command again.
 
 ### comment
@@ -1382,7 +1387,7 @@ The schemas, by command, after `schema_version` and `error`:
 | `next` | as `list`, each issue with `unresolved_blockers`: `[{ref, repo, number, on_board, status, archived, status_unknown_reason}]` (empty unless `--all`) and `unread_blockers` (blockers the token cannot read, unresolved); `matched`: issues to show before `--limit` (with `--all`, the blocked ones too); `hidden`: blocked issues left out (0 with `--all`); `incomplete`: GitHub withheld part of an issue to show or hide, or of its blockers |
 | verbs | `verb`, `default_repo` (where a bare number is), `dry_run`, `issues`: `[{number, repo, title, outcome, planned, applied, in_place, needs_yes, warnings, error}]` in argument order (`title` `null` when the issue was not read), `summary`: `{total, done, written, failed, not_attempted}` |
 | `release` | as verbs, with `release`: `{ref, commit, since, since_picked, since_commit, compared, commits}` (`since_picked`: the previous version tag, not `--since`; `compared`: GitHub compared the two, else the history was read down to a `--since` commit; commits are full SHAs), each issue with `found_by`: `[{pull_request, commit}]` (`pull_request` `owner/name#12` that closes it, with its first commit in the release, or `null`: the commit's message names it), `skipped`: `[{number, repo, ref, reason, status, found_by}]` (`reason` `excluded` by `--exclude`; `pull_request`, `not_found` or `repo_not_found` for a number only commit messages name; or `not_ready` with the `status` the verb's `from` does not allow; `status` is `null` but for `not_ready`), and `warnings`; `issues` and `summary` count only the issues the verb ran on, the default repository's first |
-| `new` | `number`, `repo`, `title`, `created` (`false`: resumed), `labels`, `status`, `status_set`, `unarchived`, `milestone` (`{title, due_on}` or `null`), `milestone_set`, `blocked_by`, `already_blocked_by` |
+| `new` | `number`, `repo`, `title`, `created` (`false`: resumed), `labels`, `status`, `status_set`, `unarchived`, `milestone` (`{title, due_on}` or `null`), `milestone_set`, `blocked_by`, `already_blocked_by`, `parent` (`owner/name#12` or `null`; read only with `--parent`), `parent_set` |
 | `comment` | `number`, `repo`, `posted` (`false`: already the last comment) |
 | `block`, `unblock` | `number`, `repo`, `action`, `changed`, `unchanged`, `missed` |
 | `describe` | `config`, `preset`, `board`, `repos`, `verbs`: `[{name, when, from, to, requires, requires_one_of, optional, batch, checks, effects}]`, `statuses`: `{initial, final, resolved}`, `exit_codes`: `[{code, meaning, next}]` |

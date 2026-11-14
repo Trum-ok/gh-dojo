@@ -1,0 +1,4 @@
+code: 3
+--- stdout
+--- stderr
+error: --parent #40: a pull request, not an issue; only an issue can have sub-issues

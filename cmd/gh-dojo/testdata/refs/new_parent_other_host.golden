@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: https://gitlab.com/a/b/issues/1: the URL is on gitlab.com, gh dojo talks to github.com
+fix: pass an issue of github.com (gh's default host: GH_HOST or gh auth login)

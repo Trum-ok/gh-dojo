@@ -9,7 +9,7 @@ import (
 
 // TestRefArgs: an issue URL on another host than the client's
 // (github.com in tests) is refused before any request, as an issue
-// argument and in --by or --blocked-by: its number would name another
+// argument and in --by, --blocked-by or --parent: its number would name another
 // issue here. A pull request's URL as the issue is exit code 3 at once.
 func TestRefArgs(t *testing.T) {
 	for _, tt := range []struct {
@@ -24,6 +24,7 @@ func TestRefArgs(t *testing.T) {
 		{"start_pull", []string{"start", "https://github.com/cli/cli/pull/1#discussion_r1"}, render.ExitNotFound},
 		{"block_by_other_host", []string{"block", "3", "--by", "17,https://gitlab.com/a/b/issues/1"}, render.ExitUsage},
 		{"new_blocked_by_other_host", []string{"new", "Fix it", "--blocked-by", "https://gitlab.com/a/b/issues/1"}, render.ExitUsage},
+		{"new_parent_other_host", []string{"new", "Fix it", "--parent", "https://gitlab.com/a/b/issues/1"}, render.ExitUsage},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			withConfig(t, dojoConfig)

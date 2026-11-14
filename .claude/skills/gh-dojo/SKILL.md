@@ -69,9 +69,10 @@ Run a verb as `gh dojo <verb> N` (`N`, `#N` or `owner/repo#N`); `--dry-run` prin
 
 ## Creating and linking issues
 
-- `gh dojo new "<title>" --type <bug|enhancement|documentation|dogfood> --body "…"`: the issue, its labels, the board in `Backlog`, in one command. A long body: `--body-file <file>`, or `--body-file -` for stdin. More labels: `--label X`. `--area X` adds the label `area:X`. `--milestone "<title>"`: an open milestone (an unknown one is exit code 1 with the list). `--blocked-by 12`: blocked from the start (repeat it, or comma-separate; an issue that does not exist is exit code 3, and nothing is created). A title starting with `-` goes after `--`, and every flag before it: `gh dojo new --type bug -- "-v is ignored"`.
+- `gh dojo new "<title>" --type <bug|enhancement|documentation|dogfood> --body "…"`: the issue, its labels, the board in `Backlog`, in one command. A long body: `--body-file <file>`, or `--body-file -` for stdin. More labels: `--label X`. `--area X` adds the label `area:X`. `--milestone "<title>"`: an open milestone (an unknown one is exit code 1 with the list). `--blocked-by 12`: blocked from the start (repeat it, or comma-separate; an issue that does not exist is exit code 3, and nothing is created). `--parent 12`: a sub-issue of #12 (one issue; one that does not exist is exit code 3, and nothing is created). A title starting with `-` goes after `--`, and every flag before it: `gh dojo new --type bug -- "-v is ignored"`.
 - `gh dojo comment N "text"`, or `gh dojo comment N --body-file -`: a comment without changing the status.
 - `gh dojo block N --by M` marks N blocked by M without changing the status; `gh dojo unblock N --by M` removes that. `--by` repeats or takes a comma-separated list; another repository's issue is `owner/repo#12` or its URL. A link already there (or already gone) is not an error: the line says `already`. A pull request cannot block (exit code 3), nor can an issue N blocks (a cycle, exit code 1).
+- An existing issue becomes a sub-issue with `gh issue edit N --parent M` (`--remove-parent` undoes it): gh-dojo has no command for it, since the link changes no status.
 
 ## Repeats are safe
 

@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: --parent is empty: pass the parent issue, like --parent 12
+fix: gh dojo new --help

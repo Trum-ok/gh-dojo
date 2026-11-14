@@ -17,7 +17,9 @@ code: 0
   "milestone": null,
   "milestone_set": false,
   "blocked_by": [],
-  "already_blocked_by": []
+  "already_blocked_by": [],
+  "parent": null,
+  "parent_set": false
 }
 
 --- stderr

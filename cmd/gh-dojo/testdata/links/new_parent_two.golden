@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: --parent "26,27" names 2 issues: an issue has one parent
+fix: gh dojo new --help

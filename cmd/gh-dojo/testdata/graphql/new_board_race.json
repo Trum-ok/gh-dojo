@@ -161,7 +161,7 @@
     },
     {
       "operation": "CreateIssue",
-      "query": "mutation CreateIssue($repo: ID!, $title: String!, $body: String!, $labels: [ID!], $milestone: ID) {\n  createIssue(input: {repositoryId: $repo, title: $title, body: $body, labelIds: $labels, milestoneId: $milestone}) {\n    issue { id number }\n  }\n}",
+      "query": "mutation CreateIssue($repo: ID!, $title: String!, $body: String!, $labels: [ID!], $milestone: ID, $parent: ID) {\n  createIssue(input: {repositoryId: $repo, title: $title, body: $body, labelIds: $labels, milestoneId: $milestone, parentIssueId: $parent}) {\n    issue { id number }\n  }\n}",
       "variables": {
         "repo": "R_kgDOVq9iIg",
         "title": "Fix login redirect",

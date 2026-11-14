@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: --parent "the epic" is not an issue: pass 12, "#12", owner/repo#12 or the issue's URL
+fix: gh dojo new --help
