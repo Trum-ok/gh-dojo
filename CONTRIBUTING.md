@@ -16,8 +16,8 @@ make install  # build and install as the gh dojo extension (see README)
 CI (`.github/workflows/ci.yml`) runs on pushes to `main` and on pull
 requests. Once, on Linux: `gofmt -l .` must print nothing, then
 `go mod tidy -diff`, `go vet ./...` (also with `GOOS=windows` and
-`GOOS=darwin`), the release build, and `agent install --check` with that
-build (see below). On Ubuntu, macOS and Windows:
+`GOOS=darwin`), `go vet -tags e2e ./e2e`, the release build, and
+`agent install --check` with that build (see below). On Ubuntu, macOS and Windows:
 `go test ./...` (with `-race` on Ubuntu) and `go build ./...`. Run the
 checks and `go test -race ./...` before sending a change.
 
@@ -25,6 +25,28 @@ Code and tests must work on all three: build paths with `path/filepath`,
 show them to users with `filepath.ToSlash`, and keep OS error texts out of
 golden files. `.gitattributes` checks every file out with LF line endings,
 Windows included.
+
+## End-to-end tests
+
+`e2e/` runs the built gh-dojo against real boards, behind the `e2e` build
+tag, so `go test ./...` never touches the network. For each preset it goes
+through `init`, `doctor`, `new`, `next`, the verbs, `comment`, `block` and
+`unblock`, `show` and `list` up to closing the issues, then deletes the
+issues it created. `.github/workflows/e2e.yml` runs it daily and by hand
+(Actions → e2e → Run workflow), not on pull requests, in the sandbox
+repository `Trum-ok/gh-dojo-sandbox` with boards `Trum-ok/6` (kanban) and
+`Trum-ok/7` (sprints), with the `E2E_TOKEN` secret: a classic token with
+the `project` and `public_repo` scopes of an admin of the sandbox. Locally,
+with gh's token:
+
+```sh
+GH_DOJO_E2E_REPO=Trum-ok/gh-dojo-sandbox GH_DOJO_E2E_KANBAN=6 GH_DOJO_E2E_SPRINTS=7 \
+  go test -tags e2e -count=1 -v ./e2e
+```
+
+The sprints board's Sprint field has iterations up to November 2027: add
+more before then, or the sprint checks fail. `e2e/doc.go` lists the
+variables and what the boards need.
 
 ## Releases
 

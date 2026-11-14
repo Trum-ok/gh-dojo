@@ -1,0 +1,40 @@
+name: e2e
+
+# Runs gh dojo against real boards: both presets, from init to closing the
+# issues, in the sandbox repository Trum-ok/gh-dojo-sandbox (see e2e/doc.go).
+# Daily and by hand, not on every pull request, to spare the API limits.
+on:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# The runs share the sandbox: one at a time.
+concurrency:
+  group: e2e
+  cancel-in-progress: false
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: e2e
+        env:
+          # A classic token with the project and public_repo scopes, of an
+          # admin of the sandbox: the tests delete the issues they create.
+          GH_TOKEN: ${{ secrets.E2E_TOKEN }}
+          GH_DOJO_E2E_REPO: Trum-ok/gh-dojo-sandbox
+          GH_DOJO_E2E_KANBAN: "6"
+          GH_DOJO_E2E_SPRINTS: "7"
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::the E2E_TOKEN secret is not set"; exit 1
+          fi
+          go test -tags e2e -count=1 -v -timeout 15m ./e2e
