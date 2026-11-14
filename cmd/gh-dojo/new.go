@@ -1261,7 +1261,7 @@ func (r *newRun) partial(err error) error {
 		again := "; re-running will not help"
 		if forbidden {
 			// The token may lack access to the parent's repository.
-			again = "; re-running will not help as the token is"
+			again = "; re-running with the same token will not help"
 			fix = "if the token lacks access to the parent's repository: " + render.AuthFix +
 				", then re-run the same command; else " + fix
 		}

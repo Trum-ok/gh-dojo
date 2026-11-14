@@ -1,6 +1,6 @@
 code: 1
 --- stdout
 --- stderr
-error: #15 found (created earlier), but making it a sub-issue of #26 failed; re-running will not help as the token is
+error: #15 found (created earlier), but making it a sub-issue of #26 failed; re-running with the same token will not help
 GitHub: Resource not accessible by integration
 fix: if the token lacks access to the parent's repository: gh auth refresh -s project, then re-run the same command; else pass another --parent to make it a sub-issue (gh issue edit 15 -R Trum-ok/gh-dojo --parent <issue>), or leave it without one
