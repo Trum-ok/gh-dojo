@@ -180,6 +180,11 @@ const (
 
 var blockersValues = []string{BlockersWarn, BlockersDeny, BlockersLink}
 
+// subIssuesValues are the values of a verb's sub_issues key: BlockersWarn
+// and BlockersDeny check the issue's unresolved sub-issues as blockers =
+// "warn" and "deny" check its blockers.
+var subIssuesValues = []string{BlockersWarn, BlockersDeny}
+
 var closeReasons = []string{CloseCompleted, CloseNotPlanned, CloseDuplicate}
 
 // CloseReasons lists the reasons close accepts.
@@ -192,7 +197,8 @@ type Statuses struct {
 	Final   []string // hidden by `list`, with a counter
 	// Resolved are the statuses in which an open blocker no longer blocks:
 	// its work is complete (kanban: Ready, Done). A closed blocker is
-	// resolved whatever its status.
+	// resolved whatever its status. The same rule resolves a sub-issue
+	// for the sub_issues check.
 	Resolved []string
 }
 
@@ -320,6 +326,10 @@ type Verb struct {
 	// issue's unresolved blockers, BlockersLink turns --by N into a
 	// blocked-by link; "" does neither.
 	Blockers string
+	// SubIssues is the sub_issues key: BlockersWarn or BlockersDeny check
+	// the issue's unresolved sub-issues (see Statuses.Resolved), as for
+	// blockers; "" does not.
+	SubIssues string
 }
 
 // ChecksBlockers reports whether the verb checks the issue's unresolved
@@ -327,6 +337,10 @@ type Verb struct {
 func (v Verb) ChecksBlockers() bool {
 	return v.Blockers == BlockersWarn || v.Blockers == BlockersDeny
 }
+
+// ChecksSubIssues reports whether the verb checks the issue's unresolved
+// sub-issues (sub_issues = "warn" or "deny").
+func (v Verb) ChecksSubIssues() bool { return v.SubIssues != "" }
 
 // OnlyClearsSprint reports whether clearing the sprint (iteration =
 // "clear") is the verb's only board effect: no status, no other fields.

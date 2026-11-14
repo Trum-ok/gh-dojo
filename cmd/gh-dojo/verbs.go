@@ -660,6 +660,12 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 		line("", "free text in --by goes into the comment as is: on an issue of another repository,")
 		line("", "GitHub links a #N in it to that issue's repository, not to the default one")
 	}
+	switch v.SubIssues {
+	case config.BlockersWarn:
+		line("Children", "warns about unresolved sub-issues (%s), then runs", unresolvedMeaning(cfg))
+	case config.BlockersDeny:
+		line("Children", "refused (exit code 2) while a sub-issue is unresolved (%s): ask the user", unresolvedMeaning(cfg))
+	}
 	if v.Close != "" {
 		line("Close", "closes the issue as %s; an issue already closed stays as it is", workflow.ReasonText(v.Close))
 	}

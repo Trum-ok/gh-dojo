@@ -1,3 +1,3 @@
 error: .github/dojo.toml: unknown key verbs.start.when_
-allowed: when, to, from, require, require_one_of, comment, labels, assign, unassign, close, reopen, confirm, iteration, field, blockers, batch, disabled
+allowed: when, to, from, require, require_one_of, comment, labels, assign, unassign, close, reopen, confirm, iteration, field, blockers, sub_issues, batch, disabled
 fix: fix the key; if it is right, the config needs a newer gh-dojo: gh extension upgrade dojo (from source: make install)

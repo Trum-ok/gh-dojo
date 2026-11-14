@@ -141,6 +141,18 @@ blockers = "deny"
 when = "Note something on an unblocked issue"
 comment = "{comment}"
 blockers = "deny"
+
+# The sub_issues check: wrap warns, finish refuses, after blockers.
+[verbs.wrap]
+when = "Wrap up, even with sub-issues left"
+to = "Ready"
+sub_issues = "warn"
+
+[verbs.finish]
+when = "Finish an issue whose sub-issues are done"
+to = "Done"
+blockers = "deny"
+sub_issues = "deny"
 `
 
 func testEngine(t *testing.T) (*Engine, *config.Config) {
@@ -194,6 +206,17 @@ func blocked(is Issue, n, unread int) Issue {
 		is.Unresolved = append(is.Unresolved, Blocker{Ref: fmt.Sprintf("#%d", 12+i), Place: places[i%len(places)]})
 	}
 	is.UnreadBlockers = unread
+	return is
+}
+
+// withSubIssues gives is n unresolved sub-issues, in varied places, and
+// unread ones that were not read.
+func withSubIssues(is Issue, n, unread int) Issue {
+	places := []string{"In progress", "not on the board", "status not read"}
+	for i := range n {
+		is.UnresolvedSubIssues = append(is.UnresolvedSubIssues, Blocker{Ref: fmt.Sprintf("#%d", 50+i), Place: places[i%len(places)]})
+	}
+	is.UnreadSubIssues = unread
 	return is
 }
 
@@ -527,6 +550,15 @@ func TestPlan(t *testing.T) {
 		{name: "claim_wrong_from_blocked", verb: "claim", code: render.ExitDenied, issue: blocked(onBoard("Ready"), 1, 0)},
 		{name: "check_blocked_refused", verb: "check", code: render.ExitDenied,
 			args: Args{Comment: "x", HasComment: true}, issue: blocked(onBoard("Ready"), 1, 0)},
+		// sub_issues = "warn" / "deny": unresolved and unread sub-issues.
+		{name: "wrap_sub_issues_warns", verb: "wrap", hasOps: 1, issue: withSubIssues(onBoard("In progress"), 2, 1)},
+		{name: "finish_sub_issues_refused", verb: "finish", code: render.ExitDenied, issue: withSubIssues(onBoard("Ready"), 5, 0)},
+		{name: "finish_unread_sub_issues_refused", verb: "finish", code: render.ExitDenied, issue: withSubIssues(onBoard("Ready"), 0, 2)},
+		{name: "finish_sub_issues_done", verb: "finish", hasOps: 1, issue: onBoard("Ready")},
+		{name: "finish_repeat_sub_issues", verb: "finish", noOps: true, issue: withSubIssues(onBoard("Done"), 1, 0)},
+		// Blockers are checked first.
+		{name: "finish_blocked_and_sub_issues", verb: "finish", code: render.ExitDenied,
+			issue: withSubIssues(blocked(onBoard("Ready"), 1, 0), 1, 0)},
 		// blockers = "link" (kanban's wait): --by names an issue the reader found.
 		{name: "wait_links", verb: "wait", hasOps: 3, args: Args{By: "12", HasBy: true},
 			issue: byIssue(onBoard("In progress"), "#12", false)},

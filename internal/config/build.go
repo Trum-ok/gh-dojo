@@ -381,7 +381,7 @@ func requires(r *rawVerb, arg string) bool {
 }
 
 // buildEffects validates labels, assign, unassign, close, reopen, confirm, blockers,
-// iteration and field.
+// sub_issues, iteration and field.
 func (c *Config) buildEffects(name string, r *rawVerb, v *Verb) error {
 	p := "verbs." + name + "."
 	if r.Labels != nil {
@@ -443,6 +443,9 @@ func (c *Config) buildEffects(name string, r *rawVerb, v *Verb) error {
 		}
 	}
 	if err := c.buildBlockers(name, r.Blockers, v); err != nil {
+		return err
+	}
+	if err := c.buildSubIssues(name, r.SubIssues, v); err != nil {
 		return err
 	}
 	if err := c.buildIteration(name, r.Iteration, v); err != nil {
@@ -541,6 +544,28 @@ func (c *Config) buildBlockers(name string, o *rawOff, v *Verb) error {
 		default:
 			v.Blockers = b
 		}
+	}
+	return nil
+}
+
+// buildSubIssues validates the sub_issues key: "warn" or "deny" (checks
+// of the issue's unresolved sub-issues), or false to turn off a preset's.
+func (c *Config) buildSubIssues(name string, o *rawOff, v *Verb) error {
+	if o == nil {
+		return nil
+	}
+	key := c.KeyPath("verbs." + name + ".sub_issues")
+	switch {
+	case o.Bool != nil && *o.Bool:
+		return c.Errorf("%s = true: want %q or %q, or false to turn it off", key, BlockersWarn, BlockersDeny).
+			WithAllowed(strconv.Quote(BlockersWarn), strconv.Quote(BlockersDeny), "false")
+	case o.Bool != nil:
+		// false: no check, turning off a preset's.
+	case !slices.Contains(subIssuesValues, *o.Str):
+		return c.Errorf("%s: unknown value %q: %q and %q check the issue's unresolved sub-issues",
+			key, *o.Str, BlockersWarn, BlockersDeny).WithAllowed(subIssuesValues...)
+	default:
+		v.SubIssues = *o.Str
 	}
 	return nil
 }

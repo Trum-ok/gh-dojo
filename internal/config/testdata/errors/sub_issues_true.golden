@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.done.sub_issues = true: want "warn" or "deny", or false to turn it off
+allowed: "warn", "deny", false

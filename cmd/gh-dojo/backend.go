@@ -160,12 +160,17 @@ func (b *githubBackend) workflowIssue(ctx context.Context, v config.Verb, lookup
 	if failed, err := b.fieldState(ctx, v, card, &is); failed != nil || err != nil {
 		return workflow.Issue{}, failed, err
 	}
-	if v.ChecksBlockers() {
+	if v.ChecksBlockers() || v.ChecksSubIssues() {
 		cfg, err := b.app.Config()
 		if err != nil {
 			return workflow.Issue{}, nil, err
 		}
-		is.Unresolved, is.UnreadBlockers = unresolvedBlockers(card, cfg.Statuses.Resolved, def)
+		if v.ChecksBlockers() {
+			is.Unresolved, is.UnreadBlockers = unresolvedLinks(card, card.BlockedBy, card.UnresolvedBlockers(cfg.Statuses.Resolved), def)
+		}
+		if v.ChecksSubIssues() {
+			is.UnresolvedSubIssues, is.UnreadSubIssues = unresolvedLinks(card, card.SubIssues, card.UnresolvedSubIssues(cfg.Statuses.Resolved), def)
+		}
 	}
 	if len(lookup.Links) > 0 {
 		if is.ByIssues, failed, err = byIssues(v, card, def); failed != nil || err != nil {
@@ -270,20 +275,21 @@ func cycleError(target issue.Ref, def issue.Repo, ref, flag string) error {
 		WithFix("gh dojo show " + target.Arg(def))
 }
 
-// unresolvedBlockers returns the card's blockers that still block (see
+// unresolvedLinks returns the unresolved ones among the card's linked
+// issues all (its blockers or its sub-issues; see
 // issue.Card.UnresolvedBlockers), each with where it stands as show says
 // it, but without why a status was not read (show has it), and how many
-// blockers were not read at all. They are named relative to def.
-func unresolvedBlockers(c *issue.Card, resolved []string, def issue.Repo) ([]workflow.Blocker, int) {
+// of all were not read at all. They are named relative to def.
+func unresolvedLinks(c *issue.Card, all graph.Page[issue.Link], unresolved []issue.Link, def issue.Repo) ([]workflow.Blocker, int) {
 	var out []workflow.Blocker
-	for _, l := range c.UnresolvedBlockers(resolved) {
+	for _, l := range unresolved {
 		place := linkPlace(l)
 		if l.StatusUnknown != "" {
 			place = "status not read"
 		}
 		out = append(out, workflow.Blocker{Ref: linkRef(c, l, def), Place: place})
 	}
-	return out, max(0, c.BlockedBy.TotalCount-len(c.BlockedBy.Nodes))
+	return out, max(0, all.TotalCount-len(all.Nodes))
 }
 
 // verbLookup is what the effects of v, run with a, need looked up with
@@ -291,15 +297,17 @@ func unresolvedBlockers(c *issue.Card, resolved []string, def issue.Repo) ([]wor
 // config or --assignee). A verb that removes labels reads all of the
 // issue's labels, so it can tell one is there; a verb that unassigns reads
 // the IDs of the issue's assignees, and the viewer for "@me"; a verb that
-// checks blockers reads all of its blockers (GitHub allows 50), so a
-// resolved one is not counted as unread.
+// checks blockers reads all of its blockers (GitHub allows 50), and one
+// that checks sub-issues all of them (GitHub allows 100), so a resolved
+// one is not counted as unread.
 func verbLookup(v config.Verb, a workflow.Args) issue.Lookup {
 	l := issue.Lookup{
-		Labels:      append(slices.Clone(v.AddLabels), v.RemoveLabels...),
-		AllLabels:   len(v.RemoveLabels) > 0,
-		AssigneeIDs: v.Unassign != "",
-		AllBlockers: v.ChecksBlockers(),
-		Viewer:      v.Unassign == config.Me,
+		Labels:       append(slices.Clone(v.AddLabels), v.RemoveLabels...),
+		AllLabels:    len(v.RemoveLabels) > 0,
+		AssigneeIDs:  v.Unassign != "",
+		AllBlockers:  v.ChecksBlockers(),
+		AllSubIssues: v.ChecksSubIssues(),
+		Viewer:       v.Unassign == config.Me,
 	}
 	login := v.Assign
 	if v.AssignArg {

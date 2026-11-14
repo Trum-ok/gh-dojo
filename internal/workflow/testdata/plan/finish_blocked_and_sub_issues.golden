@@ -1,0 +1,3 @@
+code: 2
+error: finish cannot move #42 while it has unresolved blockers: #12 (In progress)
+this is a process rule: ask the user how to proceed

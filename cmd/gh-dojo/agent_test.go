@@ -59,7 +59,8 @@ func readRepoFile(t *testing.T, dir, name string) string {
 const skillPath = ".claude/skills/gh-dojo/SKILL.md"
 
 // agentConfig covers every rule the instructions explain: confirm, the
-// blockers check (deny) and link, batch, a sprint, labels.types, notes.
+// blockers check (deny) and link, the sub_issues check (warn and deny),
+// batch, a sprint, labels.types, notes.
 const agentConfig = `
 version = 1
 preset = "sprints"
@@ -78,6 +79,12 @@ link = "claude://claude.ai/epitaxy/{id}"
 
 [verbs.start]
 blockers = "deny"
+
+[verbs.ready]
+sub_issues = "warn"
+
+[verbs.done]
+sub_issues = "deny"
 
 [verbs.drop]
 when = "The issue is not needed or a duplicate"

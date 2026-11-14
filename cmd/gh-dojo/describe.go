@@ -114,6 +114,15 @@ var (
 			}
 			return ""
 		},
+		func(_ *config.Config, v config.Verb) string {
+			switch v.SubIssues {
+			case config.BlockersWarn:
+				return "warns about unresolved sub-issues"
+			case config.BlockersDeny:
+				return "refused while a sub-issue is unresolved"
+			}
+			return ""
+		},
 	}
 	verbEffects = []func(cfg *config.Config, v config.Verb) string{
 		func(_ *config.Config, v config.Verb) string {

@@ -157,6 +157,30 @@ func TestVerbBlockersResolved(t *testing.T) {
 	checkLinkRuns(t, srv, before, runs{[]string{"start", "3"}, render.ExitOK, 2, "start_resolved"})
 }
 
+// TestVerbSubIssues: done with sub_issues = "deny" reads up to 100
+// sub-issues with the card and refuses #3 while one is unresolved (In
+// progress, not on the board, or not read); with its sub-issues closed or
+// in Ready (statuses.resolved) it runs. "warn" runs and warns. Each is one
+// request: the check needs no read of its own.
+func TestVerbSubIssues(t *testing.T) {
+	for _, tt := range []struct {
+		mode, fixture string
+		code          render.Code
+		golden        string
+	}{
+		{"deny", "done_sub_issues", render.ExitDenied, "done_sub_issues_deny"},
+		{"warn", "done_sub_issues", render.ExitOK, "done_sub_issues_warn"},
+		{"deny", "done_sub_issues_resolved", render.ExitOK, "done_sub_issues_resolved"},
+	} {
+		t.Run(tt.golden, func(t *testing.T) {
+			withConfig(t, verbDojoConfig+"\n[verbs.done]\nsub_issues = \""+tt.mode+"\"\n")
+			srv := withApp(t, boardFixture, verbFixture(tt.fixture))
+			before := warmSchema(t, srv)
+			checkLinkRuns(t, srv, before, runs{[]string{"done", "3", "--dry-run"}, tt.code, 1, tt.golden})
+		})
+	}
+}
+
 // TestVerbWaitLinks: kanban's wait (blockers = "link") with --by 26 reads
 // #26 with the card and links it in the verb's one mutation; the repeat is
 // one read and changes nothing.

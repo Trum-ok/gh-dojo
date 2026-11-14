@@ -38,6 +38,7 @@ func newAgentDoc(cfg *config.Config, root *cobra.Command, notes string) *agentDo
 	plain.Verbs = slices.Clone(cfg.Verbs)
 	for i := range plain.Verbs {
 		plain.Verbs[i].Blockers, plain.Verbs[i].Confirm, plain.Verbs[i].Batch = "", false, false
+		plain.Verbs[i].SubIssues = ""
 	}
 	d := &agentDoc{cfg: cfg, p: describeProcess(&plain), notes: notes}
 	var walk func(c *cobra.Command, prefix string)
@@ -308,6 +309,14 @@ func (d *agentDoc) rules(v config.Verb) []string {
 		}
 		r = append(r, s)
 	}
+	switch v.SubIssues {
+	case config.BlockersWarn:
+		r = append(r, "With an unresolved sub-issue it warns on stderr and still runs: read `gh dojo show N` "+
+			"and finish the sub-issues first, or ask the user.")
+	case config.BlockersDeny:
+		r = append(r, "It is refused (exit code 2) while a sub-issue is unresolved: `gh dojo show N` lists them. "+
+			"Finish them first, or ask the user; never move the status another way.")
+	}
 	if v.AssignArg {
 		r = append(r, fmt.Sprintf("`--%s <login>` names the user to assign (`--%s @me` is you); one who cannot "+
 			"be assigned issues in the repository is exit code 1, with the list of who can. Ask the user "+
@@ -387,6 +396,9 @@ func (d *agentDoc) statuses(w *mdWriter) {
 		items = append(items, "A blocker is resolved, no longer blocking, only when it is closed.")
 	}
 	items = append(items, "A blocker whose status could not be read (`status not read: …`) counts as unresolved.")
+	if slices.ContainsFunc(d.cfg.Verbs, config.Verb.ChecksSubIssues) {
+		items = append(items, "A sub-issue is resolved, or not, by the same rule.")
+	}
 	w.heading(1, "Lifecycle")
 	if path, verbs, skip := d.lifecycle(); len(path) > 1 {
 		steps := make([]string, len(path))
@@ -488,7 +500,8 @@ func (d *agentDoc) reading(w *mdWriter) {
 	}
 	items := []string{
 		"`gh dojo show N` before you work on an issue: its status, " + sprint + "milestone, labels, blockers both " +
-			"ways (unresolved first, each with its board status), status history, description and the last 5 " +
+			"ways (unresolved first, each with its board status), its parent and sub-issues (the same way), " +
+			"status history, description and the last 5 " +
 			"comments. `gh dojo show 12 13 --brief` prints three lines per issue, `--comments all` the whole " +
 			"thread (up to 100), `--full` everything uncut.",
 	}

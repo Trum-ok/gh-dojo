@@ -31,6 +31,9 @@ comment = """
 [verbs.ready]
 disabled = true
 
+[verbs.done]
+sub_issues = "deny"
+
 [verbs.note]
 when = "Leave a progress note without moving the issue"
 require = ["comment"]

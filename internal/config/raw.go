@@ -80,6 +80,7 @@ type rawVerb struct {
 	Iteration    *string    `toml:"iteration"`
 	Field        *rawFields `toml:"field"`
 	Blockers     *rawOff    `toml:"blockers"`
+	SubIssues    *rawOff    `toml:"sub_issues"`
 	Batch        *bool      `toml:"batch"`
 	Disabled     *bool      `toml:"disabled"`
 }
@@ -154,7 +155,7 @@ func (v *rawVerb) setKeys() []string {
 		{"comment", v.Comment != nil}, {"labels", v.Labels != nil}, {"assign", v.Assign != nil},
 		{"unassign", v.Unassign != nil}, {"close", v.Close != nil}, {"reopen", v.Reopen != nil}, {"confirm", v.Confirm != nil},
 		{"iteration", v.Iteration != nil}, {"field", v.Field != nil},
-		{"blockers", v.Blockers != nil}, {"batch", v.Batch != nil},
+		{"blockers", v.Blockers != nil}, {"sub_issues", v.SubIssues != nil}, {"batch", v.Batch != nil},
 	} {
 		if k.set {
 			keys = append(keys, k.name)
@@ -175,7 +176,8 @@ var (
 	releaseKeys  = []string{"keywords"}
 	verbKeys     = []string{
 		"when", "to", "from", "require", "require_one_of", "comment",
-		"labels", "assign", "unassign", "close", "reopen", "confirm", "iteration", "field", "blockers", "batch", "disabled",
+		"labels", "assign", "unassign", "close", "reopen", "confirm", "iteration", "field", "blockers", "sub_issues", "batch",
+		"disabled",
 	}
 
 	// unsupportedVerbKeys are verb keys from the spec that this version
@@ -467,6 +469,7 @@ func mergeVerb(m merger, name string, base, over *rawVerb) *rawVerb {
 		Iteration:    pick(m, p+"iteration", base.Iteration, over.Iteration),
 		Field:        pick(m, p+"field", base.Field, over.Field),
 		Blockers:     pick(m, p+"blockers", base.Blockers, over.Blockers),
+		SubIssues:    pick(m, p+"sub_issues", base.SubIssues, over.SubIssues),
 		Batch:        pick(m, p+"batch", base.Batch, over.Batch),
 		Disabled:     over.Disabled,
 	}

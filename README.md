@@ -184,7 +184,7 @@ with its status, "on the board, no status", "not on the board", or "status
 not read" and why, and a blocker whose status was not read counts as
 unresolved. Sub-issues follow the same rule and order, under a header such
 as `sub-issues: 3 of 5 closed, 1 unresolved`: the unresolved ones are what
-a verb with [`sub_issues`](#effects) checks. The first 20 sub-issues are
+a verb with [`sub_issues`](#checks) checks. The first 20 sub-issues are
 read, with a note when there are more.
 
 Long content is folded, always with a note saying what is hidden: the last 5
@@ -797,7 +797,7 @@ own name with the [`field`](#effects) effect. Logical names are lowercase:
 |------------|---------|
 | `initial`  | Set by `new`; issues without a status or not on the board count as this one for `from`. `next` shows the issues in it, or without a status |
 | `final`    | Statuses `list` hides, with a counter |
-| `resolved` | Statuses in which an open blocker no longer blocks (`show`, the `blockers` check, `next`): its work is done though the issue stays open (kanban: Ready, Done). A closed blocker is always resolved |
+| `resolved` | Statuses in which an open blocker no longer blocks (`show`, the `blockers` check, `next`): its work is done though the issue stays open (kanban: Ready, Done). A closed blocker is always resolved. The same rule resolves a sub-issue (`show`, the `sub_issues` check) |
 
 ### labels
 
@@ -852,6 +852,7 @@ commands (`show`, `list`, `new`, `comment`, `describe`, `init`, `doctor`,
 | `require`        | check  | Arguments that must all be given: `comment`, `by`, `assignee` |
 | `require_one_of` | check  | Arguments of which at least one must be given |
 | `blockers`       | check or effect | `"warn"` or `"deny"`: check the issue's unresolved blockers; `"link"`: `--by N` also marks it blocked by #N |
+| `sub_issues`     | check  | `"warn"` or `"deny"`: check the issue's unresolved [sub-issues](#show) |
 | `confirm`        | check  | `"user"`: the verb is the user's decision and runs only with `--yes` |
 | `batch`          | —      | `true`: the verb takes several issue numbers at once |
 | `to`             | effect | Target status |
@@ -877,7 +878,8 @@ rejected with "not supported in this version".
 #### Checks
 
 - **from**: the issue's status must be one of them. It is skipped for an
-  issue already in the verb's `to`, so a repeat is safe; so is `blockers`.
+  issue already in the verb's `to`, so a repeat is safe; so are `blockers`
+  and `sub_issues`.
 - **require**, **require_one_of**: without the arguments, exit code 1.
 - **blockers** `"warn"` and `"deny"` look at the issue's unresolved
   blockers: open, and not in one of [`statuses.resolved`](#statuses); a
@@ -893,6 +895,16 @@ rejected with "not supported in this version".
   issue must exist (exit code 3), and cannot be the issue itself or an issue
   it already blocks (exit code 1); issues and text mixed are exit code 1 too.
   The verb's comment template must use `{by}`.
+- **sub_issues** `"warn"` and `"deny"` look at the issue's unresolved
+  sub-issues by the rule of blockers: a sub-issue is resolved when it is
+  closed or in one of [`statuses.resolved`](#statuses), so a parent can move
+  on while its sub-issues wait in Ready for a release (and `done 10 11 12`
+  on a parent and its sub-issues passes, whatever their order); one whose
+  board status could not be read, or that was not read at all (hidden from
+  the token; a verb reads up to 100, GitHub's limit), counts as unresolved.
+  `"warn"` prints them on stderr and runs; `"deny"` refuses with exit code
+  2. Set it on the verb that finishes an issue, `sub_issues = "deny"` under
+  `[verbs.done]`, say; no preset sets it. Blockers are checked first.
 - **confirm** `"user"`: without `--yes` the verb exits with code 2 and asks
   you to ask the user; re-run it with `--yes` only once they agree. A repeat
   with nothing left to do needs no `--yes`. It is a signal, not a lock: an
@@ -981,6 +993,7 @@ off a key the preset sets:
 |-----|-----|
 | `close` | `close = false` (kanban's `done` closes; this keeps issues open in Done) |
 | `blockers` | `blockers = false` (no check, no link) |
+| `sub_issues` | `sub_issues = false` |
 | `confirm` | `confirm = false` |
 | `assign` | `assign = false` |
 | `unassign` | `unassign = false` |
@@ -1173,7 +1186,7 @@ To write your own:
    only a closed blocker is resolved. On top of a preset, set only what
    differs, add verbs, and drop the preset's with `disabled = true`.
 3. A verb is a `when` line, [checks](#checks) (`from`, `require`,
-   `require_one_of`, `blockers`, `confirm`) and [effects](#effects) (`to`,
+   `require_one_of`, `blockers`, `sub_issues`, `confirm`) and [effects](#effects) (`to`,
    `labels`, `assign`, `unassign`, `comment`, `close`, `reopen`,
    `iteration`, `field`, the `blockers` link). A verb without `to` leaves
    the status alone, like `hold` above; one with `confirm = "user"` waits

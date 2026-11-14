@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.done.sub_issues: unknown value "link": "warn" and "deny" check the issue's unresolved sub-issues
+allowed: warn, deny

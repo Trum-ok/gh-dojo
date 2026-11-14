@@ -149,6 +149,9 @@ func dump(c *Config) string {
 		if v.Blockers != "" {
 			w("  blockers: %q", v.Blockers)
 		}
+		if v.SubIssues != "" {
+			w("  sub_issues: %q", v.SubIssues)
+		}
 		if v.AssignArg || v.Unassign != "" {
 			w("  assign_arg: %v unassign: %q", v.AssignArg, v.Unassign)
 		}
@@ -196,6 +199,8 @@ iteration = "current"
 		{"agent_description", presetOnly + "[agent]\ndescription = \" Also when gh-dojo itself gets in the way. \"\n"},
 		{"blockers_off", presetOnly + "[verbs.wait]\nblockers = false\n"},
 		{"blockers_deny", presetOnly + "[verbs.start]\nblockers = \"deny\"\n[verbs.wait]\nblockers = \"warn\"\n"},
+		{"sub_issues", presetOnly + "[verbs.ready]\nsub_issues = \"warn\"\n[verbs.done]\nsub_issues = \"deny\"\n"},
+		{"sub_issues_off", presetOnly + "[verbs.done]\nsub_issues = false\n"},
 		{"override_verb_key", presetOnly + `
 [verbs.start]
 when = "Take the issue"
@@ -428,6 +433,9 @@ func TestLoadErrors(t *testing.T) {
 		{"blockers_bad", presetOnly + "[verbs.start]\nblockers = \"add\"\n"},
 		{"blockers_true", presetOnly + "[verbs.start]\nblockers = true\n"},
 		{"blockers_number", presetOnly + "[verbs.start]\nblockers = 1\n"},
+		{"sub_issues_bad", presetOnly + "[verbs.done]\nsub_issues = \"link\"\n"},
+		{"sub_issues_true", presetOnly + "[verbs.done]\nsub_issues = true\n"},
+		{"sub_issues_number", presetOnly + "[verbs.done]\nsub_issues = 1\n"},
 		{"blockers_link_without_by", presetOnly + "[verbs.ready]\nblockers = \"link\"\n"},
 		// kanban's wait links --by; a comment without {by} drops what it links.
 		{"blockers_link_comment_override", presetOnly + "[verbs.wait]\ncomment = \"Stuck: {comment}\"\n"},

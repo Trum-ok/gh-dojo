@@ -118,6 +118,12 @@ type Issue struct {
 	// "deny" looks at them.
 	Unresolved     []Blocker
 	UnreadBlockers int
+	// UnresolvedSubIssues are the issue's sub-issues whose work is not
+	// done, by the rule of Unresolved; UnreadSubIssues counts those not
+	// read, which count as unresolved too. Only a verb with sub_issues =
+	// "warn" or "deny" looks at them.
+	UnresolvedSubIssues []Blocker
+	UnreadSubIssues     int
 
 	// ByIssues are the issues --by names, in order, read for a verb with
 	// blockers = "link" when --by is an issue reference or a
@@ -159,8 +165,8 @@ type StatusChange struct {
 	To string // "" when the status was cleared
 }
 
-// Blocker is an unresolved blocker of an issue, as the blockers check
-// names it.
+// Blocker is an unresolved blocker or sub-issue of an issue, as the
+// blockers and sub_issues checks name it.
 type Blocker struct {
 	Ref   string // "#12", or "owner/repo#12" outside the default repository
 	Place string // where it stands: "In progress", "not on the board", "status not read: ..."
@@ -403,7 +409,10 @@ func join(items []string, conj string) string {
 //  5. then, for a verb with blockers = "warn" or "deny", the issue's
 //     unresolved blockers (Issue.Unresolved, Issue.UnreadBlockers) add a
 //     warning or refuse it (exit code 2). Like from, the check is skipped
-//     for an issue already in the target status.
+//     for an issue already in the target status;
+//  6. then, for a verb with sub_issues = "warn" or "deny", the issue's
+//     unresolved sub-issues (Issue.UnresolvedSubIssues,
+//     Issue.UnreadSubIssues) do the same.
 //
 // Moving an issue closed as not planned or duplicate to a final status is
 // allowed with a warning: the verb does not change why it was closed.
@@ -453,6 +462,11 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 	}
 	if !atTarget && v.ChecksBlockers() {
 		if err := p.checkBlockers(v); err != nil {
+			return nil, err
+		}
+	}
+	if !atTarget && v.ChecksSubIssues() {
+		if err := p.checkSubIssues(v); err != nil {
 			return nil, err
 		}
 	}
@@ -682,7 +696,8 @@ func (p *Plan) planLabels(v config.Verb) {
 	}
 }
 
-// maxBlockers is how many unresolved blockers a warning or refusal names.
+// maxBlockers is how many unresolved blockers or sub-issues a warning or
+// refusal names.
 const maxBlockers = 3
 
 // checkBlockers runs the blockers check of v (blockers = "warn" or
@@ -693,32 +708,48 @@ const maxBlockers = 3
 //	start cannot move #42 while it has unresolved blockers: #12 (In progress), #15 (not on the board)
 //	this is a process rule: ask the user how to proceed
 func (p *Plan) checkBlockers(v config.Verb) error {
+	return p.checkLinks(v, v.Blockers, "blockers", p.Issue.Unresolved, p.Issue.UnreadBlockers)
+}
+
+// checkSubIssues runs the sub_issues check of v ("warn" or "deny") on
+// p.Issue as checkBlockers runs the blockers check:
+//
+//	done cannot move #42 while it has unresolved sub-issues: #43 (In progress), #44 (not on the board)
+//	this is a process rule: ask the user how to proceed
+func (p *Plan) checkSubIssues(v config.Verb) error {
+	return p.checkLinks(v, v.SubIssues, "sub-issues", p.Issue.UnresolvedSubIssues, p.Issue.UnreadSubIssues)
+}
+
+// checkLinks warns about (mode "warn") or refuses (mode "deny") the
+// unresolved linked issues of p.Issue, what they are (blockers,
+// sub-issues), and those not read (unread).
+func (p *Plan) checkLinks(v config.Verb, mode, what string, unresolved []Blocker, unread int) error {
 	is := p.Issue
-	if len(is.Unresolved) == 0 && is.UnreadBlockers == 0 {
+	if len(unresolved) == 0 && unread == 0 {
 		return nil
 	}
 	var names []string
-	for i, b := range is.Unresolved {
+	for i, b := range unresolved {
 		if i == maxBlockers {
-			names = append(names, fmt.Sprintf("%d more", len(is.Unresolved)-maxBlockers))
+			names = append(names, fmt.Sprintf("%d more", len(unresolved)-maxBlockers))
 			break
 		}
 		names = append(names, b.String())
 	}
-	if n := is.UnreadBlockers; n > 0 {
-		names = append(names, fmt.Sprintf("%d not read (counted as unresolved)", n))
+	if unread > 0 {
+		names = append(names, fmt.Sprintf("%d not read (counted as unresolved)", unread))
 	}
 	list := strings.Join(names, ", ")
-	if v.Blockers == config.BlockersWarn {
-		p.Warnings = append(p.Warnings, fmt.Sprintf("%s has unresolved blockers: %s", is.Name(), list))
+	if mode == config.BlockersWarn {
+		p.Warnings = append(p.Warnings, fmt.Sprintf("%s has unresolved %s: %s", is.Name(), what, list))
 		return nil
 	}
 	action := "move"
 	if v.To == "" {
 		action = "run on"
 	}
-	return render.Denied("%s cannot %s %s while it has unresolved blockers: %s\n"+
-		"this is a process rule: ask the user how to proceed", v.Name, action, is.Name(), list)
+	return render.Denied("%s cannot %s %s while it has unresolved %s: %s\n"+
+		"this is a process rule: ask the user how to proceed", v.Name, action, is.Name(), what, list)
 }
 
 // closedRepeat reports whether v, a verb without a target that closes the

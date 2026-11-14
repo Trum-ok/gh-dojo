@@ -1,0 +1,7 @@
+code: 0
+--- stdout
+dry run: done #3 "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)"
+  status: Ready → Done
+  close: as completed
+--- stderr
+warning: #3 has unresolved sub-issues: #20 (In progress), #22 (not on the board), 1 not read (counted as unresolved)

@@ -1,0 +1,4 @@
+warning: #42 has unresolved sub-issues: #50 (In progress), #51 (not on the board), 1 not read (counted as unresolved)
+dry run: wrap #42 "Fix login redirect"
+  status: In progress → Ready
+confirm: #42 In progress → Ready
