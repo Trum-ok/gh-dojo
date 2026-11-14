@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"regexp"
@@ -338,6 +339,12 @@ func (b *batchRun) applyAll(ctx context.Context, items []*batchItem) {
 			it.skip(b.stop)
 			continue
 		}
+		if s := retriedSubIssue(it); s != nil {
+			// A sub-issue failed on the network or was not attempted: the
+			// re-run that finishes it finishes the parent too.
+			it.skip(s.err)
+			continue
+		}
 		if err := b.failedSubIssues(it, p); err != nil {
 			it.fail(err)
 			continue
@@ -361,6 +368,22 @@ func (b *batchRun) applyAll(ctx context.Context, items []*batchItem) {
 			}
 		}
 	}
+}
+
+// retriedSubIssue returns a sub-issue it relies on that a re-run of the
+// same command may finish: not attempted, or failed on the network, with
+// an unknown outcome or in part (exit codes 4 and 5); nil when none did.
+func retriedSubIssue(it *batchItem) *batchItem {
+	for _, s := range it.relies {
+		if s.err == nil {
+			continue
+		}
+		code := render.FromError(s.err).Code
+		if s.skipped || code == render.ExitNetwork || code == render.ExitPartial || errors.Is(s.err, graph.ErrUnknownOutcome) {
+			return s
+		}
+	}
+	return nil
 }
 
 // failedSubIssues refuses the plan p of it, as the sub_issues check would,

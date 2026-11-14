@@ -1,0 +1,6 @@
+code: 5
+--- stdout
+#41 In progress → Done, closed as completed
+--- stderr
+error: 1 of 3 done; #40: not attempted: GitHub write failed (HTTP 502); #42: GitHub write failed (HTTP 502)
+re-run the same command to retry #40, #42: it skips the issues done

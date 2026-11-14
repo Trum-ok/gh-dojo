@@ -954,6 +954,12 @@ func (r *newRun) finish(ctx context.Context, projectID, fieldID string, initial 
 // the parent or sub-issues (createIssue, whose other parts may fail too).
 // A parent with as many sub-issues as GitHub allows, one 8 levels deep, a
 // cycle, or no access to the parent's repository are such refusals.
+//
+// The words named looks for are a guess: GitHub's messages for these
+// refusals of createIssue were not checked (they cannot be produced
+// read-only). At worst a refusal they miss costs one more run: it is exit
+// code 5, and the re-run finds the issue and sends addSubIssue, whose
+// refusal is told by its path alone.
 func parentRefused(err error, field string, named bool) bool {
 	var gqlErr *api.GraphQLError
 	if errors.Is(err, graph.ErrUnknownOutcome) || !errors.As(err, &gqlErr) || gqlErr == nil || len(gqlErr.Errors) == 0 {
@@ -1245,12 +1251,22 @@ func (r *newRun) partial(err error) error {
 		// Re-running cannot help a parent GitHub refuses: full, too deep, a
 		// cycle, or out of the token's reach. GitHub's own words say which.
 		var gqlErr *api.GraphQLError
+		forbidden := false
 		if errors.As(cause, &gqlErr) && gqlErr != nil && len(gqlErr.Errors) > 0 {
 			why = "GitHub: " + singleLine(gqlErr.Errors[0].Message)
+			forbidden = slices.ContainsFunc(gqlErr.Errors, func(i api.GraphQLErrorItem) bool { return i.Type == "FORBIDDEN" })
 		}
-		return render.Usage("%s %s, but %s; re-running will not help\n%s", r.name(), what, step, why).
-			WithFix("pass another --" + parentFlag + " to make it a sub-issue (gh issue edit " + strconv.Itoa(r.number) +
-				" -R " + r.repo.String() + " --parent <issue>), or leave it without one").WithCause(err)
+		fix := "pass another --" + parentFlag + " to make it a sub-issue (gh issue edit " + strconv.Itoa(r.number) +
+			" -R " + r.repo.String() + " --parent <issue>), or leave it without one"
+		again := "; re-running will not help"
+		if forbidden {
+			// The token may lack access to the parent's repository.
+			again = "; re-running will not help as the token is"
+			fix = "if the token lacks access to the parent's repository: " + render.AuthFix +
+				", then re-run the same command; else " + fix
+		}
+		return render.Usage("%s %s, but %s%s\n%s", r.name(), what, step, again, why).
+			WithFix(fix).WithCause(err)
 	}
 	if graph.IsCycle(cause) {
 		// Nor a blocked-by link that makes a cycle through other issues.

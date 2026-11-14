@@ -301,6 +301,7 @@ func TestNewParentRefused(t *testing.T) {
 	}{
 		{"new_parent_full", 1},
 		{"new_parent_refused", 2},
+		{"new_parent_forbidden", 2},
 		{"new_parent_create_refused", 4},
 	} {
 		t.Run(tt.fixture, func(t *testing.T) {

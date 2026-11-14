@@ -53,6 +53,9 @@ func TestBatchSubIssues(t *testing.T) {
 		}},
 		{"batch_done_sub_issues_refused", []runs{{[]string{"done", "40", "41", "42"}, render.ExitDenied, 2, "batch_sub_issues_refused"}}},
 		{"batch_done_sub_issues_failed", []runs{{[]string{"done", "40", "41", "42"}, render.ExitDenied, 3, "batch_sub_issues_failed"}}},
+		// A lost write of #42 is no refusal: #40 is not attempted, and
+		// the same command finishes both (exit 5).
+		{"batch_done_sub_issues_network", []runs{{[]string{"done", "40", "41", "42"}, render.ExitPartial, 3, "batch_sub_issues_network"}}},
 	} {
 		t.Run(tt.fixture, func(t *testing.T) {
 			withConfig(t, verbDojoConfig+"\n[verbs.done]\nsub_issues = \"deny\"\n")
