@@ -6,7 +6,8 @@ import "encoding/json"
 // labels 20 (100 with Lookup.AllLabels), assignees 10, blockers 20 each way
 // (blockedBy 50 with Lookup.AllBlockers; each with its first 10 project
 // items), the parent and 20 sub-issues (100 with Lookup.AllSubIssues),
-// read as blockers are, project items 20 (each with up to 100 field
+// read as blockers are, with how many sub-issues there are and are closed
+// (subIssuesSummary), project items 20 (each with up to 100 field
 // values), the last 20 status changes and the last $comments comments;
 // every list of the card keeps its totalCount, so the reader can tell
 // "none" from "not read".
@@ -59,6 +60,7 @@ const cardSelection = `{
         blocking(first: 20) { totalCount nodes { ...link } }
         parent { ...link }
         subIssues(first: 20) { totalCount nodes { ...link } }
+        subIssuesSummary { total completed }
         projectItems(first: 20) {
           totalCount
           nodes {
@@ -179,10 +181,16 @@ type issueJSON struct {
 		ViewerDidAuthor bool   `json:"viewerDidAuthor"`
 		Body            string `json:"body"`
 	}] `json:"comments"`
-	BlockedBy     conn[*linkJSON] `json:"blockedBy"`
-	Blocking      conn[*linkJSON] `json:"blocking"`
-	Parent        *linkJSON       `json:"parent"`
-	SubIssues     conn[*linkJSON] `json:"subIssues"`
+	BlockedBy conn[*linkJSON] `json:"blockedBy"`
+	Blocking  conn[*linkJSON] `json:"blocking"`
+	Parent    *linkJSON       `json:"parent"`
+	SubIssues conn[*linkJSON] `json:"subIssues"`
+	// SubIssuesSummary counts all sub-issues; completed are the closed
+	// ones, whatever the reason (checked on live issues, #52).
+	SubIssuesSummary *struct {
+		Total     int `json:"total"`
+		Completed int `json:"completed"`
+	} `json:"subIssuesSummary"`
 	ProjectItems  conn[*itemJSON] `json:"projectItems"`
 	TimelineItems conn[*struct {
 		CreatedAt      string `json:"createdAt"`

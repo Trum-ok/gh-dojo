@@ -181,20 +181,17 @@ func (v cardView) brief(c *issue.Card) string {
 //	· parent: #12 · sub-issues: 3 of 5 closed, 1 unresolved (#14)
 func (v cardView) briefHierarchy(c *issue.Card) string {
 	var s string
-	if l := c.Parent; l != nil {
-		s += " · parent: " + linkRef(c, *l, v.def)
+	switch {
+	case c.Parent != nil:
+		s += " · parent: " + linkRef(c, *c.Parent, v.def)
+	case c.ParentHidden:
+		s += " · parent: not readable"
 	}
 	if len(c.SubIssues.Nodes) == 0 && c.SubIssues.TotalCount == 0 {
 		return s
 	}
-	closed := 0
-	for _, l := range c.SubIssues.Nodes {
-		if l.Closed() {
-			closed++
-		}
-	}
 	unresolved := c.UnresolvedSubIssues(v.resolved)
-	parts := subIssueCounts(c, closed, len(unresolved))
+	parts := subIssueCounts(c, len(unresolved))
 	if len(unresolved) > 0 {
 		refs := make([]string, 0, maxBriefRefs)
 		for _, l := range unresolved[:min(len(unresolved), maxBriefRefs)] {
@@ -355,10 +352,14 @@ func writeBlocking(b *strings.Builder, c *issue.Card, def issue.Repo) {
 	}
 }
 
-// parent names the issue's parent with where it stands, "none" for none.
+// parent names the issue's parent with where it stands, "none" for none,
+// "not readable" for one GitHub withheld from the token.
 func (v cardView) parent(c *issue.Card) string {
 	l := c.Parent
-	if l == nil {
+	switch {
+	case l == nil && c.ParentHidden:
+		return "not readable (GitHub withheld it from the token)"
+	case l == nil:
 		return "none"
 	}
 	about := "closed"
@@ -384,7 +385,7 @@ func (v cardView) writeSubIssues(b *strings.Builder, c *issue.Card) {
 			unresolved = append(unresolved, l)
 		}
 	}
-	writeLinks(b, "sub-issues", c.SubIssues, subIssueCounts(c, len(closed), len(unresolved)))
+	writeLinks(b, "sub-issues", c.SubIssues, subIssueCounts(c, len(unresolved)))
 	for _, l := range unresolved {
 		writeLink(b, l, linkRef(c, l, v.def), linkPlace(l))
 	}
@@ -396,24 +397,26 @@ func (v cardView) writeSubIssues(b *strings.Builder, c *issue.Card) {
 	}
 }
 
-// subIssueCounts says how many of the sub-issues read are closed, "3 of 5
-// closed" when all were read, and how many are unresolved when any is
-// open: "3 of 5 closed, 1 unresolved", "3 closed, none unresolved". None
-// for an issue without sub-issues.
-func subIssueCounts(c *issue.Card, closed, unresolved int) []string {
-	read := len(c.SubIssues.Nodes)
-	if read == 0 {
+// subIssueCounts says how many sub-issues are closed, of all of them
+// ("17 of 55 closed", GitHub's count even when only 20 were read), and
+// how many of those read are unresolved when any is open: "3 of 5
+// closed, 1 unresolved", "17 of 55 closed, none unresolved of those
+// read". None for an issue without sub-issues.
+func subIssueCounts(c *issue.Card, unresolved int) []string {
+	read, total := len(c.SubIssues.Nodes), max(c.SubIssues.TotalCount, len(c.SubIssues.Nodes))
+	if total == 0 {
 		return nil
 	}
-	counts := []string{fmt.Sprintf("%d closed", closed)}
-	if read >= c.SubIssues.TotalCount {
-		counts[0] = fmt.Sprintf("%d of %d closed", closed, read)
+	counts := []string{fmt.Sprintf("%d of %d closed", c.SubIssuesClosed, total)}
+	of := ""
+	if read < total {
+		of = " of those read"
 	}
 	switch {
 	case unresolved > 0:
-		counts = append(counts, fmt.Sprintf("%d unresolved", unresolved))
-	case closed < read:
-		counts = append(counts, "none unresolved")
+		counts = append(counts, fmt.Sprintf("%d unresolved%s", unresolved, of))
+	case c.SubIssuesClosed < total:
+		counts = append(counts, "none unresolved"+of)
 	}
 	return counts
 }

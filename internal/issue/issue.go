@@ -131,6 +131,14 @@ type Card struct {
 	// place on the board.
 	Parent    *Link
 	SubIssues graph.Page[Link]
+	// ParentHidden says the issue has a parent GitHub withheld from the
+	// token: Parent is nil, but not "none".
+	ParentHidden bool
+	// SubIssuesClosed counts the closed sub-issues, all of them, also
+	// those beyond the window (subIssuesSummary.completed, which counts an
+	// issue closed for any reason); the closed ones read when GitHub did
+	// not return it.
+	SubIssuesClosed int
 
 	// Item is the issue's item on Request.Board, nil when the issue is not
 	// on that board or BoardUnknown (see OnBoard). An archived item is still
@@ -568,6 +576,18 @@ func (n *issueJSON) card(req Request, hidden [][]any) *Card {
 	c.SubIssues = links(n.SubIssues, req, below(hidden, "subIssues"), renamed)
 	if n.Parent != nil {
 		c.Parent = link(n.Parent, req, below(hidden, "parent", "projectItems"), renamed)
+	} else {
+		c.ParentHidden = withheld(hidden, "parent")
+	}
+	if s := n.SubIssuesSummary; s != nil {
+		c.SubIssues.TotalCount = max(c.SubIssues.TotalCount, s.Total)
+		c.SubIssuesClosed = s.Completed
+	} else {
+		for _, l := range c.SubIssues.Nodes {
+			if l.Closed() {
+				c.SubIssuesClosed++
+			}
+		}
 	}
 
 	if req.Board == nil {

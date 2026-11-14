@@ -131,6 +131,7 @@ code: 0
       ],
       "blocking_total": 5,
       "parent": null,
+      "parent_hidden": false,
       "sub_issues": [],
       "sub_issues_total": 0,
       "sub_issues_closed": 0,

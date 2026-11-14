@@ -237,6 +237,8 @@ func TestReadSubIssues(t *testing.T) {
 			linkNode("Trum-ok/gh-dojo", 12, "OPEN", ""),
 			nil,
 		}}
+		// GitHub counts the withheld one too: it is closed.
+		is["subIssuesSummary"] = map[string]any{"total": 5, "completed": 2}
 	})
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -280,7 +282,43 @@ func TestReadSubIssues(t *testing.T) {
 	}
 }
 
-// TestReadSubIssuesWindow: AllSubIssues reads 100 sub-issues, GitHub's
+// TestReadParentHidden: a parent GitHub withheld from the token (null,
+// with an error at its path) is ParentHidden, not "none"; the rest of the
+// card is read.
+func TestReadParentHidden(t *testing.T) {
+	path := variant(t, func(is map[string]any) { is["parent"] = nil })
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var f map[string]any
+	if err := json.Unmarshal(data, &f); err != nil {
+		t.Fatal(err)
+	}
+	resp := f["interactions"].([]any)[0].(map[string]any)["response"].(map[string]any)
+	resp["errors"] = []any{map[string]any{
+		"type": "FORBIDDEN", "message": "Resource not accessible by integration",
+		"path": []any{"repository", "issueOrPullRequest", "parent"},
+	}}
+	if data, err = json.Marshal(f); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	srv := graphtest.New(t, path)
+	req := dojoStatus
+	req.Number = 3
+	card, err := issue.Read(context.Background(), srv.Client(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if card.Parent != nil || !card.ParentHidden || !card.Incomplete {
+		t.Errorf("parent %+v, hidden %v, incomplete %v; want nil, true, true", card.Parent, card.ParentHidden, card.Incomplete)
+	}
+}
+
+// TestReadSubIssuesWindow:AllSubIssues reads 100 sub-issues, GitHub's
 // limit per issue, instead of the card's 20.
 func TestReadSubIssuesWindow(t *testing.T) {
 	path := variant(t, func(map[string]any) {})
@@ -738,8 +776,9 @@ func dump(c *issue.Card) []byte {
 	if l := c.Parent; l != nil {
 		p("parent %s %s on board=%v archived=%v status=%q unknown=%q %q", linkRef(*l, c.Repo), l.State, l.OnBoard, l.Archived, l.Status, l.StatusUnknown, l.Title)
 	} else {
-		p("parent none")
+		p("parent none (hidden=%v)", c.ParentHidden)
 	}
+	p("sub-issues closed %d", c.SubIssuesClosed)
 	switch {
 	case c.Item == nil && c.BoardUnknown:
 		p("item: board membership unknown: %s", c.BoardUnknownReason)

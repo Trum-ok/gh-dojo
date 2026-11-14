@@ -14,7 +14,8 @@ blocking (5):
   #6 OPEN on board=true archived=false status="Ready" unknown="" "Сверка конфига с доской"
   #4 OPEN on board=true archived=false status="Ready" unknown="" "Пресет kanban через embed.FS"
 sub-issues (0):
-parent none
+parent none (hidden=false)
+sub-issues closed 0
 item PVTI_lAHOBFGd5c4BrMYFzhH6Jn8 archived=false created 2026-11-11T18:19:12Z status="Ready" unknown=false values truncated=false
   Status [SINGLE_SELECT] "Ready" option=61e4505c iteration= /0 field=PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ
   Size [SINGLE_SELECT] "M" option=7515a9f1 iteration= /0 field=PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4

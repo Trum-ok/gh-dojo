@@ -59,11 +59,13 @@ type showCard struct {
 	Unresolved     int        `json:"unresolved_blockers"`
 	Blocking       []showLink `json:"blocking"`
 	BlockingTotal  int        `json:"blocking_total"`
-	// Parent is the issue this one is a sub-issue of, null for none.
-	// SubIssues are its own; SubIssuesTotal counts every one, also those
-	// not read; SubIssuesClosed and UnresolvedSubIssues count the ones read
-	// that are closed and that are unresolved (as blockers are).
+	// Parent is the issue this one is a sub-issue of, null for none or
+	// when ParentHidden: GitHub withheld it from the token. SubIssues are
+	// its own; SubIssuesTotal and SubIssuesClosed count all of them, also
+	// those not read; UnresolvedSubIssues counts the ones read that are
+	// unresolved (as blockers are).
 	Parent              *showLink  `json:"parent"`
+	ParentHidden        bool       `json:"parent_hidden"`
 	SubIssues           []showLink `json:"sub_issues"`
 	SubIssuesTotal      int        `json:"sub_issues_total"`
 	SubIssuesClosed     int        `json:"sub_issues_closed"`
@@ -210,6 +212,8 @@ func (v cardView) cardJSON(c *issue.Card, brief bool) showCard {
 		BlockingTotal:       max(c.Blocking.TotalCount, len(c.Blocking.Nodes)),
 		SubIssues:           v.linksJSON(c, c.SubIssues.Nodes),
 		SubIssuesTotal:      max(c.SubIssues.TotalCount, len(c.SubIssues.Nodes)),
+		SubIssuesClosed:     c.SubIssuesClosed,
+		ParentHidden:        c.ParentHidden,
 		UnresolvedSubIssues: len(c.UnresolvedSubIssues(v.resolved)),
 		HistoryTruncated:    c.HistoryTruncated,
 		HistoryUntracked:    c.HistoryUntracked,
@@ -220,11 +224,6 @@ func (v cardView) cardJSON(c *issue.Card, brief bool) showCard {
 	if c.Parent != nil {
 		p := v.linkJSON(c, *c.Parent)
 		out.Parent = &p
-	}
-	for _, l := range c.SubIssues.Nodes {
-		if l.Closed() {
-			out.SubIssuesClosed++
-		}
 	}
 	if v.sprintField != "" {
 		it, unknown := v.sprintOf(c)

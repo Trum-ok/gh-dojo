@@ -14,7 +14,8 @@ blocking (5):
   #6 OPEN on board=true archived=false status="Ready" unknown="" "Сверка конфига с доской"
   #4 OPEN on board=true archived=false status="Ready" unknown="" "Пресет kanban через embed.FS"
 sub-issues (0):
-parent none
+parent none (hidden=false)
+sub-issues closed 0
 item: not on the board
 history (truncated=false untracked=false):
 comments 0 of 0:

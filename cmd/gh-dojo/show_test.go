@@ -292,6 +292,7 @@ func TestCardText(t *testing.T) {
 		{Repo: dojo, Number: 10, Title: "Open", State: issue.StateOpen, OnBoard: true, Status: "In progress"},
 		{Repo: dojo, Number: 11, Title: "Done", State: issue.StateClosed},
 	}}
+	subs.SubIssuesClosed = 17
 	b.WriteString("\n### sub-issues not all read\n")
 	header(resolved.card(&subs), "parent", "sub-issues", "  #")
 	b.WriteString(resolved.brief(&subs))
@@ -299,12 +300,19 @@ func TestCardText(t *testing.T) {
 		{Repo: dojo, Number: 11, Title: "Done", State: issue.StateClosed},
 		{Repo: dojo, Number: 12, Title: "Ready", State: issue.StateOpen, OnBoard: true, Status: "Ready"},
 	}}
+	subs.SubIssuesClosed = 1
 	b.WriteString("\n### sub-issues resolved\n")
 	header(resolved.card(&subs), "sub-issues")
 	b.WriteString(resolved.brief(&subs))
 	subs.SubIssues.Nodes[1] = issue.Link{Repo: dojo, Number: 12, Title: "Closed", State: issue.StateClosed}
+	subs.SubIssuesClosed = 2
 	b.WriteString("\n### sub-issues closed\n")
 	header(resolved.card(&subs), "sub-issues")
+	b.WriteString(resolved.brief(&subs))
+	// A parent GitHub withheld from the token is not "none".
+	subs.Parent, subs.ParentHidden = nil, true
+	b.WriteString("\n### parent not readable\n")
+	header(resolved.card(&subs), "parent")
 	b.WriteString(resolved.brief(&subs))
 	testutil.Golden(t, "show/card_text", []byte(b.String()))
 }

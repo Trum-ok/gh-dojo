@@ -142,6 +142,7 @@ code: 0
         "status_unknown_reason": null,
         "resolved": false
       },
+      "parent_hidden": false,
       "sub_issues": [
         {
           "ref": "Trum-ok/gh-dojo#20",
