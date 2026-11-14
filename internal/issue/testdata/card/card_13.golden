@@ -9,6 +9,8 @@ blocked by (2):
   #4 OPEN on board=true archived=false status="Ready" unknown="" "Пресет kanban через embed.FS"
 blocking (1):
   #14 OPEN on board=true archived=false status="Ready" unknown="" "Skill для агентов и переход на gh dojo (рубеж v0.0)"
+sub-issues (0):
+parent none
 item PVTI_lAHOBFGd5c4BrMYFzhH6Ltk archived=false created 2026-11-11T18:21:02Z status="Ready" unknown=false values truncated=false
   Status [SINGLE_SELECT] "Ready" option=61e4505c iteration= /0 field=PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ
   Size [SINGLE_SELECT] "S" option=f784b110 iteration= /0 field=PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4

@@ -32,6 +32,11 @@ type Lookup struct {
 	// (blockers = "warn" or "deny"): a resolved blocker beyond the window
 	// would count as unresolved.
 	AllBlockers bool
+	// AllSubIssues reads up to 100 of the issue's sub-issues (GitHub's
+	// limit per issue) instead of the card's 20, for a verb that checks
+	// them (sub_issues = "warn" or "deny"): one beyond the window would
+	// count as unresolved.
+	AllSubIssues bool
 	// Links are issues to read for blocked-by links (see Links), such as
 	// the issue --by names for blockers = "link".
 	Links Links
@@ -40,7 +45,7 @@ type Lookup struct {
 // Empty reports whether there is nothing to look up.
 func (l Lookup) Empty() bool {
 	return len(l.Labels) == 0 && l.User == "" && !l.Viewer && !l.AllLabels && !l.AssigneeIDs && !l.AllBlockers &&
-		len(l.Links) == 0
+		!l.AllSubIssues && len(l.Links) == 0
 }
 
 // Found is what a Lookup found. Its IDs are for mutations only; never
@@ -73,14 +78,17 @@ const assignableWindow = 100
 // widens it to allLabelsWindow. assigneesWindow is its assignees
 // selection; Lookup.AssigneeIDs adds their IDs (assigneeIDsWindow).
 // blockersWindow is its blockers selection; Lookup.AllBlockers widens it
-// to allBlockersWindow.
+// to allBlockersWindow. subIssuesWindow is its sub-issues selection;
+// Lookup.AllSubIssues widens it to allSubIssuesWindow.
 const (
-	labelsWindow      = "labels(first: 20)"
-	allLabelsWindow   = "labels(first: 100)"
-	assigneesWindow   = "assignees(first: 10) { totalCount nodes { login } }"
-	assigneeIDsWindow = "assignees(first: 10) { totalCount nodes { id login } }"
-	blockersWindow    = "blockedBy(first: 20)"
-	allBlockersWindow = "blockedBy(first: 50)"
+	labelsWindow       = "labels(first: 20)"
+	allLabelsWindow    = "labels(first: 100)"
+	assigneesWindow    = "assignees(first: 10) { totalCount nodes { login } }"
+	assigneeIDsWindow  = "assignees(first: 10) { totalCount nodes { id login } }"
+	blockersWindow     = "blockedBy(first: 20)"
+	allBlockersWindow  = "blockedBy(first: 50)"
+	subIssuesWindow    = "subIssues(first: 20)"
+	allSubIssuesWindow = "subIssues(first: 100)"
 )
 
 // The parts of cardQuery a Lookup extends.
@@ -101,7 +109,8 @@ func labelAlias(i int) string { return fmt.Sprintf("label%d", i) }
 // itself.
 //
 // AllLabels widens the issue's labels window, AllBlockers its blockers
-// window; AssigneeIDs reads the assignees' IDs.
+// window, AllSubIssues its sub-issues window; AssigneeIDs reads the
+// assignees' IDs.
 //
 //	query IssueCard(..., $label0: String!, $user: String!) {
 //	  repository(owner: $owner, name: $repo) {
@@ -156,7 +165,7 @@ func (l Lookup) parts() lookupParts {
 
 // widen widens the issue's windows of a card selection: labels for
 // Lookup.AllLabels, assignees with their IDs for Lookup.AssigneeIDs,
-// blockers for Lookup.AllBlockers.
+// blockers for Lookup.AllBlockers, sub-issues for Lookup.AllSubIssues.
 func (l Lookup) widen(s string) string {
 	if l.AllLabels {
 		s = strings.Replace(s, labelsWindow, allLabelsWindow, 1)
@@ -166,6 +175,9 @@ func (l Lookup) widen(s string) string {
 	}
 	if l.AllBlockers {
 		s = strings.Replace(s, blockersWindow, allBlockersWindow, 1)
+	}
+	if l.AllSubIssues {
+		s = strings.Replace(s, subIssuesWindow, allSubIssuesWindow, 1)
 	}
 	return s
 }

@@ -1,0 +1,248 @@
+code: 0
+--- stdout
+{
+  "schema_version": 1,
+  "error": null,
+  "brief": false,
+  "issues": [
+    {
+      "number": 3,
+      "repo": "Trum-ok/gh-dojo",
+      "url": "https://github.com/Trum-ok/gh-dojo/issues/3",
+      "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)",
+      "state": "open",
+      "state_reason": null,
+      "author": "Trum-ok",
+      "created_at": "2026-11-11T18:19:10Z",
+      "closed_at": null,
+      "incomplete": false,
+      "board": {
+        "on_board": true,
+        "unknown_reason": null,
+        "status": "Ready",
+        "status_unknown": false,
+        "archived": false,
+        "fields": [
+          {
+            "name": "Size",
+            "value": "M"
+          }
+        ],
+        "fields_truncated": false
+      },
+      "sprint": null,
+      "milestone": {
+        "title": "v0.0 — самохостинг",
+        "due_on": null
+      },
+      "labels": [],
+      "labels_total": 0,
+      "assignees": [],
+      "assignees_total": 0,
+      "blocked_by": [
+        {
+          "ref": "Trum-ok/gh-dojo#2",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 2,
+          "title": "Коды выхода и короткие ошибки (internal/render)",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": false,
+          "status_unknown_reason": null,
+          "resolved": true
+        },
+        {
+          "ref": "Trum-ok/gh-dojo#1",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 1,
+          "title": "Каркас: Go-модуль, cobra и установка как расширение gh",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": false,
+          "status_unknown_reason": null,
+          "resolved": true
+        }
+      ],
+      "blocked_by_total": 2,
+      "unresolved_blockers": 0,
+      "blocking": [
+        {
+          "ref": "Trum-ok/gh-dojo#11",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 11,
+          "title": "Глаголы из конфига: проверки и план эффектов (internal/workflow)",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": false,
+          "status_unknown_reason": null,
+          "resolved": true
+        },
+        {
+          "ref": "Trum-ok/gh-dojo#8",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 8,
+          "title": "Команда list",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": false,
+          "status_unknown_reason": null,
+          "resolved": true
+        },
+        {
+          "ref": "Trum-ok/gh-dojo#7",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 7,
+          "title": "Команда show <N>…",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": false,
+          "status_unknown_reason": null,
+          "resolved": true
+        },
+        {
+          "ref": "Trum-ok/gh-dojo#6",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 6,
+          "title": "Сверка конфига с доской",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": false,
+          "status_unknown_reason": null,
+          "resolved": true
+        },
+        {
+          "ref": "Trum-ok/gh-dojo#4",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 4,
+          "title": "Пресет kanban через embed.FS",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": false,
+          "status_unknown_reason": null,
+          "resolved": true
+        }
+      ],
+      "blocking_total": 5,
+      "parent": {
+        "ref": "Trum-ok/gh-dojo#2",
+        "repo": "Trum-ok/gh-dojo",
+        "number": 2,
+        "title": "Epic: process verbs",
+        "state": "open",
+        "on_board": true,
+        "status": "In progress",
+        "archived": false,
+        "status_unknown_reason": null,
+        "resolved": false
+      },
+      "sub_issues": [
+        {
+          "ref": "Trum-ok/gh-dojo#20",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 20,
+          "title": "Read sub-issues with the card",
+          "state": "open",
+          "on_board": true,
+          "status": "In progress",
+          "archived": false,
+          "status_unknown_reason": null,
+          "resolved": false
+        },
+        {
+          "ref": "Trum-ok/gh-dojo#21",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 21,
+          "title": "Show the hierarchy",
+          "state": "open",
+          "on_board": true,
+          "status": "Ready",
+          "archived": false,
+          "status_unknown_reason": null,
+          "resolved": true
+        },
+        {
+          "ref": "acme/api#7",
+          "repo": "acme/api",
+          "number": 7,
+          "title": "Expose the parent in the API",
+          "state": "closed",
+          "on_board": false,
+          "status": null,
+          "archived": false,
+          "status_unknown_reason": null,
+          "resolved": true
+        },
+        {
+          "ref": "Trum-ok/gh-dojo#22",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 22,
+          "title": "Document sub-issues",
+          "state": "open",
+          "on_board": false,
+          "status": null,
+          "archived": false,
+          "status_unknown_reason": null,
+          "resolved": false
+        },
+        {
+          "ref": "Trum-ok/gh-dojo#23",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 23,
+          "title": "Check sub-issues in verbs",
+          "state": "open",
+          "on_board": true,
+          "status": null,
+          "archived": false,
+          "status_unknown_reason": null,
+          "resolved": false
+        }
+      ],
+      "sub_issues_total": 5,
+      "sub_issues_closed": 1,
+      "unresolved_sub_issues": 3,
+      "history": [
+        {
+          "at": "2026-11-11T18:19:14Z",
+          "from": null,
+          "to": "Backlog",
+          "actor": "github-project-automation",
+          "automated": true
+        },
+        {
+          "at": "2026-11-11T18:42:17Z",
+          "from": "Backlog",
+          "to": "In progress",
+          "actor": "Trum-ok",
+          "automated": false
+        },
+        {
+          "at": "2026-11-11T19:02:20Z",
+          "from": "In progress",
+          "to": "Ready",
+          "actor": "Trum-ok",
+          "automated": false
+        }
+      ],
+      "history_truncated": false,
+      "history_untracked": false,
+      "body": {
+        "text": "## Зачем\nПроцесс проекта — данные в конфиге, а не код. Все команды читают конфиг.\n\n## Что сделать\n- Поиск `.github/dojo.toml` вверх от текущей папки.\n- Разбор `version`, `preset`, `[board]` (owner, project, repos, assignee), `[fields]` (`status` обязателен), `[session]` (env, link), `[verbs.*]`.\n- Для глаголов в v0.0: `when`, `to`, `from`, `require`, `require_one_of`, `comment` (шаблон). Остальные ключи из спеки распознаются, но дают понятную ошибку «не поддерживается в этой версии», а не молча игнорируются.\n- Ошибки валидации — код 1, с указанием ключа и допустимых значений.\n- Сверка с доской — отдельная задача.\n\n## Готово, когда\n- Пример конфига из спеки (без неподдерживаемых ключей) загружается.\n- Тесты на отсутствие файла, неизвестный ключ, пустой `fields.status`, глагол без `when`.\n\nСпека: `docs/spec.md`: «Модель и конфиг».",
+        "cut": false,
+        "length": 840
+      },
+      "comments": [],
+      "comments_total": 0
+    }
+  ],
+  "failed": [],
+  "warnings": []
+}
+
+--- stderr

@@ -9,6 +9,8 @@ labels: none
 assignees: alice
 blocked by: none
 blocking: none
+parent: none
+sub-issues: none
 status history:
   2026-10-20 08:00 no status → Todo by alice
   2026-10-21 09:00 Todo → In progress by alice

@@ -8,6 +8,8 @@ blocked by: 1 unresolved, 1 resolved, showing 2 of 25
   acme/auth#7 Very long title Very long title Very long title Very long title Very long title… (not on the board)
   #2 Closed one (closed)
 blocking: none
+parent: none
+sub-issues: none
 status history (latest changes only; older ones are not read):
   2026-11-12 09:30 Backlog → Ready (automation)
 note: GitHub withheld part of this issue from the token (a project or linked issue it cannot see); the rest is accurate
@@ -52,4 +54,29 @@ blocked by: 5 unresolved, 1 resolved
 #42 Fix login redirect
 open (reopened) · no status (archived) · labels: bug, area:cli (showing 2 of 23) · assignees: none
 blocked by 5 unresolved (#3, #4, #5, #8, #9); 1 resolved · blocking none · comments: 130
+note: GitHub withheld part of this issue from the token; the rest is accurate
+
+### sub-issues not all read
+  #2 Closed one (closed)
+parent: acme/api#1 Closed epic (closed)
+sub-issues: 1 closed, 1 unresolved, showing 2 of 73
+  #10 Open (In progress)
+  #11 Done (closed)
+#42 Fix login redirect
+open (reopened) · no status (archived) · labels: bug, area:cli (showing 2 of 23) · assignees: none
+blocked by 1 unresolved (acme/auth#7); 1 resolved (showing 2 of 25 blockers) · blocking none · parent: acme/api#1 · sub-issues: 1 closed, 1 unresolved (#10), showing 2 of 73 · comments: 130
+note: GitHub withheld part of this issue from the token; the rest is accurate
+
+### sub-issues resolved
+sub-issues: 1 of 2 closed, none unresolved
+#42 Fix login redirect
+open (reopened) · no status (archived) · labels: bug, area:cli (showing 2 of 23) · assignees: none
+blocked by 1 unresolved (acme/auth#7); 1 resolved (showing 2 of 25 blockers) · blocking none · parent: acme/api#1 · sub-issues: 1 of 2 closed, none unresolved · comments: 130
+note: GitHub withheld part of this issue from the token; the rest is accurate
+
+### sub-issues closed
+sub-issues: 2 of 2 closed
+#42 Fix login redirect
+open (reopened) · no status (archived) · labels: bug, area:cli (showing 2 of 23) · assignees: none
+blocked by 1 unresolved (acme/auth#7); 1 resolved (showing 2 of 25 blockers) · blocking none · parent: acme/api#1 · sub-issues: 2 of 2 closed · comments: 130
 note: GitHub withheld part of this issue from the token; the rest is accurate

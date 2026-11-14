@@ -15,6 +15,8 @@ blocking: 5 open
   #7 Команда show <N>… (Ready)
   #6 Сверка конфига с доской (Ready)
   #4 Пресет kanban через embed.FS (Ready)
+parent: none
+sub-issues: none
 status history:
   2026-11-11 18:19 no status → Backlog (automation)
   2026-11-11 18:42 Backlog → In progress by Trum-ok
@@ -48,6 +50,8 @@ labels: none
 assignees: none
 blocked by: none
 blocking: none
+parent: none
+sub-issues: none
 
 description:
   An issue of another repository, read in the same request.

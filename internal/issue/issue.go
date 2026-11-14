@@ -124,6 +124,13 @@ type Card struct {
 	// open and closed alike (see UnresolvedBlockers).
 	BlockedBy graph.Page[Link]
 	Blocking  graph.Page[Link]
+	// Parent is the issue this one is a sub-issue of, nil for none (or
+	// one the token cannot see: Incomplete). SubIssues are its own
+	// sub-issues, open and closed alike, in GitHub's order (see
+	// UnresolvedSubIssues). Both are read as blockers are, with their
+	// place on the board.
+	Parent    *Link
+	SubIssues graph.Page[Link]
 
 	// Item is the issue's item on Request.Board, nil when the issue is not
 	// on that board or BoardUnknown (see OnBoard). An archived item is still
@@ -224,6 +231,20 @@ func (c *Card) UnresolvedBlockers(resolved []string) []Link {
 	return out
 }
 
+// UnresolvedSubIssues returns the sub-issues whose work is not done, by
+// the rule of blockers (see Link.Resolved): open and not in a resolved
+// status, or with a status that could not be read. The sub-issues check
+// of a verb uses this. When SubIssues.Truncated(), more may exist.
+func (c *Card) UnresolvedSubIssues(resolved []string) []Link {
+	var out []Link
+	for _, l := range c.SubIssues.Nodes {
+		if !l.Resolved(resolved) {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
 // Milestone is an issue's milestone.
 type Milestone struct {
 	Title string
@@ -241,7 +262,8 @@ type Comment struct {
 	Body            string
 }
 
-// Link is an issue that blocks or is blocked by the card.
+// Link is an issue linked to the card: one that blocks or is blocked by
+// it, its parent or one of its sub-issues.
 type Link struct {
 	Repo   Repo
 	Number int
@@ -543,6 +565,10 @@ func (n *issueJSON) card(req Request, hidden [][]any) *Card {
 	}
 	c.BlockedBy = links(n.BlockedBy, req, below(hidden, "blockedBy"), renamed)
 	c.Blocking = links(n.Blocking, req, below(hidden, "blocking"), renamed)
+	c.SubIssues = links(n.SubIssues, req, below(hidden, "subIssues"), renamed)
+	if n.Parent != nil {
+		c.Parent = link(n.Parent, req, below(hidden, "parent", "projectItems"), renamed)
+	}
 
 	if req.Board == nil {
 		return c
@@ -667,13 +693,19 @@ func links(in conn[*linkJSON], req Request, hidden [][]any, renamed bool) graph.
 		if l == nil {
 			continue // hidden from the token
 		}
-		link := Link{Number: l.Number, Title: l.Title, State: l.State}
-		if l.Repository != nil {
-			link.Repo, _ = ParseRepo(l.Repository.NameWithOwner)
-		}
-		l.board(req, &link, below(hidden, "nodes", i, "projectItems"), renamed)
-		out.Nodes = append(out.Nodes, link)
+		out.Nodes = append(out.Nodes, *link(l, req, below(hidden, "nodes", i, "projectItems"), renamed))
 	}
+	return out
+}
+
+// link converts one linked issue; hidden are the withheld paths below its
+// projectItems.
+func link(l *linkJSON, req Request, hidden [][]any, renamed bool) *Link {
+	out := &Link{Number: l.Number, Title: l.Title, State: l.State}
+	if l.Repository != nil {
+		out.Repo, _ = ParseRepo(l.Repository.NameWithOwner)
+	}
+	l.board(req, out, hidden, renamed)
 	return out
 }
 

@@ -30,14 +30,17 @@ func newShowCmd() (*cobra.Command, error) {
 		Long: showWhen + `.
 
 Prints per issue: state, board status and fields, the sprint (with
-fields.sprint), milestone, labels, assignees, blockers both ways with
-their board status, status history on the board, the description and the
-latest comments, indented. Times are UTC.
+fields.sprint), milestone, labels, assignees, blockers both ways, the
+parent issue and the sub-issues (GitHub's sub-issues), each with its board
+status, status history on the board, the description and the latest
+comments, indented. Times are UTC.
 
 A blocker is resolved, no longer blocking, when it is closed or its board
 status is in statuses.resolved` + resolvedHelp() + `.
 Unresolved blockers are listed first; a blocker whose board status could
-not be read counts as unresolved.
+not be read counts as unresolved. Sub-issues follow the same rule and
+order, and their header counts the closed and the unresolved ones
+("3 of 5 closed, 1 unresolved").
 
 Folding, always with a note saying what is hidden:
   - the last ` + strconv.Itoa(defaultShownComments) + ` comments are printed; --comments N prints the last N,
@@ -45,8 +48,8 @@ Folding, always with a note saying what is hidden:
   - a description is cut at ` + strconv.Itoa(maxBodyRunes) + ` characters, and the comments shown share
     ` + strconv.Itoa(commentBudgetRunes) + ` (` + strconv.Itoa(minCommentRunes) + ` to ` + strconv.Itoa(maxCommentRunes) + ` each); --full prints them whole.
 --brief prints three lines per issue (four when GitHub hid part of it):
-title; state, status, sprint, milestone, labels, assignees; blockers and
-counts.
+title; state, status, sprint, milestone, labels, assignees; blockers, the
+parent and sub-issues (when it has them) and counts.
 It takes neither --comments nor --full.
 
 An issue is 42, "#42" (the default repository, board.repos[0]),

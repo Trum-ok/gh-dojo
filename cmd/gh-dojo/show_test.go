@@ -35,6 +35,8 @@ func TestShow(t *testing.T) {
 		{"card_13_brief_no_resolved", issueFixtures + "card_13.json", []string{"13", "--brief"}, render.ExitOK},
 		{"blockers", "testdata/graphql/show_blockers.json", []string{"3"}, render.ExitOK},
 		{"blockers_brief", "testdata/graphql/show_blockers.json", []string{"3", "--brief"}, render.ExitOK},
+		{"sub_issues", "testdata/graphql/show_sub_issues.json", []string{"3"}, render.ExitOK},
+		{"sub_issues_brief", "testdata/graphql/show_sub_issues.json", []string{"3", "--brief"}, render.ExitOK},
 		{"not_on_board", issueFixtures + "card_not_on_board.json", []string{"3"}, render.ExitOK},
 		{"partial", issueFixtures + "card_partial.json", []string{"42"}, render.ExitOK},
 		{"long_thread", "testdata/graphql/show_long_thread.json", []string{"42"}, render.ExitOK},
@@ -281,6 +283,29 @@ func TestCardText(t *testing.T) {
 	b.WriteString("\n### blocker places\n")
 	header(resolved.card(&places), "blocked by", "  #")
 	b.WriteString(resolved.brief(&places))
+
+	// Sub-issues beyond the window, or withheld, are counted, not read;
+	// all closed, or all resolved.
+	subs := *c
+	subs.Parent = &issue.Link{Repo: issue.Repo{Owner: "acme", Name: "api"}, Number: 1, Title: "Closed epic", State: issue.StateClosed}
+	subs.SubIssues = graph.Page[issue.Link]{TotalCount: 73, Nodes: []issue.Link{
+		{Repo: dojo, Number: 10, Title: "Open", State: issue.StateOpen, OnBoard: true, Status: "In progress"},
+		{Repo: dojo, Number: 11, Title: "Done", State: issue.StateClosed},
+	}}
+	b.WriteString("\n### sub-issues not all read\n")
+	header(resolved.card(&subs), "parent", "sub-issues", "  #")
+	b.WriteString(resolved.brief(&subs))
+	subs.SubIssues = graph.Page[issue.Link]{TotalCount: 2, Nodes: []issue.Link{
+		{Repo: dojo, Number: 11, Title: "Done", State: issue.StateClosed},
+		{Repo: dojo, Number: 12, Title: "Ready", State: issue.StateOpen, OnBoard: true, Status: "Ready"},
+	}}
+	b.WriteString("\n### sub-issues resolved\n")
+	header(resolved.card(&subs), "sub-issues")
+	b.WriteString(resolved.brief(&subs))
+	subs.SubIssues.Nodes[1] = issue.Link{Repo: dojo, Number: 12, Title: "Closed", State: issue.StateClosed}
+	b.WriteString("\n### sub-issues closed\n")
+	header(resolved.card(&subs), "sub-issues")
+	b.WriteString(resolved.brief(&subs))
 	testutil.Golden(t, "show/card_text", []byte(b.String()))
 }
 

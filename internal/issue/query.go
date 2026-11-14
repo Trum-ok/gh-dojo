@@ -4,10 +4,12 @@ import "encoding/json"
 
 // cardQuery reads a whole card in one request (principle 6). Windows:
 // labels 20 (100 with Lookup.AllLabels), assignees 10, blockers 20 each way
-// (blockedBy 50 with Lookup.AllBlockers; each with its first 10 project items), project items 20 (each with up to 100 field values), the
-// last 20 status changes and the last $comments comments; every list of
-// the card keeps its totalCount, so the reader can tell "none" from "not
-// read".
+// (blockedBy 50 with Lookup.AllBlockers; each with its first 10 project
+// items), the parent and 20 sub-issues (100 with Lookup.AllSubIssues),
+// read as blockers are, project items 20 (each with up to 100 field
+// values), the last 20 status changes and the last $comments comments;
+// every list of the card keeps its totalCount, so the reader can tell
+// "none" from "not read".
 //
 // A linked issue reads only its status on each of its first 10 projects,
 // and how many projects it is on: the reader keeps the one on the
@@ -55,6 +57,8 @@ const cardSelection = `{
         }
         blockedBy(first: 20) { totalCount nodes { ...link } }
         blocking(first: 20) { totalCount nodes { ...link } }
+        parent { ...link }
+        subIssues(first: 20) { totalCount nodes { ...link } }
         projectItems(first: 20) {
           totalCount
           nodes {
@@ -177,6 +181,8 @@ type issueJSON struct {
 	}] `json:"comments"`
 	BlockedBy     conn[*linkJSON] `json:"blockedBy"`
 	Blocking      conn[*linkJSON] `json:"blocking"`
+	Parent        *linkJSON       `json:"parent"`
+	SubIssues     conn[*linkJSON] `json:"subIssues"`
 	ProjectItems  conn[*itemJSON] `json:"projectItems"`
 	TimelineItems conn[*struct {
 		CreatedAt      string `json:"createdAt"`

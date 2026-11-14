@@ -174,20 +174,25 @@ gh dojo show <N>... [--brief] [--comments N|all] [--full]
 
 Reads issues before working on them: state, board status and fields, the
 sprint (with [`fields.sprint`](#fields): `sprint: Sprint 12 (2026-11-09 to
-2026-11-22)`), milestone, labels, assignees, blockers both ways with their
-board status, status history on the board, the description and the latest
-comments. Times are UTC. Unresolved blockers (see
+2026-11-22)`), milestone, labels, assignees, blockers both ways, the
+parent issue and the sub-issues ([GitHub's
+sub-issues](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/adding-sub-issues)),
+each with its board status, status history on the board, the description
+and the latest comments. Times are UTC. Unresolved blockers (see
 [`statuses.resolved`](#statuses)) are listed first; a linked issue is shown
 with its status, "on the board, no status", "not on the board", or "status
 not read" and why, and a blocker whose status was not read counts as
-unresolved.
+unresolved. Sub-issues follow the same rule and order, under a header such
+as `sub-issues: 3 of 5 closed, 1 unresolved`: the unresolved ones are what
+a verb with [`sub_issues`](#effects) checks. The first 20 sub-issues are
+read, with a note when there are more.
 
 Long content is folded, always with a note saying what is hidden: the last 5
 comments are printed (`--comments N` for the last N, `--comments all` for up
 to 100); the description is cut at 2000 characters and the comments shown
 share 1500. `--full` prints them whole. `--brief` prints three lines per
 issue: title; state, status, sprint, milestone, labels and assignees;
-blockers and counts.
+blockers, the parent and the sub-issues (when it has them) and counts.
 
 Several issues are read in one request (up to 20 issues per request), from
 any repositories: `gh dojo show 42 acme/api#7`. A missing issue, a pull
@@ -1359,7 +1364,7 @@ The schemas, by command, after `schema_version` and `error`:
 | Command | Top-level fields |
 |---------|------------------|
 | `show` | `brief` (`--brief`: every card's `history` and `comments` are `[]`, `body` `null`), `issues`: cards; `failed`: `[{number, repo, error}]` for issues not shown; `warnings` |
-| card | `number`, `repo`, `url`, `title`, `state` (`open`/`closed`), `state_reason` (`completed`, `not_planned`, `duplicate`, `reopened` or `null`), `author`, `created_at`, `closed_at`, `incomplete` (GitHub withheld part of it); `board`: `{on_board, unknown_reason, status, status_unknown, archived, fields: [{name, value}], fields_truncated}`; `sprint`: `null` without `fields.sprint`, else `{field, iteration: {title, start_date, end_date, duration_days} or null, unknown_reason}`; `milestone`: `{title, due_on}` or `null`; `labels`, `assignees` with `labels_total`, `assignees_total`; `blocked_by`, `blocking`: `[{ref, repo, number, title, state, on_board, status, archived, status_unknown_reason, resolved}]` with `blocked_by_total`, `blocking_total`, `unresolved_blockers`; `history`: `[{at, from, to, actor, automated}]` with `history_truncated`, `history_untracked`; `body`: `{text, cut, length}`; `comments`: `[{author, created_at, text, cut, length}]` with `comments_total` |
+| card | `number`, `repo`, `url`, `title`, `state` (`open`/`closed`), `state_reason` (`completed`, `not_planned`, `duplicate`, `reopened` or `null`), `author`, `created_at`, `closed_at`, `incomplete` (GitHub withheld part of it); `board`: `{on_board, unknown_reason, status, status_unknown, archived, fields: [{name, value}], fields_truncated}`; `sprint`: `null` without `fields.sprint`, else `{field, iteration: {title, start_date, end_date, duration_days} or null, unknown_reason}`; `milestone`: `{title, due_on}` or `null`; `labels`, `assignees` with `labels_total`, `assignees_total`; `blocked_by`, `blocking`: `[{ref, repo, number, title, state, on_board, status, archived, status_unknown_reason, resolved}]` with `blocked_by_total`, `blocking_total`, `unresolved_blockers`; `parent`: a linked issue as in `blocked_by`, or `null`; `sub_issues`: linked issues as in `blocked_by` with `sub_issues_total`, `sub_issues_closed` and `unresolved_sub_issues` (of those read); `history`: `[{at, from, to, actor, automated}]` with `history_truncated`, `history_untracked`; `body`: `{text, cut, length}`; `comments`: `[{author, created_at, text, cut, length}]` with `comments_total` |
 | `list` | `sprint_filter` (`null` without `--sprint`, `"none"` for issues without a sprint, `"iteration"` for those in `sprint`), `sprint` (the `--sprint` iteration or `null`), `issues`: `[{repo, number, title, state, status, labels, labels_total, assignees, assignees_total}]` in the printed order, cut to `--limit`; `matched` (before `--limit`), `unchecked`, `hidden`, `filtered`, `skipped`: `{draft_issues, pull_requests, unseen}`, `incomplete`, `warnings` |
 | `next` | as `list`, each issue with `unresolved_blockers`: `[{ref, repo, number, on_board, status, archived, status_unknown_reason}]` (empty unless `--all`) and `unread_blockers` (blockers the token cannot read, unresolved); `matched`: issues to show before `--limit` (with `--all`, the blocked ones too); `hidden`: blocked issues left out (0 with `--all`); `incomplete`: GitHub withheld part of an issue to show or hide, or of its blockers |
 | verbs | `verb`, `default_repo` (where a bare number is), `dry_run`, `issues`: `[{number, repo, title, outcome, planned, applied, in_place, needs_yes, warnings, error}]` in argument order (`title` `null` when the issue was not read), `summary`: `{total, done, written, failed, not_attempted}` |

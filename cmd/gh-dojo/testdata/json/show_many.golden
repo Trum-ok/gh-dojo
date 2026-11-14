@@ -135,6 +135,11 @@ code: 3
         }
       ],
       "blocking_total": 5,
+      "parent": null,
+      "sub_issues": [],
+      "sub_issues_total": 0,
+      "sub_issues_closed": 0,
+      "unresolved_sub_issues": 0,
       "history": [],
       "history_truncated": false,
       "history_untracked": false,
@@ -231,6 +236,11 @@ code: 3
         }
       ],
       "blocking_total": 1,
+      "parent": null,
+      "sub_issues": [],
+      "sub_issues_total": 0,
+      "sub_issues_closed": 0,
+      "unresolved_sub_issues": 0,
       "history": [],
       "history_truncated": false,
       "history_untracked": false,

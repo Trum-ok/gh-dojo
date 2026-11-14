@@ -6,6 +6,8 @@ labels: none
 assignees: none
 blocked by: none
 blocking: none
+parent: none
+sub-issues: none
 
 description:
   - Comment with the marker `<!-- gh-dojo:<verb>:<hash> -->`; no second one is posted.

@@ -13,6 +13,8 @@ blocking (5):
   #7 OPEN on board=true archived=false status="Ready" unknown="" "Команда show <N>…"
   #6 OPEN on board=true archived=false status="Ready" unknown="" "Сверка конфига с доской"
   #4 OPEN on board=true archived=false status="Ready" unknown="" "Пресет kanban через embed.FS"
+sub-issues (0):
+parent none
 item: not on the board
 history (truncated=false untracked=false):
 comments 0 of 0:

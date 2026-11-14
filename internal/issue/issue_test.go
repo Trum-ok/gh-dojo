@@ -206,6 +206,112 @@ func TestReadLinkWithheldItems(t *testing.T) {
 	}
 }
 
+// linkNode is a linked issue as cardQuery's link fragment reads it, in
+// status on the gh-dojo board ("" for not on it).
+func linkNode(repo string, number int, state, status string) map[string]any {
+	items := []any{}
+	if status != "" {
+		items = append(items, map[string]any{
+			"isArchived": false,
+			"project":    map[string]any{"id": dojoBoard.ID},
+			"status":     map[string]any{"name": status, "field": map[string]any{"id": statusID}},
+		})
+	}
+	return map[string]any{
+		"number": number, "title": fmt.Sprintf("Issue %d", number), "state": state,
+		"repository":   map[string]any{"nameWithOwner": repo},
+		"projectItems": map[string]any{"totalCount": len(items), "nodes": items},
+	}
+}
+
+// TestReadSubIssues: the parent and the sub-issues are read as blockers
+// are, each with its place on the board; a sub-issue withheld from the
+// token is not read (Incomplete) and still counted.
+func TestReadSubIssues(t *testing.T) {
+	path := variant(t, func(is map[string]any) {
+		is["parent"] = linkNode("Trum-ok/gh-dojo", 2, "OPEN", "In progress")
+		is["subIssues"] = map[string]any{"totalCount": 5, "nodes": []any{
+			linkNode("Trum-ok/gh-dojo", 10, "OPEN", "In progress"),
+			linkNode("Trum-ok/gh-dojo", 11, "OPEN", "Ready"),
+			linkNode("acme/api", 7, "CLOSED", ""),
+			linkNode("Trum-ok/gh-dojo", 12, "OPEN", ""),
+			nil,
+		}}
+	})
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var f map[string]any
+	if err := json.Unmarshal(data, &f); err != nil {
+		t.Fatal(err)
+	}
+	resp := f["interactions"].([]any)[0].(map[string]any)["response"].(map[string]any)
+	resp["errors"] = []any{map[string]any{
+		"type": "FORBIDDEN", "message": "Resource not accessible by integration",
+		"path": []any{"repository", "issueOrPullRequest", "subIssues", "nodes", 4},
+	}}
+	if data, err = json.Marshal(f); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	srv := graphtest.New(t, path)
+	req := dojoStatus
+	req.Number = 3
+	card, err := issue.Read(context.Background(), srv.Client(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testutil.Golden(t, "card/sub_issues", dump(card))
+	if !card.Incomplete {
+		t.Error("card not incomplete")
+	}
+	var got []string
+	for _, l := range card.UnresolvedSubIssues([]string{"Ready", "Done"}) {
+		got = append(got, linkRef(l, dojo))
+	}
+	if want := "#10 #12"; strings.Join(got, " ") != want {
+		t.Errorf("unresolved sub-issues %v, want %s", got, want)
+	}
+	if n := card.SubIssues.TotalCount - len(card.SubIssues.Nodes); n != 1 {
+		t.Errorf("sub-issues not read = %d, want 1", n)
+	}
+}
+
+// TestReadSubIssuesWindow: AllSubIssues reads 100 sub-issues, GitHub's
+// limit per issue, instead of the card's 20.
+func TestReadSubIssuesWindow(t *testing.T) {
+	path := variant(t, func(map[string]any) {})
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var f map[string]any
+	if err := json.Unmarshal(data, &f); err != nil {
+		t.Fatal(err)
+	}
+	in := f["interactions"].([]any)[0].(map[string]any)
+	q := in["query"].(string)
+	if !strings.Contains(q, "subIssues(first: 20)") {
+		t.Fatalf("card query has no subIssues(first: 20):\n%s", q)
+	}
+	in["query"] = strings.Replace(q, "subIssues(first: 20)", "subIssues(first: 100)", 1)
+	if data, err = json.Marshal(f); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	srv := graphtest.New(t, path)
+	req := dojoStatus
+	req.Number, req.Lookup = 3, issue.Lookup{AllSubIssues: true}
+	if _, err := issue.Read(context.Background(), srv.Client(), req); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestLinkResolved(t *testing.T) {
 	resolved := []string{"Ready", "Done"}
 	tests := []struct {
@@ -622,11 +728,17 @@ func dump(c *issue.Card) []byte {
 		name string
 		page []issue.Link
 		n    int
-	}{{"blocked by", c.BlockedBy.Nodes, c.BlockedBy.TotalCount}, {"blocking", c.Blocking.Nodes, c.Blocking.TotalCount}} {
+	}{{"blocked by", c.BlockedBy.Nodes, c.BlockedBy.TotalCount}, {"blocking", c.Blocking.Nodes, c.Blocking.TotalCount},
+		{"sub-issues", c.SubIssues.Nodes, c.SubIssues.TotalCount}} {
 		p("%s (%d):", pair.name, pair.n)
 		for _, l := range pair.page {
 			p("  %s %s on board=%v archived=%v status=%q unknown=%q %q", linkRef(l, c.Repo), l.State, l.OnBoard, l.Archived, l.Status, l.StatusUnknown, l.Title)
 		}
+	}
+	if l := c.Parent; l != nil {
+		p("parent %s %s on board=%v archived=%v status=%q unknown=%q %q", linkRef(*l, c.Repo), l.State, l.OnBoard, l.Archived, l.Status, l.StatusUnknown, l.Title)
+	} else {
+		p("parent none")
 	}
 	switch {
 	case c.Item == nil && c.BoardUnknown:

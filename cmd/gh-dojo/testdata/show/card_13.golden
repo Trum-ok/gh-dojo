@@ -11,6 +11,8 @@ blocked by: none unresolved (2 resolved)
   #4 Пресет kanban через embed.FS (Ready, resolved)
 blocking: 1 open
   #14 Skill для агентов и переход на gh dojo (рубеж v0.0) (Ready)
+parent: none
+sub-issues: none
 status history:
   2026-11-11 18:21 no status → Backlog (automation)
   2026-11-11 19:59 Backlog → In progress by Trum-ok

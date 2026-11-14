@@ -154,6 +154,11 @@ code: 0
         }
       ],
       "blocking_total": 2,
+      "parent": null,
+      "sub_issues": [],
+      "sub_issues_total": 0,
+      "sub_issues_closed": 0,
+      "unresolved_sub_issues": 0,
       "history": [
         {
           "at": "2026-11-11T18:19:14Z",

@@ -17,6 +17,8 @@ blocked by: 5 unresolved, 2 resolved
 blocking: 1 open, 1 closed
   #11 Глаголы из конфига: проверки и план эффектов (internal/workflow) (Backlog)
   #8 Команда list (closed)
+parent: none
+sub-issues: none
 status history:
   2026-11-11 18:19 no status → Backlog (automation)
   2026-11-11 18:42 Backlog → In progress by Trum-ok

@@ -8,6 +8,8 @@ milestone none
 blocked by (1):
   acme/auth#7 CLOSED on board=false archived=false status="" unknown="" "Auth library upgrade"
 blocking (0):
+sub-issues (0):
+parent none
 item: board membership unknown: GitHub withheld some of the issue's projects from this token
 history (truncated=true untracked=false):
   2026-11-11T18:19:14Z "" → "Backlog" by "github-project-automation" automated=false

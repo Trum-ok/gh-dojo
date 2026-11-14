@@ -87,6 +87,8 @@ func (v cardView) card(c *issue.Card) string {
 	line("assignees: %s", cardNames(c.Assignees))
 	v.writeBlockers(&b, c)
 	writeBlocking(&b, c, v.def)
+	line("parent: %s", v.parent(c))
+	v.writeSubIssues(&b, c)
 	if c.OnBoard() || c.BoardUnknown && len(c.History) > 0 {
 		writeHistory(&b, c)
 	}
@@ -166,11 +168,47 @@ func (v cardView) brief(c *issue.Card) string {
 			blocking += " (" + note + ")"
 		}
 	}
-	fmt.Fprintf(&b, "%s · %s · comments: %d\n", blocked, blocking, c.Comments.TotalCount)
+	fmt.Fprintf(&b, "%s · %s%s · comments: %d\n", blocked, blocking, v.briefHierarchy(c), c.Comments.TotalCount)
 	if c.Incomplete {
 		b.WriteString("note: GitHub withheld part of this issue from the token; the rest is accurate\n")
 	}
 	return b.String()
+}
+
+// briefHierarchy is the parent and the sub-issues for --brief, each part
+// only when the issue has it, starting with " · ":
+//
+//	· parent: #12 · sub-issues: 3 of 5 closed, 1 unresolved (#14)
+func (v cardView) briefHierarchy(c *issue.Card) string {
+	var s string
+	if l := c.Parent; l != nil {
+		s += " · parent: " + linkRef(c, *l, v.def)
+	}
+	if len(c.SubIssues.Nodes) == 0 && c.SubIssues.TotalCount == 0 {
+		return s
+	}
+	closed := 0
+	for _, l := range c.SubIssues.Nodes {
+		if l.Closed() {
+			closed++
+		}
+	}
+	unresolved := c.UnresolvedSubIssues(v.resolved)
+	parts := subIssueCounts(c, closed, len(unresolved))
+	if len(unresolved) > 0 {
+		refs := make([]string, 0, maxBriefRefs)
+		for _, l := range unresolved[:min(len(unresolved), maxBriefRefs)] {
+			refs = append(refs, linkRef(c, l, v.def))
+		}
+		if n := len(unresolved) - len(refs); n > 0 {
+			refs = append(refs, fmt.Sprintf("%d more", n))
+		}
+		parts[len(parts)-1] += " (" + strings.Join(refs, ", ") + ")"
+	}
+	if note := render.Shown(len(c.SubIssues.Nodes), c.SubIssues.TotalCount, ""); note != "" {
+		parts = append(parts, note)
+	}
+	return s + " · sub-issues: " + strings.Join(parts, ", ")
 }
 
 // board describes the issue's place on the board: status, other field
@@ -315,6 +353,69 @@ func writeBlocking(b *strings.Builder, c *issue.Card, def issue.Repo) {
 	for _, l := range closed {
 		writeLink(b, l, linkRef(c, l, def), "closed")
 	}
+}
+
+// parent names the issue's parent with where it stands, "none" for none.
+func (v cardView) parent(c *issue.Card) string {
+	l := c.Parent
+	if l == nil {
+		return "none"
+	}
+	about := "closed"
+	if !l.Closed() {
+		about = linkPlace(*l)
+	}
+	return linkRef(c, *l, v.def) + " " + clipRunes(singleLine(l.Title), maxLinkTitleRunes) + " (" + singleLine(about) + ")"
+}
+
+// writeSubIssues writes the issue's sub-issues, one per line, as
+// writeBlockers writes blockers: unresolved first, then resolved ones
+// still open, then closed ones. The header counts the closed ones and the
+// unresolved ones, which a verb with sub_issues = "warn" or "deny" checks.
+func (v cardView) writeSubIssues(b *strings.Builder, c *issue.Card) {
+	var unresolved, done, closed []issue.Link
+	for _, l := range c.SubIssues.Nodes {
+		switch {
+		case l.Closed():
+			closed = append(closed, l)
+		case l.Resolved(v.resolved):
+			done = append(done, l)
+		default:
+			unresolved = append(unresolved, l)
+		}
+	}
+	writeLinks(b, "sub-issues", c.SubIssues, subIssueCounts(c, len(closed), len(unresolved)))
+	for _, l := range unresolved {
+		writeLink(b, l, linkRef(c, l, v.def), linkPlace(l))
+	}
+	for _, l := range done {
+		writeLink(b, l, linkRef(c, l, v.def), linkPlace(l)+", resolved")
+	}
+	for _, l := range closed {
+		writeLink(b, l, linkRef(c, l, v.def), "closed")
+	}
+}
+
+// subIssueCounts says how many of the sub-issues read are closed, "3 of 5
+// closed" when all were read, and how many are unresolved when any is
+// open: "3 of 5 closed, 1 unresolved", "3 closed, none unresolved". None
+// for an issue without sub-issues.
+func subIssueCounts(c *issue.Card, closed, unresolved int) []string {
+	read := len(c.SubIssues.Nodes)
+	if read == 0 {
+		return nil
+	}
+	counts := []string{fmt.Sprintf("%d closed", closed)}
+	if read >= c.SubIssues.TotalCount {
+		counts[0] = fmt.Sprintf("%d of %d closed", closed, read)
+	}
+	switch {
+	case unresolved > 0:
+		counts = append(counts, fmt.Sprintf("%d unresolved", unresolved))
+	case closed < read:
+		counts = append(counts, "none unresolved")
+	}
+	return counts
 }
 
 // linkPlace says where an open linked issue stands on the board: its
