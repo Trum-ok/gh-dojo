@@ -115,8 +115,10 @@ type IssueRead struct {
 	Ref   issue.Ref
 	Issue workflow.Issue
 	Err   error
-	// PullRequest says Err is because the number is a pull request.
-	PullRequest bool
+	// Cause says Err is because the issue is not there: no such issue,
+	// a pull request, or its repository not found (issue.Cause); "" for
+	// any other error.
+	Cause issue.Cause
 }
 
 // newBackend returns the backend for cfg: GitHub through one App per run,

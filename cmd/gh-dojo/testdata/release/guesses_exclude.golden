@@ -1,0 +1,10 @@
+code: 0
+--- stdout
+release HEAD: 4 commits since abc1234, 1 issue
+excluded: #43 (commit 1313131), acme/api#7 (PR #50)
+#42 Ready → Done, closed as completed
+1 of 1 done
+--- stderr
+warning: --exclude #77: not in the release
+warning: #99 not found: left out (commit 1212121)
+warning: acme/api#3: repository acme/api not found, or the token cannot see it: left out (commit 1212121)

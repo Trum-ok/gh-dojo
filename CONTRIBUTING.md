@@ -66,6 +66,13 @@ an open issue still in progress with a `Refs` commit in the release is
 listed as not ready and left alone; a later release picks it up only if its
 commits name it again, else `gh dojo done N` once it is Ready and released.
 
+So in a commit message, an issue reference that is not a link, such as an
+example of the syntax, goes in backticks: `` `Fixes #12` ``,
+`` `refs: #12, acme/api#3` ``. Release does not count code; without the
+backticks it takes those numbers as the release's issues. One a message
+names that is no issue is left out with a warning (exit code 0); any other
+mistaken match is left out with `--exclude N`.
+
 The interface, help text and documentation are in English. Texts that go
 into issues (verb `when` lines and comment templates) come from the config.
 

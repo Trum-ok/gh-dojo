@@ -236,6 +236,37 @@ func TestReadAllRepoNotFound(t *testing.T) {
 	}
 }
 
+// TestReadRefsOtherRepoNotFound: a missing repository other than the
+// default one fails only its issues (CauseNoRepo), whether it is read
+// alone, one issue (Read's request) or several.
+func TestReadRefsOtherRepoNotFound(t *testing.T) {
+	gone := issue.Repo{Owner: "Trum-ok", Name: "no-such-repo-xyz"}
+	for _, tt := range []struct {
+		file    string
+		numbers []int
+	}{
+		{"card_repo_not_found", []int{1}},
+		{"cards_repo_not_found", []int{1, 2}},
+	} {
+		srv := graphtest.New(t, fixture(tt.file))
+		var refs []issue.Ref
+		for _, n := range tt.numbers {
+			refs = append(refs, issue.Ref{Repo: gone, Number: n})
+		}
+		res, err := issue.ReadRefs(context.Background(), srv.Client(), issue.Request{
+			Repo: dojo, Board: dojoBoard, StatusField: "Status",
+		}, refs)
+		if err != nil || len(res) != len(refs) {
+			t.Fatalf("%s: res %+v, err %v", tt.file, res, err)
+		}
+		for _, r := range res {
+			if r.Cause != issue.CauseNoRepo || !strings.Contains(r.Err.Error(), "no-such-repo-xyz not found, or the token cannot see it") {
+				t.Errorf("%s: %+v", tt.file, r)
+			}
+		}
+	}
+}
+
 // TestReadAllSingle sends exactly Read's request for one number.
 func TestReadAllSingle(t *testing.T) {
 	res, err := readAll(t, "card_not_found", 9999)

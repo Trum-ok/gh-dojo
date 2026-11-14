@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/Trum-ok/gh-dojo/internal/config"
@@ -87,7 +88,8 @@ type fakeBackend struct {
 	// others are issues outside acme/shop by "owner/name#N"; Display and
 	// DefaultRepo are filled as the GitHub backend fills them.
 	others    map[string]workflow.Issue
-	pulls     map[int]bool // numbers of acme/shop that are pull requests
+	pulls     map[int]bool    // numbers of acme/shop that are pull requests
+	gone      map[string]bool // "owner/name" in lower case: repositories not found
 	applyErr  error
 	applyErrs map[int]error // by issue number, for batches
 	confirmed map[int]int   // with applyErrs: how many ops GitHub confirmed first
@@ -123,12 +125,19 @@ func (f *fakeBackend) ReadIssues(_ context.Context, _ config.Verb, refs []issue.
 	out := make([]IssueRead, len(refs))
 	for i, ref := range refs {
 		out[i].Ref = ref.In(fakeRepo)
-		if f.pulls[ref.Number] && out[i].Ref.Same(issue.Ref{Repo: fakeRepo, Number: ref.Number}) {
+		switch {
+		case f.pulls[ref.Number] && out[i].Ref.Same(issue.Ref{Repo: fakeRepo, Number: ref.Number}):
 			out[i].Err = render.NotFound("#%d in %s is a pull request; gh dojo works with issues only", ref.Number, fakeRepo)
-			out[i].PullRequest = true
-			continue
+			out[i].Cause = issue.CausePullRequest
+		case f.gone[strings.ToLower(ref.Repo.String())]:
+			out[i].Err = render.NotFound("repository %s not found, or the token cannot see it", ref.Repo)
+			out[i].Cause = issue.CauseNoRepo
+		default:
+			out[i].Issue, out[i].Err = f.issue(ref)
+			if out[i].Err != nil {
+				out[i].Cause = issue.CauseMissing
+			}
 		}
-		out[i].Issue, out[i].Err = f.issue(ref)
 	}
 	return out, nil
 }

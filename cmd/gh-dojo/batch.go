@@ -140,7 +140,7 @@ type batchRun struct {
 	retried        bool            // the stale-schema retry is spent (retryStale)
 	stop           error           // the error that stopped the writes (graph.AffectsAll)
 	// keep, when set, says which issues read to plan: release leaves out
-	// the pull requests a commit message names.
+	// the numbers a commit message names that are no issue.
 	keep func(IssueRead) bool
 	// before, when set, is called with the planned issues before the
 	// first one is printed or written, and returns those to go on with:

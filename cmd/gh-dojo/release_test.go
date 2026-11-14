@@ -123,6 +123,53 @@ func TestReleaseFake(t *testing.T) {
 	})
 }
 
+// TestReleaseGuesses: a commit message's numbers that are no issue, #99
+// (no such issue) and acme/api#3 (no such repository), are left out with
+// a warning, not failed; #44 in a code span does not count. acme/api#7,
+// which merged pull request #50 closes, fails the batch as any issue
+// (exit code 3), until --exclude leaves it out; an --exclude the release
+// does not include is a warning.
+func TestReleaseGuesses(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []string
+		code    render.Code
+		applied int
+	}{
+		{"guesses", []string{"--dry-run"}, render.ExitNotFound, 0},
+		{"guesses_exclude", []string{"--exclude", "acme/api#7", "--exclude", "#43,77"}, render.ExitOK, 1},
+		{"guesses_exclude_json", []string{"--exclude", "acme/api#7", "--dry-run", "--json"}, render.ExitOK, 0},
+		{"guesses_exclude_all", []string{"--exclude", "acme/api#7,42,43"}, render.ExitOK, 0},
+		// Nothing left to read.
+		{"guesses_exclude_every", []string{"--exclude", "acme/api#7,42,43,99,acme/api#3"}, render.ExitOK, 0},
+		{"guesses_exclude_bad", []string{"--exclude", "acme"}, render.ExitUsage, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			withConfig(t, verbsConfig)
+			if tt.code != render.ExitUsage {
+				withApp(t, verbFixture("release_shop_guesses"))
+			}
+			f := &fakeBackend{
+				issues: map[int]workflow.Issue{
+					42: {Number: 42, Title: "Fix login redirect", OnBoard: true, Status: "Ready"},
+					43: {Number: 43, Title: "Speed up checkout", OnBoard: true, Status: "Done", Closed: true},
+				},
+				gone: map[string]bool{"acme/api": true},
+			}
+			withBackend(t, f)
+			code, out := runOut(append([]string{"release", "HEAD", "--since", "abc1234", "--verb", "done"}, tt.args...)...)
+			if code != tt.code {
+				t.Errorf("exit code = %d, want %d\n%s", code, tt.code, out)
+			}
+			if len(f.applied) != tt.applied {
+				t.Errorf("applied %d plans, want %d", len(f.applied), tt.applied)
+			}
+			testutil.Golden(t, "release/"+tt.name, out)
+		})
+	}
+}
+
 // TestReleaseArgs: mistakes found before any request.
 func TestReleaseArgs(t *testing.T) {
 	tests := []struct {

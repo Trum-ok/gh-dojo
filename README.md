@@ -566,7 +566,7 @@ exit code. [`release`](#release) runs it on the issues of a release.
 ### release
 
 ```sh
-gh dojo release <ref> --verb <verb> [--since <ref>] [--dry-run] [--yes] [--comment TEXT]
+gh dojo release <ref> --verb <verb> [--since <ref>] [--exclude N] [--dry-run] [--yes] [--comment TEXT]
 ```
 
 Once a release is tagged, runs a verb with [`batch = true`](#several-issues-at-once)
@@ -597,8 +597,28 @@ keywords: `Fixes #12`, `closes: acme/api#3`, `Resolves <issue URL>`, any
 case; a list after a keyword counts whole up to the end of its line (`Fixes
 #12, #13 and #14`), a mention without one (`see #12`) does not. `Refs #12` says a commit is about
 an issue, which may be done only in part, so `refs` is not a default; a
-project that commits without pull requests adds it, as this one does. A
-number a message names that is a pull request is left out with a warning.
+project that commits without pull requests adds it, as this one does.
+Code in a message does not count, as Markdown does not link it: a code span
+(`` `Refs #12` ``) or a fenced block (```` ``` ````) is an example of the
+syntax, not a link, so put such examples in backticks.
+
+**A message is text**, a guess at a link, where a pull request closing an
+issue is GitHub's own. So a number only commit messages name that is no
+issue is left out with a warning on stderr and listed in the JSON's
+`skipped`, not failed: a pull request (`pull_request`), a missing issue
+(`not_found`), or a repository not found (`repo_not_found`), such as an
+example `acme/api#3` in a message. GitHub answers the same for a private
+repository the token cannot see, so the warning says so: `acme/api#3:
+repository acme/api not found, or the token cannot see it: left out (commit
+de25f45)`; if the issue is real, give the token access and run the verb on
+it. A token GitHub denies outright (SAML single sign-on, OAuth app
+restrictions) is still exit code 4: the fix is the token's, not the
+release's. An issue a merged pull request closes, even if a message names
+it too, fails the batch as any issue does. `--exclude N` (`#N`,
+`owner/repo#N` or a URL; repeatable, or comma-separated) leaves out an issue
+found by mistake, before it is read: the line `excluded: acme/api#3 (commit
+de25f45)` and the JSON's `skipped` (`excluded`) name it, and an `--exclude`
+the release does not include is a warning.
 
 **Not ready.** An open issue whose status the verb's `from` does not allow,
 such as one still in progress with a `Refs` commit when `done` starts only
@@ -1335,7 +1355,7 @@ The schemas, by command, after `schema_version` and `error`:
 | `list` | `sprint_filter` (`null` without `--sprint`, `"none"` for issues without a sprint, `"iteration"` for those in `sprint`), `sprint` (the `--sprint` iteration or `null`), `issues`: `[{repo, number, title, state, status, labels, labels_total, assignees, assignees_total}]` in the printed order, cut to `--limit`; `matched` (before `--limit`), `unchecked`, `hidden`, `filtered`, `skipped`: `{draft_issues, pull_requests, unseen}`, `incomplete`, `warnings` |
 | `next` | as `list`, each issue with `unresolved_blockers`: `[{ref, repo, number, on_board, status, archived, status_unknown_reason}]` (empty unless `--all`) and `unread_blockers` (blockers the token cannot read, unresolved); `matched`: issues to show before `--limit` (with `--all`, the blocked ones too); `hidden`: blocked issues left out (0 with `--all`); `incomplete`: GitHub withheld part of an issue to show or hide, or of its blockers |
 | verbs | `verb`, `default_repo` (where a bare number is), `dry_run`, `issues`: `[{number, repo, title, outcome, planned, applied, in_place, needs_yes, warnings, error}]` in argument order (`title` `null` when the issue was not read), `summary`: `{total, done, written, failed, not_attempted}` |
-| `release` | as verbs, with `release`: `{ref, commit, since, since_picked, since_commit, compared, commits}` (`since_picked`: the previous version tag, not `--since`; `compared`: GitHub compared the two, else the history was read down to a `--since` commit; commits are full SHAs), each issue with `found_by`: `[{pull_request, commit}]` (`pull_request` `owner/name#12` that closes it, with its first commit in the release, or `null`: the commit's message names it), `skipped`: `[{number, repo, ref, reason, status, found_by}]` (`reason` `pull_request`, or `not_ready` with the `status` the verb's `from` does not allow), and `warnings`; `issues` and `summary` count only the issues the verb ran on, the default repository's first |
+| `release` | as verbs, with `release`: `{ref, commit, since, since_picked, since_commit, compared, commits}` (`since_picked`: the previous version tag, not `--since`; `compared`: GitHub compared the two, else the history was read down to a `--since` commit; commits are full SHAs), each issue with `found_by`: `[{pull_request, commit}]` (`pull_request` `owner/name#12` that closes it, with its first commit in the release, or `null`: the commit's message names it), `skipped`: `[{number, repo, ref, reason, status, found_by}]` (`reason` `excluded` by `--exclude`; `pull_request`, `not_found` or `repo_not_found` for a number only commit messages name; or `not_ready` with the `status` the verb's `from` does not allow; `status` is `null` but for `not_ready`), and `warnings`; `issues` and `summary` count only the issues the verb ran on, the default repository's first |
 | `new` | `number`, `repo`, `title`, `created` (`false`: resumed), `labels`, `status`, `status_set`, `unarchived`, `milestone` (`{title, due_on}` or `null`), `milestone_set`, `blocked_by`, `already_blocked_by` |
 | `comment` | `number`, `repo`, `posted` (`false`: already the last comment) |
 | `block`, `unblock` | `number`, `repo`, `action`, `changed`, `unchanged`, `missed` |

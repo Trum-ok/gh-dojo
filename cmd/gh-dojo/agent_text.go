@@ -342,8 +342,21 @@ func (d *agentDoc) releaseRule(v config.Verb) string {
 		"batch. An open issue whose status it does not start from is listed as not ready and left out, not "+
 		"failed; only a later release whose commits name it again picks it up, so once it is ready run `gh dojo "+
 		"%s N` on it. A closed issue it does not start from is refused (exit code 2): ask the user. The start is "+
-		"the previous version tag; the first release needs `--since <tag or commit>`.",
-		v.Name, found, v.Name, v.Name)
+		"the previous version tag; the first release needs `--since <tag or commit>`.%s",
+		v.Name, found, v.Name, v.Name, d.messageRule())
+}
+
+// messageRule says, when commit messages count for a release, how release
+// reads their numbers and how to write an example of one; "" without
+// keywords.
+func (d *agentDoc) messageRule() string {
+	if len(d.cfg.Release.Keywords) == 0 {
+		return ""
+	}
+	return " A number only commit messages name that is no issue (a pull request, a missing issue, a repository " +
+		"not found or hidden from the token) is left out with a warning, not failed; `--exclude N` leaves out an " +
+		"issue found by mistake. In a commit message, put an example of an issue reference in backticks " +
+		"(`` `Fixes #12` ``): code does not count."
 }
 
 // verbsFrom lists the verbs that can start from status s.

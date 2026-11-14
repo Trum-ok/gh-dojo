@@ -34,8 +34,8 @@ type Source struct {
 // Collect lists the issues of the commits of r, each once, in the order
 // they were found: through the pull requests of a commit first, then its
 // message. A reference by URL on a host other than host (gh's) is left out
-// with a warning. A message's #12 may be a pull request: the caller tells
-// once it reads the issues.
+// with a warning. A message's #12 may be a pull request, or no issue at
+// all: the caller tells once it reads the issues.
 func Collect(r *Range, m *Matcher, host string) (found []Found, warnings []string) {
 	index := map[string]int{}
 	add := func(ref issue.Ref, s Source) {

@@ -26,7 +26,7 @@ const (
 	CauseMissing     Cause = "missing"      // no issue with that number
 	CausePullRequest Cause = "pull request" // the number is a pull request
 	// CauseNoRepo: the issue's repository does not exist, or the token
-	// cannot see it, in a batch that reads other repositories too.
+	// cannot see it (see ReadRefs).
 	CauseNoRepo Cause = "no repository"
 )
 
@@ -69,11 +69,14 @@ func ReadAll(ctx context.Context, q graph.Querier, req Request, numbers []int) (
 //
 // It returns one Result per ref, in order. A missing issue or a pull
 // request number fails only its own Result; so does a missing repository
-// in a request that reads other repositories too (CauseNoRepo). When a
-// batch request fails as a whole (a timeout, say), its issues are read
-// once more one by one; the first of those reads to fail that way is
-// returned as err, together with the results read before it. A missing
-// repository of a request that reads no other one is err at once.
+// other than req.Repo (CauseNoRepo), or req.Repo in a request that reads
+// other repositories too: an issue of another repository may be a guess
+// (a commit message's acme/api#3, see gh dojo release), and the issues of
+// the others are still read. When a batch request fails as a whole (a
+// timeout, say), its issues are read once more one by one; the first of
+// those reads to fail that way is returned as err, together with the
+// results read before it. A missing req.Repo in a request that reads no
+// other repository is err at once: the config names it.
 func ReadRefs(ctx context.Context, q graph.Querier, req Request, refs []Ref) ([]Result, error) {
 	refs = slices.Clone(refs)
 	for i, r := range refs {
@@ -126,6 +129,11 @@ func readEach(ctx context.Context, q graph.Querier, req Request, refs []Ref) ([]
 				res.Cause = CauseMissing
 			case pullRequest(r).What:
 				res.Cause = CausePullRequest
+			case repoNotFound(r.Repo).What:
+				if sameRepo(r.Repo, req.Repo) {
+					return out, err
+				}
+				res.Cause = CauseNoRepo
 			default:
 				return out, err
 			}
@@ -182,7 +190,7 @@ func readBatch(ctx context.Context, q graph.Querier, req Request, refs []Ref) ([
 		errs, ok = perIssueErrors(err)
 		first := resp.Repos[repoAlias(0)]
 		switch {
-		case ok && (len(repos) > 1 || first != nil):
+		case ok && (len(repos) > 1 || first != nil || !sameRepo(repos[0], req.Repo)):
 		case render.FromError(err).Code == render.ExitNotFound && len(repos) == 1 && first == nil:
 			return nil, repoNotFound(repos[0]).WithCause(errors.Join(errRepoMissing, err))
 		default:

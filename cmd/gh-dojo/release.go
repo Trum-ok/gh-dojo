@@ -30,6 +30,7 @@ func init() { register(newReleaseCmd) }
 
 type releaseOpts struct {
 	verb, since string
+	exclude     []string // --exclude as given
 	dryRun      bool
 	args        workflow.Args
 }
@@ -51,13 +52,19 @@ func newReleaseCmd() (*cobra.Command, error) {
 			"(its closing keywords or linked issues; squash, merge and rebase alike), or\n" +
 			"when a commit message names it after a keyword of [release] keywords, by\n" +
 			"default GitHub's closing ones (closes, fixes, resolves); owner/repo#N names\n" +
-			"an issue of another repository.\n\n" +
+			"an issue of another repository. Code in a message (`Refs #12`, a ``` block)\n" +
+			"does not count: put examples of the syntax in backticks.\n\n" +
+			"A message names issues as text, so a number there that is no issue (a pull\n" +
+			"request, a missing issue, a repository not found or that the token cannot\n" +
+			"see) is left out with a warning, not failed. --exclude leaves out an issue\n" +
+			"a message names by mistake.\n\n" +
 			"An open issue whose status the verb's from does not allow (still in progress,\n" +
 			"say) is listed as not ready and left out, not failed; only a later release\n" +
 			"whose commits name it again picks it up. A closed one is refused (exit code 2).\n\n" +
 			"--dry-run lists each issue with how it was found and its plan.",
 		Example: `  gh dojo release v0.2.0 --verb done --dry-run
   gh dojo release v0.2.0 --verb done
+  gh dojo release v0.2.0 --verb done --exclude acme/api#3
   gh dojo release v0.1.0 --since 4c40894 --verb done --comment "Released in v0.1.0."`,
 		Args: releaseArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -69,6 +76,8 @@ func newReleaseCmd() (*cobra.Command, error) {
 	f := cmd.Flags()
 	f.StringVar(&o.verb, "verb", "", "the verb to apply to the release's issues: one with batch = true")
 	f.StringVar(&o.since, "since", "", "where the release starts, a tag, branch or commit; default: the previous version tag")
+	f.StringArrayVar(&o.exclude, "exclude", nil,
+		"an `issue` to leave out: 12, \"#12\", owner/repo#12 or its URL; repeatable, or comma-separated")
 	f.BoolVar(&o.dryRun, "dry-run", false, "list the issues, how each was found and its plan, without changing anything")
 	f.BoolVar(&o.args.Yes, "yes", false, "the user agreed: for a verb that is the user's decision")
 	f.StringVar(&o.args.Comment, config.ArgComment, "", "text for {comment} in the verb's comment, for every issue")
@@ -125,6 +134,10 @@ func runRelease(cmd *cobra.Command, ref string, o *releaseOpts) error {
 	if err != nil {
 		return err
 	}
+	excluded, err := parseBlockers(o.exclude, "exclude", def, issue.Ref{}, cmd.CommandPath()+" --help")
+	if err != nil {
+		return err
+	}
 	var q graph.Querier
 	if gb, ok := be.(*githubBackend); ok {
 		q = gb.app.Client
@@ -138,42 +151,46 @@ func runRelease(cmd *cobra.Command, ref string, o *releaseOpts) error {
 	}
 	found, warnings := release.Collect(rng, release.NewMatcher(cfg.Release.Keywords), clientHost())
 	warnings = append(slices.Clone(rng.Warnings), warnings...)
-	for _, w := range warnings {
-		render.Warn(cmd.ErrOrStderr(), "%s", w)
-	}
 	for i := range found {
 		found[i].Ref = found[i].Ref.In(def) // the default repository as the config spells it
 	}
 	slices.SortStableFunc(found, func(a, b release.Found) int { return compareRefs(def)(a.Ref, b.Ref) })
 
 	res := &releaseRun{rng: rng, def: def, found: found, keywords: cfg.Release.Keywords}
-	if len(found) == 0 {
+	refs, w := res.exclude(excluded)
+	warnings = append(warnings, w...)
+	for _, w := range warnings {
+		render.Warn(cmd.ErrOrStderr(), "%s", w)
+	}
+	if len(refs) == 0 {
 		return emit(cmd, res.json(v.Name, backendRepo(be), o.dryRun, nil, warnings), func(w io.Writer) {
 			fmt.Fprintln(w, res.head(0))
+			if line := res.excludedLine(); line != "" {
+				fmt.Fprintln(w, line)
+			}
 		})
 	}
 	b := newBatchRun(cmd, be, cfg, v, o.args, def)
 	b.keep = res.keep(cmd)
 	out := cmd.OutOrStdout()
-	// Once the issues are read and planned: the pull requests a message
-	// names are left out (keep), and so are the issues not ready.
+	// Once the issues are read and planned: the numbers a message names
+	// that are no issue are left out (keep), and so are the issues not
+	// ready.
 	b.before = func(items []*batchItem) []*batchItem {
 		n := len(items)
 		items = res.ready(v, items)
 		if !b.json {
 			fmt.Fprintln(out, res.head(n))
-			if line := res.notReadyLine(v); line != "" {
-				fmt.Fprintln(out, line)
+			for _, line := range []string{res.excludedLine(), res.notReadyLine(v)} {
+				if line != "" {
+					fmt.Fprintln(out, line)
+				}
 			}
 			if o.dryRun {
 				res.list(out, items)
 			}
 		}
 		return items
-	}
-	refs := make([]issue.Ref, len(found))
-	for i, f := range found {
-		refs[i] = f.Ref
 	}
 	items, err := b.run(ctx, refs, o.dryRun)
 	if err != nil {
@@ -222,22 +239,67 @@ type releaseRun struct {
 	def      issue.Repo
 	found    []release.Found
 	keywords []string
-	// skipped are the issues left out once read: a pull request a commit
-	// message names, or an issue not ready for the verb.
+	// skipped are the issues left out: by --exclude, then once read a
+	// number a commit message names that is no issue, or an issue not
+	// ready for the verb.
 	skipped      []releaseSkipped
 	skipWarnings []string
 }
 
 // Why release leaves out an issue it found.
 const (
-	skipPullRequest = "pull_request" // a commit message names a pull request
-	skipNotReady    = "not_ready"    // the verb's from refuses the issue's status
+	skipExcluded     = "excluded"       // --exclude names it
+	skipPullRequest  = "pull_request"   // a commit message names a pull request
+	skipNotFound     = "not_found"      // only a commit message names it, and there is no such issue
+	skipRepoNotFound = "repo_not_found" // only a commit message names it, in a repository not found or hidden from the token
+	skipNotReady     = "not_ready"      // the verb's from refuses the issue's status
 )
 
 type releaseSkipped struct {
 	found  release.Found
-	reason string // skipPullRequest or skipNotReady
+	reason string // one of the skip constants
 	status string // not ready: where the issue stands ("In progress", "no status", "not on the board")
+}
+
+// exclude leaves out of the issues found those --exclude names
+// (excluded, in the default repository when bare), and returns the rest
+// to read, with a warning for each excluded issue the release does not
+// include, a typo say. The parsing is --by's (parseBlockers): the same
+// forms, repeated or comma-separated.
+func (r *releaseRun) exclude(excluded []issue.Ref) (refs []issue.Ref, warnings []string) {
+	for _, f := range r.found {
+		if slices.ContainsFunc(excluded, f.Ref.Same) {
+			r.skipped = append(r.skipped, releaseSkipped{found: f, reason: skipExcluded})
+			continue
+		}
+		refs = append(refs, f.Ref)
+	}
+	for _, x := range excluded {
+		if !slices.ContainsFunc(r.found, func(f release.Found) bool { return f.Ref.Same(x) }) {
+			warnings = append(warnings, fmt.Sprintf("--exclude %s: not in the release", x.String(r.def)))
+		}
+	}
+	return refs, warnings
+}
+
+// excludedLine names the issues --exclude left out, with how each was
+// found; "" for none:
+//
+//	excluded: acme/api#3 (commit de25f45)
+func (r *releaseRun) excludedLine() string {
+	var names []string
+	for _, s := range r.skipped {
+		if s.reason == skipExcluded {
+			names = append(names, s.found.Ref.String(r.def)+" ("+r.sources(s.found)+")")
+		}
+	}
+	if len(names) == 0 {
+		return ""
+	}
+	if len(names) > maxErrorRefs {
+		names = append(names[:maxErrorRefs], fmt.Sprintf("and %d more", len(names)-maxErrorRefs))
+	}
+	return "excluded: " + strings.Join(names, ", ")
 }
 
 // ready leaves out of items, with their reason, the open issues verb v
@@ -328,22 +390,45 @@ func (r *releaseRun) foundOf(ref issue.Ref) release.Found {
 	return release.Found{Ref: ref}
 }
 
-// keep leaves out a number a commit message names that is a pull request,
-// with a warning: "Fixes #12" in a message may mean the pull request,
-// and failing the release on it would help no one. A pull request found
-// through a closing reference cannot happen.
+// keep leaves out, with a warning, a number a commit message names that
+// is no issue: a pull request ("Fixes #12" may mean the pull request),
+// and, when only messages name it, a missing issue or one whose
+// repository is not found, which may be the token's lack of access
+// (GitHub answers the same for a repository it hides): an example of the
+// syntax in a message, say. A message is text, a guess at a link, and
+// failing the release on it would help no one. An issue a merged pull
+// request closes is GitHub's link: if it cannot be read, the batch fails
+// as any batch does. A pull request found through a closing reference
+// cannot happen.
 func (r *releaseRun) keep(cmd *cobra.Command) func(IssueRead) bool {
 	return func(read IssueRead) bool {
-		if !read.PullRequest {
+		f := r.foundOf(read.Ref)
+		name := f.Ref.String(r.def)
+		var reason, w string
+		switch {
+		case read.Cause == issue.CausePullRequest:
+			reason, w = skipPullRequest, name+" is a pull request, not an issue"
+		case read.Cause == "" || !byMessageOnly(f):
+			return true
+		case read.Cause == issue.CauseMissing:
+			reason, w = skipNotFound, name+" not found"
+		case read.Cause == issue.CauseNoRepo:
+			reason, w = skipRepoNotFound, fmt.Sprintf("%s: repository %s not found, or the token cannot see it", name, f.Ref.Repo)
+		default:
 			return true
 		}
-		f := r.foundOf(read.Ref)
-		r.skipped = append(r.skipped, releaseSkipped{found: f, reason: skipPullRequest})
-		w := fmt.Sprintf("%s is a pull request, not an issue: left out (%s)", f.Ref.String(r.def), r.sources(f))
+		r.skipped = append(r.skipped, releaseSkipped{found: f, reason: reason})
+		w += ": left out (" + r.sources(f) + ")"
 		r.skipWarnings = append(r.skipWarnings, w)
 		render.Warn(cmd.ErrOrStderr(), "%s", w)
 		return false
 	}
+}
+
+// byMessageOnly reports whether only commit messages name f, no merged
+// pull request.
+func byMessageOnly(f release.Found) bool {
+	return len(f.Sources) > 0 && !slices.ContainsFunc(f.Sources, func(s release.Source) bool { return s.Pull != nil })
 }
 
 // head is the first line of the text: the range and how many issues it
@@ -418,8 +503,9 @@ type releaseResult struct {
 	// Issues are those found, in order (the default repository's first,
 	// by number), with how each was found.
 	Issues []releaseIssue `json:"issues"`
-	// Skipped are the issues found and left out: pull requests a commit
-	// message names, and issues not ready for the verb.
+	// Skipped are the issues found and left out: by --exclude, numbers
+	// only commit messages name that are no issue (a pull request, a
+	// missing issue or repository), and issues not ready for the verb.
 	Skipped  []releaseSkip `json:"skipped"`
 	Summary  verbSummary   `json:"summary"`
 	Warnings []string      `json:"warnings"`
@@ -457,9 +543,11 @@ type releaseSkip struct {
 	Number int    `json:"number"`
 	Repo   string `json:"repo"`
 	Ref    string `json:"ref"`
-	Reason string `json:"reason"` // pull_request or not_ready
+	// Reason is excluded, pull_request, not_found, repo_not_found or
+	// not_ready.
+	Reason string `json:"reason"`
 	// Status is where an issue not ready stands: a status, "no status" or
-	// "not on the board"; null for a pull request.
+	// "not on the board"; null for the other reasons.
 	Status  *string         `json:"status"`
 	FoundBy []releaseSource `json:"found_by"`
 }

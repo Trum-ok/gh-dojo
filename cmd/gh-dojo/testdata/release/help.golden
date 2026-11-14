@@ -14,7 +14,13 @@ An issue is in the release when a merged pull request of a commit closes it
 (its closing keywords or linked issues; squash, merge and rebase alike), or
 when a commit message names it after a keyword of [release] keywords, by
 default GitHub's closing ones (closes, fixes, resolves); owner/repo#N names
-an issue of another repository.
+an issue of another repository. Code in a message (`Refs #12`, a ``` block)
+does not count: put examples of the syntax in backticks.
+
+A message names issues as text, so a number there that is no issue (a pull
+request, a missing issue, a repository not found or that the token cannot
+see) is left out with a warning, not failed. --exclude leaves out an issue
+a message names by mistake.
 
 An open issue whose status the verb's from does not allow (still in progress,
 say) is listed as not ready and left out, not failed; only a later release
@@ -28,12 +34,14 @@ Usage:
 Examples:
   gh dojo release v0.2.0 --verb done --dry-run
   gh dojo release v0.2.0 --verb done
+  gh dojo release v0.2.0 --verb done --exclude acme/api#3
   gh dojo release v0.1.0 --since 4c40894 --verb done --comment "Released in v0.1.0."
 
 Flags:
       --by string        value for {by} in the verb's comment, for every issue
       --comment string   text for {comment} in the verb's comment, for every issue
       --dry-run          list the issues, how each was found and its plan, without changing anything
+      --exclude issue    an issue to leave out: 12, "#12", owner/repo#12 or its URL; repeatable, or comma-separated
   -h, --help             help for release
       --since string     where the release starts, a tag, branch or commit; default: the previous version tag
       --verb string      the verb to apply to the release's issues: one with batch = true
