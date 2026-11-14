@@ -148,12 +148,10 @@ func (s *sandbox) scenario(t *testing.T, preset string, project int, sprints boo
 	}
 
 	// next: the free ones, not B.
-	var next struct {
-		Issues []listIssue `json:"issues"`
-	}
-	d.json(&next, 0, "next", "--limit", "100")
-	if !hasIssue(next.Issues, a) || !hasIssue(next.Issues, c) || hasIssue(next.Issues, b) {
-		t.Fatalf("next = %v, want #%d and #%d without #%d", numbers(next.Issues), a, c, b)
+	if got, ok := d.listUntil(func(is []listIssue) bool {
+		return hasIssue(is, a) && hasIssue(is, c) && !hasIssue(is, b)
+	}, "next", "--limit", "100"); !ok {
+		t.Fatalf("next = %v, want #%d and #%d without #%d", numbers(got), a, c, b)
 	}
 
 	// A dry run plans and changes nothing; the blocker is a warning.
@@ -248,16 +246,15 @@ func (s *sandbox) scenario(t *testing.T, preset string, project int, sprints boo
 	}
 
 	// list hides the final status, --all shows it.
-	var list struct {
-		Issues []listIssue `json:"issues"`
+	if got, ok := d.listUntil(func(is []listIssue) bool {
+		return hasIssue(is, c) && !hasIssue(is, a) && !hasIssue(is, b)
+	}, "list", "--limit", "100"); !ok {
+		t.Fatalf("list = %v, want #%d without the done #%d and #%d", numbers(got), c, a, b)
 	}
-	d.json(&list, 0, "list", "--limit", "100")
-	if !hasIssue(list.Issues, c) || hasIssue(list.Issues, a) || hasIssue(list.Issues, b) {
-		t.Fatalf("list = %v, want #%d without the done #%d and #%d", numbers(list.Issues), c, a, b)
-	}
-	d.json(&list, 0, "list", "--all", "--limit", "100")
-	if !hasIssue(list.Issues, a) || !hasIssue(list.Issues, b) {
-		t.Fatalf("list --all = %v, want #%d and #%d", numbers(list.Issues), a, b)
+	if got, ok := d.listUntil(func(is []listIssue) bool {
+		return hasIssue(is, a) && hasIssue(is, b)
+	}, "list", "--all", "--limit", "100"); !ok {
+		t.Fatalf("list --all = %v, want #%d and #%d", numbers(got), a, b)
 	}
 }
 
@@ -420,6 +417,32 @@ func (d *dojo) json(v any, code int, args ...string) {
 		d.t.Fatalf("gh dojo %s --json: %v\n%s", strings.Join(args, " "), err, out)
 	}
 }
+
+// listUntil runs list or next (args) until ok accepts its issues, for up to
+// listWait: GitHub lists a board's items a few seconds behind the writes,
+// while show reads the issue itself and is up to date at once. It returns
+// the last issues read and whether ok accepted them.
+func (d *dojo) listUntil(ok func([]listIssue) bool, args ...string) ([]listIssue, bool) {
+	d.t.Helper()
+	deadline := time.Now().Add(listWait)
+	for {
+		var out struct {
+			Issues []listIssue `json:"issues"`
+		}
+		d.json(&out, 0, args...)
+		if ok(out.Issues) {
+			return out.Issues, true
+		}
+		if time.Now().After(deadline) {
+			return out.Issues, false
+		}
+		d.t.Logf("gh dojo %s: %v, not there yet; reading again", strings.Join(args, " "), numbers(out.Issues))
+		time.Sleep(3 * time.Second)
+	}
+}
+
+// listWait is how long listUntil waits for the board's items to catch up.
+const listWait = 30 * time.Second
 
 type verbResult struct {
 	Issues []struct {
