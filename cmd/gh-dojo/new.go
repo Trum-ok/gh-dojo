@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cli/go-gh/v2/pkg/api"
+
 	"github.com/Trum-ok/gh-dojo/internal/board"
 	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/effects"
@@ -115,19 +117,22 @@ const newContextQuery = `query NewIssueContext($owner: String!, $repo: String!, 
 }`
 
 // newContextQueryWith is newContextQuery that also reads links, the
-// --blocked-by and --parent issues (see issue.Links), and, with parent,
-// the parent of each recent issue, so a resumed one shows whether it has
-// one; without either it is newContextQuery itself.
+// --blocked-by and --parent issues (see issue.Links), and, with parent
+// (the last link), how many sub-issues it has and the parent of each
+// recent issue, so a resumed one shows whether it has one; without either
+// it is newContextQuery itself.
 func newContextQueryWith(links issue.Links, parent bool) string {
 	q := newContextQuery
+	sub := -1
 	if parent {
 		q = strings.Replace(q, newIssueMilestone, newIssueMilestone+newIssueParent, 1)
+		sub = len(links) - 1
 	}
 	if len(links) == 0 {
 		return q
 	}
 	q = strings.Replace(q, "$window: Int!)", "$window: Int!"+links.Decls()+")", 1)
-	return strings.TrimSuffix(q, "}") + links.Fields() + "}"
+	return strings.TrimSuffix(q, "}") + links.FieldsCountingSubIssues(sub) + "}"
 }
 
 // newIssueMilestone is the milestone of a recent issue in newContextQuery;
@@ -458,8 +463,8 @@ A repository not in board.repos is exit code 1, listing them.
 A repeat is safe: the body ends with a hidden marker of the title, and a run
 that finds it on one of the repo's 20 newest open issues, written by you,
 finishes that issue (labels, milestone, board, status, blocked-by links,
-parent) instead of creating another; a different milestone or parent it
-already has is kept.
+parent) instead of creating another; a different milestone or parent it (or one
+the token cannot read) already has is kept.
 So filing an open issue again with the same title (ignoring case and
 spacing) resumes it. If a run fails after creating the issue, it exits with
 code 5: run the same command again.`)
@@ -637,15 +642,20 @@ type newRun struct {
 	linked      []*issue.Linked // blocked-by links added now
 	linkedFound []*issue.Linked // blocked-by links a resumed issue had already
 
-	parent     *issue.Ref // the issue's parent, nil for none or not known
-	parentSet  bool       // made a sub-issue of --parent now
-	parentKept *issue.Ref // the --parent not applied: a resumed issue had another
+	parent       *issue.Ref // the issue's parent, nil for none or not known
+	parentSet    bool       // made a sub-issue of --parent now
+	parentKept   *issue.Ref // the --parent not applied: a resumed issue had another
+	parentHidden bool       // a resumed issue has a parent the token cannot read
+	parentErr    error      // GitHub refused the parent of createIssue for good (parentRefused)
 }
 
 // newStepError says which write failed, as "setting status Backlog failed".
 type newStepError struct {
 	step string
 	err  error
+	// parent: the step is the --parent link, which GitHub refused for good
+	// (parentRefused): re-running cannot help.
+	parent bool
 }
 
 func (e *newStepError) Error() string { return e.step + ": " + e.err.Error() }
@@ -705,6 +715,13 @@ func (r *newRun) run(ctx context.Context) error {
 
 	marker := workflow.Marker(newMarkerVerb, newDedupKey(r.opts.Title))
 	found := nc.find(marker, s.ID)
+	// A parent with as many sub-issues as GitHub allows takes no more: no
+	// re-run would help, so nothing is written.
+	if p := nc.Parent; p != nil && p.SubIssues >= issue.MaxSubIssues &&
+		(found == nil || found.parentID == "" && !found.parentHidden) {
+		return render.Usage("--%s %s has %d sub-issues, as many as GitHub allows", parentFlag, p.Ref.String(def), p.SubIssues).
+			WithFix("pass another parent, or drop --" + parentFlag)
+	}
 	if found != nil {
 		for _, l := range nc.Links {
 			switch {
@@ -759,6 +776,13 @@ func (r *newRun) run(ctx context.Context) error {
 			r.parent = found.parent
 			switch {
 			case found.parentID == p.ID:
+			case found.parentHidden:
+				// It has a parent the token cannot read: addSubIssue would
+				// fail, or move it from a parent nobody here can see.
+				r.parentKept, r.parentHidden = &p.Ref, true
+				r.warnings = append(r.warnings, fmt.Sprintf(
+					"%s has a parent the token cannot read; kept it, --%s %s not applied (to see it: gh issue view %d -R %s)",
+					r.name(), parentFlag, p.Ref.Arg(def), r.number, repo))
 			case found.parentID == "":
 				addParent = p
 			default:
@@ -779,26 +803,26 @@ func (r *newRun) run(ctx context.Context) error {
 	if len(missing) > 0 {
 		vars := map[string]any{"issue": r.id, "labels": missing}
 		if err := r.Client.Mutate(ctx, newAddLabelsMutation, vars, nil); err != nil {
-			return &newStepError{"adding labels " + strings.Join(r.labels, ", ") + " failed", err}
+			return &newStepError{step: "adding labels " + strings.Join(r.labels, ", ") + " failed", err: err}
 		}
 	}
 	if setMilestone {
 		vars := map[string]any{"issue": r.id, "milestone": milestone.ID}
 		if err := r.Client.Mutate(ctx, newSetMilestoneMutation, vars, nil); err != nil {
-			return &newStepError{"setting milestone " + singleLine(milestone.Title) + " failed", err}
+			return &newStepError{step: "setting milestone " + singleLine(milestone.Title) + " failed", err: err}
 		}
 		r.milestone, r.milestoneSet = milestone, true
 	}
 	if r.archived {
 		vars := map[string]any{"project": s.ID, "item": r.itemID}
 		if err := r.Client.Mutate(ctx, newUnarchiveMutation, vars, nil); err != nil {
-			return &newStepError{"unarchiving it on board " + s.Ref().String() + " failed", err}
+			return &newStepError{step: "unarchiving it on board " + s.Ref().String() + " failed", err: err}
 		}
 		r.unarchived = true
 	}
 	if r.itemID == "" {
 		if err := r.addToBoard(ctx, s.ID, statusField.Name); err != nil {
-			return &newStepError{"adding it to board " + s.Ref().String() + " failed", err}
+			return &newStepError{step: "adding it to board " + s.Ref().String() + " failed", err: err}
 		}
 	}
 	// A resumed issue keeps a status it already has: someone may have
@@ -815,14 +839,19 @@ func (r *newRun) run(ctx context.Context) error {
 		}
 	}
 	if len(pending) > 0 || addParent != nil {
-		return r.finish(ctx, s.ID, statusField.ID, initial, pending, addParent)
-	}
-	if initial != nil {
+		if err := r.finish(ctx, s.ID, statusField.ID, initial, pending, addParent); err != nil {
+			return err
+		}
+	} else if initial != nil {
 		vars := map[string]any{"project": s.ID, "item": r.itemID, "field": statusField.ID, "option": initial.ID}
 		if err := r.Client.Mutate(ctx, newSetStatusMutation, vars, nil); err != nil {
-			return &newStepError{"setting status " + initial.Name + " failed", err}
+			return &newStepError{step: "setting status " + initial.Name + " failed", err: err}
 		}
 		r.status, r.statusSet = initial.Name, true
+	}
+	if r.parentErr != nil {
+		// The rest is done; createIssue refused the parent for good.
+		return &newStepError{step: "making it a sub-issue of " + nc.Parent.Ref.String(def) + " failed", err: r.parentErr, parent: true}
 	}
 	return nil
 }
@@ -894,12 +923,17 @@ func (r *newRun) finish(ctx context.Context, projectID, fieldID string, initial 
 	if len(missed) > 0 {
 		steps = append(steps, "marking it blocked by "+joinRefs(missed, r.def))
 	}
+	parentMissed := false
 	if parent != nil {
 		if raw, ok := data["parent"]; ok && !isJSONNull(raw) {
 			r.parent, r.parentSet = &parent.Ref, true
 		} else {
 			steps = append(steps, "making it a sub-issue of "+parent.Ref.String(r.def))
+			parentMissed = true
 		}
+	}
+	if parentMissed && len(steps) == 1 && parentRefused(err, "parent", false) {
+		return &newStepError{step: steps[0] + " failed", err: err, parent: true}
 	}
 	switch {
 	case len(steps) == 0 && err != nil:
@@ -908,9 +942,43 @@ func (r *newRun) finish(ctx context.Context, projectID, fieldID string, initial 
 		err = render.Network("GitHub returned no result for part of the write")
 		fallthrough
 	case len(steps) > 0:
-		return &newStepError{strings.Join(steps, " and ") + " failed", err}
+		return &newStepError{step: strings.Join(steps, " and ") + " failed", err: err}
 	}
 	return nil
+}
+
+// parentRefused reports whether err is GitHub refusing the --parent link
+// for good, so that re-running cannot help: every GraphQL error of err is
+// at field (the alias of the write), of type UNPROCESSABLE or FORBIDDEN, or
+// an input error without a type; with named, its message must also name
+// the parent or sub-issues (createIssue, whose other parts may fail too).
+// A parent with as many sub-issues as GitHub allows, one 8 levels deep, a
+// cycle, or no access to the parent's repository are such refusals.
+func parentRefused(err error, field string, named bool) bool {
+	var gqlErr *api.GraphQLError
+	if errors.Is(err, graph.ErrUnknownOutcome) || !errors.As(err, &gqlErr) || gqlErr == nil || len(gqlErr.Errors) == 0 {
+		return false
+	}
+	for _, item := range gqlErr.Errors {
+		if len(item.Path) == 0 || item.Path[0] != field {
+			return false
+		}
+		switch item.Type {
+		case "UNPROCESSABLE", "FORBIDDEN", "":
+		default:
+			return false
+		}
+		if named && !containsAnyFold(item.Message, "parent", "sub-issue", "sub issue", "subissue") {
+			return false
+		}
+	}
+	return true
+}
+
+// containsAnyFold reports whether s contains any of words, ignoring case.
+func containsAnyFold(s string, words ...string) bool {
+	s = strings.ToLower(s)
+	return slices.ContainsFunc(words, func(w string) bool { return strings.Contains(s, w) })
 }
 
 // addToBoard puts the issue on the board projectID and sets r.itemID (and
@@ -1041,6 +1109,13 @@ func (r *newRun) create(ctx context.Context, repoID, body string, labels []newLa
 	}
 	is := out.Create.Issue
 	r.number, r.id = is.Number, is.ID
+	if err != nil && parent != nil && parentRefused(err, "createIssue", true) {
+		// The issue exists with the rest: the run goes on, and ends with
+		// this refusal (see run).
+		r.parentErr = err
+		r.milestone, r.milestoneSet = milestone, milestone != nil
+		return nil
+	}
 	if err != nil {
 		parts := []string{"labels"}
 		if milestone != nil {
@@ -1049,7 +1124,7 @@ func (r *newRun) create(ctx context.Context, repoID, body string, labels []newLa
 		if parent != nil {
 			parts = append(parts, "parent")
 		}
-		return &newStepError{"GitHub refused part of the request (" + joinWords(parts, "or") + ")", err}
+		return &newStepError{step: "GitHub refused part of the request (" + joinWords(parts, "or") + ")", err: err}
 	}
 	r.milestone, r.milestoneSet = milestone, milestone != nil
 	if parent != nil {
@@ -1108,7 +1183,11 @@ func (r *newRun) confirm() string {
 	switch {
 	case r.opts.Parent == nil:
 	case r.parentKept != nil:
-		effects = append(effects, "sub-issue of "+r.parentName(r.parent)+" (kept, not "+r.parentKept.String(r.def)+")")
+		of := r.parentName(r.parent)
+		if r.parentHidden {
+			of = "a parent not readable"
+		}
+		effects = append(effects, "sub-issue of "+of+" (kept, not "+r.parentKept.String(r.def)+")")
 	case r.parentSet:
 		effects = append(effects, "sub-issue of "+r.parentName(r.parent))
 	case r.parent != nil:
@@ -1162,8 +1241,19 @@ func (r *newRun) partial(err error) error {
 	}
 	e := render.FromError(cause)
 	why, _, _ := strings.Cut(e.What, "\n")
+	if se != nil && se.parent {
+		// Re-running cannot help a parent GitHub refuses: full, too deep, a
+		// cycle, or out of the token's reach. GitHub's own words say which.
+		var gqlErr *api.GraphQLError
+		if errors.As(cause, &gqlErr) && gqlErr != nil && len(gqlErr.Errors) > 0 {
+			why = "GitHub: " + singleLine(gqlErr.Errors[0].Message)
+		}
+		return render.Usage("%s %s, but %s; re-running will not help\n%s", r.name(), what, step, why).
+			WithFix("pass another --" + parentFlag + " to make it a sub-issue (gh issue edit " + strconv.Itoa(r.number) +
+				" -R " + r.repo.String() + " --parent <issue>), or leave it without one").WithCause(err)
+	}
 	if graph.IsCycle(cause) {
-		// Re-running cannot help: the links make a cycle through other issues.
+		// Nor a blocked-by link that makes a cycle through other issues.
 		return render.Usage("%s %s, but %s\n%s", r.name(), what, step, why).
 			WithFix("gh dojo show " + strings.TrimPrefix(r.name(), "#")).WithCause(err)
 	}
@@ -1250,6 +1340,7 @@ type newIssueJSON struct {
 	ProjectItems struct {
 		Nodes []*newItemJSON `json:"nodes"`
 	} `json:"projectItems"`
+	parentHidden bool // GitHub withheld its parent (hiddenParents)
 }
 
 // readNewContext reads what new needs before writing, with the issues of
@@ -1278,8 +1369,9 @@ func readNewContext(ctx context.Context, q graph.Querier, repo issue.Repo, statu
 			return nil, render.Internal("cannot decode GitHub's answer").WithCause(uerr)
 		}
 	}
-	if err != nil && r != nil && issue.OnlyLinkErrors(err) {
-		err = nil // a missing --blocked-by issue: LinksError names it
+	hidden, others := hiddenParents(err)
+	if err != nil && r != nil && (others == nil || issue.OnlyLinkErrors(others)) {
+		err = nil // a missing --blocked-by issue (LinksError names it), or a parent withheld
 	}
 	if r == nil && (err == nil || render.FromError(err).Code == render.ExitNotFound) {
 		return nil, render.NotFound("repository %s not found, or the token cannot see it", repo).
@@ -1289,6 +1381,11 @@ func readNewContext(ctx context.Context, q graph.Querier, repo issue.Repo, statu
 		return nil, err
 	}
 	nc := &newContext{RepoID: r.ID, Labels: r.Labels, Milestones: r.Milestones, Issues: r.Issues.Nodes}
+	for i, is := range nc.Issues {
+		if is != nil && hidden[i] {
+			is.parentHidden = true
+		}
+	}
 	if len(links) > 0 {
 		if nc.Links, err = links.Decode(data); err != nil {
 			return nil, render.Internal("cannot decode GitHub's answer").WithCause(err)
@@ -1298,6 +1395,34 @@ func readNewContext(ctx context.Context, q graph.Querier, repo issue.Repo, statu
 		nc.Links, nc.Parent = nc.Links[:len(blockers)], nc.Links[len(blockers)]
 	}
 	return nc, nil
+}
+
+// hiddenParents returns the indexes of the recent issues whose parent
+// GitHub withheld from the token (NOT_FOUND or FORBIDDEN at
+// repository.issues.nodes.<i>.parent), and err without those errors: nil
+// when they were all of them, or when err is not a GraphQL error.
+func hiddenParents(err error) (map[int]bool, error) {
+	var gqlErr *api.GraphQLError
+	if !errors.As(err, &gqlErr) || gqlErr == nil {
+		return nil, err
+	}
+	hidden := map[int]bool{}
+	var rest []api.GraphQLErrorItem
+	for _, item := range gqlErr.Errors {
+		p := item.Path
+		if len(p) == 5 && p[0] == "repository" && p[1] == "issues" && p[2] == "nodes" && p[4] == "parent" &&
+			(item.Type == "NOT_FOUND" || item.Type == "FORBIDDEN") {
+			if i, ok := p[3].(float64); ok {
+				hidden[int(i)] = true
+				continue
+			}
+		}
+		rest = append(rest, item)
+	}
+	if len(rest) == 0 {
+		return hidden, nil
+	}
+	return hidden, &api.GraphQLError{Errors: rest}
 }
 
 // foundIssue is an issue an earlier run created, as find returns it.
@@ -1312,6 +1437,8 @@ type foundIssue struct {
 	// it; read with --parent only.
 	parentID string
 	parent   *issue.Ref
+	// parentHidden: it has a parent GitHub withheld from the token.
+	parentHidden bool
 }
 
 // find returns the newest open issue the viewer wrote whose body ends with
@@ -1322,7 +1449,7 @@ func (nc *newContext) find(marker, projectID string) *foundIssue {
 		if is == nil || !is.ViewerDidAuthor || !strings.HasSuffix(strings.TrimSpace(is.Body), marker) {
 			continue
 		}
-		f := &foundIssue{ID: is.ID, Number: is.Number, title: is.Title, milestone: is.Milestone}
+		f := &foundIssue{ID: is.ID, Number: is.Number, title: is.Title, milestone: is.Milestone, parentHidden: is.parentHidden}
 		if p := is.Parent; p != nil && p.ID != "" && p.Repository != nil {
 			if repo, err := issue.ParseRepo(p.Repository.NameWithOwner); err == nil {
 				f.parentID, f.parent = p.ID, &issue.Ref{Repo: repo, Number: p.Number}

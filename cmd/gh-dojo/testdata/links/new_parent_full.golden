@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: --parent #26 has 100 sub-issues, as many as GitHub allows
+fix: pass another parent, or drop --parent

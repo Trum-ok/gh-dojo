@@ -1,0 +1,5 @@
+code: 0
+--- stdout
+#15 "Fix login redirect" already created, labels bug, area:cli, In progress (unchanged), sub-issue of a parent not readable (kept, not #26)
+--- stderr
+warning: #15 has a parent the token cannot read; kept it, --parent 26 not applied (to see it: gh issue view 15 -R Trum-ok/gh-dojo)

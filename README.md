@@ -280,7 +280,11 @@ Creates an issue, labels it, adds it to the board and sets the initial status
   request); [`show`](#show) lists a parent's sub-issues, and a verb with
   [`sub_issues`](#checks) checks them. An existing issue becomes a sub-issue
   with `gh issue edit 15 --parent 40`: gh-dojo has no command for it, since
-  the link changes no status;
+  the link changes no status. A parent with 100 sub-issues, GitHub's limit,
+  fails before anything is created (exit code 1); one GitHub refuses
+  otherwise (8 levels deep, a cycle, out of the token's reach) is exit
+  code 1 once the rest is done, with GitHub's reason, since re-running
+  cannot help;
 - `--repo acme/api` creates it in another repository of
   [`board.repos`](#board) than the first: its labels, milestones and repeat
   check are that repository's, the issue is named `acme/api#15`, and a bare
@@ -302,8 +306,9 @@ A repeat is safe: the body ends with a hidden marker of the title, and a run
 that finds it on one of the repository's 20 newest open issues written by
 you finishes that issue (labels, milestone, board, status, blocked-by links,
 parent) instead of creating another; a different milestone or parent it
-already has is kept, with a warning. If a run fails after creating the issue, it exits with code
-5: run the same command again.
+already has (or a parent the token cannot read) is kept, with a warning.
+If a run fails after creating the issue, it exits with code 5: run the
+same command again.
 
 ### comment
 

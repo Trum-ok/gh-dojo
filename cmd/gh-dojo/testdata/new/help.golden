@@ -35,8 +35,8 @@ A repository not in board.repos is exit code 1, listing them.
 A repeat is safe: the body ends with a hidden marker of the title, and a run
 that finds it on one of the repo's 20 newest open issues, written by you,
 finishes that issue (labels, milestone, board, status, blocked-by links,
-parent) instead of creating another; a different milestone or parent it
-already has is kept.
+parent) instead of creating another; a different milestone or parent it (or one
+the token cannot read) already has is kept.
 So filing an open issue again with the same title (ignoring case and
 spacing) resumes it. If a run fails after creating the issue, it exits with
 code 5: run the same command again.

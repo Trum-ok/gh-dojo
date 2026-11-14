@@ -1,0 +1,245 @@
+{
+  "comment": "Hand-crafted from new_parent_resume.json: addSubIssue is refused, for good (exit code 1). Mutations are never sent to GitHub; their payloads follow the GraphQL schema (createIssue.issue, addSubIssue.issue: the parent); refusals are hand-written, their messages made up. The read is new_blocked_by.json's, with #26 (as recorded) as the --parent link, how many sub-issues it has, and each recent issue's parent (null: the recorded issues have none).",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "NewIssueContext",
+      "query": "query NewIssueContext($owner: String!, $repo: String!, $status: String!, $window: Int!, $link0Owner: String!, $link0Repo: String!, $link0Number: Int!) {\n  repository(owner: $owner, name: $repo) {\n    id\n    labels(first: 100, orderBy: {field: NAME, direction: ASC}) {\n      totalCount\n      pageInfo { hasNextPage endCursor }\n      nodes { id name }\n    }\n    milestones(first: 100, states: OPEN, orderBy: {field: NUMBER, direction: ASC}) {\n      totalCount\n      pageInfo { hasNextPage endCursor }\n      nodes { id title dueOn }\n    }\n    issues(last: $window, states: OPEN, orderBy: {field: CREATED_AT, direction: ASC}) {\n      nodes {\n        id\n        number\n        title\n        body\n        viewerDidAuthor\n        labels(first: 50) { nodes { name } }\n        milestone { title dueOn }\n        parent { id number repository { nameWithOwner } }\n        projectItems(first: 20) {\n          nodes {\n            id\n            isArchived\n            project { id }\n            fieldValueByName(name: $status) { ... on ProjectV2ItemFieldSingleSelectValue { name } }\n          }\n        }\n      }\n    }\n  }\n  link0: repository(owner: $link0Owner, name: $link0Repo) {\n    nameWithOwner\n    issueOrPullRequest(number: $link0Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } subIssues { totalCount } } }\n  }\n}",
+      "variables": {
+        "owner": "Trum-ok",
+        "repo": "gh-dojo",
+        "status": "Status",
+        "window": 20,
+        "link0Owner": "Trum-ok",
+        "link0Repo": "gh-dojo",
+        "link0Number": 26
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "id": "R_kgDOVq9iIg",
+            "labels": {
+              "totalCount": 13,
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": "MTE"
+              },
+              "nodes": [
+                {
+                  "id": "LA_kwDOVq9iIs8AAAADCYId8Q",
+                  "name": "accessibility"
+                },
+                {
+                  "id": "LA_kwDOVq9iIs8AAAADCaREAb",
+                  "name": "area:board"
+                },
+                {
+                  "id": "LA_kwDOVq9iIs8AAAADCaREAc",
+                  "name": "area:cli"
+                },
+                {
+                  "id": "LA_kwDOVq9iIs8AAAADCYId4A",
+                  "name": "bug"
+                },
+                {
+                  "id": "LA_kwDOVq9iIs8AAAADCYIeBw",
+                  "name": "documentation"
+                },
+                {
+                  "id": "LA_kwDOVq9iIs8AAAADCYLjtg",
+                  "name": "dogfood"
+                },
+                {
+                  "id": "LA_kwDOVq9iIs8AAAADCYIeHQ",
+                  "name": "duplicate"
+                },
+                {
+                  "id": "LA_kwDOVq9iIs8AAAADCYIeOA",
+                  "name": "enhancement"
+                },
+                {
+                  "id": "LA_kwDOVq9iIs8AAAADCYIeYg",
+                  "name": "good first issue"
+                },
+                {
+                  "id": "LA_kwDOVq9iIs8AAAADCYIeTA",
+                  "name": "help wanted"
+                },
+                {
+                  "id": "LA_kwDOVq9iIs8AAAADCYIecw",
+                  "name": "invalid"
+                },
+                {
+                  "id": "LA_kwDOVq9iIs8AAAADCYIehg",
+                  "name": "question"
+                },
+                {
+                  "id": "LA_kwDOVq9iIs8AAAADCYIeog",
+                  "name": "wontfix"
+                }
+              ]
+            },
+            "milestones": {
+              "totalCount": 2,
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": "Y3Vyc29yOnYyOpICzgEopNw="
+              },
+              "nodes": [
+                {
+                  "id": "MI_kwDOVq9iIs4BKI_2",
+                  "title": "v0.0 — самохостинг",
+                  "dueOn": null
+                },
+                {
+                  "id": "MI_kwDOVq9iIs4BKKTc",
+                  "title": "v0.1 — первый публичный релиз",
+                  "dueOn": null
+                }
+              ]
+            },
+            "issues": {
+              "nodes": [
+                {
+                  "id": "I_kwDOVq9iIs8AAAABeZMbcQ",
+                  "number": 13,
+                  "title": "Доска и .github/dojo.toml для самого gh-dojo",
+                  "body": "## Зачем\ngh-dojo ведёт собственную разработку через себя.\n\n## Что сделать\n- Привести статусы доски gh-dojo (проект №5) к ожиданиям пресета `kanban`.\n- Написать `.github/dojo.toml` для репозитория: доска, поля, пресет и переопределения; тексты комментариев — на языке проекта.\n- Завести метку `dogfood` для неудобств, замеченных по ходу работы, если её ещё нет.\n\n## Готово, когда\n- Конфиг загружается и проходит сверку с доской без ошибок.\n\nСпека: `docs/spec.md`: «Этапы → Самохостинг».\n",
+                  "viewerDidAuthor": true,
+                  "labels": {
+                    "nodes": []
+                  },
+                  "milestone": {
+                    "title": "v0.0 — самохостинг",
+                    "dueOn": null
+                  },
+                  "parent": null,
+                  "projectItems": {
+                    "nodes": [
+                      {
+                        "id": "PVTI_lAHOBFGd5c4BrMYFzhH6Ltk",
+                        "isArchived": false,
+                        "project": {
+                          "id": "PVT_kwHOBFGd5c4BrMYF"
+                        },
+                        "fieldValueByName": {
+                          "name": "Backlog"
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "id": "I_kwDOVq9iIs8AAAABeZMk6g",
+                  "number": 14,
+                  "title": "Skill для агентов и переход на gh dojo (рубеж v0.0)",
+                  "body": "## Зачем\nРубеж v0.0: все задачи gh-dojo лежат на его собственной доске, агенты работают с ней только через `gh dojo`.\n\n## Что сделать\n- Написать вручную `.claude/skills/gh-dojo/SKILL.md`: глаголы проекта, когда их применять, коды выхода, правило «неудобство → задача с меткой `dogfood`» (с v0.2 skill генерирует `agent install`).\n- В `CLAUDE.md` указать, что задачи ведутся только через `gh dojo`, а не через `gh issue` и `gh project`.\n- Проверить, что все открытые задачи на доске и `gh dojo list` их показывает.\n- Пройти цикл одной реальной задачи: `new` → `start` → `ready`/`done` → `show`.\n\n## Готово, когда\n- Рубеж выполнен; найденные неудобства заведены с меткой `dogfood`.\n\nСпека: `docs/spec.md`: «Этапы → v0.0, Самохостинг», «Интеграция с агентами».\n",
+                  "viewerDidAuthor": true,
+                  "labels": {
+                    "nodes": []
+                  },
+                  "milestone": {
+                    "title": "v0.0 — самохостинг",
+                    "dueOn": null
+                  },
+                  "parent": null,
+                  "projectItems": {
+                    "nodes": [
+                      {
+                        "id": "PVTI_lAHOBFGd5c4BrMYFzhH6L4Q",
+                        "isArchived": false,
+                        "project": {
+                          "id": "PVT_kwHOBFGd5c4BrMYF"
+                        },
+                        "fieldValueByName": {
+                          "name": "Backlog"
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "id": "I_kwDOVq9iIs8AAAABfNEW15",
+                  "number": 15,
+                  "title": "Fix login redirect",
+                  "body": "The redirect drops the query string.\n\n<!-- gh-dojo:new:49fa8a69 -->",
+                  "viewerDidAuthor": true,
+                  "labels": {
+                    "nodes": [
+                      {
+                        "name": "bug"
+                      },
+                      {
+                        "name": "area:cli"
+                      }
+                    ]
+                  },
+                  "milestone": null,
+                  "parent": null,
+                  "projectItems": {
+                    "nodes": [
+                      {
+                        "id": "PVTI_lAHOBFGd5c4BrMYFzhNEW15",
+                        "isArchived": false,
+                        "project": {
+                          "id": "PVT_kwHOBFGd5c4BrMYF"
+                        },
+                        "fieldValueByName": {
+                          "name": "In progress"
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          "link0": {
+            "nameWithOwner": "Trum-ok/gh-dojo",
+            "issueOrPullRequest": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8AAAABeb-QYw",
+              "title": "Блокеры: block/unblock, new --blocked-by, проверка blockers, эффект blockers",
+              "state": "OPEN",
+              "blocking": {
+                "nodes": [
+                  {
+                    "id": "I_kwDOVq9iIs8AAAABeb-zgQ"
+                  }
+                ]
+              },
+              "blockedBy": {
+                "nodes": []
+              },
+              "subIssues": {
+                "totalCount": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "NewFinish",
+      "query": "mutation NewFinish($issue: ID!, $parent: ID!) {\n  parent: addSubIssue(input: {issueId: $parent, subIssueId: $issue}) { issue { id } }\n}",
+      "variables": {
+        "issue": "I_kwDOVq9iIs8AAAABfNEW15",
+        "parent": "I_kwDOVq9iIs8AAAABeb-QYw"
+      },
+      "response": {
+        "data": {
+          "parent": null
+        },
+        "errors": [
+          {
+            "type": "UNPROCESSABLE",
+            "path": [
+              "parent"
+            ],
+            "message": "Issue may not contain duplicate sub-issues or cycles"
+          }
+        ]
+      }
+    }
+  ]
+}

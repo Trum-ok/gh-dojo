@@ -270,6 +270,12 @@ func TestNewParent(t *testing.T) {
 			{append(slices.Clone(newFixArgs), "--parent", "#26"), render.ExitOK, 2, "new_parent_resume"},
 			{append(slices.Clone(newFixArgs), "--parent", "https://github.com/Trum-ok/gh-dojo/issues/26"), render.ExitOK, 1, "new_parent_repeat"},
 		}},
+		// One mutation: the status, the blocked-by link and the parent.
+		{"new_parent_finish_all", []runs{
+			{append(slices.Clone(newFixArgs), "--blocked-by", "26", "--parent", "3"), render.ExitOK, 2, "new_parent_finish_all"},
+		}},
+		// A parent the token cannot read is kept, never replaced.
+		{"new_parent_hidden", []runs{{append(slices.Clone(newFixArgs), "--parent", "26"), render.ExitOK, 1, "new_parent_hidden"}}},
 		{"new_parent_kept", []runs{
 			{append(slices.Clone(newFixArgs), "--parent", "26"), render.ExitOK, 1, "new_parent_kept"},
 			{append(slices.Clone(newFixArgs), "--parent", "26", "--json"), render.ExitOK, 1, "new_parent_kept_json"},
@@ -278,6 +284,29 @@ func TestNewParent(t *testing.T) {
 		t.Run(tt.fixture, func(t *testing.T) {
 			srv := withApp(t, boardFixture, verbFixture(tt.fixture))
 			checkLinkRuns(t, srv, warmSchema(t, srv), tt.steps...)
+		})
+	}
+}
+
+// TestNewParentRefused: GitHub's refusals of the parent are for good, so
+// they are exit code 1, not 5, which would have an agent re-run forever:
+// a parent with 100 sub-issues is refused before anything is written; a
+// refused addSubIssue after the rest; a parent createIssue refuses leaves
+// the issue created, put on the board in Backlog all the same.
+func TestNewParentRefused(t *testing.T) {
+	withConfig(t, dojoConfig)
+	for _, tt := range []struct {
+		fixture  string
+		requests int
+	}{
+		{"new_parent_full", 1},
+		{"new_parent_refused", 2},
+		{"new_parent_create_refused", 4},
+	} {
+		t.Run(tt.fixture, func(t *testing.T) {
+			srv := withApp(t, boardFixture, verbFixture(tt.fixture))
+			checkLinkRuns(t, srv, warmSchema(t, srv),
+				runs{append(slices.Clone(newFixArgs), "--parent", "26"), render.ExitUsage, tt.requests, tt.fixture})
 		})
 	}
 }

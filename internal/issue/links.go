@@ -143,8 +143,11 @@ type Linked struct {
 	ID          string // node ID, for addBlockedBy; never print it
 	Title       string
 	State       string
-	blocking    []string // node IDs of the issues it blocks
-	blockedBy   []string // node IDs of the issues blocking it
+	// SubIssues is how many sub-issues it has, read with
+	// Links.FieldsCountingSubIssues only.
+	SubIssues int
+	blocking  []string // node IDs of the issues it blocks
+	blockedBy []string // node IDs of the issues blocking it
 }
 
 // Blocks reports whether the linked issue blocks the issue with node ID
@@ -189,17 +192,31 @@ func (ls Links) Decls() string {
 // Fields returns the top-level fields that read the links, one per line,
 // indented by two spaces. nameWithOwner gives the repository as GitHub
 // spells it, whatever case the ref was written in.
-func (ls Links) Fields() string {
+func (ls Links) Fields() string { return ls.fields(-1) }
+
+// FieldsCountingSubIssues is Fields, the link at index sub also reading
+// how many sub-issues it has (Linked.SubIssues): gh dojo new reads its
+// --parent so, since GitHub allows MaxSubIssues.
+func (ls Links) FieldsCountingSubIssues(sub int) string { return ls.fields(sub) }
+
+func (ls Links) fields(sub int) string {
 	var b strings.Builder
 	for i := range ls {
 		a := linkAlias(i)
+		extra := ""
+		if i == sub {
+			extra = " subIssues { totalCount }"
+		}
 		fmt.Fprintf(&b, "  %s: repository(owner: $%sOwner, name: $%sRepo) {\n    nameWithOwner\n"+
 			"    issueOrPullRequest(number: $%sNumber) { __typename ... on Issue { id title state "+
-			"blocking(first: %d) { nodes { id } } blockedBy(first: %d) { nodes { id } } } }\n  }\n",
-			a, a, a, a, BlockingWindow, BlockingWindow)
+			"blocking(first: %d) { nodes { id } } blockedBy(first: %d) { nodes { id } }%s } }\n  }\n",
+			a, a, a, a, BlockingWindow, BlockingWindow, extra)
 	}
 	return b.String()
 }
+
+// MaxSubIssues is how many sub-issues GitHub allows an issue.
+const MaxSubIssues = 100
 
 // AddVars adds the links' variables to vars.
 func (ls Links) AddVars(vars map[string]any) {
@@ -230,6 +247,9 @@ func (ls Links) Decode(data map[string]json.RawMessage) ([]*Linked, error) {
 				State     string  `json:"state"`
 				Blocking  idNodes `json:"blocking"`
 				BlockedBy idNodes `json:"blockedBy"`
+				SubIssues *struct {
+					TotalCount int `json:"totalCount"`
+				} `json:"subIssues"`
 			} `json:"issueOrPullRequest"`
 		}
 		if err := json.Unmarshal(raw, &v); err != nil {
@@ -248,6 +268,9 @@ func (ls Links) Decode(data map[string]json.RawMessage) ([]*Linked, error) {
 		}
 		l.ID, l.Title, l.State = v.Issue.ID, v.Issue.Title, v.Issue.State
 		l.blocking, l.blockedBy = v.Issue.Blocking.ids(), v.Issue.BlockedBy.ids()
+		if s := v.Issue.SubIssues; s != nil {
+			l.SubIssues = s.TotalCount
+		}
 	}
 	return out, nil
 }

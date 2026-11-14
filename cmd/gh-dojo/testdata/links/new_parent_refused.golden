@@ -1,0 +1,6 @@
+code: 1
+--- stdout
+--- stderr
+error: #15 found (created earlier), but making it a sub-issue of #26 failed; re-running will not help
+GitHub: Issue may not contain duplicate sub-issues or cycles
+fix: pass another --parent to make it a sub-issue (gh issue edit 15 -R Trum-ok/gh-dojo --parent <issue>), or leave it without one

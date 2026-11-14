@@ -1,10 +1,10 @@
 {
-  "comment": "Hand-crafted from new_blocked_by_resume.json: gh dojo new ... --parent 26 finds #15 done but without a parent: addSubIssue alone; the repeat finds #26 its parent and writes nothing. Mutations are never sent to GitHub; their payloads follow the GraphQL schema (createIssue.issue, addSubIssue.issue: the parent). The read is new_blocked_by.json's, with #26 (as recorded) as the --parent link and each recent issue's parent (null: the recorded issues have none).",
+  "comment": "Hand-crafted from new_blocked_by_resume.json: gh dojo new ... --parent 26 finds #15 done but without a parent: addSubIssue alone; the repeat finds #26 its parent and writes nothing. Mutations are never sent to GitHub; their payloads follow the GraphQL schema (createIssue.issue, addSubIssue.issue: the parent); refusals are hand-written, their messages made up. The read is new_blocked_by.json's, with #26 (as recorded) as the --parent link, how many sub-issues it has, and each recent issue's parent (null: the recorded issues have none).",
   "handcrafted": true,
   "interactions": [
     {
       "operation": "NewIssueContext",
-      "query": "query NewIssueContext($owner: String!, $repo: String!, $status: String!, $window: Int!, $link0Owner: String!, $link0Repo: String!, $link0Number: Int!) {\n  repository(owner: $owner, name: $repo) {\n    id\n    labels(first: 100, orderBy: {field: NAME, direction: ASC}) {\n      totalCount\n      pageInfo { hasNextPage endCursor }\n      nodes { id name }\n    }\n    milestones(first: 100, states: OPEN, orderBy: {field: NUMBER, direction: ASC}) {\n      totalCount\n      pageInfo { hasNextPage endCursor }\n      nodes { id title dueOn }\n    }\n    issues(last: $window, states: OPEN, orderBy: {field: CREATED_AT, direction: ASC}) {\n      nodes {\n        id\n        number\n        title\n        body\n        viewerDidAuthor\n        labels(first: 50) { nodes { name } }\n        milestone { title dueOn }\n        parent { id number repository { nameWithOwner } }\n        projectItems(first: 20) {\n          nodes {\n            id\n            isArchived\n            project { id }\n            fieldValueByName(name: $status) { ... on ProjectV2ItemFieldSingleSelectValue { name } }\n          }\n        }\n      }\n    }\n  }\n  link0: repository(owner: $link0Owner, name: $link0Repo) {\n    nameWithOwner\n    issueOrPullRequest(number: $link0Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } } }\n  }\n}",
+      "query": "query NewIssueContext($owner: String!, $repo: String!, $status: String!, $window: Int!, $link0Owner: String!, $link0Repo: String!, $link0Number: Int!) {\n  repository(owner: $owner, name: $repo) {\n    id\n    labels(first: 100, orderBy: {field: NAME, direction: ASC}) {\n      totalCount\n      pageInfo { hasNextPage endCursor }\n      nodes { id name }\n    }\n    milestones(first: 100, states: OPEN, orderBy: {field: NUMBER, direction: ASC}) {\n      totalCount\n      pageInfo { hasNextPage endCursor }\n      nodes { id title dueOn }\n    }\n    issues(last: $window, states: OPEN, orderBy: {field: CREATED_AT, direction: ASC}) {\n      nodes {\n        id\n        number\n        title\n        body\n        viewerDidAuthor\n        labels(first: 50) { nodes { name } }\n        milestone { title dueOn }\n        parent { id number repository { nameWithOwner } }\n        projectItems(first: 20) {\n          nodes {\n            id\n            isArchived\n            project { id }\n            fieldValueByName(name: $status) { ... on ProjectV2ItemFieldSingleSelectValue { name } }\n          }\n        }\n      }\n    }\n  }\n  link0: repository(owner: $link0Owner, name: $link0Repo) {\n    nameWithOwner\n    issueOrPullRequest(number: $link0Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } subIssues { totalCount } } }\n  }\n}",
       "variables": {
         "owner": "Trum-ok",
         "repo": "gh-dojo",
@@ -210,6 +210,9 @@
               },
               "blockedBy": {
                 "nodes": []
+              },
+              "subIssues": {
+                "totalCount": 0
               }
             }
           }
@@ -235,7 +238,7 @@
     },
     {
       "operation": "NewIssueContext",
-      "query": "query NewIssueContext($owner: String!, $repo: String!, $status: String!, $window: Int!, $link0Owner: String!, $link0Repo: String!, $link0Number: Int!) {\n  repository(owner: $owner, name: $repo) {\n    id\n    labels(first: 100, orderBy: {field: NAME, direction: ASC}) {\n      totalCount\n      pageInfo { hasNextPage endCursor }\n      nodes { id name }\n    }\n    milestones(first: 100, states: OPEN, orderBy: {field: NUMBER, direction: ASC}) {\n      totalCount\n      pageInfo { hasNextPage endCursor }\n      nodes { id title dueOn }\n    }\n    issues(last: $window, states: OPEN, orderBy: {field: CREATED_AT, direction: ASC}) {\n      nodes {\n        id\n        number\n        title\n        body\n        viewerDidAuthor\n        labels(first: 50) { nodes { name } }\n        milestone { title dueOn }\n        parent { id number repository { nameWithOwner } }\n        projectItems(first: 20) {\n          nodes {\n            id\n            isArchived\n            project { id }\n            fieldValueByName(name: $status) { ... on ProjectV2ItemFieldSingleSelectValue { name } }\n          }\n        }\n      }\n    }\n  }\n  link0: repository(owner: $link0Owner, name: $link0Repo) {\n    nameWithOwner\n    issueOrPullRequest(number: $link0Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } } }\n  }\n}",
+      "query": "query NewIssueContext($owner: String!, $repo: String!, $status: String!, $window: Int!, $link0Owner: String!, $link0Repo: String!, $link0Number: Int!) {\n  repository(owner: $owner, name: $repo) {\n    id\n    labels(first: 100, orderBy: {field: NAME, direction: ASC}) {\n      totalCount\n      pageInfo { hasNextPage endCursor }\n      nodes { id name }\n    }\n    milestones(first: 100, states: OPEN, orderBy: {field: NUMBER, direction: ASC}) {\n      totalCount\n      pageInfo { hasNextPage endCursor }\n      nodes { id title dueOn }\n    }\n    issues(last: $window, states: OPEN, orderBy: {field: CREATED_AT, direction: ASC}) {\n      nodes {\n        id\n        number\n        title\n        body\n        viewerDidAuthor\n        labels(first: 50) { nodes { name } }\n        milestone { title dueOn }\n        parent { id number repository { nameWithOwner } }\n        projectItems(first: 20) {\n          nodes {\n            id\n            isArchived\n            project { id }\n            fieldValueByName(name: $status) { ... on ProjectV2ItemFieldSingleSelectValue { name } }\n          }\n        }\n      }\n    }\n  }\n  link0: repository(owner: $link0Owner, name: $link0Repo) {\n    nameWithOwner\n    issueOrPullRequest(number: $link0Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } subIssues { totalCount } } }\n  }\n}",
       "variables": {
         "owner": "Trum-ok",
         "repo": "gh-dojo",
@@ -450,6 +453,9 @@
               },
               "blockedBy": {
                 "nodes": []
+              },
+              "subIssues": {
+                "totalCount": 0
               }
             }
           }
