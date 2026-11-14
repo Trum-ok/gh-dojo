@@ -96,6 +96,20 @@ func TestMatcher(t *testing.T) {
 		{"Merge pull request #16 from x/y", ""},
 		{"Fixes #17.\nAlso refs #18 #19", "#17 #18 #19"},
 		{"Closes Trum-ok/gh-dojo#20", "#20"},
+		// Code is an example, not a link: a span, a fenced block.
+		{"Parse `refs: #12, #13 and acme/api#3`\n\nRefs #51", "#51"},
+		{"Refs `#12`", ""},
+		{"Refs #30, `#31`", "#30"},
+		{"Fixes ``a ` refs #32``, fixes #33", "#33"},
+		{"Refs `#34\nstill code` refs #35", "#35"},                // a span may wrap a line
+		{"Refs #36 `x\n\nRefs #37` and refs #38", "#36 #37 #38"},  // not past a paragraph: text
+		{"Example:\n```\nFixes #40\n```\nFixes #41", "#41"},       // a fenced block
+		{"```sh\nrefs #42\n~~~\nrefs #43\n````\nrefs #44", "#44"}, // closed by ``` or longer only
+		{"~~~\nFixes #45\n~~~\nFixes #46", "#46"},
+		{"    ```\nFixes #47\n```", "#47"}, // four spaces: not a fence
+		{"```\nFixes #48", ""},             // a block open to the end
+		{"Fixes #49 ``` and ```", "#49"},   // a span of three backticks, not a fence
+		{"A lone ` refs #50", "#50"},       // a backtick nothing closes is text
 	}
 	for _, tt := range tests {
 		var got []string
