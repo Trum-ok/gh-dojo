@@ -1,0 +1,6 @@
+code: 2
+--- stdout
+#41 In progress → Done, closed as completed
+--- stderr
+error: 1 of 3 done; #40: done cannot move #40 while it has unresolved sub-issues: #42 (failed in this run); #42: GitHub API rejected the request
+this is a process rule: ask the user how to proceed

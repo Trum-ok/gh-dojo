@@ -1,0 +1,12 @@
+code: 0
+--- stdout
+dry run: done #41 "Read sub-issues"
+  status: In progress → Done
+  close: as completed
+dry run: done #42 "Check sub-issues"
+  status: In progress → Done
+  close: as completed
+dry run: done #40 "Epic: sub-issues"
+  status: Ready → Done
+  close: as completed
+--- stderr

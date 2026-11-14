@@ -906,13 +906,18 @@ rejected with "not supported in this version".
 - **sub_issues** `"warn"` and `"deny"` look at the issue's unresolved
   sub-issues by the rule of blockers: a sub-issue is resolved when it is
   closed or in one of [`statuses.resolved`](#statuses), so a parent can move
-  on while its sub-issues wait in Ready for a release (and `done 10 11 12`
-  on a parent and its sub-issues passes, whatever their order); one whose
-  board status could not be read, or that was not read at all (hidden from
-  the token; a verb reads up to 100, GitHub's limit), counts as unresolved.
+  on while its sub-issues wait in Ready for a release; one whose board
+  status could not be read, or that was not read at all (hidden from the
+  token; a verb reads up to 100, GitHub's limit), counts as unresolved.
   `"warn"` prints them on stderr and runs; `"deny"` refuses with exit code
   2. Set it on the verb that finishes an issue, `sub_issues = "deny"` under
   `[verbs.done]`, say; no preset sets it. Blockers are checked first.
+  In a batch (`done 40 41 42`, or a release) whose verb closes the issues
+  or moves them to a resolved status, the sub-issues the same run moves
+  count as resolved: they are planned and written before their parent (so
+  the confirmation lines follow that order; the JSON keeps the order of
+  the arguments), and the parent is refused if one of them is refused or
+  fails to be written.
 - **confirm** `"user"`: without `--yes` the verb exits with code 2 and asks
   you to ask the user; re-run it with `--yes` only once they agree. A repeat
   with nothing left to do needs no `--yes`. It is a signal, not a lock: an

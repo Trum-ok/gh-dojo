@@ -36,8 +36,9 @@ import (
 // anyway. The cost is one mutation per issue, as if the verb ran on each.
 //
 // Output: the confirmation line of each issue done (applied, or already in
-// place) on stdout, in the order of the arguments, then a summary. With
-// every issue done it is "3 of 3 done" on stdout ("3 of 3 done (2
+// place) on stdout, in the order of the arguments (but sub-issues before
+// their parent, see resolvesSubIssues), then a summary. With every issue
+// done it is "3 of 3 done" on stdout ("3 of 3 done (2
 // written)" when one was in place) and exit code 0. Otherwise it is an
 // error naming each issue not done with its reason, then the next steps:
 //
@@ -86,6 +87,7 @@ func newBatchRun(cmd *cobra.Command, be Backend, cfg *config.Config, v config.Ve
 	b := &batchRun{
 		be: be, engine: workflow.New(cfg), v: v, args: args, json: jsonMode(cmd), def: def,
 		stdout: cmd.OutOrStdout(), stderr: cmd.ErrOrStderr(), warned: map[string]bool{},
+		resolved: cfg.Statuses.Resolved, resolving: map[string]*batchItem{},
 	}
 	b.engine.Getenv = getenv
 	return b
@@ -106,25 +108,100 @@ func (b *batchRun) run(ctx context.Context, refs []issue.Ref, dryRun bool) ([]*b
 	if b.keep != nil {
 		reads = slices.DeleteFunc(reads, func(r IssueRead) bool { return !b.keep(r) })
 	}
-	items := make([]*batchItem, len(reads))
+	items := make([]*batchItem, len(reads)) // in the order of the arguments
 	for i, r := range reads {
 		items[i] = &batchItem{ref: r.Ref}
-		b.plan(items[i], r)
 	}
-	b.replanStale(ctx, items)
+	// Planned and applied sub-issues first (see subIssuesInRun).
+	order := make([]*batchItem, 0, len(items))
+	for _, i := range b.planOrder(reads) {
+		b.plan(items[i], reads[i])
+		order = append(order, items[i])
+	}
+	b.replanStale(ctx, order)
 	if b.before != nil {
-		items = b.before(items)
+		order = b.before(order)
 	}
 	if dryRun {
-		for _, it := range items {
+		for _, it := range order {
 			if it.err == nil && !b.json {
 				fmt.Fprintln(b.stdout, it.run.first.DryRun())
 			}
 		}
 	} else {
-		b.applyAll(ctx, items)
+		b.applyAll(ctx, order)
 	}
-	return items, nil
+	// The result in the order of the arguments, without what before left
+	// out.
+	return slices.DeleteFunc(items, func(it *batchItem) bool { return !slices.Contains(order, it) }), nil
+}
+
+// A verb with sub_issues = "warn" or "deny" that leaves an issue resolved
+// (it closes it, or moves it to a status of statuses.resolved) counts the
+// sub-issues the same run plans, and so resolves, as resolved: gh dojo
+// done 40 41 42 on a parent and its sub-issues in In progress moves all
+// three, as running it twice would. The run plans and applies each
+// sub-issue before its parent (planOrder), and a parent whose sub-issue
+// then fails to be written is refused (applyAll).
+
+// resolvesSubIssues reports whether the run's verb checks sub-issues and
+// leaves the issues it runs on resolved.
+func (b *batchRun) resolvesSubIssues() bool {
+	return b.v.ChecksSubIssues() && (b.v.Close != "" || b.v.To != "" && slices.Contains(b.resolved, b.v.To))
+}
+
+// runKey is how the run matches an issue with a sub-issue a card names.
+func (b *batchRun) runKey(ref string) string { return strings.ToLower(ref) }
+
+// planOrder returns the indexes of reads in the order to plan and apply
+// them: the order of the arguments, but each issue after its unresolved
+// sub-issues of the run (when resolvesSubIssues).
+func (b *batchRun) planOrder(reads []IssueRead) []int {
+	index := map[string]int{}
+	for i, r := range reads {
+		index[b.runKey(r.Ref.String(b.def))] = i
+	}
+	order := make([]int, 0, len(reads))
+	seen := make([]bool, len(reads))
+	var visit func(i int)
+	visit = func(i int) {
+		if seen[i] {
+			return
+		}
+		seen[i] = true
+		if r := reads[i]; r.Err == nil && b.resolvesSubIssues() {
+			for _, s := range r.Issue.UnresolvedSubIssues {
+				if j, ok := index[b.runKey(s.Ref)]; ok {
+					visit(j)
+				}
+			}
+		}
+		order = append(order, i)
+	}
+	for i := range reads {
+		visit(i)
+	}
+	return order
+}
+
+// subIssuesInRun drops from is the unresolved sub-issues planned in this
+// run (resolving) and returns their items, which the issue then relies
+// on being written.
+func (b *batchRun) subIssuesInRun(is *workflow.Issue) []*batchItem {
+	if !b.resolvesSubIssues() {
+		return nil
+	}
+	var relies []*batchItem
+	var left []workflow.Blocker
+	for _, s := range is.UnresolvedSubIssues {
+		if it := b.resolving[b.runKey(s.Ref)]; it != nil && it.err == nil && it.run != nil {
+			relies = append(relies, it)
+			continue
+		}
+		left = append(left, s)
+	}
+	is.UnresolvedSubIssues = left
+	return relies
 }
 
 // batchRun is one run of a verb on several issues.
@@ -142,6 +219,11 @@ type batchRun struct {
 	// keep, when set, says which issues read to plan: release leaves out
 	// the numbers a commit message names that are no issue.
 	keep func(IssueRead) bool
+	// resolved is statuses.resolved; resolving the issues of the run, by
+	// key, whose plan leaves them resolved as sub-issues (see
+	// subIssuesInRun).
+	resolved  []string
+	resolving map[string]*batchItem
 	// before, when set, is called with the planned issues before the
 	// first one is printed or written, and returns those to go on with:
 	// release leaves out the issues not ready for the verb.
@@ -159,6 +241,9 @@ type batchItem struct {
 	why string
 	// skipped: not attempted, after an error stopped the writes (skip).
 	skipped bool
+	// relies are the sub-issues of the run its plan counted as resolved
+	// (subIssuesInRun): applied before it, which must not fail.
+	relies []*batchItem
 }
 
 // plan plans verb v on the issue read as r, printing its warnings.
@@ -168,10 +253,14 @@ func (b *batchRun) plan(it *batchItem, r IssueRead) {
 		return
 	}
 	it.read = &r.Issue
-	p, err := b.engine.Plan(b.v, r.Issue, b.args)
+	it.relies = b.subIssuesInRun(it.read)
+	p, err := b.engine.Plan(b.v, *it.read, b.args)
 	if err != nil {
 		it.fail(err)
 		return
+	}
+	if b.resolvesSubIssues() {
+		b.resolving[b.runKey(it.ref.String(b.def))] = it
 	}
 	for _, w := range p.Warnings {
 		if !b.warned[w] {
@@ -249,6 +338,10 @@ func (b *batchRun) applyAll(ctx context.Context, items []*batchItem) {
 			it.skip(b.stop)
 			continue
 		}
+		if err := b.failedSubIssues(it, p); err != nil {
+			it.fail(err)
+			continue
+		}
 		err := it.run.apply(ctx, b.be, p)
 		switch {
 		case err == nil:
@@ -268,6 +361,32 @@ func (b *batchRun) applyAll(ctx context.Context, items []*batchItem) {
 			}
 		}
 	}
+}
+
+// failedSubIssues refuses the plan p of it, as the sub_issues check would,
+// when a sub-issue of the run its plan counted as resolved failed: it
+// stays unresolved. A warning is enough for sub_issues = "warn".
+func (b *batchRun) failedSubIssues(it *batchItem, p *workflow.Plan) error {
+	var refs []string
+	for _, s := range it.relies {
+		if s.err != nil {
+			refs = append(refs, s.ref.String(b.def))
+		}
+	}
+	if len(refs) == 0 {
+		return nil
+	}
+	list := strings.Join(refs, ", ")
+	if b.v.SubIssues == config.BlockersWarn {
+		render.Warn(b.stderr, "%s has unresolved sub-issues: %s (failed in this run)", p.Issue.Name(), list)
+		return nil
+	}
+	action := "move"
+	if b.v.To == "" {
+		action = "run on"
+	}
+	return render.Denied("%s cannot %s %s while it has unresolved sub-issues: %s (failed in this run)\n"+
+		"this is a process rule: ask the user how to proceed", b.v.Name, action, p.Issue.Name(), list)
 }
 
 // reread re-reads the issues of items that have not failed, in one request
@@ -300,6 +419,7 @@ func (b *batchRun) reread(ctx context.Context, items []*batchItem, staleErr erro
 			it.failRun(first, staleErr, r.Err)
 			continue
 		}
+		it.relies = b.subIssuesInRun(&r.Issue)
 		fresh, perr := b.engine.Plan(b.v, r.Issue, b.args)
 		if perr != nil {
 			it.failRun(first, staleErr, perr)

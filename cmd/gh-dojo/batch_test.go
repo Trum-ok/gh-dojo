@@ -36,6 +36,33 @@ func TestBatchRefused(t *testing.T) {
 	)
 }
 
+// TestBatchSubIssues: done with sub_issues = "deny" on #40 and its
+// sub-issues #41 and #42, both In progress, in one request with the
+// sub-issues window of the check. The run moves the sub-issues it plans,
+// so #40 is not refused for them: they are written first, #40 after
+// (lines in that order), as a second run would. A sub-issue the run
+// refuses (#42 in Backlog) or fails to write keeps #40 refused.
+func TestBatchSubIssues(t *testing.T) {
+	for _, tt := range []struct {
+		fixture string
+		steps   []runs
+	}{
+		{"batch_done_sub_issues", []runs{
+			{[]string{"done", "40", "41", "42", "--dry-run"}, render.ExitOK, 1, "batch_sub_issues_dry_run"},
+			{[]string{"done", "40", "41", "42", "--json"}, render.ExitOK, 4, "batch_sub_issues"},
+		}},
+		{"batch_done_sub_issues_refused", []runs{{[]string{"done", "40", "41", "42"}, render.ExitDenied, 2, "batch_sub_issues_refused"}}},
+		{"batch_done_sub_issues_failed", []runs{{[]string{"done", "40", "41", "42"}, render.ExitDenied, 3, "batch_sub_issues_failed"}}},
+	} {
+		t.Run(tt.fixture, func(t *testing.T) {
+			withConfig(t, verbDojoConfig+"\n[verbs.done]\nsub_issues = \"deny\"\n")
+			withSession(t, "abc")
+			srv := withApp(t, boardFixture, verbFixture(tt.fixture))
+			checkRuns(t, srv, warmSchema(t, srv), tt.steps...)
+		})
+	}
+}
+
 // TestBatchNetwork: the mutation of #7 gets a 502 while #3 and #9 are
 // applied: exit 5. The re-run finds #3 and #9 done and sends only #7
 // (exit 0); a repeat finds everything in place and writes nothing.

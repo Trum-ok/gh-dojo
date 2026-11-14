@@ -317,6 +317,10 @@ func (d *agentDoc) rules(v config.Verb) []string {
 		r = append(r, "It is refused (exit code 2) while a sub-issue is unresolved: `gh dojo show N` lists them. "+
 			"Finish them first, or ask the user; never move the status another way.")
 	}
+	if v.ChecksSubIssues() && v.Batch && (v.Close != "" || slices.Contains(d.cfg.Statuses.Resolved, v.To)) {
+		r = append(r, fmt.Sprintf("In one run with its sub-issues (`gh dojo %s 40 41 42`) the sub-issues it "+
+			"moves count as resolved: they go first, and the parent is refused only if one of them is.", v.Name))
+	}
 	if v.AssignArg {
 		r = append(r, fmt.Sprintf("`--%s <login>` names the user to assign (`--%s @me` is you); one who cannot "+
 			"be assigned issues in the repository is exit code 1, with the list of who can. Ask the user "+

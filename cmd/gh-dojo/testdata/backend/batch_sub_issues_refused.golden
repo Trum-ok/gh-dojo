@@ -1,0 +1,6 @@
+code: 2
+--- stdout
+#41 In progress → Done, closed as completed
+--- stderr
+error: 1 of 3 done; #40: done cannot move #40 while it has unresolved sub-issues: #42 (Backlog); #42: done cannot move #42 from Backlog, it starts only from Ready or In progress
+this is a process rule: ask the user how to proceed
