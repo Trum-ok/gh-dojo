@@ -353,10 +353,10 @@ func (d *agentDoc) messageRule() string {
 	if len(d.cfg.Release.Keywords) == 0 {
 		return ""
 	}
-	return " A number only commit messages name that is no issue (a pull request, a missing issue, a repository " +
-		"not found or hidden from the token) is left out with a warning, not failed; `--exclude N` leaves out an " +
-		"issue found by mistake. In a commit message, put an example of an issue reference in backticks " +
-		"(`` `Fixes #12` ``): code does not count."
+	return " A number only commit messages name that is no issue (a pull request, a missing issue, or one of a " +
+		"repository outside `board.repos` not found or hidden from the token) is left out with a warning, not " +
+		"failed; `--exclude N` leaves out any issue found by mistake. In a commit message, put an example of an " +
+		"issue reference in backticks (`` `Fixes #12` ``): code does not count."
 }
 
 // verbsFrom lists the verbs that can start from status s.

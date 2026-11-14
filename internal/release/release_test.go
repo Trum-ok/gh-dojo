@@ -110,6 +110,15 @@ func TestMatcher(t *testing.T) {
 		{"```\nFixes #48", ""},             // a block open to the end
 		{"Fixes #49 ``` and ```", "#49"},   // a span of three backticks, not a fence
 		{"A lone ` refs #50", "#50"},       // a backtick nothing closes is text
+		// Code ends a list as the backticks did; it is no separator.
+		{"Refs `#12` #13", ""},
+		{"Fixes `foo` #13", ""},
+		{"Refs #30 `x` #31", "#30"},
+		// An indented block, after a blank line, is code; within a
+		// paragraph an indented line is text.
+		{"Example:\n\n    Fixes #52\n\tRefs #53\n\n    refs #54\nFixes #55", "#55"},
+		{"Refs #56,\n    #57\nwrapped:\n    fixes #58", "#56 #58"},
+		{"    Fixes #59", ""}, // the first line, after nothing
 	}
 	for _, tt := range tests {
 		var got []string

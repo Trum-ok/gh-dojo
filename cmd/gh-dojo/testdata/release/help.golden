@@ -17,10 +17,11 @@ default GitHub's closing ones (closes, fixes, resolves); owner/repo#N names
 an issue of another repository. Code in a message (`Refs #12`, a ``` block)
 does not count: put examples of the syntax in backticks.
 
-A message names issues as text, so a number there that is no issue (a pull
-request, a missing issue, a repository not found or that the token cannot
-see) is left out with a warning, not failed. --exclude leaves out an issue
-a message names by mistake.
+A message names issues as text, so a number only messages name that is no
+issue (a pull request, a missing issue, or one of a repository outside
+board.repos that is not found or the token cannot see) is left out with a
+warning, not failed. --exclude leaves out any issue found, however it was
+found.
 
 An open issue whose status the verb's from does not allow (still in progress,
 say) is listed as not ready and left out, not failed; only a later release
@@ -41,7 +42,7 @@ Flags:
       --by string        value for {by} in the verb's comment, for every issue
       --comment string   text for {comment} in the verb's comment, for every issue
       --dry-run          list the issues, how each was found and its plan, without changing anything
-      --exclude issue    an issue to leave out: 12, "#12", owner/repo#12 or its URL; repeatable, or comma-separated
+      --exclude issue    an issue found to leave out, by a pull request or a message: 12, "#12", owner/repo#12 or its URL; repeatable, or comma-separated
   -h, --help             help for release
       --since string     where the release starts, a tag, branch or commit; default: the previous version tag
       --verb string      the verb to apply to the release's issues: one with batch = true

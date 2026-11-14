@@ -1,5 +1,5 @@
 {
-  "comment": "Hand-crafted from release_shop.json for the fake backend's acme/shop: gh dojo release HEAD --since abc1234. Fixes #42 and #43; a message names #99 (no such issue) and acme/api#3 (no such repository); merged pull request #50 closes acme/api#7; an example in a code span names #44, which does not count.",
+  "comment": "Hand-crafted from release_shop.json for the fake backend's acme/shop: gh dojo release HEAD --since abc1234. Fixes #42 and #43; a message names #99 (no such issue) and acme/api#3 (no such repository); merged pull request #50 closes acme/api#7 and #98 (no such issue), which its message names too; an example in a code span names #44, which does not count.",
   "handcrafted": true,
   "interactions": [
     {
@@ -76,7 +76,7 @@
                   },
                   {
                     "oid": "1515151515151515151515151515151515151515",
-                    "message": "Link the API (#50)\n\nExample: `fixes #44`",
+                    "message": "Link the API (#50)\n\nFixes #98. Example: `fixes #44`",
                     "associatedPullRequests": {
                       "totalCount": 1,
                       "nodes": [
@@ -87,12 +87,18 @@
                             "nameWithOwner": "acme/shop"
                           },
                           "closingIssuesReferences": {
-                            "totalCount": 1,
+                            "totalCount": 2,
                             "nodes": [
                               {
                                 "number": 7,
                                 "repository": {
                                   "nameWithOwner": "acme/api"
+                                }
+                              },
+                              {
+                                "number": 98,
+                                "repository": {
+                                  "nameWithOwner": "acme/shop"
                                 }
                               }
                             ]

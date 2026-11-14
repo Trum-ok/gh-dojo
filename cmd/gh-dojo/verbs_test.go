@@ -88,8 +88,9 @@ type fakeBackend struct {
 	// others are issues outside acme/shop by "owner/name#N"; Display and
 	// DefaultRepo are filled as the GitHub backend fills them.
 	others    map[string]workflow.Issue
-	pulls     map[int]bool    // numbers of acme/shop that are pull requests
-	gone      map[string]bool // "owner/name" in lower case: repositories not found
+	pulls     map[int]bool     // numbers of acme/shop that are pull requests
+	gone      map[string]bool  // "owner/name" in lower case: repositories not found
+	readErrs  map[string]error // "owner/name" in lower case: the error of reading its issues, without a Cause
 	applyErr  error
 	applyErrs map[int]error // by issue number, for batches
 	confirmed map[int]int   // with applyErrs: how many ops GitHub confirmed first
@@ -132,6 +133,8 @@ func (f *fakeBackend) ReadIssues(_ context.Context, _ config.Verb, refs []issue.
 		case f.gone[strings.ToLower(ref.Repo.String())]:
 			out[i].Err = render.NotFound("repository %s not found, or the token cannot see it", ref.Repo)
 			out[i].Cause = issue.CauseNoRepo
+		case f.readErrs[strings.ToLower(ref.Repo.String())] != nil:
+			out[i].Err = f.readErrs[strings.ToLower(ref.Repo.String())]
 		default:
 			out[i].Issue, out[i].Err = f.issue(ref)
 			if out[i].Err != nil {

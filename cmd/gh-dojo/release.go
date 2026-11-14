@@ -54,10 +54,11 @@ func newReleaseCmd() (*cobra.Command, error) {
 			"default GitHub's closing ones (closes, fixes, resolves); owner/repo#N names\n" +
 			"an issue of another repository. Code in a message (`Refs #12`, a ``` block)\n" +
 			"does not count: put examples of the syntax in backticks.\n\n" +
-			"A message names issues as text, so a number there that is no issue (a pull\n" +
-			"request, a missing issue, a repository not found or that the token cannot\n" +
-			"see) is left out with a warning, not failed. --exclude leaves out an issue\n" +
-			"a message names by mistake.\n\n" +
+			"A message names issues as text, so a number only messages name that is no\n" +
+			"issue (a pull request, a missing issue, or one of a repository outside\n" +
+			"board.repos that is not found or the token cannot see) is left out with a\n" +
+			"warning, not failed. --exclude leaves out any issue found, however it was\n" +
+			"found.\n\n" +
 			"An open issue whose status the verb's from does not allow (still in progress,\n" +
 			"say) is listed as not ready and left out, not failed; only a later release\n" +
 			"whose commits name it again picks it up. A closed one is refused (exit code 2).\n\n" +
@@ -77,7 +78,7 @@ func newReleaseCmd() (*cobra.Command, error) {
 	f.StringVar(&o.verb, "verb", "", "the verb to apply to the release's issues: one with batch = true")
 	f.StringVar(&o.since, "since", "", "where the release starts, a tag, branch or commit; default: the previous version tag")
 	f.StringArrayVar(&o.exclude, "exclude", nil,
-		"an `issue` to leave out: 12, \"#12\", owner/repo#12 or its URL; repeatable, or comma-separated")
+		"an `issue` found to leave out, by a pull request or a message: 12, \"#12\", owner/repo#12 or its URL; repeatable, or comma-separated")
 	f.BoolVar(&o.dryRun, "dry-run", false, "list the issues, how each was found and its plan, without changing anything")
 	f.BoolVar(&o.args.Yes, "yes", false, "the user agreed: for a verb that is the user's decision")
 	f.StringVar(&o.args.Comment, config.ArgComment, "", "text for {comment} in the verb's comment, for every issue")
@@ -156,7 +157,12 @@ func runRelease(cmd *cobra.Command, ref string, o *releaseOpts) error {
 	}
 	slices.SortStableFunc(found, func(a, b release.Found) int { return compareRefs(def)(a.Ref, b.Ref) })
 
-	res := &releaseRun{rng: rng, def: def, found: found, keywords: cfg.Release.Keywords}
+	res := &releaseRun{rng: rng, def: def, found: found, keywords: cfg.Release.Keywords, repos: []issue.Repo{def}}
+	for _, s := range cfg.Board.Repos {
+		if r, err := issue.ParseRepo(s); err == nil { // the config checked it
+			res.repos = append(res.repos, r)
+		}
+	}
 	refs, w := res.exclude(excluded)
 	warnings = append(warnings, w...)
 	for _, w := range warnings {
@@ -239,6 +245,9 @@ type releaseRun struct {
 	def      issue.Repo
 	found    []release.Found
 	keywords []string
+	// repos are the project's own: the default repository and
+	// board.repos.
+	repos []issue.Repo
 	// skipped are the issues left out: by --exclude, then once read a
 	// number a commit message names that is no issue, or an issue not
 	// ready for the verb.
@@ -251,7 +260,7 @@ const (
 	skipExcluded     = "excluded"       // --exclude names it
 	skipPullRequest  = "pull_request"   // a commit message names a pull request
 	skipNotFound     = "not_found"      // only a commit message names it, and there is no such issue
-	skipRepoNotFound = "repo_not_found" // only a commit message names it, in a repository not found or hidden from the token
+	skipRepoNotFound = "repo_not_found" // only a commit message names it, in a repository outside the project's not found or hidden from the token
 	skipNotReady     = "not_ready"      // the verb's from refuses the issue's status
 )
 
@@ -392,14 +401,18 @@ func (r *releaseRun) foundOf(ref issue.Ref) release.Found {
 
 // keep leaves out, with a warning, a number a commit message names that
 // is no issue: a pull request ("Fixes #12" may mean the pull request),
-// and, when only messages name it, a missing issue or one whose
-// repository is not found, which may be the token's lack of access
-// (GitHub answers the same for a repository it hides): an example of the
-// syntax in a message, say. A message is text, a guess at a link, and
-// failing the release on it would help no one. An issue a merged pull
-// request closes is GitHub's link: if it cannot be read, the batch fails
-// as any batch does. A pull request found through a closing reference
-// cannot happen.
+// and, when only messages name it, a missing issue or one of a repository
+// outside the project's (r.repos) that is not found, which may be the
+// token's lack of access (GitHub answers the same for a repository it
+// hides): an example of the syntax in a message, say. A message is text,
+// a guess at a link, and failing the release on it would help no one.
+//
+// A repository of the project's own not found is the token's lack of
+// access almost surely, so it fails the batch (exit code 3) as before;
+// so does any other error, such as a token GitHub denies outright. An
+// issue a merged pull request closes is GitHub's link: if it cannot be
+// read, the batch fails as any batch does. A pull request found through a
+// closing reference cannot happen.
 func (r *releaseRun) keep(cmd *cobra.Command) func(IssueRead) bool {
 	return func(read IssueRead) bool {
 		f := r.foundOf(read.Ref)
@@ -412,7 +425,7 @@ func (r *releaseRun) keep(cmd *cobra.Command) func(IssueRead) bool {
 			return true
 		case read.Cause == issue.CauseMissing:
 			reason, w = skipNotFound, name+" not found"
-		case read.Cause == issue.CauseNoRepo:
+		case read.Cause == issue.CauseNoRepo && !r.ours(f.Ref.Repo):
 			reason, w = skipRepoNotFound, fmt.Sprintf("%s: repository %s not found, or the token cannot see it", name, f.Ref.Repo)
 		default:
 			return true
@@ -423,6 +436,11 @@ func (r *releaseRun) keep(cmd *cobra.Command) func(IssueRead) bool {
 		render.Warn(cmd.ErrOrStderr(), "%s", w)
 		return false
 	}
+}
+
+// ours reports whether repo is one of the project's own (r.repos).
+func (r *releaseRun) ours(repo issue.Repo) bool {
+	return slices.ContainsFunc(r.repos, func(o issue.Repo) bool { return strings.EqualFold(o.String(), repo.String()) })
 }
 
 // byMessageOnly reports whether only commit messages name f, no merged

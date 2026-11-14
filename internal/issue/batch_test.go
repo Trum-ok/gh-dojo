@@ -265,6 +265,16 @@ func TestReadRefsOtherRepoNotFound(t *testing.T) {
 			}
 		}
 	}
+
+	// A repository GitHub denies the token (SAML) is no missing one: the
+	// call fails, as the token's fix is the same for every issue.
+	srv := graphtest.New(t, fixture("card_forbidden"))
+	res, err := issue.ReadRefs(context.Background(), srv.Client(), issue.Request{
+		Repo: issue.Repo{Owner: "cli", Name: "cli"}, Board: dojoBoard, StatusField: "Status",
+	}, []issue.Ref{{Repo: dojo, Number: 3}})
+	if render.FromError(err).Code != render.ExitNetwork || len(res) != 0 {
+		t.Errorf("SAML: res %+v, err %v", res, err)
+	}
 }
 
 // TestReadAllSingle sends exactly Read's request for one number.

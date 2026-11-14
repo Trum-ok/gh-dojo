@@ -606,19 +606,22 @@ syntax, not a link, so put such examples in backticks.
 issue is GitHub's own. So a number only commit messages name that is no
 issue is left out with a warning on stderr and listed in the JSON's
 `skipped`, not failed: a pull request (`pull_request`), a missing issue
-(`not_found`), or a repository not found (`repo_not_found`), such as an
-example `acme/api#3` in a message. GitHub answers the same for a private
-repository the token cannot see, so the warning says so: `acme/api#3:
-repository acme/api not found, or the token cannot see it: left out (commit
-de25f45)`; if the issue is real, give the token access and run the verb on
-it. A token GitHub denies outright (SAML single sign-on, OAuth app
-restrictions) is still exit code 4: the fix is the token's, not the
-release's. An issue a merged pull request closes, even if a message names
-it too, fails the batch as any issue does. `--exclude N` (`#N`,
-`owner/repo#N` or a URL; repeatable, or comma-separated) leaves out an issue
-found by mistake, before it is read: the line `excluded: acme/api#3 (commit
-de25f45)` and the JSON's `skipped` (`excluded`) name it, and an `--exclude`
-the release does not include is a warning.
+(`not_found`), or an issue of a repository outside `board.repos` that is
+not found (`repo_not_found`), such as an example `acme/api#3` in a message.
+GitHub answers the same for a private repository the token cannot see, so
+the warning says so: `acme/api#3: repository acme/api not found, or the
+token cannot see it: left out (commit de25f45)`; if the issue is real, give
+the token access and run the verb on it. A repository of `board.repos` (or
+the default one) not found is the token's lack of access almost surely, so
+its issues fail the batch (exit code 3) as any issue does. So does any
+other error: a token GitHub denies outright (SAML single sign-on, OAuth app
+restrictions) fails the batch as a network error, whose fix is the token's.
+An issue a merged pull request closes, even if a message names it too,
+fails the batch as any issue does. `--exclude N` (`#N`, `owner/repo#N` or a
+URL; repeatable, or comma-separated) leaves out any issue found, by a pull
+request or a message, before it is read: the line `excluded: acme/api#3
+(commit de25f45)` and the JSON's `skipped` (`excluded`) name it, and an
+`--exclude` the release does not include is a warning.
 
 **Not ready.** An open issue whose status the verb's `from` does not allow,
 such as one still in progress with a `Refs` commit when `done` starts only

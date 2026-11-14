@@ -1,5 +1,5 @@
 code: 0
 --- stdout
 release HEAD: 4 commits since abc1234, 0 issues
-excluded: #42 (commit a1a1a1a), #43 (commit 1313131), #99 (commit 1212121), acme/api#3 (commit 1212121), acme/api#7 (PR #50)
+excluded: #42 (commit a1a1a1a), #43 (commit 1313131), #98 (PR #50, commit 1515151), #99 (commit 1212121), acme/api#3 (commit 1212121), acme/api#7 (PR #50)
 --- stderr

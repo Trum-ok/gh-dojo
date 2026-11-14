@@ -125,28 +125,45 @@ func TestReleaseFake(t *testing.T) {
 
 // TestReleaseGuesses: a commit message's numbers that are no issue, #99
 // (no such issue) and acme/api#3 (no such repository), are left out with
-// a warning, not failed; #44 in a code span does not count. acme/api#7,
-// which merged pull request #50 closes, fails the batch as any issue
-// (exit code 3), until --exclude leaves it out; an --exclude the release
-// does not include is a warning.
+// a warning, not failed; #44 in a code span does not count. acme/api#7
+// and #98, which merged pull request #50 closes (#98 its message names
+// too), fail the batch as any issue (exit code 3), until --exclude leaves
+// them out; an --exclude the release does not include is a warning. A
+// repository of board.repos not found, and any other error, fail the
+// batch even for an issue only a message names.
 func TestReleaseGuesses(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    []string
 		code    render.Code
 		applied int
+		repos   string // board.repos, when set
+		denied  bool   // the token is denied acme/api (SAML), not told it is missing
 	}{
-		{"guesses", []string{"--dry-run"}, render.ExitNotFound, 0},
-		{"guesses_exclude", []string{"--exclude", "acme/api#7", "--exclude", "#43,77"}, render.ExitOK, 1},
-		{"guesses_exclude_json", []string{"--exclude", "acme/api#7", "--dry-run", "--json"}, render.ExitOK, 0},
-		{"guesses_exclude_all", []string{"--exclude", "acme/api#7,42,43"}, render.ExitOK, 0},
+		// #98, which pull request #50 closes and a message names, is not
+		// found: that fails the batch too.
+		{"guesses", []string{"--dry-run"}, render.ExitNotFound, 0, "", false},
+		{"guesses_exclude", []string{"--exclude", "acme/api#7,98", "--exclude", "#43,77"}, render.ExitOK, 1, "", false},
+		{"guesses_exclude_json", []string{"--exclude", "acme/api#7,98", "--dry-run", "--json"}, render.ExitOK, 0, "", false},
+		{"guesses_exclude_all", []string{"--exclude", "acme/api#7,42,43,98"}, render.ExitOK, 0, "", false},
 		// Nothing left to read.
-		{"guesses_exclude_every", []string{"--exclude", "acme/api#7,42,43,99,acme/api#3"}, render.ExitOK, 0},
-		{"guesses_exclude_bad", []string{"--exclude", "acme"}, render.ExitUsage, 0},
+		{"guesses_exclude_every", []string{"--exclude", "acme/api#7,42,43,98,99,acme/api#3"}, render.ExitOK, 0, "", false},
+		{"guesses_exclude_bad", []string{"--exclude", "acme"}, render.ExitUsage, 0, "", false},
+		// acme/api is one of the project's repositories: not found, it is
+		// the token's access almost surely, and fails the batch.
+		{"guesses_own_repo", []string{"--exclude", "acme/api#7,98", "--dry-run"}, render.ExitNotFound, 0,
+			`["acme/shop", "acme/api"]`, false},
+		// An error other than a missing issue or repository is not left
+		// out: a token GitHub denies fails the batch as a network error.
+		{"guesses_denied", []string{"--exclude", "acme/api#7,98", "--dry-run"}, render.ExitNetwork, 0, "", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			withConfig(t, verbsConfig)
+			cfg := verbsConfig
+			if tt.repos != "" {
+				cfg = strings.Replace(cfg, "project = 3\n", "project = 3\nrepos = "+tt.repos+"\n", 1)
+			}
+			withConfig(t, cfg)
 			if tt.code != render.ExitUsage {
 				withApp(t, verbFixture("release_shop_guesses"))
 			}
@@ -156,6 +173,11 @@ func TestReleaseGuesses(t *testing.T) {
 					43: {Number: 43, Title: "Speed up checkout", OnBoard: true, Status: "Done", Closed: true},
 				},
 				gone: map[string]bool{"acme/api": true},
+			}
+			if tt.denied {
+				f.gone = nil
+				f.readErrs = map[string]error{"acme/api": render.Network(
+					"GitHub denied access: the organization enforces SAML single sign-on and the token is not authorized for it")}
 			}
 			withBackend(t, f)
 			code, out := runOut(append([]string{"release", "HEAD", "--since", "abc1234", "--verb", "done"}, tt.args...)...)

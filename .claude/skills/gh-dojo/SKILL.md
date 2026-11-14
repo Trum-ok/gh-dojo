@@ -57,7 +57,7 @@ Run a verb as `gh dojo <verb> N` (`N`, `#N` or `owner/repo#N`); `--dry-run` prin
 `gh dojo done N`: Ready → Done; optional --comment; also on closed issues; comments "{comment}"; closes as completed.
 
 - It takes several numbers at once, `gh dojo done 12 13 14`: each issue is checked and written on its own, one that fails is skipped, and a summary names each issue not done. Running the same command again touches only what is left.
-- For a release, `gh dojo release <tag> --verb done --dry-run` lists the issues the release includes (those the merged pull requests of its commits close, or its commit messages name after `close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves`, `resolved`, `refs`), how each was found and its plan; without `--dry-run` it runs `done` on them as one batch. An open issue whose status it does not start from is listed as not ready and left out, not failed; only a later release whose commits name it again picks it up, so once it is ready run `gh dojo done N` on it. A closed issue it does not start from is refused (exit code 2): ask the user. The start is the previous version tag; the first release needs `--since <tag or commit>`. A number only commit messages name that is no issue (a pull request, a missing issue, a repository not found or hidden from the token) is left out with a warning, not failed; `--exclude N` leaves out an issue found by mistake. In a commit message, put an example of an issue reference in backticks (`` `Fixes #12` ``): code does not count.
+- For a release, `gh dojo release <tag> --verb done --dry-run` lists the issues the release includes (those the merged pull requests of its commits close, or its commit messages name after `close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves`, `resolved`, `refs`), how each was found and its plan; without `--dry-run` it runs `done` on them as one batch. An open issue whose status it does not start from is listed as not ready and left out, not failed; only a later release whose commits name it again picks it up, so once it is ready run `gh dojo done N` on it. A closed issue it does not start from is refused (exit code 2): ask the user. The start is the previous version tag; the first release needs `--since <tag or commit>`. A number only commit messages name that is no issue (a pull request, a missing issue, or one of a repository outside `board.repos` not found or hidden from the token) is left out with a warning, not failed; `--exclude N` leaves out any issue found by mistake. In a commit message, put an example of an issue reference in backticks (`` `Fixes #12` ``): code does not count.
 - It comments only when given `--comment`.
 - An issue closed already stays closed as it is.
 
@@ -151,7 +151,8 @@ gh dojo show 42 --jq '.issues[0].blocked_by[] | select(.resolved | not) | .ref'
 - Предупреждение release вида `acme/api#3: repository acme/api not found, or the token cannot see it: left out`
   или `#99 not found: left out` — номер есть только в тексте коммита, а задачи нет (или токен её не видит); release
   его пропускает (код 0). Если это ложное совпадение — ничего не делай (или `--exclude acme/api#3`); если задача
-  настоящая, но токен её не видит, — скажи пользователю.
+  настоящая, но токен её не видит, — скажи пользователю. Пропускаются только репозитории вне `board.repos`: свой
+  репозиторий «not found» — ошибка пачки (код 3), почти наверняка нет доступа у токена; скажи пользователю.
 - В `--comment` у `ready` и `done` полезно указать коммит или релиз: `--comment "5fc0e30"`.
 
 ## Неудобство → задача `dogfood`

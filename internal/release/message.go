@@ -76,30 +76,42 @@ func containsRef(refs []issue.Ref, r issue.Ref) bool {
 	return false
 }
 
-// stripCode blanks out the code of a message as Markdown reads it, so no
+// stripCode masks the code of a message as Markdown reads it, so no
 // reference in it matches: fenced blocks (a line opening with three or
 // more ` or ~, up to a line closing with as many or more of the same, or
-// the end), then code spans (a run of backticks up to the next run of the
-// same length, within a paragraph). Code becomes spaces and keeps its line
-// breaks, so the text around it keeps its lines. A backtick run that
-// nothing closes is text.
+// the end), indented blocks (lines indented by four spaces or a tab, from
+// one after a blank line, a fence or the start), then code spans (a run of backticks up to the next run of
+// the same length, within a paragraph). A backtick run that nothing closes
+// is text.
+//
+// Code becomes codeByte and keeps its line breaks: the text around it
+// keeps its lines, and code ends a keyword's list as the backticks did,
+// so "Refs `#12` #13" names nothing.
 func stripCode(message string) string {
-	if !strings.ContainsAny(message, "`~") {
-		return message
-	}
 	lines := strings.SplitAfter(message, "\n")
-	fence := "" // the run of ` or ~ of the open fenced block
+	fence := ""                    // the run of ` or ~ of the open fenced block
+	blank, indented := true, false // after a blank line; in an indented block
 	for i, l := range lines {
-		run, rest := fenceRun(l)
-		switch {
-		case fence == "" && run == "":
+		if fence != "" {
+			if run, rest := fenceRun(l); strings.HasPrefix(run, fence) && strings.TrimSpace(rest) == "" {
+				fence, blank = "", true // the closing fence; a block may follow
+			}
+			lines[i] = maskLine(l)
 			continue
-		case fence == "":
-			fence = run
-		case strings.HasPrefix(run, fence) && strings.TrimSpace(rest) == "":
-			fence = "" // the closing fence
 		}
-		lines[i] = blankOut(l)
+		switch {
+		case strings.TrimSpace(l) == "":
+			blank = true
+			continue
+		case (blank || indented) && (strings.HasPrefix(l, "    ") || strings.HasPrefix(l, "\t")):
+			indented, blank = true, false
+			lines[i] = maskLine(l)
+			continue
+		}
+		indented, blank = false, false
+		if fence, _ = fenceRun(l); fence != "" {
+			lines[i] = maskLine(l)
+		}
 	}
 	s := []byte(strings.Join(lines, ""))
 	for i := 0; i < len(s); {
@@ -115,7 +127,7 @@ func stripCode(message string) string {
 		}
 		for j := i; j < end; j++ {
 			if s[j] != '\n' {
-				s[j] = ' '
+				s[j] = codeByte
 			}
 		}
 		i = end
@@ -180,8 +192,13 @@ func blankLineAt(s []byte, i int) bool {
 	return true
 }
 
-// blankOut is l with every byte but its line break a space.
-func blankOut(l string) string {
+// codeByte stands for each byte of code: neither a space, which would
+// separate the references around it, nor a character of a keyword or a
+// reference.
+const codeByte = 0
+
+// maskLine is l with every byte but its line break codeByte.
+func maskLine(l string) string {
 	body := strings.TrimRight(l, "\r\n")
-	return strings.Repeat(" ", len(body)) + l[len(body):]
+	return strings.Repeat("\x00", len(body)) + l[len(body):]
 }
