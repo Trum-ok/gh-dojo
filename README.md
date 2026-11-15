@@ -16,11 +16,11 @@ knows the board's fields, statuses and rules from the repository's
 </picture>
 
 **Why.** With plain `gh`, an agent can set any board field to any value
-(`gh project item-edit`, or GraphQL with project, field and option IDs on
-older `gh`), and nothing tells it the process. Agents invent it as they go:
-they forget to leave a reason for waiting or move an issue from the wrong
-status. gh-dojo keeps the process in the repository as data, and turns it
-into commands:
+(`gh project item-edit`, by field and option name; older `gh` needs project,
+field and option IDs), and nothing tells it the process. Agents invent it as
+they go: they forget to leave a reason for waiting or move an issue from the
+wrong status. gh-dojo keeps the process in the repository as data, and turns
+it into commands:
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/media/compare-dark.gif">

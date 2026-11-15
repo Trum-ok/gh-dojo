@@ -73,7 +73,8 @@ func buildRoot(ctors []constructor) (*cobra.Command, error) {
 		Use:   "gh-dojo",
 		Short: "Process verbs for GitHub Projects, built for AI agents",
 		Long: "gh dojo moves issues through a GitHub Projects board with process verbs\n" +
-			"defined in .github/dojo.toml, so agents never deal with field or option IDs." +
+			"defined in .github/dojo.toml, so agents follow the project's process instead\n" +
+			"of setting board fields." +
 			configNote(),
 		Annotations: map[string]string{
 			cobra.CommandDisplayNameAnnotation: "gh dojo",
