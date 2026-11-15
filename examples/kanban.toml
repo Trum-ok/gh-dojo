@@ -7,10 +7,10 @@
 # Backlog, In progress, Waiting, Ready and Done (other options are fine).
 # Repository: a label "blocked" (gh label create blocked), for wait and start.
 #
-# Reference: https://github.com/Trum-ok/gh-dojo#configuration
+# Reference: https://github.com/Trum-ok/gh-dojo/blob/main/docs/configuration.md
 
 version = 1
-preset = "kanban"            # start, wait, ready, done; see README "Kanban preset"
+preset = "kanban"            # start, wait, ready, done; see docs/configuration.md "Kanban preset"
 
 [board]
 owner = "acme"               # user or organization that owns the project

@@ -10,8 +10,12 @@ make test     # go test ./...
 make vet      # go vet ./...
 make dist     # release binaries for all platforms into dist/
 make agent    # regenerate the agent skill from .github/dojo.toml
-make install  # build and install as the gh dojo extension (see README)
+make install  # build and install as the gh dojo extension (see below)
+make demo     # render the README animations (needs Node and ffmpeg)
 ```
+
+The animations in the README are [Remotion](https://www.remotion.dev/)
+videos in [`docs/media/`](docs/media).
 
 CI (`.github/workflows/ci.yml`) runs on pushes to `main` and on pull
 requests. Once, on Linux: `gofmt -l .` must print nothing, then
@@ -25,6 +29,36 @@ Code and tests must work on all three: build paths with `path/filepath`,
 show them to users with `filepath.ToSlash`, and keep OS error texts out of
 golden files. `.gitattributes` checks every file out with LF line endings,
 Windows included.
+
+## Install from source
+
+To run the latest `main`, install from source; this needs Go
+(the version in `go.mod`) and `gh`:
+
+```sh
+git clone https://github.com/Trum-ok/gh-dojo
+cd gh-dojo
+make install
+gh dojo --version
+```
+
+`make install` builds into `~/.local/share/gh-dojo/gh-dojo` (override with
+`INSTALL_DIR`, whose last element must be `gh-dojo`) and installs the extension
+from there, so the installed `gh dojo` does not change when you switch
+branches in the working copy. Re-run it to update. A different `gh dojo`
+extension already installed is replaced, and put back if the install fails.
+`gh dojo --version` shows the release tag, or the `git describe` of a source
+build.
+
+On Windows `make install` is not available. Build in the clone (its directory
+must be named `gh-dojo`) from Git Bash and install it as a local extension;
+gh runs local extensions through Git for Windows' `sh`, and they follow the
+working copy, so rebuild after switching branches:
+
+```sh
+go build -ldflags "-X main.version=$(git describe --always --dirty)" -o gh-dojo.exe ./cmd/gh-dojo
+gh extension install .
+```
 
 ## End-to-end tests
 
@@ -101,7 +135,7 @@ the text and `--json` come from the same data (`emitWrite` for a command
 that writes). JSON fields are snake_case and always present: lists are `[]`,
 an absent value is `null`, never `""`; no node IDs. A command returns its
 error as usual: `run` prints it as JSON too. A new field is fine, a renamed or
-removed one needs a new `schema_version` (README, "JSON output", lists the
+removed one needs a new `schema_version` ([docs/output.md](docs/output.md#json-output) lists the
 schemas).
 Each command has JSON golden files under `cmd/gh-dojo/testdata/json/`.
 
@@ -117,7 +151,7 @@ make golden   # UPDATE_GOLDEN=1 go test ./...
 
 Rewriting is refused when `CI` is set, so CI can never pass by accepting its
 own output. `internal/config`'s `TestReadmeExamples` loads every `toml` block
-in `README.md`, and `TestExampleConfigs` every `examples/*.toml`, so README
+in `README.md` and `docs/*.md`, and `TestExampleConfigs` every `examples/*.toml`, so README
 examples and example configs must stay valid configs. `cmd/gh-dojo`'s
 `TestExampleReview` runs `describe`, a dry run of every verb and
 `agent install` on `examples/review.toml`, against the hand-crafted board

@@ -1,7 +1,7 @@
 code: 0
 --- stdout
 # gh-dojo: the board and the process verbs of this repository.
-# Format and keys: https://github.com/Trum-ok/gh-dojo#configuration
+# Format and keys: https://github.com/Trum-ok/gh-dojo/blob/main/docs/configuration.md
 # Preset kanban brings the verbs, statuses and fields; override any of
 # them below, e.g. [verbs.start] when = "..." in your project's language.
 # gh dojo --help shows the verbs this file gives.

@@ -13,7 +13,7 @@ code: 0
   ],
   "matches_board": true,
   "problems": [],
-  "content": "# gh-dojo: the board and the process verbs of this repository.\n# Format and keys: https://github.com/Trum-ok/gh-dojo#configuration\n# Preset kanban brings the verbs, statuses and fields; override any of\n# them below, e.g. [verbs.start] when = \"...\" in your project's language.\n# gh dojo --help shows the verbs this file gives.\n\nversion = 1\npreset = \"kanban\"\n\n[board]\nowner = \"Trum-ok\"\nproject = 5  # gh-dojo\nrepos = [\"Trum-ok/gh-dojo\"]  # the first one is the default repository\n"
+  "content": "# gh-dojo: the board and the process verbs of this repository.\n# Format and keys: https://github.com/Trum-ok/gh-dojo/blob/main/docs/configuration.md\n# Preset kanban brings the verbs, statuses and fields; override any of\n# them below, e.g. [verbs.start] when = \"...\" in your project's language.\n# gh dojo --help shows the verbs this file gives.\n\nversion = 1\npreset = \"kanban\"\n\n[board]\nowner = \"Trum-ok\"\nproject = 5  # gh-dojo\nrepos = [\"Trum-ok/gh-dojo\"]  # the first one is the default repository\n"
 }
 
 --- stderr

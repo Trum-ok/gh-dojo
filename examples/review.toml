@@ -18,7 +18,7 @@
 # not by a preset). The reviewer, named with review --assignee, must be able
 # to be assigned issues in the repository.
 #
-# Reference: https://github.com/Trum-ok/gh-dojo#configuration
+# Reference: https://github.com/Trum-ok/gh-dojo/blob/main/docs/configuration.md
 
 version = 1                  # no preset: nothing comes from kanban or sprints
 

@@ -42,7 +42,7 @@ code: 1
       "fix": "add \"Waiting\" to field \"Status\" on the board (https://github.com/orgs/github/projects/4247), or override in .github/dojo.toml: [verbs.start] from = […]; [verbs.wait] to = \"…\"; [verbs.ready] from = […]"
     }
   ],
-  "content": "# gh-dojo: the board and the process verbs of this repository.\n# Format and keys: https://github.com/Trum-ok/gh-dojo#configuration\n# Preset kanban brings the verbs, statuses and fields; override any of\n# them below, e.g. [verbs.start] when = \"...\" in your project's language.\n# gh dojo --help shows the verbs this file gives.\n\nversion = 1\npreset = \"kanban\"\n\n[board]\nowner = \"github\"\nproject = 4247  # GitHub Public Roadmap\n# repos = [\"owner/name\"]  # unset: the current repository (GH_REPO, else the git remote)\n"
+  "content": "# gh-dojo: the board and the process verbs of this repository.\n# Format and keys: https://github.com/Trum-ok/gh-dojo/blob/main/docs/configuration.md\n# Preset kanban brings the verbs, statuses and fields; override any of\n# them below, e.g. [verbs.start] when = \"...\" in your project's language.\n# gh dojo --help shows the verbs this file gives.\n\nversion = 1\npreset = \"kanban\"\n\n[board]\nowner = \"github\"\nproject = 4247  # GitHub Public Roadmap\n# repos = [\"owner/name\"]  # unset: the current repository (GH_REPO, else the git remote)\n"
 }
 
 --- stderr

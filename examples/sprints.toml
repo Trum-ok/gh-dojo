@@ -8,10 +8,10 @@
 #     Waiting, Ready and Done (other options are fine);
 #   - an iteration field named Sprint, with an iteration for today.
 #
-# Reference: https://github.com/Trum-ok/gh-dojo#configuration
+# Reference: https://github.com/Trum-ok/gh-dojo/blob/main/docs/configuration.md
 
 version = 1
-preset = "sprints"           # the kanban flow plus the sprint; see README "Sprints preset"
+preset = "sprints"           # the kanban flow plus the sprint; see docs/configuration.md "Sprints preset"
 
 [board]
 owner = "acme"               # an organization board works the same as a user's

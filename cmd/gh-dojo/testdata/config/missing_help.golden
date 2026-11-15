@@ -4,7 +4,7 @@ gh dojo moves issues through a GitHub Projects board with process verbs
 defined in .github/dojo.toml, so agents follow the project's process instead
 of setting board fields.
 
-No process verbs: no .github/dojo.toml found (create one: gh dojo init; format: https://github.com/Trum-ok/gh-dojo#configuration).
+No process verbs: no .github/dojo.toml found (create one: gh dojo init; format: https://github.com/Trum-ok/gh-dojo/blob/main/docs/configuration.md).
 
 Usage:
   gh dojo [flags]

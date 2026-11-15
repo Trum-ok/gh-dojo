@@ -26,8 +26,8 @@ import (
 // FileName is the config path relative to the repository root.
 const FileName = ".github/dojo.toml"
 
-// DocsURL is the README section that documents the config format.
-const DocsURL = "https://github.com/Trum-ok/gh-dojo#configuration"
+// DocsURL is the page that documents the config format.
+const DocsURL = "https://github.com/Trum-ok/gh-dojo/blob/main/docs/configuration.md"
 
 // ErrNoConfig is the cause of the error Find and Load return when there is
 // no config file to load; test for it with errors.Is. Any other error means

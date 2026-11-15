@@ -43,7 +43,7 @@ import (
 // anything was read, ...) is JSON too: run prints {"schema_version":1,
 // "error":{...}} on stdout (writeErrorJSON). The error is also printed as
 // text on stderr, in every mode, with the same exit code; warnings stay
-// on stderr. README ("JSON output") documents the schemas.
+// on stderr. docs/output.md ("JSON output") documents the schemas.
 
 // schemaVersion is the version of every JSON schema. It changes only for
 // a breaking change, in a major release; adding a field is not one.

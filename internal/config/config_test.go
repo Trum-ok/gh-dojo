@@ -607,7 +607,7 @@ func TestPresetsValid(t *testing.T) {
 	}
 }
 
-// TestPresetStatuses keeps the presets on the statuses README.md
+// TestPresetStatuses keeps the presets on the statuses docs/configuration.md
 // documents for their boards.
 func TestPresetStatuses(t *testing.T) {
 	for _, tt := range []struct{ name, content string }{{"kanban", presetOnly}, {"sprints", sprintsOnly}} {
@@ -763,21 +763,33 @@ func TestBatch(t *testing.T) {
 	}
 }
 
-// TestReadmeExamples keeps the README config examples loadable.
+// TestReadmeExamples keeps the config examples of README.md and docs/*.md
+// loadable.
 func TestReadmeExamples(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join("..", "..", "README.md"))
+	root := filepath.Join("..", "..")
+	docs, err := filepath.Glob(filepath.Join(root, "docs", "*.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	blocks := strings.Split(string(data), "```toml\n")[1:]
-	if len(blocks) < 2 {
-		t.Fatalf("found %d toml blocks in README.md, want at least 2", len(blocks))
-	}
-	for i, b := range blocks {
-		b, _, _ = strings.Cut(b, "```")
-		if _, err := Parse([]byte(b), fmt.Sprintf("README.md block %d", i+1)); err != nil {
-			t.Error(err)
+	total := 0
+	for _, path := range append([]string{filepath.Join(root, "README.md")}, docs...) {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
 		}
+		name, _ := filepath.Rel(root, path)
+		name = filepath.ToSlash(name)
+		blocks := strings.Split(string(data), "```toml\n")[1:]
+		total += len(blocks)
+		for i, b := range blocks {
+			b, _, _ = strings.Cut(b, "```")
+			if _, err := Parse([]byte(b), fmt.Sprintf("%s block %d", name, i+1)); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+	if total < 3 {
+		t.Fatalf("found %d toml blocks in README.md and docs/*.md, want at least 3", total)
 	}
 }
 
