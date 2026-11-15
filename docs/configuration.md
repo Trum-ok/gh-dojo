@@ -330,8 +330,12 @@ rejected with "not supported in this version".
   spells it; only such a verb takes it. Each issue's milestone is matched in
   its own repository, so in a batch an `owner/repo#N` whose repository has
   no such milestone fails alone. An issue already in the milestone keeps
-  it: `milestone unchanged (v0.3 — extensibility)`. The open milestones come
-  with the issue's read (page by page past 100). A verb cannot clear a
+  it: `milestone unchanged (v0.3 — extensibility)`. An issue whose
+  milestone has the whole title given, regardless of case, keeps it without
+  a match, so a repeat still finds it in place once that milestone is
+  closed. Otherwise only open milestones count: a start of a title picks an
+  open milestone even when a closed one has exactly that title. The open
+  milestones come with the issue's read (the rest page by page past 100). A verb cannot clear a
   milestone. [`gh dojo doctor`](commands.md#doctor) checks that each title
   of the config matches one open milestone of the default repository;
   [`release`](commands.md#release) cannot run a verb with

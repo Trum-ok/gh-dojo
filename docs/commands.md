@@ -175,8 +175,10 @@ that finds it on one of the repository's 20 newest open issues written by
 you finishes that issue (labels, milestone, board, status, blocked-by links,
 parent) instead of creating another; a different milestone or parent it
 already has (or a parent the token cannot read) is kept, with a warning
-that names the command to change it: a verb with `milestone = "{milestone}"`
-when the config has one.
+that names the command to change it: a verb that only sets
+`milestone = "{milestone}"` (no other effect or required argument, no
+`confirm`) and starts from the issue's status, when the config has one,
+else `gh issue edit`.
 If a run fails after creating the issue, it exits with code 5: run the
 same command again.
 
@@ -549,9 +551,8 @@ dry run: done #3 "Read the config"
 `--dry-run` lists how each issue was found (`PR #N`, `commit <sha>`) and its
 plan. No issues is a line saying where release looked, exit code 0.
 `--comment`, `--by` and `--yes` go to the verb, for every issue. A verb
-without `batch = true` is exit code 1, and so is one that needs
-`--assignee` or `--milestone` (`assign = "{assignee}"`,
-`milestone = "{milestone}"`), which release does not take: run it on the
-issues themselves, a `<ref>` or `--since` GitHub does not
-know exit code 3. Requests: one for `<ref>` and the start (one per 100
+without `batch = true` is exit code 1. So is one that needs `--assignee`
+or `--milestone` (`assign = "{assignee}"`, `milestone = "{milestone}"`),
+which release does not take: run it on the issues themselves. A `<ref>`
+or `--since` GitHub does not know is exit code 3. Requests: one for `<ref>` and the start (one per 100
 tags), one per 100 commits with their pull requests, then the batch's.
