@@ -36,13 +36,13 @@ files agents read, so the rules are written once, in the config:
   agents-md  a section of AGENTS.md, which Codex and other agents read
   copilot    a section of .github/copilot-instructions.md
 
-The instructions are in English: the lifecycle, each verb with when to use
-it, what it needs, checks and does along the way, blockers, the session
-link, reading and creating issues, exit codes and JSON, and the commands of
-this gh-dojo. The markdown file [agent] notes names is appended as it is,
-for what the config cannot say, and [agent] description is added to the
-skill's description. Without --agent, the agents of [agent] targets are
-written (by default claude).
+The instructions are in English: to handle issues only through gh dojo,
+the lifecycle, each verb with when to use it, what it needs, checks and
+does along the way, blockers, reading, creating and linking issues, safe
+repeats, exit codes and JSON. The markdown file [agent] notes names is
+appended as it is, for what the config cannot say, and [agent] description
+is added to the skill's description. Without --agent, the agents of
+[agent] targets are written (by default claude).
 
 The skill is gh-dojo's whole file: one that exists without gh-dojo's
 marker, written by hand, is not overwritten (exit code 1; --check says

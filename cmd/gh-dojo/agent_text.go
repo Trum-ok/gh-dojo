@@ -25,11 +25,9 @@ type agentDoc struct {
 	// blockers check and link, confirm, batch), so a verb's line does not
 	// say it twice.
 	p     *process
-	cmds  []agentCommand // the built-in commands, for hasCommand
-	notes string         // "" or markdown ending in a newline
+	cmds  []string // the built-in commands, for hasCommand
+	notes string   // "" or markdown ending in a newline
 }
-
-type agentCommand struct{ name, short string }
 
 // newAgentDoc collects the doc of cfg. root gives the commands this build
 // has, so a command added later (next, release) shows up without a list
@@ -52,7 +50,7 @@ func newAgentDoc(cfg *config.Config, root *cobra.Command, notes string) *agentDo
 				walk(sub, prefix+sub.Name()+" ")
 				continue
 			}
-			d.cmds = append(d.cmds, agentCommand{prefix + sub.Name(), sub.Short})
+			d.cmds = append(d.cmds, prefix+sub.Name())
 		}
 	}
 	walk(root, "")
@@ -563,7 +561,7 @@ func (d *agentDoc) foldedList() string {
 
 // hasCommand reports whether this build has the built-in command name.
 func (d *agentDoc) hasCommand(name string) bool {
-	return slices.ContainsFunc(d.cmds, func(c agentCommand) bool { return c.name == name })
+	return slices.Contains(d.cmds, name)
 }
 
 // takeVerb is the verb that takes an issue: the first one from the
