@@ -2,13 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -239,6 +239,9 @@ func (s *sandbox) levelOne(outDir string, repeat int) error {
 	return nil
 }
 
+// errNoLock is tryLock's answer where there is no flock.
+var errNoLock = errors.New("the benchmark runs only on Unix: it locks the board with flock")
+
 // lockBoard takes a lock on the board for this process, refusing when another
 // benchmark run from this working copy holds it. The lock is in the results'
 // directory, not the temporary one, which differs between sandboxes.
@@ -251,8 +254,11 @@ func lockBoard(outDir, repo string, project int) (func(), error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+	if err := tryLock(f); err != nil {
 		f.Close()
+		if errors.Is(err, errNoLock) {
+			return nil, err
+		}
 		return nil, fmt.Errorf("another benchmark is running on %s board %d (lock %s): wait for it or stop it", repo, project, f.Name())
 	}
 	return func() { f.Close() }, nil
