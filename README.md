@@ -81,10 +81,12 @@ gh extension install Trum-ok/gh-dojo
 gh extension upgrade dojo
 ```
 
-Prebuilt binaries for macOS, Linux and Windows (amd64 and arm64); to build
-from source, see [CONTRIBUTING.md](CONTRIBUTING.md#install-from-source).
+Requires [GitHub CLI](https://cli.github.com/) 2.x. Prebuilt binaries for
+macOS, Linux and Windows (amd64 and arm64); to build from source, see
+[CONTRIBUTING.md](CONTRIBUTING.md#install-from-source).
 gh-dojo uses gh's authentication (or `GH_TOKEN`). Projects need the `project`
-scope: `gh auth refresh -s project`. Boards of users and of organizations are
+scope: `gh auth refresh -s project`; [`gh dojo doctor`](docs/commands.md#doctor)
+checks it. Boards of users and of organizations are
 both supported; for an organization with SAML single sign-on, the token must
 also be authorized for it.
 
