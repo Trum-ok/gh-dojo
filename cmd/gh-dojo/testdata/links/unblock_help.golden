@@ -7,16 +7,19 @@ N and --by take 12, "#12" (the default repository, board.repos[0]),
 owner/repo#12 or the issue's URL; repeat --by, or separate the issues
 with commas. A link already gone is not an error: the line
 says "already". An issue that does not exist fails before anything is
-written (exit code 3).
+written (exit code 3). --dry-run prints the plan without changing
+anything.
 
 Usage:
   gh dojo unblock <N> --by <M>... [flags]
 
 Examples:
   gh dojo unblock 42 --by 17
+  gh dojo unblock 42 --by 17 --dry-run
 
 Flags:
       --by issue   the blocking issue: 12, "#12", owner/repo#12 or its URL; repeatable, or comma-separated
+      --dry-run    print the plan without changing anything
   -h, --help       help for unblock
 
 Global Flags:

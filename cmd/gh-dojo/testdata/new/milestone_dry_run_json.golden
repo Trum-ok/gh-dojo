@@ -1,0 +1,4 @@
+code: 0
+--- stdout
+{"schema_version":1,"error":null,"number":null,"repo":"Trum-ok/gh-dojo","title":"Fix login redirect","dry_run":true,"created":true,"labels":["bug","area:cli"],"status":"Backlog","status_set":true,"unarchived":false,"milestone":{"title":"v0.1","due_on":"2026-12-01"},"milestone_set":true,"blocked_by":[],"already_blocked_by":[],"parent":null,"parent_set":false}
+--- stderr

@@ -49,6 +49,19 @@ func TestVerbMilestone(t *testing.T) {
 	)
 }
 
+// TestVerbMilestoneNone: plan --milestone none takes #3 out of v0.0. The
+// dry run plans v0.0 → none; the card is read without the open
+// milestones, and one mutation clears it and posts the comment, where
+// {milestone} is "none". The repeat, in another case, finds both in place.
+func TestVerbMilestoneNone(t *testing.T) {
+	srv, before := withMilestoneApp(t, verbFixture("milestone_clear"))
+	checkRuns(t, srv, before,
+		runs{[]string{"plan", "3", "--milestone", "none", "--dry-run"}, render.ExitOK, 1, "milestone_clear_dry_run"},
+		runs{[]string{"plan", "3", "--milestone", "none"}, render.ExitOK, 2, "milestone_clear"},
+		runs{[]string{"plan", "3", "--milestone", "None", "--json"}, render.ExitOK, 1, "milestone_clear_repeat"},
+	)
+}
+
 // TestVerbMilestoneMatch: what --milestone and a title of the config
 // match, in dry runs. A start several titles share, or none, is exit code
 // 1 with the candidates or the open milestones, after the card's one read;

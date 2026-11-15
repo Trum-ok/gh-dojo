@@ -144,7 +144,7 @@ code 1).
 ## new
 
 ```sh
-gh dojo new <title> [--type T] [--area A]... [--label L]... [--milestone M] [--blocked-by N]... [--parent N] [--repo owner/repo] [--body TEXT | --body-file FILE]
+gh dojo new <title> [--type T] [--area A]... [--label L]... [--milestone M] [--blocked-by N]... [--parent N] [--repo owner/repo] [--body TEXT | --body-file FILE] [--dry-run]
 ```
 
 Creates an issue, labels it, adds it to the board and sets the initial status
@@ -156,11 +156,13 @@ Creates an issue, labels it, adds it to the board and sets the initial status
 - `--milestone v1.2` puts the issue in the open milestone titled `v1.2`
   (ignoring case), or else in the only one whose title starts with it:
   `--milestone v0.3` for `v0.3 — extensibility`. Several such are exit
-  code 1, listing them. A verb with
+  code 1, listing them; `--milestone none` is no milestone, as for a verb. A verb with
   [`milestone = "{milestone}"`](configuration.md#effects) moves an existing
   issue to another milestone, matched the same way;
 - `--blocked-by 17` marks it blocked by #17 (repeatable, or comma-separated;
-  `owner/repo#17` or a URL for another repository);
+  `owner/repo#17` or a URL for another repository); `--by 17`, as
+  [`wait`](#process-verbs) and [`block`](#block-unblock) call it, is the
+  same flag, left out of the help;
 - `--parent 40` makes it a sub-issue of #40, set as it is created (no extra
   request); [`show`](#show) lists a parent's sub-issues, and a verb with
   [`sub_issues`](configuration.md#checks) checks them. An existing issue becomes a sub-issue
@@ -199,23 +201,39 @@ else `gh issue edit`.
 If a run fails after creating the issue, it exits with code 5: run the
 same command again.
 
+`--dry-run` reads and checks everything a run does, so an unknown label or
+a missing blocker fails the same way, and prints the plan instead of
+writing: the issue it would create, or, for one an earlier run created,
+what finishing it would do.
+
+```console
+$ gh dojo new "Fix login redirect" --type bug --area cli --blocked-by 26 --dry-run
+dry run: new "Fix login redirect"
+  create: in Trum-ok/gh-dojo
+  labels: bug, area:cli
+  add to the board
+  status: no status → Backlog
+  blocked by: #26
+```
+
 ## comment
 
 ```sh
-gh dojo comment <N> [text] [--body-file FILE]
+gh dojo comment <N> [text] [--body-file FILE] [--dry-run]
 ```
 
 Comments on an issue without changing its status. The text comes from the
 second argument or from `--body-file` (`-` reads stdin), exactly one of them.
 Text starting with `-` goes after `--`: `gh dojo comment 42 -- "-1, still
 broken"`. When the issue's last comment is yours with the same text, it is
-not posted again.
+not posted again. `--dry-run` reads the issue and prints the comment it
+would post, or that it is the last comment already, without posting.
 
 ## block, unblock
 
 ```sh
-gh dojo block <N> --by <M>...
-gh dojo unblock <N> --by <M>...
+gh dojo block <N> --by <M>... [--dry-run]
+gh dojo unblock <N> --by <M>... [--dry-run]
 ```
 
 Marks issue N blocked by the issues `--by` names, or removes those links,
@@ -224,7 +242,9 @@ or the issue's URL; repeat `--by` or separate the issues with commas. A link alr
 there (`block`) or already gone (`unblock`) is not an error, and the line
 says so. An issue that does not exist, or a pull request, fails before
 anything is written (exit code 3); an issue cannot block itself, nor an
-issue it already blocks: GitHub refuses cycles (exit code 1).
+issue it already blocks: GitHub refuses cycles (exit code 1). `--dry-run`
+reads and checks the same and prints the links it would change, then those
+already as asked, without writing.
 
 ```console
 $ gh dojo block 42 --by 17,18
@@ -446,7 +466,9 @@ issue number (rendered `#12`) or free text; with
 assign, also `{assignee}` in the template. `--milestone` (an open
 milestone's title, or a start only that title has) exists only on a verb
 with [`milestone = "{milestone}"`](configuration.md#effects), and is
-required there: the milestone to set, also `{milestone}` in the template.
+required there: the milestone to set, also `{milestone}` in the template;
+`--milestone none` (in any case) takes the issue out of its milestone, and
+`{milestone}` is then `none`: `gh dojo plan 56 --milestone none`.
 `--yes` exists only on a verb
 with [`confirm = "user"`](configuration.md#checks).
 `--dry-run` prints the plan without changing anything:

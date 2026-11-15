@@ -15,6 +15,8 @@ A repeat is safe: the comment carries a hidden marker, and when the issue's
 last comment is yours with the same text it is not posted again. The same
 text after someone else's comment is posted.
 
+--dry-run reads the issue and prints what would be posted, without posting.
+
 Usage:
   gh dojo comment <N> [text] [flags]
 
@@ -23,9 +25,11 @@ Examples:
   gh dojo comment 42 --body-file notes.md
   echo "Waiting for the API team" | gh dojo comment 42 --body-file -
   gh dojo comment 42 --json -- "-1, still broken"
+  gh dojo comment 42 "Reproduced on main" --dry-run
 
 Flags:
       --body-file file   read the text from file; - reads stdin
+      --dry-run          print the plan without changing anything
   -h, --help             help for comment
 
 Global Flags:

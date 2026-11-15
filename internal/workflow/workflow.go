@@ -217,11 +217,25 @@ type Args struct {
 	Assignee    string
 	HasAssignee bool // --assignee was given, even if blank
 	// Milestone is --milestone, the title of the open milestone a verb
-	// with milestone = "{milestone}" sets, or the start of it.
+	// with milestone = "{milestone}" sets, or the start of it; NoMilestone
+	// takes the issue out of its milestone.
 	Milestone    string
 	HasMilestone bool // --milestone was given, even if blank
 	// Yes is --yes: the user agreed to a verb with confirm = "user".
 	Yes bool
+}
+
+// NoMilestone is the --milestone value, in any case, that takes the issue
+// out of its milestone, as "none" is no status for gh dojo list --status.
+// It always means that, even in a repository with a milestone titled
+// "none".
+const NoMilestone = "none"
+
+// ClearsMilestone reports whether v, run with a, takes the issue out of
+// its milestone: --milestone none, on a verb with milestone =
+// "{milestone}".
+func ClearsMilestone(v config.Verb, a Args) bool {
+	return v.MilestoneArg && strings.EqualFold(strings.TrimSpace(a.Milestone), NoMilestone)
 }
 
 func (a Args) given(arg string) bool {
@@ -532,7 +546,7 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 		return nil, err
 	}
 	p.planFields(v)
-	milestone, err := p.planMilestone(v)
+	milestone, err := p.planMilestone(v, a)
 	if err != nil {
 		return nil, err
 	}
@@ -695,12 +709,22 @@ func (p *Plan) planAssign(v config.Verb, a Args) (string, error) {
 // and returns its title, "" for none. The reader matched the title of the
 // config or --milestone against the open milestones of the issue's
 // repository (Issue.SetMilestone); an issue in that milestone already has
-// it in place. Milestone titles are unique in a repository.
-func (p *Plan) planMilestone(v config.Verb) (string, error) {
+// it in place. Milestone titles are unique in a repository. --milestone
+// none (ClearsMilestone) takes the issue out of its milestone, in place
+// for one without; {milestone} is then "none".
+func (p *Plan) planMilestone(v config.Verb, a Args) (string, error) {
 	if !v.SetsMilestone() {
 		return "", nil
 	}
 	is := p.Issue
+	if ClearsMilestone(v, a) {
+		if is.Milestone == "" {
+			p.InPlace = append(p.InPlace, SetMilestone{})
+		} else {
+			p.Ops = append(p.Ops, SetMilestone{From: is.Milestone})
+		}
+		return NoMilestone, nil
+	}
 	to := is.SetMilestone
 	if to == "" {
 		return "", render.Internal("%s sets a milestone, but the milestone of %s was not looked up", v.Name, is.Name())

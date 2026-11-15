@@ -21,6 +21,7 @@ import (
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/Trum-ok/gh-dojo/internal/workflow"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 // gh dojo new creates an issue with its labels, on the board, in the
@@ -223,6 +224,9 @@ type newOptions struct {
 	// Repo is the repository of --repo, one of board.repos; zero for the
 	// default one.
 	Repo issue.Repo
+	// DryRun reads and checks everything and writes nothing: the run's
+	// fields say what would be done (see newRun.dryRun).
+	DryRun bool
 }
 
 func newNewCmd() (*cobra.Command, error) {
@@ -241,6 +245,7 @@ func newNewCmd() (*cobra.Command, error) {
   gh dojo new "Release v1.2" --milestone v1.2 --blocked-by 17 --blocked-by 18
   gh dojo new "Document the export" --type documentation --parent 40
   gh dojo new "Rate limit the export" --repo acme/api --type bug
+  gh dojo new "Fix login redirect" --type bug --blocked-by 17 --dry-run
   gh dojo new --type bug -- "-v is ignored by list"`,
 		Args: newArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -263,8 +268,11 @@ func newNewCmd() (*cobra.Command, error) {
 				o.Body = strings.TrimSpace(o.Body)
 			}
 			if f.Changed("milestone") {
-				if o.Milestone = strings.TrimSpace(o.Milestone); o.Milestone == "" {
+				switch o.Milestone = strings.TrimSpace(o.Milestone); {
+				case o.Milestone == "":
 					return render.Usage("--milestone is empty").WithFix(cmd.CommandPath() + " --help")
+				case strings.EqualFold(o.Milestone, workflow.NoMilestone):
+					o.Milestone = "" // no milestone, as for a verb
 				}
 			}
 			cfg, err := loadConfig()
@@ -285,7 +293,7 @@ func newNewCmd() (*cobra.Command, error) {
 				if err != nil {
 					return err
 				}
-				if o.Blockers, err = parseBlockers(o.BlockedBy, "blocked-by", repo, issue.Ref{}, cmd.CommandPath()+" --help"); err != nil {
+				if o.Blockers, err = parseBlockers(o.BlockedBy, blockedByFlag, repo, issue.Ref{}, cmd.CommandPath()+" --help"); err != nil {
 					return err // before any request
 				}
 				if f.Changed(parentFlag) {
@@ -301,7 +309,11 @@ func newNewCmd() (*cobra.Command, error) {
 			// A run that stopped after creating the issue prints it as JSON
 			// too; its text is the error.
 			return emitWrite(cmd, r.result(), func(w io.Writer) {
-				if err == nil {
+				switch {
+				case err != nil:
+				case o.DryRun:
+					fmt.Fprintln(w, r.dryRun())
+				default:
 					fmt.Fprintln(w, r.confirm())
 				}
 			}, err, r.wrote())
@@ -311,15 +323,29 @@ func newNewCmd() (*cobra.Command, error) {
 	f.StringVar(&o.Type, "type", "", newTypeUsage())
 	f.StringArrayVar(&o.Areas, "area", nil, "area `name`: adds the label <labels.area_prefix><name>; repeatable")
 	f.StringArrayVar(&o.Labels, "label", nil, "any existing repo `label`; repeatable")
-	f.StringVar(&o.Milestone, "milestone", "", "an open milestone of the repo, by `title`")
+	f.StringVar(&o.Milestone, "milestone", "", "an open milestone of the repo, by `title`; none for no milestone")
 	f.StringVar(&o.Body, "body", "", "issue body (markdown); one starting with - goes as --body=...")
 	f.StringVar(&bodyFile, bodyFileFlag, "", "read the body from `file`; - reads stdin")
-	f.StringArrayVar(&o.BlockedBy, "blocked-by", nil,
+	f.StringArrayVar(&o.BlockedBy, blockedByFlag, nil,
 		"the blocking `issue`: 12, \"#12\", owner/repo#12 or its URL; repeatable, or comma-separated")
 	f.StringVar(&parent, parentFlag, "", "make it a sub-issue of the parent `issue`: 12, \"#12\", owner/repo#12 or its URL")
 	f.StringVar(&repoName, "repo", "", "create the issue in `owner/repo`, one of board.repos (default: the first)")
+	f.BoolVar(&o.DryRun, dryRunFlag, false, "check everything and print the plan without creating or changing anything")
+	// --by, as wait and block name the blocking issue, is --blocked-by
+	// here: agents carry the name over (#61). Not in the help: one name
+	// is shown.
+	f.SetNormalizeFunc(func(_ *pflag.FlagSet, name string) pflag.NormalizedName {
+		if name == byFlag {
+			name = blockedByFlag
+		}
+		return pflag.NormalizedName(name)
+	})
 	return cmd, nil
 }
+
+// blockedByFlag is new's flag naming the blocking issues; --by is taken
+// for it too.
+const blockedByFlag = "blocked-by"
 
 // parentFlag is new's flag naming the parent issue.
 const parentFlag = "parent"
@@ -423,7 +449,7 @@ created, listing the allowed values.
 --milestone puts the issue in an open milestone of the repo, by title
 (ignoring case) or a start only its title has: v0.3 for "v0.3 — extensibility".
 An unknown or ambiguous one fails before anything is created, listing the open
-milestones or the candidates.
+milestones or the candidates. --milestone none is no milestone, as for a verb.
 
 The body comes from --body or --body-file (a file, or - for stdin). A title
 starting with - goes after --, and every flag before the --, since anything
@@ -452,7 +478,12 @@ parent) instead of creating another; a different milestone or parent it (or one
 the token cannot read) already has is kept.
 So filing an open issue again with the same title (ignoring case and
 spacing) resumes it. If a run fails after creating the issue, it exits with
-code 5: run the same command again.`)
+code 5: run the same command again.
+
+--dry-run reads and checks everything a run does (labels, milestone,
+blockers, parent, an issue an earlier run created) and prints the plan:
+the issue it would create, or what finishing the earlier one would do.
+Nothing is created or changed.`)
 	cfg, err := loadConfig()
 	if err != nil {
 		return b.String()
@@ -514,9 +545,14 @@ func runNew(ctx context.Context, a *App, cfg *config.Config, o newOptions, warn 
 // newResult is new's JSON: the issue created or resumed, and how far the
 // run got.
 type newResult struct {
-	Number int    `json:"number"`
+	// Number is null in a dry run that would create the issue.
+	Number *int   `json:"number"`
 	Repo   string `json:"repo"`
 	Title  string `json:"title"`
+	// DryRun: nothing was written, and the fields say what would be: the
+	// issue created or resumed, the ones ending in _set and blocked_by what
+	// would be set, unarchived what would be unarchived.
+	DryRun bool `json:"dry_run"`
 	// Created is false when an earlier run created the issue and this one
 	// found it by its marker and finished it.
 	Created bool     `json:"created"`
@@ -546,6 +582,9 @@ type newResult struct {
 // wrote reports whether this run wrote anything: created the issue, or
 // finished one an earlier run created.
 func (r *newRun) wrote() bool {
+	if r.opts.DryRun {
+		return false
+	}
 	return !r.resumed || r.added || r.statusSet || r.unarchived || r.milestoneSet || len(r.linked) > 0 || r.parentSet
 }
 
@@ -555,8 +594,12 @@ func (r *newRun) result() newResult {
 	if title == "" {
 		title = r.opts.Title
 	}
+	var number *int
+	if r.number != 0 {
+		number = &r.number
+	}
 	return newResult{
-		Number: r.number, Repo: r.repo.String(), Title: singleLine(title), Created: !r.resumed,
+		Number: number, Repo: r.repo.String(), Title: singleLine(title), DryRun: r.opts.DryRun, Created: !r.resumed,
 		Labels: orEmpty(r.labels), Status: orNull(r.status), StatusSet: r.statusSet, Unarchived: r.unarchived,
 		Milestone: milestoneJSON(r.milestone), MilestoneSet: r.milestoneSet,
 		BlockedBy: refList(r.linked, r.def), AlreadyBlockedBy: refList(r.linkedFound, r.def),
@@ -609,6 +652,8 @@ type newRun struct {
 	title   string // its title on GitHub when found, "" when created now
 	resumed bool   // an earlier run created it; this one found it by its marker
 	labels  []string
+	// labelsMissing are the labels a resumed issue lacks, for a dry run.
+	labelsMissing []string
 
 	itemID     string
 	added      bool   // this run added the issue to the board
@@ -688,7 +733,7 @@ func (r *newRun) run(ctx context.Context) error {
 			return err
 		}
 	}
-	if err := issue.LinksError("--blocked-by", nc.Links, def); err != nil {
+	if err := issue.LinksError("--"+blockedByFlag, nc.Links, def); err != nil {
 		return err
 	}
 	if err := parentError(nc.Parent, def); err != nil {
@@ -711,9 +756,9 @@ func (r *newRun) run(ctx context.Context) error {
 		for _, l := range nc.Links {
 			switch {
 			case l.ID == found.ID:
-				return selfBlock(issue.Ref{Repo: repo, Number: found.Number}, def, "--blocked-by")
+				return selfBlock(issue.Ref{Repo: repo, Number: found.Number}, def, "--"+blockedByFlag)
 			case l.BlockedBy(found.ID):
-				return cycleError(issue.Ref{Repo: repo, Number: found.Number}, def, l.Ref.String(def), "--blocked-by")
+				return cycleError(issue.Ref{Repo: repo, Number: found.Number}, def, l.Ref.String(def), "--"+blockedByFlag)
 			}
 		}
 		if p := nc.Parent; p != nil && p.ID == found.ID {
@@ -722,15 +767,17 @@ func (r *newRun) run(ctx context.Context) error {
 				WithFix("pass the issue " + name + " is a part of")
 		}
 		r.resumed = true
-	} else if err := r.create(ctx, nc.RepoID, withMarker(r.opts.Body, marker), labels, milestone, nc.Parent); err != nil {
-		if r.number != 0 || !errors.Is(err, graph.ErrUnknownOutcome) {
-			return err
+	} else if !r.opts.DryRun {
+		if err := r.create(ctx, nc.RepoID, withMarker(r.opts.Body, marker), labels, milestone, nc.Parent); err != nil {
+			if r.number != 0 || !errors.Is(err, graph.ErrUnknownOutcome) {
+				return err
+			}
+			// The answer was lost: look once whether the issue was created.
+			if found = r.recheck(ctx, repo, statusField.Name, marker, s.ID); found == nil {
+				return err
+			}
+			r.warnings = append(r.warnings, fmt.Sprintf("GitHub's answer to creating the issue was lost; found %s on a re-read", issue.Ref{Repo: repo, Number: found.Number}.String(def)))
 		}
-		// The answer was lost: look once whether the issue was created.
-		if found = r.recheck(ctx, repo, statusField.Name, marker, s.ID); found == nil {
-			return err
-		}
-		r.warnings = append(r.warnings, fmt.Sprintf("GitHub's answer to creating the issue was lost; found %s on a re-read", issue.Ref{Repo: repo, Number: found.Number}.String(def)))
 	}
 	var missing []string // label IDs the found issue lacks
 	setMilestone := false
@@ -742,6 +789,7 @@ func (r *newRun) run(ctx context.Context) error {
 		for _, l := range labels {
 			if !slices.ContainsFunc(found.labels, func(n string) bool { return strings.EqualFold(n, l.Name) }) {
 				missing = append(missing, l.ID)
+				r.labelsMissing = append(r.labelsMissing, l.Name)
 			}
 		}
 		// A milestone the issue already has stays, like its status: someone
@@ -783,6 +831,10 @@ func (r *newRun) run(ctx context.Context) error {
 					r.name(), r.parentName(found.parent), parentFlag, p.Ref.Arg(def), r.number, repo, arg))
 			}
 		}
+	}
+	if r.opts.DryRun {
+		r.planDry(milestone, setMilestone, initial, nc.Links, nc.Parent, addParent)
+		return nil
 	}
 
 	if len(missing) > 0 {
@@ -1189,6 +1241,133 @@ func (r *newRun) confirm() string {
 		title = r.opts.Title
 	}
 	return render.Confirm(r.name(), title, effects...)
+}
+
+// planDry fills the run's fields as a run that writes would leave them,
+// for a dry run: the issue created with the labels, milestone and parent,
+// or the resumed one finished as run would finish it; on the board,
+// unarchived, in the initial status unless a resumed issue has one, and
+// blocked by links, those it lacks (linked) apart from those it has
+// (linkedFound).
+func (r *newRun) planDry(milestone *newMilestone, setMilestone bool, initial *board.Option, links []*issue.Linked, parent, addParent *issue.Linked) {
+	if !r.resumed {
+		r.milestone, r.milestoneSet = milestone, milestone != nil
+		if parent != nil {
+			r.parent, r.parentSet = &parent.Ref, true
+		}
+		r.linked = links
+	} else {
+		if setMilestone {
+			r.milestone, r.milestoneSet = milestone, true
+		}
+		if addParent != nil {
+			r.parent, r.parentSet = &addParent.Ref, true
+		}
+		for _, l := range links {
+			if l.Blocks(r.id) {
+				r.linkedFound = append(r.linkedFound, l)
+			} else {
+				r.linked = append(r.linked, l)
+			}
+		}
+	}
+	r.added = r.itemID == ""
+	r.unarchived = r.archived
+	if initial != nil && (!r.resumed || r.status == "") {
+		r.status, r.statusSet = initial.Name, true
+	}
+}
+
+// dryRun is the plan a dry run prints, from the fields planDry filled:
+//
+//	dry run: new "Fix login redirect"
+//	  create: in Trum-ok/gh-dojo
+//	  labels: bug, area:cli
+//	  milestone: v1.2
+//	  add to the board
+//	  status: no status → Backlog
+//	  blocked by: #12 and #13
+//	  sub-issue of: #40
+//
+// and for an issue an earlier run created, what finishing it would do:
+//
+//	dry run: new #57 "Fix login redirect"
+//	  create: already created by an earlier run; finishes it
+//	  labels: +area:cli (bug already in place)
+//	  milestone: v1.1 kept, not v1.2
+//	  status: Backlog (unchanged)
+//	  blocked by: #13 (#12 already linked)
+func (r *newRun) dryRun() string {
+	var b strings.Builder
+	line := func(s string) { b.WriteString("\n  " + s) }
+	if r.resumed {
+		b.WriteString(render.Confirm("dry run: new "+r.name(), r.title))
+		line("create: already created by an earlier run; finishes it")
+	} else {
+		b.WriteString(render.Confirm("dry run: new", r.opts.Title))
+		line("create: in " + r.repo.String())
+	}
+	inPlace := len(r.labels) - len(r.labelsMissing)
+	switch {
+	case !r.resumed && len(r.labels) > 0:
+		line("labels: " + strings.Join(r.labels, ", "))
+	case len(r.labelsMissing) > 0 && inPlace > 0:
+		var have []string
+		for _, l := range r.labels {
+			if !slices.Contains(r.labelsMissing, l) {
+				have = append(have, l)
+			}
+		}
+		line("labels: +" + strings.Join(r.labelsMissing, " +") + " (" + strings.Join(have, ", ") + " already in place)")
+	case len(r.labelsMissing) > 0:
+		line("labels: +" + strings.Join(r.labelsMissing, " +"))
+	case len(r.labels) > 0:
+		line("labels: " + strings.Join(r.labels, ", ") + " already in place")
+	}
+	switch {
+	case r.milestoneKept != "" && r.milestone != nil:
+		line("milestone: " + singleLine(r.milestone.Title) + " kept, not " + singleLine(r.milestoneKept))
+	case r.milestoneSet && r.resumed:
+		line("milestone: none → " + singleLine(r.milestone.Title))
+	case r.milestoneSet:
+		line("milestone: " + singleLine(r.milestone.Title))
+	case r.opts.Milestone != "" && r.milestone != nil:
+		line("milestone: " + singleLine(r.milestone.Title) + " already set")
+	}
+	if r.added {
+		line(workflow.AddToBoard{}.Describe())
+	}
+	if r.unarchived {
+		line(workflow.Unarchive{}.Describe())
+	}
+	switch {
+	case r.statusSet:
+		line("status: " + render.Transition("", r.status))
+	case r.status != "":
+		line("status: " + render.Transition(r.status, r.status))
+	case r.noInitial:
+		line("status: none set (statuses.initial is not set)")
+	}
+	switch {
+	case len(r.linked) > 0 && len(r.linkedFound) > 0:
+		line("blocked by: " + joinRefs(r.linked, r.def) + " (" + joinRefs(r.linkedFound, r.def) + " already linked)")
+	case len(r.linked) > 0:
+		line("blocked by: " + joinRefs(r.linked, r.def))
+	case len(r.linkedFound) > 0:
+		line("blocked by: " + joinRefs(r.linkedFound, r.def) + " already linked")
+	}
+	switch {
+	case r.opts.Parent == nil:
+	case r.parentKept != nil && r.parentHidden:
+		line("sub-issue of: a parent not readable, kept, not " + r.parentKept.String(r.def))
+	case r.parentKept != nil:
+		line("sub-issue of: " + r.parentName(r.parent) + " kept, not " + r.parentKept.String(r.def))
+	case r.parentSet:
+		line("sub-issue of: " + r.parentName(r.parent))
+	case r.parent != nil:
+		line("sub-issue of: " + r.parentName(r.parent) + " already")
+	}
+	return b.String()
 }
 
 // name is how output names the issue: "#57", or "owner/repo#57" outside

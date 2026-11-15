@@ -30,6 +30,25 @@ func TestComment(t *testing.T) {
 	}
 }
 
+// TestCommentDryRun: the dry run reads the card and posts nothing (the
+// fixtures have no AddComment to answer): the text it would post, or that
+// it is the last comment already.
+func TestCommentDryRun(t *testing.T) {
+	withConfig(t, dojoConfig)
+	withApp(t, boardFixture, card3Fixture)
+	code, out := runOut("comment", "3", "Reproduced on main.", "--dry-run")
+	testutil.Golden(t, "comment/dry_run", out)
+	if code != render.ExitOK {
+		t.Errorf("code = %d", code)
+	}
+	withApp(t, boardFixture, commentPostedCard)
+	code, out = runOut("comment", "3", "Reproduced on main.", "--dry-run", "--json")
+	testutil.Golden(t, "comment/dry_run_present_json", out)
+	if code != render.ExitOK {
+		t.Errorf("code = %d", code)
+	}
+}
+
 // TestCommentRepeat: the latest gh-dojo comment already has the text, so
 // nothing is posted (the fixtures have no AddComment to answer).
 func TestCommentRepeat(t *testing.T) {

@@ -22,6 +22,8 @@ import (
 // removeBlockedBy per link to change; none when every link is already as
 // asked. The board is not read. A repeat is safe: a link already there
 // (block) or already gone (unblock) is skipped, and the line says so.
+// --dry-run reads and checks the same, and prints the plan instead of
+// writing.
 
 func init() {
 	register(func() (*cobra.Command, error) { return newLinkCmd(true), nil })
@@ -32,7 +34,10 @@ func init() {
 const byFlag = "by"
 
 func newLinkCmd(add bool) *cobra.Command {
-	var bys []string
+	var (
+		bys    []string
+		dryRun bool
+	)
 	name, short, long := "block", "Mark an issue blocked by other issues, without changing its status",
 		`Mark issue N blocked by the issues --by names, without changing its status.
 
@@ -41,14 +46,16 @@ owner/repo#12 or the issue's URL; repeat --by, or separate the issues
 with commas. A link already there is not an error: the line
 says "already". An issue that does not exist, or a pull request, fails
 before anything is written (exit code 3); so does, with exit code 1, a
-blocker that N already blocks: GitHub refuses cycles.
+blocker that N already blocks: GitHub refuses cycles. --dry-run checks the
+same and prints the plan without changing anything.
 
 A blocker stops blocking once it is closed or in a resolved status
 (statuses.resolved); a verb with blockers = "warn" or "deny" checks that,
 and gh dojo show lists the unresolved blockers first.`
 	example := `  gh dojo block 42 --by 17
   gh dojo block 42 --by 17,18 --by acme/api#7
-  gh dojo block acme/api#7 --by 42`
+  gh dojo block acme/api#7 --by 42
+  gh dojo block 42 --by 17 --dry-run`
 	if !add {
 		name, short, long = "unblock", "Remove blocked-by links of an issue, without changing its status",
 			`Remove the blocked-by links between issue N and the issues --by names,
@@ -58,8 +65,10 @@ N and --by take 12, "#12" (the default repository, board.repos[0]),
 owner/repo#12 or the issue's URL; repeat --by, or separate the issues
 with commas. A link already gone is not an error: the line
 says "already". An issue that does not exist fails before anything is
-written (exit code 3).`
-		example = `  gh dojo unblock 42 --by 17`
+written (exit code 3). --dry-run prints the plan without changing
+anything.`
+		example = `  gh dojo unblock 42 --by 17
+  gh dojo unblock 42 --by 17 --dry-run`
 	}
 	cmd := &cobra.Command{
 		Use:     name + " <N> --by <M>...",
@@ -69,7 +78,7 @@ written (exit code 3).`
 		Args:    issueArg,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ref, _ := parseRef(args[0]) // validated by issueArg
-			res, err := runLinks(cmd, add, ref, bys)
+			res, err := runLinks(cmd, add, ref, bys, dryRun)
 			if res == nil { // nothing done
 				return err
 			}
@@ -77,6 +86,7 @@ written (exit code 3).`
 		},
 	}
 	cmd.Flags().StringArrayVar(&bys, byFlag, nil, "the blocking `issue`: 12, \"#12\", owner/repo#12 or its URL; repeatable, or comma-separated")
+	cmd.Flags().BoolVar(&dryRun, dryRunFlag, false, "print the plan without changing anything")
 	return cmd
 }
 
@@ -139,7 +149,10 @@ func parseBlockers(values []string, flag string, def issue.Repo, target issue.Re
 //
 //	#42 blocked by #17 and acme/api#7, already blocked by #18
 //	acme/api#7 no longer blocked by #17, already not blocked by #18
-func runLinks(cmd *cobra.Command, add bool, ref issue.Ref, bys []string) (*linksResult, error) {
+//
+// A dry run reads and checks the same and returns the plan, writing
+// nothing (see linksResult.write).
+func runLinks(cmd *cobra.Command, add bool, ref issue.Ref, bys []string, dryRun bool) (*linksResult, error) {
 	help := cmd.CommandPath() + " --help"
 	arg := ref.Arg(issue.Repo{}) // as given
 	noBy := func() error {
@@ -192,6 +205,12 @@ func runLinks(cmd *cobra.Command, add bool, ref issue.Ref, bys []string) (*links
 			Changed: refList(done, repo), Unchanged: refList(same, repo), Missed: refList(missed, repo),
 			line: line(done), err: err,
 		}
+	}
+	if dryRun {
+		res := result(change, nil, nil)
+		res.DryRun = true
+		res.line = linksDryRun(add, name, target.Title, repo, change, same)
+		return res, nil
 	}
 	if len(change) == 0 {
 		return result(nil, nil, nil), nil
@@ -253,6 +272,9 @@ type linksResult struct {
 	Number int    `json:"number"`
 	Repo   string `json:"repo"`   // the issue's repository
 	Action string `json:"action"` // block or unblock
+	// DryRun: nothing was written, and Changed are the blockers to link or
+	// unlink.
+	DryRun bool `json:"dry_run"`
 	// Changed are the blockers linked (block) or unlinked (unblock) now,
 	// Unchanged those already as asked, Missed those a partial write left
 	// as they were (see the top-level "error"), each as owner/name#12.
@@ -260,7 +282,7 @@ type linksResult struct {
 	Unchanged []string `json:"unchanged"`
 	Missed    []string `json:"missed"`
 
-	line string // the confirmation line
+	line string // the confirmation line, or the plan of a dry run
 	err  error  // what stopped a partial write
 }
 
@@ -324,6 +346,32 @@ func linksConfirm(add bool, name string, repo issue.Repo, done, same []*issue.Li
 		parts = append(parts, "already not blocked by "+joinRefs(same, repo))
 	}
 	return render.Confirm(name, "", parts...)
+}
+
+// linksDryRun is the plan of block (add) or unblock for the issue name
+// names, titled title: the links to change, then those as asked already
+// (same), named relative to repo.
+//
+//	dry run: block #42 "Fix login redirect"
+//	  blocked by: #17 and acme/api#7
+//	  blocked by: #18 already linked
+//	dry run: unblock #42 "Fix login redirect"
+//	  unlink blocked by: #17
+//	  blocked by: #18 already not linked
+func linksDryRun(add bool, name, title string, repo issue.Repo, change, same []*issue.Linked) string {
+	verb, do, done := "block", "blocked by: ", " already linked"
+	if !add {
+		verb, do, done = "unblock", "unlink blocked by: ", " already not linked"
+	}
+	var b strings.Builder
+	b.WriteString(render.Confirm("dry run: "+verb+" "+name, title))
+	if len(change) > 0 {
+		b.WriteString("\n  " + do + joinRefs(change, repo))
+	}
+	if len(same) > 0 {
+		b.WriteString("\n  blocked by: " + joinRefs(same, repo) + done)
+	}
+	return b.String()
 }
 
 // joinRefs lists linked issues as "#12", "#12 and #13", "#12, #13 and #14".

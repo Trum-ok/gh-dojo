@@ -11,6 +11,7 @@ code: 5
   "number": 3,
   "repo": "Trum-ok/gh-dojo",
   "action": "block",
+  "dry_run": false,
   "changed": [
     "Trum-ok/gh-dojo#2"
   ],

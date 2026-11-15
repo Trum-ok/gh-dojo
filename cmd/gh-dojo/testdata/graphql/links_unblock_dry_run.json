@@ -1,0 +1,93 @@
+{
+  "comment": "A dry run reads and writes nothing. From links_unblock.json, its first read alone: Hand-crafted from internal/issue/testdata/graphql/links_3.json (recorded: #2 blocks #3, #26 does not); mutations are never sent to GitHub, their payloads follow the GraphQL schema (addBlockedBy.issue, removeBlockedBy.issue). gh dojo unblock 3 --by 2 --by 26: one mutation removes #2; the repeat finds neither linked.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "IssueLinks",
+      "query": "query IssueLinks($owner: String!, $repo: String!, $number: Int!, $link0Owner: String!, $link0Repo: String!, $link0Number: Int!, $link1Owner: String!, $link1Repo: String!, $link1Number: Int!) {\n  repository(owner: $owner, name: $repo) {\n    nameWithOwner\n    issueOrPullRequest(number: $number) { __typename ... on Issue { id title blockedBy(first: 50) { nodes { id } } } }\n  }\n  link0: repository(owner: $link0Owner, name: $link0Repo) {\n    nameWithOwner\n    issueOrPullRequest(number: $link0Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } } }\n  }\n  link1: repository(owner: $link1Owner, name: $link1Repo) {\n    nameWithOwner\n    issueOrPullRequest(number: $link1Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } } }\n  }\n}",
+      "variables": {
+        "link0Number": 2,
+        "link0Owner": "Trum-ok",
+        "link0Repo": "gh-dojo",
+        "link1Number": 26,
+        "link1Owner": "Trum-ok",
+        "link1Repo": "gh-dojo",
+        "number": 3,
+        "owner": "Trum-ok",
+        "repo": "gh-dojo"
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "nameWithOwner": "Trum-ok/gh-dojo",
+            "issueOrPullRequest": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8AAAABeZKr9A",
+              "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)",
+              "blockedBy": {
+                "nodes": [
+                  {
+                    "id": "I_kwDOVq9iIs8AAAABeZKieQ"
+                  }
+                ]
+              }
+            }
+          },
+          "link0": {
+            "nameWithOwner": "Trum-ok/gh-dojo",
+            "issueOrPullRequest": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8AAAABeZKieQ",
+              "title": "Коды выхода и короткие ошибки (internal/render)",
+              "state": "OPEN",
+              "blocking": {
+                "nodes": [
+                  {
+                    "id": "I_kwDOVq9iIs8AAAABeZL4lg"
+                  },
+                  {
+                    "id": "I_kwDOVq9iIs8AAAABeZLtRg"
+                  },
+                  {
+                    "id": "I_kwDOVq9iIs8AAAABeZLhqw"
+                  },
+                  {
+                    "id": "I_kwDOVq9iIs8AAAABeZLXnw"
+                  },
+                  {
+                    "id": "I_kwDOVq9iIs8AAAABeZK-9Q"
+                  },
+                  {
+                    "id": "I_kwDOVq9iIs8AAAABeZKr9A"
+                  }
+                ]
+              },
+              "blockedBy": {
+                "nodes": []
+              }
+            }
+          },
+          "link1": {
+            "nameWithOwner": "Trum-ok/gh-dojo",
+            "issueOrPullRequest": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8AAAABeb-QYw",
+              "title": "Блокеры: block/unblock, new --blocked-by, проверка blockers, эффект blockers",
+              "state": "OPEN",
+              "blocking": {
+                "nodes": [
+                  {
+                    "id": "I_kwDOVq9iIs8AAAABeb-zgQ"
+                  }
+                ]
+              },
+              "blockedBy": {
+                "nodes": []
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

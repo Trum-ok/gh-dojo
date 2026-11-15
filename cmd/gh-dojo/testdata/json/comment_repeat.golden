@@ -5,6 +5,7 @@ code: 0
   "error": null,
   "number": 3,
   "repo": "Trum-ok/gh-dojo",
+  "dry_run": false,
   "posted": false
 }
 

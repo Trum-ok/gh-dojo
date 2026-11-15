@@ -7,6 +7,7 @@ require (
 	github.com/cli/go-gh/v2 v2.17.0
 	github.com/rivo/uniseg v0.4.7
 	github.com/spf13/cobra v1.10.2
+	github.com/spf13/pflag v1.0.9
 )
 
 require (
@@ -44,7 +45,6 @@ require (
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/spf13/cast v1.7.0 // indirect
-	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/thlib/go-timezone-local v0.0.9 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	golang.org/x/crypto v0.53.0 // indirect

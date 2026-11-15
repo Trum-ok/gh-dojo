@@ -205,6 +205,11 @@ func Build(ops []workflow.Op, ids IDs) (*Mutation, error) {
 			field = "reopenIssue(input: {issueId: $issue}) { issue { id } }"
 		case workflow.SetMilestone:
 			alias = AliasMilestone
+			if op.To == "" { // out of its milestone
+				err = declare("issue", "ID!", ids.Issue)
+				field = "updateIssue(input: {id: $issue, milestoneId: null}) { issue { id } }"
+				break
+			}
 			err = firstErr(declare("issue", "ID!", ids.Issue), declare("milestone", "ID!", ids.Milestone))
 			field = "updateIssue(input: {id: $issue, milestoneId: $milestone}) { issue { id } }"
 		case workflow.AddLabels:
@@ -439,7 +444,7 @@ func isNull(v json.RawMessage) bool {
 // changed", "labels not added", "labels not removed", "not assigned",
 // "not unassigned", "not blocked by #12", "comment not posted", "not closed", "sprint not
 // set", "sprint not cleared", "Priority not set", "Priority and Estimate
-// not set", "milestone not set".
+// not set", "milestone not set", "milestone not cleared".
 func Missed(op workflow.Op) string {
 	switch op := op.(type) {
 	case workflow.AddToBoard:
@@ -451,6 +456,9 @@ func Missed(op workflow.Op) string {
 	case workflow.SetStatus:
 		return "status not changed"
 	case workflow.SetMilestone:
+		if op.To == "" {
+			return "milestone not cleared"
+		}
 		return "milestone not set"
 	case workflow.AddLabels:
 		return "labels not added"

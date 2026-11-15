@@ -6,6 +6,7 @@ code: 0
   "number": 3,
   "repo": "Trum-ok/gh-dojo",
   "action": "unblock",
+  "dry_run": false,
   "changed": [
     "Trum-ok/gh-dojo#2"
   ],

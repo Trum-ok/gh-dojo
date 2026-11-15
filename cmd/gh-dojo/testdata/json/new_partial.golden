@@ -11,6 +11,7 @@ code: 5
   "number": 15,
   "repo": "Trum-ok/gh-dojo",
   "title": "Fix login redirect",
+  "dry_run": false,
   "created": true,
   "labels": [
     "bug",

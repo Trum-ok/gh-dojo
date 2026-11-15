@@ -1,0 +1,4 @@
+code: 0
+--- stdout
+{"schema_version":1,"error":null,"verb":"plan","default_repo":"Trum-ok/gh-dojo","dry_run":false,"issues":[{"number":3,"repo":"Trum-ok/gh-dojo","title":"Конфиг: загрузка и валидация .github/dojo.toml (internal/config)","outcome":"unchanged","planned":[],"applied":[],"in_place":[{"op":"set_milestone","from":null,"to":null},{"op":"add_comment","body":null}],"needs_yes":false,"warnings":[],"error":null,"card":null}],"summary":{"total":1,"done":1,"written":0,"failed":0,"not_attempted":0}}
+--- stderr

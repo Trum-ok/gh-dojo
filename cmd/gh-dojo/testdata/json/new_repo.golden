@@ -1,4 +1,4 @@
 code: 0
 --- stdout
-{"schema_version":1,"error":null,"number":15,"repo":"acme/api","title":"Fix login redirect","created":true,"labels":["bug","area:cli"],"status":"Backlog","status_set":true,"unarchived":false,"milestone":null,"milestone_set":false,"blocked_by":[],"already_blocked_by":[],"parent":null,"parent_set":false}
+{"schema_version":1,"error":null,"number":15,"repo":"acme/api","title":"Fix login redirect","dry_run":false,"created":true,"labels":["bug","area:cli"],"status":"Backlog","status_set":true,"unarchived":false,"milestone":null,"milestone_set":false,"blocked_by":[],"already_blocked_by":[],"parent":null,"parent_set":false}
 --- stderr

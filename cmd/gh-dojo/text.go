@@ -14,6 +14,10 @@ import (
 // bodyFileFlag names the flag that reads text from a file, "-" for stdin.
 const bodyFileFlag = "body-file"
 
+// dryRunFlag names the flag of every command that writes to GitHub that
+// prints its plan instead of writing.
+const dryRunFlag = "dry-run"
+
 // maxTextBytes caps text read from a file or stdin: GitHub rejects issue
 // and comment bodies longer than 65536 characters anyway.
 const maxTextBytes = 256 << 10

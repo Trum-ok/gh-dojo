@@ -125,6 +125,34 @@ func TestNewRepo(t *testing.T) {
 	}
 }
 
+// TestNewMilestoneDryRun: the dry run reads as the run does and writes
+// nothing; its JSON says what would be, with no number yet.
+func TestNewMilestoneDryRun(t *testing.T) {
+	withConfig(t, dojoConfig)
+	srv := withApp(t, boardFixture, "testdata/graphql/new_milestone_dry_run.json")
+	before := warmSchema(t, srv)
+	code, out := runOut(append(slices.Clone(newFixArgs), "--milestone", "v0.1", "--dry-run", "--json")...)
+	testutil.Golden(t, "new/milestone_dry_run_json", out)
+	if code != render.ExitOK {
+		t.Errorf("code = %d", code)
+	}
+	if n := srv.Requests() - before; n != 1 {
+		t.Errorf("requests with a warm schema = %d, want 1 (read)", n)
+	}
+}
+
+// TestNewMilestoneNone: --milestone none, as for a verb, is no milestone:
+// the same requests and line as without it.
+func TestNewMilestoneNone(t *testing.T) {
+	withConfig(t, dojoConfig)
+	withApp(t, boardFixture, newSuccessFixture)
+	code, out := runOut(append(slices.Clone(newFixArgs), "--milestone", "None")...)
+	testutil.Golden(t, "new/success", out)
+	if code != render.ExitOK {
+		t.Errorf("code = %d", code)
+	}
+}
+
 func TestNewBodyFromStdin(t *testing.T) {
 	withConfig(t, dojoConfig)
 	withApp(t, boardFixture, newSuccessFixture) // the same body, so the same CreateIssue variables

@@ -138,8 +138,9 @@ type SetFields struct {
 	Changes []FieldChange
 }
 
-// SetMilestone puts the issue in the open milestone titled To. From is
-// the title of the milestone it had, "" for none.
+// SetMilestone puts the issue in the open milestone titled To, or takes
+// it out of its milestone for To "". From is the title of the milestone it
+// had, "" for none.
 type SetMilestone struct {
 	From, To string
 }

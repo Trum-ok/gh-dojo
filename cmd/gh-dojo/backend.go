@@ -351,7 +351,10 @@ func verbLookup(v config.Verb, a workflow.Args) issue.Lookup {
 		l.User = login
 	}
 	l.Milestone = v.Milestone
-	if v.MilestoneArg {
+	switch {
+	case workflow.ClearsMilestone(v, a): // no milestone to look up
+		l.Milestone = ""
+	case v.MilestoneArg:
 		l.Milestone = strings.TrimSpace(a.Milestone)
 	}
 	return l

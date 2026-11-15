@@ -7,7 +7,8 @@ owner/repo#12 or the issue's URL; repeat --by, or separate the issues
 with commas. A link already there is not an error: the line
 says "already". An issue that does not exist, or a pull request, fails
 before anything is written (exit code 3); so does, with exit code 1, a
-blocker that N already blocks: GitHub refuses cycles.
+blocker that N already blocks: GitHub refuses cycles. --dry-run checks the
+same and prints the plan without changing anything.
 
 A blocker stops blocking once it is closed or in a resolved status
 (statuses.resolved); a verb with blockers = "warn" or "deny" checks that,
@@ -20,9 +21,11 @@ Examples:
   gh dojo block 42 --by 17
   gh dojo block 42 --by 17,18 --by acme/api#7
   gh dojo block acme/api#7 --by 42
+  gh dojo block 42 --by 17 --dry-run
 
 Flags:
       --by issue   the blocking issue: 12, "#12", owner/repo#12 or its URL; repeatable, or comma-separated
+      --dry-run    print the plan without changing anything
   -h, --help       help for block
 
 Global Flags:

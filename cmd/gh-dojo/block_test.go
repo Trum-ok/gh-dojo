@@ -67,6 +67,18 @@ func TestBlockOtherRepo(t *testing.T) {
 	)
 }
 
+// TestBlockDryRun: block and unblock --dry-run read as the run does and
+// write nothing: the links to change, then those as asked already, in
+// the text and the JSON.
+func TestBlockDryRun(t *testing.T) {
+	srv, before := withLinksApp(t, verbFixture("links_block_dry_run"))
+	checkLinkRuns(t, srv, before,
+		runs{[]string{"block", "3", "--by", "2,26", "--dry-run"}, render.ExitOK, 1, "block_dry_run"})
+	srv, before = withLinksApp(t, verbFixture("links_unblock_dry_run"))
+	checkLinkRuns(t, srv, before,
+		runs{[]string{"unblock", "3", "--by", "2", "--by", "26", "--dry-run", "--json"}, render.ExitOK, 1, "unblock_dry_run_json"})
+}
+
 func TestUnblock(t *testing.T) {
 	srv, before := withLinksApp(t, verbFixture("links_unblock"))
 	checkLinkRuns(t, srv, before,
@@ -221,12 +233,32 @@ func TestVerbWaitLinkErrors(t *testing.T) {
 }
 
 // TestNewBlockedBy: the --blocked-by issue is read with new's context and
-// linked in the status mutation: still 4 requests.
+// linked in the status mutation: still 4 requests. --by, as wait and block
+// call it, is the same flag.
 func TestNewBlockedBy(t *testing.T) {
+	for _, flag := range []string{"--blocked-by", "--by"} {
+		t.Run(flag, func(t *testing.T) {
+			withConfig(t, dojoConfig)
+			srv := withApp(t, boardFixture, verbFixture("new_blocked_by"))
+			before := warmSchema(t, srv)
+			checkLinkRuns(t, srv, before, runs{append(slices.Clone(newFixArgs), flag, "26"), render.ExitOK, 4, "new"})
+		})
+	}
+}
+
+// TestNewBlockedByDryRun: new --dry-run reads as the run does and writes
+// nothing: the issue to create with its link; for one an earlier run
+// created, what finishing it would do, here the link alone.
+func TestNewBlockedByDryRun(t *testing.T) {
 	withConfig(t, dojoConfig)
-	srv := withApp(t, boardFixture, verbFixture("new_blocked_by"))
+	srv := withApp(t, boardFixture, verbFixture("new_blocked_by_dry_run"))
 	before := warmSchema(t, srv)
-	checkLinkRuns(t, srv, before, runs{append(slices.Clone(newFixArgs), "--blocked-by", "26"), render.ExitOK, 4, "new"})
+	checkLinkRuns(t, srv, before,
+		runs{append(slices.Clone(newFixArgs), "--by", "26", "--dry-run"), render.ExitOK, 1, "new_dry_run"})
+	srv = withApp(t, boardFixture, verbFixture("new_blocked_by_resume_dry_run"))
+	before = warmSchema(t, srv)
+	checkLinkRuns(t, srv, before,
+		runs{append(slices.Clone(newFixArgs), "--blocked-by", "#26", "--dry-run"), render.ExitOK, 1, "new_resume_dry_run"})
 }
 
 // TestNewBlockedByResume: a re-run finds the issue done but unlinked and

@@ -178,6 +178,11 @@ Every command is checked against these rules.
 - **No MCP server.** The target agents have a shell, and a CLI costs fewer
   tokens and works in any of them. A local MCP server would only serve agents
   without a shell; revisit if one asks.
+- **Every command that writes to GitHub takes `--dry-run`** (verbs,
+  `release`, `new`, `comment`, `block`, `unblock`; `init` for its file):
+  agents carry the flag from one command to the next (#60). It reads and
+  checks what the run does and prints the plan; its JSON has `dry_run`.
+  A new command that writes gets it too.
 - **`release` goes through pull requests**, so it works with any merge
   strategy (squash, merge, rebase); commit keywords are the fallback.
 - **The generated skill is loaded into every session, so it repeats

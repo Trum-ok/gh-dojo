@@ -335,8 +335,12 @@ rejected with "not supported in this version".
   a match, so a repeat still finds it in place once that milestone is
   closed. Otherwise only open milestones count: a start of a title picks an
   open milestone even when a closed one has exactly that title. The open
-  milestones come with the issue's read (the rest page by page past 100). A verb cannot clear a
-  milestone. [`gh dojo doctor`](commands.md#doctor) checks that each title
+  milestones come with the issue's read (the rest page by page past 100).
+  `--milestone none` (in any case) takes the issue out of its milestone,
+  with no milestones read: `milestone v0.3 → none`, `{milestone}` is
+  `none`, and an issue without one has it in place; `none` always means
+  that, even with a milestone titled so. A title of the config always
+  names a milestone. [`gh dojo doctor`](commands.md#doctor) checks that each title
   of the config matches one open milestone of the default repository;
   [`release`](commands.md#release) cannot run a verb with
   `milestone = "{milestone}"`, which needs `--milestone`.

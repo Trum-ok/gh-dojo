@@ -172,8 +172,8 @@ func newVerbCmd(cfg *config.Config, v config.Verb) *cobra.Command {
 	}
 	f.StringVar(&args.By, config.ArgBy, "", byUsage)
 	f.StringVar(&args.Assignee, config.ArgAssignee, "", "the user to assign: a login, or @me for yourself")
-	f.StringVar(&args.Milestone, config.ArgMilestone, "", "the open milestone to set, by `title` or a start only its title has")
-	f.BoolVar(&dryRun, "dry-run", false, "print the plan without changing anything")
+	f.StringVar(&args.Milestone, config.ArgMilestone, "", "the open milestone to set, by `title` or a start only its title has; "+workflow.NoMilestone+" takes the issue out of its milestone")
+	f.BoolVar(&dryRun, dryRunFlag, false, "print the plan without changing anything")
 	f.BoolVar(&show, showFlag, false, "also print the issue's card, as gh dojo show N does, from the same read")
 	f.BoolVar(&args.Yes, "yes", false, "the user agreed: run a verb that is the user's decision")
 	// Flags the verb does not take stay registered but hidden, so passing
@@ -659,7 +659,8 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 	case v.MilestoneArg:
 		line("Milestone", "the open milestone --%s names, by title or a start only its title has;", config.ArgMilestone)
 		line("", "an issue in it already keeps it, so a repeat is safe")
-		line("", "no such milestone, or several, is exit code 1, with the open ones or the candidates")
+		line("", "no such milestone, or several, is exit code 1, with the open ones or the candidates;")
+		line("", "--%s %s takes the issue out of its milestone", config.ArgMilestone, workflow.NoMilestone)
 	case v.Milestone != "":
 		line("Milestone", "%s (an open milestone, by title or a start only its title has);", v.Milestone)
 		line("", "an issue in it already keeps it, so a repeat is safe")

@@ -13,7 +13,8 @@ The issue moves to another stage
   Board:     adds the issue if it is not there
   Milestone: the open milestone --milestone names, by title or a start only its title has;
              an issue in it already keeps it, so a repeat is safe
-             no such milestone, or several, is exit code 1, with the open ones or the candidates
+             no such milestone, or several, is exit code 1, with the open ones or the candidates;
+             --milestone none takes the issue out of its milestone
   Comment:   posted unless it renders empty or is already the latest gh-dojo comment:
                Moved to {milestone}.
 
@@ -23,7 +24,7 @@ Usage:
 Flags:
       --dry-run           print the plan without changing anything
   -h, --help              help for plan
-      --milestone title   the open milestone to set, by title or a start only its title has
+      --milestone title   the open milestone to set, by title or a start only its title has; none takes the issue out of its milestone
       --show              also print the issue's card, as gh dojo show N does, from the same read
 
 Global Flags:

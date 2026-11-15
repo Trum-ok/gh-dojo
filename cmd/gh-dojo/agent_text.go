@@ -10,6 +10,7 @@ import (
 	"github.com/Trum-ok/gh-dojo/internal/agent"
 	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/render"
+	"github.com/Trum-ok/gh-dojo/internal/workflow"
 	"github.com/spf13/cobra"
 )
 
@@ -373,7 +374,8 @@ func (d *agentDoc) rules(v config.Verb) []string {
 	}
 	if v.MilestoneArg {
 		r = append(r, fmt.Sprintf("`--%s <title>`, or a start only that title has (`--%s v1.2`): ask the user "+
-			"which milestone if you do not know.", config.ArgMilestone, config.ArgMilestone))
+			"which milestone if you do not know. `--%s %s` takes the issue out of its milestone.",
+			config.ArgMilestone, config.ArgMilestone, config.ArgMilestone, workflow.NoMilestone))
 	}
 	if v.Batch {
 		// A release finishes issues: only a verb that does is pointed there.

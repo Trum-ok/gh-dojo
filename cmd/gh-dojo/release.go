@@ -79,7 +79,7 @@ func newReleaseCmd() (*cobra.Command, error) {
 	f.StringVar(&o.since, "since", "", "where the release starts, a tag, branch or commit; default: the previous version tag")
 	f.StringArrayVar(&o.exclude, "exclude", nil,
 		"an `issue` found to leave out, by a pull request or a message: 12, \"#12\", owner/repo#12 or its URL; repeatable, or comma-separated")
-	f.BoolVar(&o.dryRun, "dry-run", false, "list the issues, how each was found and its plan, without changing anything")
+	f.BoolVar(&o.dryRun, dryRunFlag, false, "list the issues, how each was found and its plan, without changing anything")
 	f.BoolVar(&o.args.Yes, "yes", false, "the user agreed: for a verb that is the user's decision")
 	f.StringVar(&o.args.Comment, config.ArgComment, "", "text for {comment} in the verb's comment, for every issue")
 	f.StringVar(&o.args.By, config.ArgBy, "", "value for {by} in the verb's comment, for every issue")

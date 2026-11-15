@@ -1,0 +1,6 @@
+code: 0
+--- stdout
+dry run: block #3 "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)"
+  blocked by: #26
+  blocked by: #2 already linked
+--- stderr
