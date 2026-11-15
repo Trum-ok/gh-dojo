@@ -24,15 +24,20 @@ const milestonesQuery = `query RepoMilestones($owner: String!, $repo: String!, $
   }
 }`
 
-// ReadMilestones reads all open milestones of repo, oldest first, page by
-// page: for a repository with more than MilestonesSelection reads.
-func ReadMilestones(ctx context.Context, q graph.Querier, repo Repo) ([]OpenMilestone, error) {
+// ReadMilestones reads the open milestones of repo after the cursor after,
+// oldest first, page by page: for a repository with more than
+// MilestonesSelection reads, after is that page's endCursor, and the
+// result its continuation. "" reads them all.
+func ReadMilestones(ctx context.Context, q graph.Querier, repo Repo, after string) ([]OpenMilestone, error) {
 	type resp struct {
 		Repository *struct {
 			Milestones graph.Connection[OpenMilestone] `json:"milestones"`
 		} `json:"repository"`
 	}
 	vars := map[string]any{"owner": repo.Owner, "repo": repo.Name}
+	if after != "" {
+		vars["cursor"] = after
+	}
 	page, err := graph.Paginate(ctx, q, milestonesQuery, vars, 0, func(r *resp) *graph.Connection[OpenMilestone] {
 		if r.Repository == nil {
 			return nil
@@ -49,6 +54,14 @@ func ReadMilestones(ctx context.Context, q graph.Querier, repo Repo) ([]OpenMile
 // that several open milestones' titles start with; test for it with
 // errors.Is.
 var ErrAmbiguousMilestone = errors.New("ambiguous milestone")
+
+// SameMilestone reports whether title, as given to a verb or new, names
+// the milestone titled current exactly, regardless of case: an issue in
+// that milestone has it already, even once the milestone is closed and
+// MatchMilestone no longer finds it among the open ones.
+func SameMilestone(current, title string) bool {
+	return current != "" && strings.EqualFold(current, title)
+}
 
 // MatchMilestone returns the milestone of open, the open milestones of
 // repo, that title names: the one titled so regardless of case (spelled

@@ -53,6 +53,21 @@ func TestMatchMilestone(t *testing.T) {
 			t.Errorf("%q:\ngot  %s\nwant %s", tt.title, got, tt.want)
 		}
 	}
+	// A whole title wins over a longer one it starts, in any case.
+	both := []issue.OpenMilestone{{ID: "MI_31", Title: "v0.3.1"}, {ID: "MI_3", Title: "v0.3"}}
+	for _, title := range []string{"v0.3", "V0.3"} {
+		if m, err := issue.MatchMilestone(title, both, repo); err != nil || m.ID != "MI_3" {
+			t.Errorf("%q among v0.3.1 and v0.3: %+v, %v; want v0.3", title, m, err)
+		}
+	}
+	if m, err := issue.MatchMilestone("v0.3.", both, repo); err != nil || m.ID != "MI_31" {
+		t.Errorf("%q: %+v, %v; want v0.3.1", "v0.3.", m, err)
+	}
+	for current, want := range map[string]bool{"v0.3 — расширяемость": true, "V0.3 — РАСШИРЯЕМОСТЬ": true, "v0.3": false, "": false} {
+		if got := issue.SameMilestone(current, "v0.3 — расширяемость"); got != want {
+			t.Errorf("SameMilestone(%q) = %v, want %v", current, got, want)
+		}
+	}
 	_, err := issue.MatchMilestone("v1", nil, repo)
 	want := "error: unknown milestone \"v1\": Trum-ok/gh-dojo has no open milestones\n" +
 		"fix: if it is new, create it: gh api repos/Trum-ok/gh-dojo/milestones -f title=\"v1\""

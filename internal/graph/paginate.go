@@ -44,7 +44,9 @@ func (p Page[T]) Truncated() bool { return len(p.Nodes) < p.TotalCount }
 // Paginate runs query page by page and collects the nodes of one connection.
 //
 // The query must declare "$cursor: String" and pass it as "after: $cursor";
-// Paginate sets vars["cursor"] (vars itself is not modified). R is the type
+// Paginate sets vars["cursor"] (vars itself is not modified). A string
+// cursor already in vars is where the first page starts, to continue
+// after a page read with other fields; else it starts at the beginning. R is the type
 // of the response data and conn picks the connection out of it, returning
 // nil when the connection's parent is missing: Paginate then fails with a
 // not-found error (exit code 3) wrapping ErrParentNotFound, along with the
@@ -71,7 +73,9 @@ func Paginate[R, T any](ctx context.Context, q Querier, query string, vars map[s
 	if v == nil {
 		v = map[string]any{}
 	}
-	v["cursor"] = nil
+	if c, ok := v["cursor"].(string); !ok || c == "" {
+		v["cursor"] = nil
+	}
 	for {
 		var r R
 		if err := q.Query(ctx, query, v, &r); err != nil {

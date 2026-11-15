@@ -1,5 +1,5 @@
 {
-  "comment": "Hand-crafted reads, from new_success.json: the read's first page of milestones (v0.1) has more, so RepoMilestones reads them all (pages cut to v0.1, then v0.2 and v0.3) and an unknown --milestone lists every one. Milestones v0.1 (due 2026-12-01) and v0.2 stand in for the repo's own; createIssue.milestoneId and updateIssue(milestoneId) as in the GraphQL schema (checked by introspection); mutations are never sent to GitHub.",
+  "comment": "Hand-crafted reads, from new_success.json: the read's first page of milestones (v0.1) has more, so RepoMilestones reads the rest from that page's end (v0.2 and v0.3) and an unknown --milestone lists every one. Milestones v0.1 (due 2026-12-01) and v0.2 stand in for the repo's own; createIssue.milestoneId and updateIssue(milestoneId) as in the GraphQL schema (checked by introspection); mutations are never sent to GitHub.",
   "handcrafted": true,
   "interactions": [
     {
@@ -147,35 +147,6 @@
                       }
                     ]
                   }
-                }
-              ]
-            }
-          }
-        }
-      }
-    },
-    {
-      "operation": "RepoMilestones",
-      "query": "query RepoMilestones($owner: String!, $repo: String!, $cursor: String) {\n  repository(owner: $owner, name: $repo) {\n    milestones(first: 100, after: $cursor, states: OPEN, orderBy: {field: NUMBER, direction: ASC}) {\n      totalCount\n      pageInfo { hasNextPage endCursor }\n      nodes { id title dueOn }\n    }\n  }\n}",
-      "variables": {
-        "owner": "Trum-ok",
-        "repo": "gh-dojo",
-        "cursor": null
-      },
-      "response": {
-        "data": {
-          "repository": {
-            "milestones": {
-              "totalCount": 3,
-              "pageInfo": {
-                "hasNextPage": true,
-                "endCursor": "Y3Vyc29yOnYyOpEB"
-              },
-              "nodes": [
-                {
-                  "id": "MI_kwDOVq9iIs4AAAAAAAAv01",
-                  "title": "v0.1",
-                  "dueOn": "2026-12-01T00:00:00Z"
                 }
               ]
             }

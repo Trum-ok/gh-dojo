@@ -862,12 +862,12 @@ func checkVerbs(ctx context.Context, r *doctorReport, a *App, cfg *config.Config
 	_ = json.Unmarshal(out.Repository["milestones"], &open)
 	milestones := open.Nodes
 	if c.milestones && open.PageInfo.HasNextPage {
-		all, err := issue.ReadMilestones(ctx, a.Client, repo.Repo)
+		rest, err := issue.ReadMilestones(ctx, a.Client, repo.Repo, open.PageInfo.EndCursor)
 		if err != nil {
 			r.problem("verbs", err)
 			return
 		}
-		milestones = all
+		milestones = append(milestones, rest...)
 	}
 
 	repoName, problems := repo.Repo.String(), 0 // problems counts warnings too: no ok line then

@@ -60,14 +60,15 @@ func (b *githubBackend) allowedOnce(kind string, repo issue.Repo, read func() ([
 	return names, err
 }
 
-// milestonesOnce returns the open milestones of repo, read page by page
-// once per run.
-func (b *githubBackend) milestonesOnce(ctx context.Context, repo issue.Repo) ([]issue.OpenMilestone, error) {
+// milestonesOnce returns the open milestones of repo after the cursor
+// after, the end of the first page the card read, read page by page once
+// per run.
+func (b *githubBackend) milestonesOnce(ctx context.Context, repo issue.Repo, after string) ([]issue.OpenMilestone, error) {
 	key := "milestones " + strings.ToLower(repo.String())
 	if v, ok := b.allowed[key]; ok {
 		return v.milestones, v.err
 	}
-	all, err := issue.ReadMilestones(ctx, b.app.Client, repo)
+	all, err := issue.ReadMilestones(ctx, b.app.Client, repo, after)
 	if b.allowed == nil {
 		b.allowed = map[string]allowedValues{}
 	}
@@ -160,13 +161,16 @@ func (b *githubBackend) workflowIssue(ctx context.Context, v config.Verb, lookup
 	if err := statusUnknown(card, def); err != nil {
 		return workflow.Issue{}, err, nil
 	}
-	if err := b.checkFound(ctx, v, lookup, card); err != nil {
-		if lookupMissing(v, lookup, card.Found) && card.Ref().Same(issue.Ref{Repo: def, Number: card.Number}) {
+	if every, err := b.checkFound(ctx, v, lookup, card); err != nil {
+		if every && card.Ref().Same(issue.Ref{Repo: def, Number: card.Number}) {
 			return workflow.Issue{}, nil, err
 		}
 		return workflow.Issue{}, err, nil
 	}
 	is = workflowIssue(card, def)
+	if milestoneInPlace(lookup, card) {
+		is.SetMilestone = card.Milestone.Title // whatever the repository's match
+	}
 	if card.Found != nil {
 		for _, name := range v.RemoveLabels {
 			if card.Found.Labels[name] == "" {
@@ -198,15 +202,21 @@ func (b *githubBackend) workflowIssue(ctx context.Context, v config.Verb, lookup
 }
 
 // lookupMissing reports whether a lookup of v found nothing for every
-// issue alike: a label to add, the user to assign, the milestone to set
-// or the viewer is missing. checkFound refuses the verb then, whatever the
-// issue.
+// issue alike: a label to add, the user to assign or the viewer is
+// missing. checkFound refuses the verb then, whatever the issue.
 func lookupMissing(v config.Verb, l issue.Lookup, f *issue.Found) bool {
 	if f == nil {
 		f = &issue.Found{}
 	}
 	return slices.ContainsFunc(v.AddLabels, func(name string) bool { return f.Labels[name] == "" }) ||
-		l.User != "" && f.User == nil || l.Viewer && f.Viewer == nil || l.Milestone != "" && f.Milestone == nil
+		l.User != "" && f.User == nil || l.Viewer && f.Viewer == nil
+}
+
+// milestoneInPlace reports whether the card's issue is in the milestone
+// the lookup names by its whole title (issue.SameMilestone): it has it
+// already, open or closed, and needs no match.
+func milestoneInPlace(l issue.Lookup, card *issue.Card) bool {
+	return l.Milestone != "" && card.Milestone != nil && issue.SameMilestone(card.Milestone.Title, l.Milestone)
 }
 
 // byRefs parses --by of a verb with blockers = "link" for issue target:
@@ -351,7 +361,12 @@ func verbLookup(v config.Verb, a workflow.Args) issue.Lookup {
 // repository, or whose assignee cannot be assigned there: a config error
 // (exit code 1) with the allowed values, which take one more read. None of
 // the verb's effects is applied then. So is one whose milestone names no
-// open milestone of the repository, or several (see matchMilestone).
+// open milestone of the repository, or several (see matchMilestone),
+// unless the issue is in that milestone already (milestoneInPlace). every
+// says the error is the same for every issue of the repository (see
+// lookupMissing), rather than this issue's alone. The milestone is
+// matched first: it is the repository's, so a refusal of this issue alone
+// (a label to remove it has in another case) never leaves it unmatched.
 //
 // Labels are looked up by their exact name, while GitHub's names are
 // unique regardless of case. A label to remove that does not exist is in
@@ -359,18 +374,24 @@ func verbLookup(v config.Verb, a workflow.Args) issue.Lookup {
 // another way: then it is refused too, or it would stay. A name that
 // differs from an existing label only in case gets "write it as" for a
 // fix, since gh label create would fail.
-func (b *githubBackend) checkFound(ctx context.Context, v config.Verb, l issue.Lookup, card *issue.Card) error {
+func (b *githubBackend) checkFound(ctx context.Context, v config.Verb, l issue.Lookup, card *issue.Card) (every bool, err error) {
 	if l.Empty() {
-		return nil
+		return false, nil
 	}
 	cfg, err := b.app.Config()
 	if err != nil {
-		return err
+		return true, err
 	}
 	f := card.Found
 	if f == nil {
 		f = &issue.Found{}
 	}
+	if l.Milestone != "" && !milestoneInPlace(l, card) {
+		if err := b.matchMilestone(ctx, v, l, card, f); err != nil {
+			return true, err
+		}
+	}
+	defer func() { every = err != nil && lookupMissing(v, l, f) }()
 	var missing []string
 	for _, name := range v.AddLabels {
 		if f.Labels[name] == "" {
@@ -400,9 +421,9 @@ func (b *githubBackend) checkFound(ctx context.Context, v config.Verb, l issue.L
 			e = e.WithAllowed(closestFirst(names, missing)...)
 		}
 		if spelled := spelling(missing[0], append(slices.Clone(card.Labels.Nodes), names...)); spelled != "" {
-			return e.WithFix(fmt.Sprintf("write it as %q in %s", spelled, labelsKey))
+			return false, e.WithFix(fmt.Sprintf("write it as %q in %s", spelled, labelsKey))
 		}
-		return e.WithFix(fmt.Sprintf("gh label create %s -R %s, or fix %s", quoted[0], card.Repo, labelsKey))
+		return false, e.WithFix(fmt.Sprintf("gh label create %s -R %s, or fix %s", quoted[0], card.Repo, labelsKey))
 	case l.User != "" && f.User == nil:
 		e := cfg.Errorf("%s: %s cannot be assigned issues in %s", cfg.KeyPath(key+"assign"), l.User, card.Repo).
 			WithFix(fmt.Sprintf("check the login, or give %s access to %s", l.User, card.Repo))
@@ -415,50 +436,53 @@ func (b *githubBackend) checkFound(ctx context.Context, v config.Verb, l issue.L
 		}); err == nil {
 			e = e.WithAllowed(logins...)
 		}
-		return e
+		return false, e
 	case l.Viewer && f.Viewer == nil:
-		return render.Network("GitHub did not return the authenticated user for %s", config.Me).
+		return false, render.Network("GitHub did not return the authenticated user for %s", config.Me).
 			WithFix(render.AuthFix)
-	case l.Milestone != "":
-		return b.matchMilestone(ctx, v, l, card, f)
 	}
-	return nil
+	return false, nil
 }
 
 // matchMilestone finds the open milestone of the card's repository that
 // the verb's milestone names (Lookup.Milestone), as gh dojo new --milestone
-// does (issue.MatchMilestone), and keeps it in f.Milestone for every card
-// of the repository. The open milestones came with the card; past the
-// first 100 they are read page by page, once per repository and run. No
-// match, or several, is exit code 1: a usage error for --milestone, a
-// config error naming the key for a title of the config.
+// does (issue.MatchMilestone), and keeps it in f.Milestone, or why none
+// matches in f.MilestoneErr, for every card of the repository. The open
+// milestones came with the card; past the first 100 the rest are read
+// page by page, once per repository and run. No match, or several, is
+// exit code 1: a usage error for --milestone, a config error naming the
+// key for a title of the config.
 func (b *githubBackend) matchMilestone(ctx context.Context, v config.Verb, l issue.Lookup, card *issue.Card, f *issue.Found) error {
-	if f.Milestone != nil {
+	switch {
+	case f.Milestone != nil:
 		return nil
+	case f.MilestoneErr != nil:
+		return f.MilestoneErr
 	}
 	open := f.Milestones
 	if f.MoreMilestones {
-		all, err := b.milestonesOnce(ctx, card.Repo)
+		rest, err := b.milestonesOnce(ctx, card.Repo, f.MilestonesCursor)
 		if err != nil {
 			return err
 		}
-		open = all
+		open = append(slices.Clone(f.Milestones), rest...)
 	}
 	m, err := issue.MatchMilestone(l.Milestone, open, card.Repo)
-	if err == nil {
+	switch {
+	case err == nil:
 		f.Milestone = m
 		return nil
+	case !v.MilestoneArg:
+		cfg, cerr := b.app.Config()
+		if cerr != nil {
+			return cerr
+		}
+		e := milestoneKeyError(cfg.KeyPath("verbs."+v.Name+".milestone"), err)
+		e.What = cfg.Display + ": " + e.What
+		err = e
 	}
-	if v.MilestoneArg {
-		return err
-	}
-	cfg, cerr := b.app.Config()
-	if cerr != nil {
-		return cerr
-	}
-	e := milestoneKeyError(cfg.KeyPath("verbs."+v.Name+".milestone"), err)
-	e.What = cfg.Display + ": " + e.What
-	return e
+	f.MilestoneErr = err
+	return err
 }
 
 // milestoneKeyError is err of issue.MatchMilestone for a milestone of the

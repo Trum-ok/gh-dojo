@@ -1651,9 +1651,11 @@ func (nc *newContext) milestone(ctx context.Context, q graph.Querier, repo issue
 	if nc.Milestones.PageInfo.HasNextPage {
 		if nc.allMilestones == nil {
 			var err error
-			if nc.allMilestones, err = issue.ReadMilestones(ctx, q, repo); err != nil {
+			rest, err := issue.ReadMilestones(ctx, q, repo, nc.Milestones.PageInfo.EndCursor)
+			if err != nil {
 				return nil, err
 			}
+			nc.allMilestones = append(slices.Clone(nc.Milestones.Nodes), rest...)
 		}
 		all = nc.allMilestones
 	}

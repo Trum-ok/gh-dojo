@@ -70,13 +70,16 @@ type Found struct {
 	Links []*Linked
 	// Milestones are the repository's open milestones for
 	// Lookup.Milestone, oldest first; MoreMilestones says it has more than
-	// were read (see ReadMilestones).
-	Milestones     []OpenMilestone
-	MoreMilestones bool
+	// were read, after MilestonesCursor (see ReadMilestones).
+	Milestones       []OpenMilestone
+	MoreMilestones   bool
+	MilestonesCursor string
 	// Milestone is the open milestone Lookup.Milestone names, once the
-	// caller matched it (MatchMilestone) against all of Milestones; nil
-	// until then, or when none matches.
-	Milestone *OpenMilestone
+	// caller matched it (MatchMilestone) against all of Milestones, and
+	// MilestoneErr why none matches; both nil until then. They are the
+	// repository's, the same for every card of it.
+	Milestone    *OpenMilestone
+	MilestoneErr error
 }
 
 // OpenMilestone is an open milestone of a repository. DueOn is RFC 3339,
@@ -279,6 +282,7 @@ func (l Lookup) found(r *repoJSON, viewer *User, data map[string]json.RawMessage
 		if l.Milestone != "" && r.Milestones != nil {
 			f.Milestones = r.Milestones.Nodes
 			f.MoreMilestones = r.Milestones.PageInfo.HasNextPage
+			f.MilestonesCursor = r.Milestones.PageInfo.EndCursor
 		}
 		if l.User != "" && r.Assignable != nil {
 			for _, u := range r.Assignable.Nodes {

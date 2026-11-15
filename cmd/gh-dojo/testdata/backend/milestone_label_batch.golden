@@ -1,0 +1,7 @@
+code: 1
+--- stdout
+#4 milestone none → v0.3 — расширяемость, labels unchanged
+#5 milestone none → v0.3 — расширяемость, labels unchanged
+--- stderr
+error: 2 of 3 done; #3: .github/dojo.toml: verbs.replan.labels: no label "blocked" in Trum-ok/gh-dojo
+fix: write it as "Blocked" in verbs.replan.labels

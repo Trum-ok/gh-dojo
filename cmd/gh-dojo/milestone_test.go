@@ -97,6 +97,43 @@ func TestVerbMilestoneRepos(t *testing.T) {
 		runs{[]string{"plan", "3", "acme/api#7", "--milestone", "v0.3", "--dry-run"}, render.ExitUsage, 1, "milestone_repos"})
 }
 
+// TestVerbMilestonePartial: GitHub sets the milestone and refuses the
+// comment: exit 5 naming both. The re-run finds the milestone in place and
+// posts the comment alone.
+func TestVerbMilestonePartial(t *testing.T) {
+	srv, before := withMilestoneApp(t, verbFixture("milestone_partial"))
+	checkRuns(t, srv, before,
+		runs{[]string{"plan", "3", "--milestone", "v0.3"}, render.ExitPartial, 2, "milestone_partial"},
+		runs{[]string{"plan", "3", "--milestone", "v0.3"}, render.ExitOK, 2, "milestone_partial_rerun"},
+	)
+}
+
+// TestVerbMilestoneClosed: #3 is in v0.3, closed since the verb set it.
+// Named by its whole title, in any case, it is in place, though no open
+// milestone matches any more: the repeat writes nothing.
+func TestVerbMilestoneClosed(t *testing.T) {
+	srv, before := withMilestoneApp(t, verbFixture("milestone_closed"))
+	checkRuns(t, srv, before,
+		runs{[]string{"plan", "3", "--milestone", "V0.3 — РАСШИРЯЕМОСТЬ"}, render.ExitOK, 1, "milestone_closed"})
+}
+
+// TestVerbMilestoneLabelBatch: in replan 3 4 5, #3 has the label to remove
+// spelled otherwise than the repository's lookup: #3 fails alone, and #4
+// and #5 still get the milestone, matched once for the repository before
+// any issue's own checks.
+func TestVerbMilestoneLabelBatch(t *testing.T) {
+	srv, before := withMilestoneApp(t, verbFixture("milestone_label_batch"))
+	withConfig(t, milestoneDojoConfig+`
+[verbs.replan]
+when = "Moved to another stage, unblocked"
+labels = ["-blocked"]
+milestone = "{milestone}"
+batch = true
+`)
+	checkRuns(t, srv, before,
+		runs{[]string{"replan", "3", "4", "5", "--milestone", "v0.3"}, render.ExitUsage, 4, "milestone_label_batch"})
+}
+
 // TestReleaseMilestoneVerb: release has no --milestone, so a verb with
 // milestone = "{milestone}" is refused before any read, as one with
 // assign = "{assignee}" is.

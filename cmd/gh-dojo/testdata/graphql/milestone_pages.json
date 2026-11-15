@@ -1,5 +1,5 @@
 {
-  "comment": "Hand-crafted from assignee_flag.json (itself from internal/issue/testdata/graphql/card_3.json, recorded), with the open milestones of internal/issue/testdata/graphql/card_55_milestones.json (recorded); mutations are never recorded. The card's milestones window stands for 100 with 2: it reads v0.0 and v0.1 and says there are more (hasNextPage), so RepoMilestones reads them all, as gh dojo new --milestone does.",
+  "comment": "Hand-crafted from assignee_flag.json (itself from internal/issue/testdata/graphql/card_3.json, recorded), with the open milestones of internal/issue/testdata/graphql/card_55_milestones.json (recorded); mutations are never recorded. The card's milestones window stands for 100 with 2: it reads v0.0 and v0.1 and says there are more (hasNextPage), so RepoMilestones reads the rest (v0.2 and v0.3) from the end of that page, as gh dojo new --milestone does.",
   "handcrafted": true,
   "interactions": [
     {
@@ -377,7 +377,7 @@
       "variables": {
         "owner": "Trum-ok",
         "repo": "gh-dojo",
-        "cursor": null
+        "cursor": "Y3Vyc29yOnYyOpIEzgEqNS8="
       },
       "response": {
         "data": {
@@ -386,19 +386,9 @@
               "totalCount": 4,
               "pageInfo": {
                 "hasNextPage": false,
-                "endCursor": "Y3Vyc29yOnYyOpIEzgEqNS8="
+                "endCursor": "Y3Vyc29yOnYyOpIEzgEqNS9="
               },
               "nodes": [
-                {
-                  "id": "MI_kwDOVq9iIs4BKI_2",
-                  "title": "v0.0 — самохостинг",
-                  "dueOn": null
-                },
-                {
-                  "id": "MI_kwDOVq9iIs4BKKTc",
-                  "title": "v0.1 — первый публичный релиз",
-                  "dueOn": null
-                },
                 {
                   "id": "MI_kwDOVq9iIs4BKRnx",
                   "title": "v0.2 — агент и релизы",
