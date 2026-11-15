@@ -137,7 +137,11 @@ Creates an issue, labels it, adds it to the board and sets the initial status
   the areas when that list is empty), `--area cli` adds the label
   `<labels.area_prefix>cli`, `--label` adds any existing label;
 - `--milestone v1.2` puts the issue in the open milestone titled `v1.2`
-  (ignoring case);
+  (ignoring case), or else in the only one whose title starts with it:
+  `--milestone v0.3` for `v0.3 — extensibility`. Several such are exit
+  code 1, listing them. A verb with
+  [`milestone = "{milestone}"`](configuration.md#effects) moves an existing
+  issue to another milestone, matched the same way;
 - `--blocked-by 17` marks it blocked by #17 (repeatable, or comma-separated;
   `owner/repo#17` or a URL for another repository);
 - `--parent 40` makes it a sub-issue of #40, set as it is created (no extra
@@ -170,7 +174,9 @@ A repeat is safe: the body ends with a hidden marker of the title, and a run
 that finds it on one of the repository's 20 newest open issues written by
 you finishes that issue (labels, milestone, board, status, blocked-by links,
 parent) instead of creating another; a different milestone or parent it
-already has (or a parent the token cannot read) is kept, with a warning.
+already has (or a parent the token cannot read) is kept, with a warning
+that names the command to change it: a verb with `milestone = "{milestone}"`
+when the config has one.
 If a run fails after creating the issue, it exits with code 5: run the
 same command again.
 
@@ -289,14 +295,15 @@ ok       verbs    octocat/shop: 2 labels exist, 1 assignee can be assigned
 | `repo` | Each repository of [`board.repos`](configuration.md#board), or the current one, is visible with issues enabled; a warning when `board.repos` spells one otherwise than GitHub does |
 | `labels` | With [`labels.types`](configuration.md#labels) or `labels.area_prefix` set, in each repository of the `repo` check: every type label exists (missing is a problem, since `new --type` fails on it, fixed by `gh label create`; spelled in another case is `warn`, since `new` matches labels regardless of case, fixed by `gh label edit`), and how many labels start with the area prefix. None is `warn` when `.github/dojo.toml` sets the prefix, since `new --area` finds nothing (create one, or set the prefix to `""`); with the prefix from a preset, which many teams never use, it is a note on the `ok` line. Past 100 labels the area count is a lower bound ("at least"), and none found is "could not confirm" rather than a warning |
 | `sprint` | With [`fields.sprint`](configuration.md#fields): an iteration covers today, a date in [`board.timezone`](configuration.md#board) |
-| `verbs` | When verbs have labels or assignees: the labels exist in the default repository, spelled exactly as there (those of `from_labels` and `refuse_labels` in any case, as the checks match them), and the users can be assigned |
+| `verbs` | When verbs have labels, assignees or milestones: the labels exist in the default repository, spelled exactly as there (those of `from_labels` and `refuse_labels` in any case, as the checks match them), the users can be assigned, and each milestone a verb names in the config matches one open milestone there, as the verb matches it (none or several is a problem) |
 | `agent` | With [`[agent]`](configuration.md#agent) set (and `targets` not empty), or a file with a gh-dojo marker: the files [`agent install`](#agent-install) writes are up to date (`agent install --check`, without the diff). Out of date or missing is `warn`, since the text also depends on the gh-dojo version; a hand-written skill under `[agent]` is a problem |
 
 It sends one request for the token and the repositories, one more for the
 board when its schema is not cached, one for the labels when
 `labels.types` or `labels.area_prefix` is set (plus a repository's labels
 page by page when it has over 100 and a type is not found), and one for
-the verbs' labels and assignees when a verb has them. The exit code is 0
+the verbs' labels, assignees and milestones when a verb has them (plus the
+open milestones page by page past 100). The exit code is 0
 when no check is a problem (warnings included), 4 when one failed on auth
 or the network, else 1.
 
@@ -376,7 +383,7 @@ notes, the generator or a command's short help, run `make agent`.
 ## Process verbs
 
 ```sh
-gh dojo <verb> <N> [--comment TEXT] [--by N|TEXT] [--assignee LOGIN] [--yes] [--dry-run]
+gh dojo <verb> <N> [--comment TEXT] [--by N|TEXT] [--assignee LOGIN] [--milestone TITLE] [--yes] [--dry-run]
 gh dojo <verb> <N>... [flags]     # a verb with batch = true, such as done
 ```
 
@@ -400,7 +407,7 @@ and, in one command:
    (`sub_issues`), and the user's go-ahead (`confirm`);
 2. adds the issue to the board if it is not there;
 3. applies its [effects](configuration.md#effects): reopens it, sets the status and the
-   sprint, sets other board fields, adds and removes labels, assigns and
+   sprint, sets other board fields, sets the milestone, adds and removes labels, assigns and
    unassigns users, marks it blocked by the `--by` issues, posts the rendered
    [comment template](configuration.md#comment-templates) and closes it.
 
@@ -417,7 +424,11 @@ issue number (rendered `#12`) or free text; with
 [`blockers = "link"`](configuration.md#checks) issues are also marked as blocking this one.
 `--assignee` (a login, or `@me`) exists only on a verb with
 [`assign = "{assignee}"`](configuration.md#effects), and is required there: the user to
-assign, also `{assignee}` in the template. `--yes` exists only on a verb
+assign, also `{assignee}` in the template. `--milestone` (an open
+milestone's title, or a start only that title has) exists only on a verb
+with [`milestone = "{milestone}"`](configuration.md#effects), and is
+required there: the milestone to set, also `{milestone}` in the template.
+`--yes` exists only on a verb
 with [`confirm = "user"`](configuration.md#checks).
 `--dry-run` prints the plan without changing anything:
 
@@ -538,6 +549,9 @@ dry run: done #3 "Read the config"
 `--dry-run` lists how each issue was found (`PR #N`, `commit <sha>`) and its
 plan. No issues is a line saying where release looked, exit code 0.
 `--comment`, `--by` and `--yes` go to the verb, for every issue. A verb
-without `batch = true` is exit code 1, a `<ref>` or `--since` GitHub does not
+without `batch = true` is exit code 1, and so is one that needs
+`--assignee` or `--milestone` (`assign = "{assignee}"`,
+`milestone = "{milestone}"`), which release does not take: run it on the
+issues themselves, a `<ref>` or `--since` GitHub does not
 know exit code 3. Requests: one for `<ref>` and the start (one per 100
 tags), one per 100 commits with their pull requests, then the batch's.

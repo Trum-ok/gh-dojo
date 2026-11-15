@@ -195,6 +195,7 @@ error object alone. `planned`, `applied` and `in_place` are lists of ops:
 | `set_status` | `from`, `to` (`null`: no status, or not on the board) |
 | `set_iteration` | `from`, `to` (iteration titles, `null` for none), `start_date` (of `to`) |
 | `set_fields` | `fields`: `[{field, from, to}]` |
+| `set_milestone` | `from`, `to` (milestone titles, `null` for none) |
 | `add_labels`, `remove_labels` | `labels` |
 | `assign` | `login` |
 | `unassign` | `logins` (in `in_place`: the users not assigned; empty for `unassign = "all"` with nobody to remove), `kept` (`true` in `in_place` for a user it names and also assigns, who stays) |

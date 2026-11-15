@@ -89,6 +89,11 @@ iteration = "current"        # or "clear"
 Priority = "P1"              # single select: an option name
 Estimate = 3                 # number; a text field takes a string, a date field 2026-11-30
 
+[verbs.schedule]
+when = "The issue moves to another release"
+milestone = "{milestone}"    # an open milestone from --milestone; or a title such as "v1.2"
+batch = true
+
 [verbs.done]
 close = false                # keep the issue open: false turns off the preset's close
 
@@ -186,7 +191,7 @@ commands (`show`, `list`, `new`, `comment`, `describe`, `init`, `doctor`,
 | `from`           | check  | Statuses the verb may start from; empty or missing means any |
 | `from_labels`    | check  | Labels the issue must all have: `["blocked"]` |
 | `refuse_labels`  | check  | Labels of which the issue may have none: `["blocked"]` |
-| `require`        | check  | Arguments that must all be given: `comment`, `by`, `assignee` |
+| `require`        | check  | Arguments that must all be given: `comment`, `by`, `assignee`, `milestone` |
 | `require_one_of` | check  | Arguments of which at least one must be given |
 | `blockers`       | check or effect | `"warn"` or `"deny"`: check the issue's unresolved blockers; `"link"`: `--by N` also marks it blocked by #N |
 | `sub_issues`     | check  | `"warn"` or `"deny"`: check the issue's unresolved [sub-issues](commands.md#show) |
@@ -198,17 +203,19 @@ commands (`show`, `list`, `new`, `comment`, `describe`, `init`, `doctor`,
 | `labels`         | effect | Labels to add (`"+name"`) and remove (`"-name"`): `["+in-review", "-blocked"]` |
 | `assign`         | effect | Who to add to the assignees: `true` (`board.assignee`), `"@me"`, a login, or `"{assignee}"`: the user `--assignee` names when the verb runs |
 | `unassign`       | effect | Who to remove from the assignees: `true` (`board.assignee`), `"@me"`, a login, or `"all"`: everyone but the user the verb assigns |
+| `milestone`      | effect | The open milestone to put the issue in: a title (`"v1.2"`, or a start only one title has), or `"{milestone}"`: the one `--milestone` names when the verb runs |
 | `comment`        | effect | [Comment template](#comment-templates) |
 | `close`          | effect | Close the issue with this reason: `completed`, `not_planned` or `duplicate` |
 | `reopen`         | effect | `true` reopens a closed issue |
 | `disabled`       | —      | `true` removes a verb the preset defines; it stands alone in its table |
 
 A verb needs at least one effect: `to`, `comment`, `labels`, `assign`,
-`unassign`, `close`, `reopen`, `iteration` or `field`. `comment` and `by` in
+`unassign`, `milestone`, `close`, `reopen`, `iteration` or `field`. `comment` and `by` in
 `require` and `require_one_of` must appear in the verb's comment template; a
 verb that requires `comment` and has no template posts the `--comment` text
 as is. `assignee` needs `assign = "{assignee}"`, which requires it anyway, so
-it may only be repeated in `require`.
+it may only be repeated in `require`; so does `milestone`, with
+`milestone = "{milestone}"`.
 Keys from the design that are not implemented yet (`pre`, `post`) are
 rejected with "not supported in this version".
 
@@ -308,6 +315,27 @@ rejected with "not supported in this version".
   a user named `all` cannot be named. [`gh dojo doctor`](commands.md#doctor) warns
   about a login of `unassign` that cannot be assigned: the verb removes
   current assignees, so such a login is likely a typo.
+- **milestone**: puts the issue in an open milestone of its repository, in
+  the same mutation as the other effects; the milestone it had, if any, is
+  replaced. A title matches the milestone with that title regardless of
+  case, or else the only one whose title starts with it, so `"v0.3"` names
+  `v0.3 — extensibility`. A start several titles share is exit code 1
+  listing them, and no match is exit code 1 listing the open milestones,
+  with `gh api repos/<owner>/<repo>/milestones -f title=…` to create one;
+  either fails before anything is written. `milestone = "{milestone}"`
+  takes the milestone from `--milestone` when the verb runs, for one that
+  changes from issue to issue, such as moving an issue to the next
+  release: `gh dojo plan 46 --milestone v0.3`. The flag is then required,
+  and `{milestone}` in the comment template is the title as the repository
+  spells it; only such a verb takes it. Each issue's milestone is matched in
+  its own repository, so in a batch an `owner/repo#N` whose repository has
+  no such milestone fails alone. An issue already in the milestone keeps
+  it: `milestone unchanged (v0.3 — extensibility)`. The open milestones come
+  with the issue's read (page by page past 100). A verb cannot clear a
+  milestone. [`gh dojo doctor`](commands.md#doctor) checks that each title
+  of the config matches one open milestone of the default repository;
+  [`release`](commands.md#release) cannot run a verb with
+  `milestone = "{milestone}"`, which needs `--milestone`.
 - **close**, **reopen**: a verb sets at most one of them. An issue already
   closed is not closed again, even with another reason; the line says
   `already closed as completed`. A verb that closes and has no `to` refuses
@@ -357,6 +385,7 @@ off a key the preset sets:
 | `confirm` | `confirm = false` |
 | `assign` | `assign = false` |
 | `unassign` | `unassign = false` |
+| `milestone` | `milestone = false` |
 | `reopen` | `reopen = false` |
 | `batch` | `batch = false` |
 | `iteration` | `iteration = ""` |
@@ -368,8 +397,9 @@ off a key the preset sets:
 ## Comment templates
 
 Templates may use `{session}`, `{comment}` (the `--comment` text), `{by}`
-(the `--by` value) and, in a verb with `assign = "{assignee}"`, `{assignee}`
-(the login it assigns). A line whose placeholders all come out empty is
+(the `--by` value), in a verb with `assign = "{assignee}"`, `{assignee}`
+(the login it assigns), and in a verb with `milestone = "{milestone}"`,
+`{milestone}` (the title of the milestone it sets). A line whose placeholders all come out empty is
 dropped, so `"Waiting for {by}."` disappears when `--by` is not given; runs
 of blank template lines collapse, trailing spaces and leading and trailing
 blank lines are cut, and indentation stays. A template that renders to
