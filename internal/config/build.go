@@ -493,8 +493,13 @@ func (c *Config) buildLabelChecks(name string, r *rawVerb, v *Verb) error {
 		}
 		for _, label := range *list.src {
 			if label[0] == '+' || label[0] == '-' {
+				// The name without the sign, if that is a name at all.
+				fix := fmt.Sprintf(`%s = [%q]`, list.key, strings.TrimLeft(label, "+-"))
+				if nameProblem(strings.TrimLeft(label, "+-")) != "" {
+					fix = fmt.Sprintf(`write a label name, like %s = ["blocked"]`, list.key)
+				}
 				return c.Errorf("%s: %q: write the label name without %c; + and - mark labels to add and remove", key, label, label[0]).
-					WithFix(fmt.Sprintf(`%s = [%q]`, list.key, strings.TrimLeft(label, "+-")))
+					WithFix(fix)
 			}
 			folded := strings.ToLower(label)
 			switch prev, ok := seen[folded]; {
@@ -508,8 +513,10 @@ func (c *Config) buildLabelChecks(name string, r *rawVerb, v *Verb) error {
 			same := func(l string) bool { return strings.EqualFold(l, label) }
 			labelsKey := c.KeyPath(p + "labels")
 			if i := slices.IndexFunc(list.moot, same); i >= 0 {
-				return c.Errorf("%s names %q, so %s %s%s never %s anything; keep one",
-					key, label, labelsKey, list.mootSign, list.moot[i], list.mootDoes)
+				entry := list.mootSign + list.moot[i]
+				return c.Errorf("%s names %q, so %s %s never %s anything; keep one",
+					key, label, labelsKey, entry, list.mootDoes).
+					WithFix(fmt.Sprintf("remove %q from %s, or %q from %s", entry, labelsKey, label, key))
 			}
 			if i := slices.IndexFunc(list.rerun, same); i >= 0 {
 				does, again := "adds", "adding the label again changes nothing"

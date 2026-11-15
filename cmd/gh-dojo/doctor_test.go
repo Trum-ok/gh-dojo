@@ -435,6 +435,35 @@ when = "Hand it to the owner"
 assign = "trum-ok"
 `
 
+// TestVerbsCheckLabels: doctor looks up each label verbs add or remove by
+// its exact spelling, and a label a check names only when no entry names
+// it in any case, so +bug and Bug are one label; checks come after the
+// effects whatever the verb order.
+func TestVerbsCheckLabels(t *testing.T) {
+	cfg, err := config.Parse([]byte(verbDojoConfig+`
+[verbs.poke]
+when = "Ask how it goes"
+comment = "{comment}"
+refuse_labels = ["Bug", "wip"]
+
+[verbs.tag]
+when = "It is a bug"
+labels = ["+bug", "-triage"]
+from_labels = ["WIP", "ready"]
+
+[verbs.retag]
+when = "It is a Bug"
+labels = ["+Bug"]
+`), ".github/dojo.toml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"bug", "triage", "Bug", "wip", "ready"}
+	if got := newVerbsCheck(cfg, "Trum-ok").labels; !slices.Equal(got, want) {
+		t.Errorf("labels = %q, want %q", got, want)
+	}
+}
+
 // TestVerbsCheckUsers: doctor checks the users verbs assign and unassign
 // by login or "@me" (the viewer), each once regardless of case; --assignee
 // and unassign = "all" name nobody to check.

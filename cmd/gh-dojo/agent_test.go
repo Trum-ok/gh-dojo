@@ -60,7 +60,8 @@ const skillPath = ".claude/skills/gh-dojo/SKILL.md"
 
 // agentConfig covers every rule the instructions explain: confirm, the
 // blockers check (deny) and link, the sub_issues check (warn and deny),
-// batch, a sprint, labels.types, notes.
+// the label checks (from_labels and refuse_labels, with the verbs that
+// add and remove their labels), batch, a sprint, labels.types, notes.
 const agentConfig = `
 version = 1
 preset = "sprints"
@@ -92,6 +93,24 @@ close = "not_planned"
 require = ["comment"]
 confirm = "user"
 
+[verbs.approve]
+when = "The user approved the change"
+labels = ["+approved"]
+
+[verbs.park]
+when = "Work on the issue stops for now"
+labels = ["+parked"]
+
+[verbs.unpark]
+when = "Work on the issue goes on"
+labels = ["-parked"]
+
+[verbs.ship]
+when = "The approved change goes out"
+to = "Done"
+from_labels = ["approved"]
+refuse_labels = ["parked"]
+
 [agent]
 targets = ["claude", "agents-md", "copilot"]
 notes = "docs/agent-notes.md"
@@ -99,6 +118,17 @@ description = "Also load it before a release."
 `
 
 const agentNotes = "## Our rules\r\n\r\nRun `make test` before `ready`.\r\n\r\n\r\n"
+
+// TestLabelChecksHelp: the help of a verb with label checks names the
+// verbs that add the label it needs and remove the one it refuses.
+func TestLabelChecksHelp(t *testing.T) {
+	withConfig(t, agentConfig)
+	code, out := runOut("ship", "--help")
+	if code != render.ExitOK {
+		t.Errorf("exit code = %d, want 0", code)
+	}
+	testutil.Golden(t, "verbs/help_ship_labels", out)
+}
 
 // TestAgentInstall writes the files of every agent, shows them, and runs
 // install and --check again: nothing changes.

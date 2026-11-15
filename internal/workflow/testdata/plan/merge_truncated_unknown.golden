@@ -1,0 +1,3 @@
+code: 2
+error: merge cannot move #42: it has more labels than were read, so the label "tested" could not be checked
+this is a process rule: ask the user how to proceed

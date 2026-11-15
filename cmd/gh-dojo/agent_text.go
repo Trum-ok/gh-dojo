@@ -291,18 +291,29 @@ func (d *agentDoc) rules(v config.Verb) []string {
 		r = append(r, "It is the user's decision: without `--yes` it exits with code 2. Ask the user, and "+
 			"run it again with `--yes` only if they agree; never add `--yes` on your own.")
 	}
-	if len(v.FromLabels) > 0 {
-		r = append(r, "It is refused (exit code 2) unless the issue has "+labelNames(v.FromLabels, "and", code)+
-			": `gh dojo show N` lists its labels. Ask the user rather than add a label to get it through.")
-	}
-	if len(v.RefuseLabels) > 0 {
-		s := "It is refused (exit code 2) while the issue has " + labelNames(v.RefuseLabels, "or", code) + "."
-		for _, name := range v.RefuseLabels {
-			if verbs := labelRemovers(d.cfg, v, name); len(verbs) > 0 {
-				s += " " + joinWords(quoted(verbs), "or") + " removes " + code(name) + "."
+	// verbsFor names the verbs that add (remove false) or remove each
+	// label: " `hold` adds `on-hold`."
+	verbsFor := func(labels []string, remove bool) string {
+		does := " adds "
+		if remove {
+			does = " removes "
+		}
+		s := ""
+		for _, name := range labels {
+			if verbs := labelVerbs(d.cfg, v, name, remove); len(verbs) > 0 {
+				s += " " + joinWords(quoted(verbs), "or") + does + code(name) + "."
 			}
 		}
-		r = append(r, s+" Never remove a label another way to get it through; ask the user.")
+		return s
+	}
+	if len(v.FromLabels) > 0 {
+		r = append(r, "It is refused (exit code 2) unless the issue has "+labelNames(v.FromLabels, "and", code)+
+			": `gh dojo show N` lists its labels."+verbsFor(v.FromLabels, false)+
+			" Never add a label another way to get it through; ask the user.")
+	}
+	if len(v.RefuseLabels) > 0 {
+		r = append(r, "It is refused (exit code 2) while the issue has "+labelNames(v.RefuseLabels, "or", code)+"."+
+			verbsFor(v.RefuseLabels, true)+" Never remove a label another way to get it through; ask the user.")
 	}
 	switch v.Blockers {
 	case config.BlockersWarn:

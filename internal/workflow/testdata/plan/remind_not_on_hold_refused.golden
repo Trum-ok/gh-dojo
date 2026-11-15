@@ -1,3 +1,3 @@
 code: 2
-error: remind cannot run on #42 without the label "on-hold"
+error: remind cannot run on #42 without the label "on-hold"; hold adds it
 this is a process rule: ask the user how to proceed

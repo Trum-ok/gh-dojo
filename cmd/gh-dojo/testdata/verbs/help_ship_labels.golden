@@ -1,0 +1,25 @@
+code: 0
+--- stdout
+The approved change goes out
+
+  From:      any status
+  To:        Done; an issue already there keeps it, so a repeat is safe
+  Needs:     the label approved on the issue; refused (exit code 2) without it: ask the user
+             approve adds it
+  Refused:   while the issue has the label parked (exit code 2): ask the user
+             unpark removes it
+  Requires:  nothing besides the issue number
+  Board:     adds the issue if it is not there
+
+Usage:
+  gh dojo ship <N> [flags]
+
+Flags:
+      --dry-run   print the plan without changing anything
+  -h, --help      help for ship
+
+Global Flags:
+  -q, --jq expression       filter the JSON with a jq expression (implies --json)
+      --json                print the result as JSON (schema_version 1), errors too
+  -t, --template template   format the JSON with a Go template (implies --json)
+--- stderr

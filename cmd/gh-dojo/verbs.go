@@ -546,6 +546,26 @@ func batchVerbsNote(cfg *config.Config) string {
 	return "\nverbs that take several: " + strings.Join(names, ", ")
 }
 
+// labelVerbsHelp adds a help line per checked label that names the verbs
+// adding it (remove false, for from_labels) or removing it (for
+// refuse_labels): "resume removes it", "hold adds on-hold".
+func labelVerbsHelp(cfg *config.Config, v config.Verb, labels []string, remove bool,
+	line func(label, format string, a ...any)) {
+	does := "adds"
+	if remove {
+		does = "removes"
+	}
+	for _, name := range labels {
+		if verbs := labelVerbs(cfg, v, name, remove); len(verbs) > 0 {
+			what := name
+			if len(labels) == 1 {
+				what = "it"
+			}
+			line("", "%s %s %s", joinWords(verbs, "or"), does, what)
+		}
+	}
+}
+
 // verbHelp is the long help of a verb: its when line, then what it checks,
 // needs and does.
 func verbHelp(cfg *config.Config, v config.Verb) string {
@@ -578,18 +598,11 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 		}
 		line("Needs", "%s on the issue; refused (exit code 2) without %s: ask the user",
 			labelNames(v.FromLabels, "and", nil), them)
+		labelVerbsHelp(cfg, v, v.FromLabels, false, line)
 	}
 	if len(v.RefuseLabels) > 0 {
 		line("Refused", "while the issue has %s (exit code 2): ask the user", labelNames(v.RefuseLabels, "or", nil))
-		for _, name := range v.RefuseLabels {
-			if verbs := labelRemovers(cfg, v, name); len(verbs) > 0 {
-				what := name
-				if len(v.RefuseLabels) == 1 {
-					what = "it"
-				}
-				line("", "%s removes %s", joinWords(verbs, "or"), what)
-			}
-		}
+		labelVerbsHelp(cfg, v, v.RefuseLabels, true, line)
 	}
 
 	var required, optional []string

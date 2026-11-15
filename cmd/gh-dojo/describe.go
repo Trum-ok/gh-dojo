@@ -220,14 +220,20 @@ func labelNames(names []string, conj string, wrap func(string) string) string {
 	return "the labels " + joinWords(out, conj)
 }
 
-// labelRemovers are the verbs of cfg, other than v, that remove the label
-// name without closing the issue: the process's way to take off a label
-// v's refuse_labels refuses.
-func labelRemovers(cfg *config.Config, v config.Verb, name string) []string {
+// labelVerbs are the verbs of cfg, other than v, that remove the label
+// name (remove true) or add it, without closing the issue: the process's
+// way to take off a label v's refuse_labels refuses, or to put on one its
+// from_labels needs. Unlike a refusal (workflow), which names those that
+// can run on the issue as it stands, they are named whatever the status.
+func labelVerbs(cfg *config.Config, v config.Verb, name string, remove bool) []string {
 	var out []string
 	for _, o := range cfg.Verbs {
+		labels := o.AddLabels
+		if remove {
+			labels = o.RemoveLabels
+		}
 		if o.Name != v.Name && o.Close == "" &&
-			slices.ContainsFunc(o.RemoveLabels, func(l string) bool { return strings.EqualFold(l, name) }) {
+			slices.ContainsFunc(labels, func(l string) bool { return strings.EqualFold(l, name) }) {
 			out = append(out, o.Name)
 		}
 	}

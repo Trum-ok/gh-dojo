@@ -412,8 +412,9 @@ func join(items []string, conj string) string {
 //     not on the board or without a status counts as Engine.Initial;
 //  5. then, for a verb with from_labels or refuse_labels, an issue without
 //     one of from_labels, or with one of refuse_labels, is refused (exit
-//     code 2; see checkLabels). Like from, the check is skipped for an
-//     issue already in the target status;
+//     code 2; see checkLabels). It is skipped for an issue already in the
+//     target status, as from is, but not for a repeat of a verb without a
+//     target that closes the issue (closedRepeat), which skips from alone;
 //  6. then, for a verb with blockers = "warn" or "deny", the issue's
 //     unresolved blockers (Issue.Unresolved, Issue.UnreadBlockers) add a
 //     warning or refuse it (exit code 2), skipped the same way;
@@ -712,14 +713,17 @@ func (p *Plan) planLabels(v config.Verb) {
 // v.FromLabels or has one of v.RefuseLabels. Names match regardless of
 // case: GitHub's label names are unique regardless of case. The reader
 // reads all of the issue's labels for such a verb (GitHub allows 100 per
-// issue). A refusal names the labels; one because of refuse_labels also
-// names the verbs that remove each (see removers). Like checkBlockers, it
-// has no fix line: it ends with asking the user.
+// issue); should it still have more than were read
+// (Issue.LabelsTruncated), a checked label not seen among them is refused
+// too, as unknown, whichever list names it. A refusal names the labels,
+// and the verbs that add a missing one or remove a refused one (see
+// labelVerbs). Like checkBlockers, it has no fix line: it ends with
+// asking the user.
 //
 //	review cannot move #42 while it has the label "blocked"; resume removes it
 //	this is a process rule: ask the user how to proceed
 //
-//	resume cannot run on #42 without the label "blocked"
+//	remind cannot run on #42 without the label "on-hold"; hold adds it
 //	this is a process rule: ask the user how to proceed
 func (e *Engine) checkLabels(v config.Verb, is Issue) error {
 	// spelled is the issue's label name, "" when it lacks the label.
@@ -733,41 +737,62 @@ func (e *Engine) checkLabels(v config.Verb, is Issue) error {
 	if v.To == "" {
 		action = "run on"
 	}
-	var missing []string
+	refuse := func(format string, a ...any) error {
+		return render.Denied("%s cannot %s %s"+format+"\n"+
+			"this is a process rule: ask the user how to proceed", append([]any{v.Name, action, is.Name()}, a...)...)
+	}
+	var missing, found, unknown []string
 	for _, name := range v.FromLabels {
-		if spelled(name) == "" {
+		switch {
+		case spelled(name) != "":
+		case is.LabelsTruncated:
+			unknown = append(unknown, name)
+		default:
 			missing = append(missing, name)
 		}
 	}
-	if len(missing) > 0 {
-		return render.Denied("%s cannot %s %s without %s\n"+
-			"this is a process rule: ask the user how to proceed", v.Name, action, is.Name(), labelsText(missing, "and"))
-	}
-	var found []string
 	for _, name := range v.RefuseLabels {
-		if s := spelled(name); s != "" {
+		switch s := spelled(name); {
+		case s != "":
 			found = append(found, s) // as the issue spells it
+		case is.LabelsTruncated:
+			unknown = append(unknown, name)
 		}
 	}
-	if len(found) == 0 {
-		return nil
+	switch {
+	case len(missing) > 0:
+		return refuse(" without %s%s", labelsText(missing, "and"), e.labelHint(v, is, missing, false))
+	case len(found) > 0:
+		return refuse(" while it has %s%s", labelsText(found, "and"), e.labelHint(v, is, found, true))
+	case len(unknown) > 0:
+		return refuse(": it has more labels than were read, so %s could not be checked", labelsText(unknown, "and"))
+	}
+	return nil
+}
+
+// labelHint is the part of a label refusal that names the verbs that add
+// the missing labels (remove false) or remove the refused ones (remove
+// true): "; resume removes it", "; resume removes "blocked", unpark
+// removes "wip""; "" when no verb does.
+func (e *Engine) labelHint(v config.Verb, is Issue, labels []string, remove bool) string {
+	does := " adds "
+	if remove {
+		does = " removes "
 	}
 	var hints []string
-	for _, name := range found {
-		if verbs := e.removers(v, is, name); len(verbs) > 0 {
+	for _, name := range labels {
+		if verbs := e.labelVerbs(v, is, name, remove); len(verbs) > 0 {
 			what := "it"
-			if len(found) > 1 {
+			if len(labels) > 1 {
 				what = strconv.Quote(name)
 			}
-			hints = append(hints, join(verbs, "or")+" removes "+what)
+			hints = append(hints, join(verbs, "or")+does+what)
 		}
 	}
-	hint := ""
-	if len(hints) > 0 {
-		hint = "; " + strings.Join(hints, ", ")
+	if len(hints) == 0 {
+		return ""
 	}
-	return render.Denied("%s cannot %s %s while it has %s%s\n"+
-		"this is a process rule: ask the user how to proceed", v.Name, action, is.Name(), labelsText(found, "and"), hint)
+	return "; " + strings.Join(hints, ", ")
 }
 
 // labelsText names labels in a refusal: `the label "blocked"`, `the labels
@@ -783,19 +808,27 @@ func labelsText(names []string, conj string) string {
 	return "the labels " + join(quoted, conj)
 }
 
-// removers are the verbs of the config, other than v, that remove the
-// label name and can run on is in its status (their from, as checkFrom
-// reads it), without closing it: the way the process takes the label off
-// so that v can run.
-func (e *Engine) removers(v config.Verb, is Issue, name string) []string {
+// labelVerbs are the verbs of the config, other than v, that remove the
+// label name (remove true) or add it, and can run on is: from its status
+// (their from, as checkFrom reads it), and on a closed issue only those
+// that run on one (runsOnClosed), without closing it. They are the
+// process's way to take the label off, or put it on, so that v can run.
+func (e *Engine) labelVerbs(v config.Verb, is Issue, name string, remove bool) []string {
 	current := is.Status
 	if current == "" {
 		current = e.Initial
 	}
 	var out []string
 	for _, o := range e.Verbs {
-		removes := slices.ContainsFunc(o.RemoveLabels, func(l string) bool { return strings.EqualFold(l, name) })
-		if o.Name == v.Name || !removes || o.Close != "" || len(o.From) > 0 && !slices.Contains(o.From, current) {
+		labels := o.AddLabels
+		if remove {
+			labels = o.RemoveLabels
+		}
+		has := slices.ContainsFunc(labels, func(l string) bool { return strings.EqualFold(l, name) })
+		switch {
+		case o.Name == v.Name, !has, o.Close != "",
+			len(o.From) > 0 && !slices.Contains(o.From, current),
+			is.Closed && !e.runsOnClosed(o):
 			continue
 		}
 		out = append(out, o.Name)

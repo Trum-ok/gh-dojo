@@ -1,0 +1,5 @@
+dry run: scrap #42 "Fix login redirect"
+  comment: "Scrapped."
+  close: as not planned
+confirm: #42 comment left, closed as not planned
+post: "Scrapped.\n\n<!-- gh-dojo:scrap:dba4c640 -->"

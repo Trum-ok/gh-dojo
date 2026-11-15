@@ -155,10 +155,34 @@ blockers = "deny"
 sub_issues = "deny"
 
 # from_labels and refuse_labels: on hold is a label. poke refuses an issue
-# on hold, remind runs only on one; resume (from any status) and unstick
-# (from Waiting) remove the label, abandon too but it closes the issue, so
-# a refusal names only the first two. ship refuses either of two labels,
-# merge needs both of two.
+# on hold, remind runs only on one; hold (from In progress or Waiting)
+# adds the label; resume (from any status), unstick (from Waiting) and
+# thaw (from Ready, reopening a closed issue) remove it, abandon too but it
+# closes the issue, so a refusal never names it; on a closed issue only
+# thaw runs. ship refuses either of two labels, merge needs both of two,
+# which approve (from Ready) adds one of. scrap closes without a target.
+[verbs.hold]
+when = "Put the issue on hold"
+from = ["In progress", "Waiting"]
+labels = ["+on-hold"]
+
+[verbs.thaw]
+when = "Bring back a closed issue that was on hold"
+from = ["Ready"]
+reopen = true
+labels = ["-on-hold"]
+
+[verbs.approve]
+when = "The change is approved"
+from = ["Ready"]
+labels = ["+approved"]
+
+[verbs.scrap]
+when = "Scrap an issue nobody holds"
+close = "not_planned"
+comment = "Scrapped."
+refuse_labels = ["on-hold"]
+
 [verbs.poke]
 when = "Ask whoever has it how it goes"
 from = ["In progress", "Waiting"]
@@ -266,6 +290,21 @@ func withSubIssues(is Issue, n, unread int) Issue {
 // labelled gives is the labels names.
 func labelled(is Issue, names ...string) Issue {
 	is.Labels = append(is.Labels, names...)
+	return is
+}
+
+// truncated says is has more labels than were read.
+func truncated(is Issue) Issue {
+	is.LabelsTruncated = true
+	return is
+}
+
+// closed closes is as completed.
+func closed(is Issue) Issue { return closedAs(is, config.CloseCompleted) }
+
+// closedAs closes is with reason.
+func closedAs(is Issue, reason string) Issue {
+	is.Closed, is.StateReason = true, reason
 	return is
 }
 
@@ -670,6 +709,32 @@ func TestPlan(t *testing.T) {
 		// Labels are checked before blockers.
 		{name: "merge_labels_missing_blocked", verb: "merge", code: render.ExitDenied,
 			issue: blocked(onBoard("Ready"), 1, 0)},
+		// Like from, from_labels is skipped for an issue already in the target.
+		{name: "merge_repeat_without_labels", verb: "merge", noOps: true, issue: onBoard("Done")},
+		// On a closed issue a refusal names only the verbs that run on one:
+		// thaw reopens it, resume and approve would refuse it.
+		{name: "ship_closed_on_hold", verb: "ship", code: render.ExitDenied,
+			issue: labelled(closed(onBoard("Ready")), "on-hold")},
+		{name: "merge_closed_label_missing", verb: "merge", code: render.ExitDenied,
+			issue: labelled(closed(onBoard("Ready")), "tested")},
+		// More labels than were read: a checked label not seen is unknown,
+		// and refused in both directions; one seen is refused as such.
+		{name: "merge_truncated_unknown", verb: "merge", code: render.ExitDenied,
+			issue: truncated(labelled(onBoard("Ready"), "approved"))},
+		{name: "ship_truncated_unknown", verb: "ship", code: render.ExitDenied,
+			issue: truncated(labelled(onBoard("Ready"), "bug"))},
+		{name: "ship_truncated_found", verb: "ship", code: render.ExitDenied,
+			issue: truncated(labelled(onBoard("Ready"), "wip"))},
+		{name: "merge_truncated_seen", verb: "merge", hasOps: 1,
+			issue: truncated(labelled(onBoard("Ready"), "approved", "tested"))},
+		// A verb without a target that closes: the check runs on the issue
+		// open, and on a repeat too, which skips only from.
+		{name: "scrap_on_hold_refused", verb: "scrap", code: render.ExitDenied,
+			issue: labelled(onBoard("In progress"), "on-hold")},
+		{name: "scrap_runs", verb: "scrap", hasOps: 2, issue: onBoard("In progress")},
+		{name: "scrap_repeat_on_hold_refused", verb: "scrap", code: render.ExitDenied,
+			issue: labelled(closedAs(onBoard("Ready"), config.CloseNotPlanned), "on-hold")},
+		{name: "scrap_repeat", verb: "scrap", hasOps: 1, issue: closedAs(onBoard("Ready"), config.CloseNotPlanned)},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

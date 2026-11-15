@@ -697,20 +697,36 @@ func (c *labelsCheck) check(ctx context.Context, r *doctorReport, a *App, cfg *c
 // verbsCheck is what checkVerbs asks GitHub about the verbs: label names
 // exactly as written, logins to assign (config.Me as the viewer's).
 type verbsCheck struct {
-	labels []string          // distinct, config order
+	// labels are the labels verbs add and remove, each spelling once, as
+	// a verb looks them up by their exact names; then those that
+	// from_labels and refuse_labels check and no other entry names in any
+	// case, as the checks match names regardless of case. Config order.
+	labels []string
 	users  []string          // distinct regardless of case
 	alias  map[string]string // label name or lowercase login → alias
 }
 
 func newVerbsCheck(cfg *config.Config, viewer string) *verbsCheck {
 	c := &verbsCheck{alias: map[string]string{}}
+	add := func(name string) {
+		c.alias[name] = fmt.Sprintf("label%d", len(c.labels))
+		c.labels = append(c.labels, name)
+	}
 	for _, v := range cfg.Verbs {
-		for _, name := range verbLabels(v) {
+		for _, name := range slices.Concat(v.AddLabels, v.RemoveLabels) {
 			if _, ok := c.alias[name]; !ok {
-				c.alias[name] = fmt.Sprintf("label%d", len(c.labels))
-				c.labels = append(c.labels, name)
+				add(name)
 			}
 		}
+	}
+	for _, v := range cfg.Verbs {
+		for _, name := range slices.Concat(v.FromLabels, v.RefuseLabels) {
+			if !slices.ContainsFunc(c.labels, func(l string) bool { return strings.EqualFold(l, name) }) {
+				add(name)
+			}
+		}
+	}
+	for _, v := range cfg.Verbs {
 		for _, login := range verbUsers(v) {
 			if login.name == config.Me {
 				login.name = viewer
@@ -722,12 +738,6 @@ func newVerbsCheck(cfg *config.Config, viewer string) *verbsCheck {
 		}
 	}
 	return c
-}
-
-// verbLabels are the labels v names: those it adds and removes, then
-// those its from_labels and refuse_labels check.
-func verbLabels(v config.Verb) []string {
-	return slices.Concat(v.AddLabels, v.RemoveLabels, v.FromLabels, v.RefuseLabels)
 }
 
 // verbUser is a user a verb's config names, with its key: "assign" or
@@ -848,8 +858,10 @@ func checkVerbs(ctx context.Context, r *doctorReport, a *App, cfg *config.Config
 			key := cfg.KeyPath("verbs." + v.Name + "." + check.key)
 			for _, name := range check.names {
 				// A check matches names regardless of case, as GitHub's
-				// label names are unique regardless of case.
-				if exists(name) || spelling(name, names) != "" {
+				// label names are unique regardless of case: any spelling
+				// looked up or in the window will do.
+				if slices.ContainsFunc(c.labels, func(l string) bool { return strings.EqualFold(l, name) && exists(l) }) ||
+					slices.ContainsFunc(names, func(n string) bool { return strings.EqualFold(n, name) }) {
 					continue
 				}
 				problem(render.Usage("%s: no label %q in %s, so %s", key, name, repoName, check.never).

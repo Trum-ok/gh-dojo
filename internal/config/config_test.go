@@ -460,6 +460,8 @@ func TestLoadErrors(t *testing.T) {
 		{"sub_issues_number", presetOnly + "[verbs.done]\nsub_issues = 1\n"},
 		{"refuse_labels_sign", presetOnly + "[verbs.ready]\nrefuse_labels = [\"-blocked\"]\n"},
 		{"from_labels_sign", presetOnly + "[verbs.ready]\nfrom_labels = [\"+reviewed\"]\n"},
+		{"from_labels_sign_alone", presetOnly + "[verbs.ready]\nfrom_labels = [\"+\"]\n"},
+		{"refuse_labels_sign_alone", presetOnly + "[verbs.ready]\nrefuse_labels = [\"--\"]\n"},
 		{"refuse_labels_not_list", presetOnly + "[verbs.ready]\nrefuse_labels = \"blocked\"\n"},
 		{"refuse_labels_blank", presetOnly + "[verbs.ready]\nrefuse_labels = [\"blocked\", \" \"]\n"},
 		{"refuse_labels_duplicate", presetOnly + "[verbs.ready]\nrefuse_labels = [\"blocked\", \"blocked\"]\n"},
