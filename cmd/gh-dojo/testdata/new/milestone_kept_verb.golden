@@ -2,4 +2,4 @@ code: 0
 --- stdout
 #15 "Fix login redirect" already created, labels bug, area:cli, milestone v0.2 (kept, not v0.1), In progress (unchanged)
 --- stderr
-warning: #15 already has milestone "v0.2"; kept it, --milestone "v0.1" not applied (to change it: gh dojo plan 15 --milestone "v0.1")
+warning: #15 already has milestone "v0.2"; kept it, --milestone "v0.1" not applied (to change it: gh dojo move 15 --milestone "v0.1")

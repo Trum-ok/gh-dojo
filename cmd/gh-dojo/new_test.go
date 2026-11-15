@@ -422,17 +422,35 @@ func TestNewMilestoneResume(t *testing.T) {
 	}
 }
 
-// TestNewMilestoneKeptVerb: with a verb that sets the --milestone
-// milestone, the warning about a milestone kept names that verb, not gh
+// TestNewMilestoneKeptVerb: the warning about a milestone kept names a
+// verb that only sets the --milestone milestone and starts from the
+// issue's status (In progress): not plan, which also comments, nor
+// backlog-plan, which starts only from Backlog. Without one it names gh
 // issue edit.
 func TestNewMilestoneKeptVerb(t *testing.T) {
-	withConfig(t, milestoneDojoConfig)
-	srv := withApp(t, boardFixture, newMilestoneKept)
-	warmSchema(t, srv)
-	code, out := runOut(append(slices.Clone(newFixArgs), "--milestone", "v0.1")...)
-	testutil.Golden(t, "new/milestone_kept_verb", out)
-	if code != render.ExitOK {
-		t.Errorf("code = %d", code)
+	for _, tt := range []struct{ name, config string }{
+		{"milestone_kept_verb", milestoneDojoConfig + `
+[verbs.backlog-plan]
+when = "Plan an issue not started yet"
+from = ["Backlog"]
+milestone = "{milestone}"
+
+[verbs.move]
+when = "The issue moves to another stage"
+milestone = "{milestone}"
+`},
+		{"milestone_kept_no_verb", milestoneDojoConfig},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			withConfig(t, tt.config)
+			srv := withApp(t, boardFixture, newMilestoneKept)
+			warmSchema(t, srv)
+			code, out := runOut(append(slices.Clone(newFixArgs), "--milestone", "v0.1")...)
+			testutil.Golden(t, "new/"+tt.name, out)
+			if code != render.ExitOK {
+				t.Errorf("code = %d", code)
+			}
+		})
 	}
 }
 

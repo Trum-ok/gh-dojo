@@ -1609,11 +1609,16 @@ func hasPrefixFold(s, prefix string) bool {
 }
 
 // milestoneFix is the command that puts issue r.number of repo in the
-// milestone title: a verb with milestone = "{milestone}", else gh issue
-// edit.
+// milestone title: a verb that only sets the --milestone milestone (see
+// onlySetsMilestone) and starts from the issue's status (r.status, or
+// statuses.initial without one), else gh issue edit.
 func (r *newRun) milestoneFix(repo issue.Repo, title string) string {
+	status := r.status
+	if status == "" {
+		status = r.cfg.Statuses.Initial
+	}
 	for _, v := range r.cfg.Verbs {
-		if v.MilestoneArg {
+		if onlySetsMilestone(v) && (len(v.From) == 0 || slices.Contains(v.From, status)) {
 			def, err := r.App.Repo()
 			if err != nil {
 				def = issue.Repo{}
@@ -1623,6 +1628,18 @@ func (r *newRun) milestoneFix(repo issue.Repo, title string) string {
 		}
 	}
 	return fmt.Sprintf("gh issue edit %d -R %s --milestone %q", r.number, repo, title)
+}
+
+// onlySetsMilestone reports whether v does nothing but set the
+// --milestone milestone: no status, comment, labels, assignees, close,
+// reopen, sprint or fields; it needs nothing besides --milestone, not the
+// user's go-ahead, and checks neither labels nor, to refuse, blockers or
+// sub-issues. Such a verb is a safe way to change an issue's milestone.
+func onlySetsMilestone(v config.Verb) bool {
+	return v.MilestoneArg && v.To == "" && v.Comment == "" && len(v.AddLabels)+len(v.RemoveLabels) == 0 &&
+		!v.Assigns() && v.Unassign == "" && v.Close == "" && !v.Reopen && v.Iteration == "" && len(v.Fields) == 0 &&
+		!v.Confirm && slices.Equal(v.Require, []string{config.ArgMilestone}) && len(v.RequireOneOf) == 0 &&
+		!v.ChecksLabels() && v.Blockers != config.BlockersDeny && v.SubIssues != config.BlockersDeny
 }
 
 // milestone returns the open milestone title names, matched as a verb's
