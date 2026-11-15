@@ -18,6 +18,7 @@ const (
 	reviewExample        = "../../examples/review.toml"
 	reviewBoardFixture   = "testdata/graphql/review_board.json"
 	reviewExampleFixture = "testdata/graphql/review_example.json"
+	reviewOnHoldFixture  = "testdata/graphql/review_on_hold.json"
 )
 
 // reviewDryRuns is a dry run of every verb of the example, each on its own
@@ -79,6 +80,33 @@ func TestExampleReview(t *testing.T) {
 			}
 			testutil.Golden(t, "examples/review_"+verb, out)
 		}
+	})
+
+	// The help of the verbs that check the label blocked: hold and review
+	// refuse it, naming resume, which needs it.
+	t.Run("help", func(t *testing.T) {
+		withConfig(t, toml)
+		for _, verb := range []string{"hold", "resume", "review"} {
+			code, out := runOut(verb, "--help")
+			if code != render.ExitOK {
+				t.Errorf("%s --help: exit code = %d, want 0\n%s", verb, code, out)
+			}
+			testutil.Golden(t, "examples/review_help_"+verb, out)
+		}
+	})
+
+	// On hold is the label blocked: review refuses #29 on hold, naming
+	// resume; merged on #30 (on hold) and #32 (merged already) refuses
+	// #30 alone, in a dry run as in the run, with exit code 2 and one read.
+	t.Run("on_hold", func(t *testing.T) {
+		withConfig(t, toml)
+		srv := withApp(t, reviewBoardFixture, reviewOnHoldFixture)
+		checkRuns(t, srv, warmSchema(t, srv),
+			runs{[]string{"review", "29", "--comment", "acme/payments#31", "--assignee", "octocat", "--dry-run"},
+				render.ExitDenied, 1, "review_on_hold"},
+			runs{[]string{"merged", "30", "32", "--dry-run"}, render.ExitDenied, 1, "merged_on_hold_dry_run"},
+			runs{[]string{"merged", "30", "32", "--json"}, render.ExitDenied, 1, "merged_on_hold"},
+		)
 	})
 
 	t.Run("agent_install", func(t *testing.T) {

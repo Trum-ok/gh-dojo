@@ -1,0 +1,5 @@
+code: 2
+--- stdout
+--- stderr
+error: review cannot move #29 while it has the label "blocked"; resume removes it
+this is a process rule: ask the user how to proceed

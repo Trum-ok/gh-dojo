@@ -59,14 +59,16 @@ Started. Session: {session}
 
 {comment}"""
 
-# On hold is a label, not a status, and no verb checks it: review, approve
-# and merged still run on an issue on hold. resume, reject and merged
-# remove the label.
+# On hold is a label, not a status, so the issue keeps its status: hold
+# adds the label and resume removes it (reject too, closing the issue).
+# review, approve and merged refuse an issue on hold (exit code 2), and so
+# does hold itself; resume runs only on one.
 
 [verbs.hold]
 when = "Work is stuck: waiting for another issue or an outside decision"
 from = ["In progress", "Changes requested"]   # no `to`: the status stays
 labels = ["+blocked"]
+refuse_labels = ["blocked"]  # already on hold
 blockers = "link"            # --by 17 also marks the issue blocked by #17
 require_one_of = ["by", "comment"]
 comment = """
@@ -78,6 +80,7 @@ On hold until {by}.
 when = "What held the issue is resolved"
 from = ["In progress", "Changes requested"]
 labels = ["-blocked"]
+from_labels = ["blocked"]    # only an issue on hold
 blockers = "deny"            # refuse while a blocker is still open
 comment = "{comment}"
 
@@ -88,6 +91,7 @@ from = ["In progress", "Changes requested"]
 blockers = "deny"            # nothing goes to review on top of an unmerged change
 require = ["comment"]        # the pull request
 labels = ["+needs-review", "-changes-requested"]
+refuse_labels = ["blocked"]  # not while on hold
 assign = "{assignee}"        # the reviewer: review 24 --assignee octocat; added next to the author
 comment = "Ready for review by @{assignee}: {comment}"
 
@@ -110,6 +114,7 @@ when = "The user approved the pull request after reviewing it"
 to = "Approved"
 from = ["In review"]
 labels = ["-needs-review"]
+refuse_labels = ["blocked"]
 assign = true                # the author merges it...
 unassign = "all"             # ...and the reviewer is done
 confirm = "user"
@@ -133,6 +138,6 @@ when = "The approved pull request has been merged into main"
 to = "Merged"
 from = ["Approved"]
 close = "completed"          # an issue the pull request closed stays closed
-labels = ["-blocked"]
+refuse_labels = ["blocked"]
 batch = true                 # gh dojo merged 12 13 14
 comment = "{comment}"

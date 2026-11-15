@@ -10,19 +10,19 @@ Verbs:
   start           You begin writing the change
                   optional --comment; refused while a blocker is unresolved; assigns you; comments "Started. Session: {session} {comment}"
   hold            Work is stuck: waiting for another issue or an outside decision
-                  needs --by or --comment; labels +blocked; --by N also marks it blocked by #N; comments "On hold until {by}. {comment}"
+                  needs --by or --comment; refused with the label blocked; labels +blocked; --by N also marks it blocked by #N; comments "On hold until {by}. {comment}"
   resume          What held the issue is resolved
-                  optional --comment; refused while a blocker is unresolved; labels -blocked; comments "{comment}"
+                  optional --comment; refused without the label blocked; refused while a blocker is unresolved; labels -blocked; comments "{comment}"
   review          The pull request is open and ready for review
-                  needs --comment and --assignee; refused while a blocker is unresolved; labels +needs-review -changes-requested; assigns the --assignee user; comments "Ready for review by @{assignee}: {comment}"
+                  needs --comment and --assignee; refused with the label blocked; refused while a blocker is unresolved; labels +needs-review -changes-requested; assigns the --assignee user; comments "Ready for review by @{assignee}: {comment}"
   request-changes The reviewer asked for changes; the author makes them and runs review again
                   needs --comment; labels +changes-requested -needs-review; assigns you; unassigns everyone else; comments "Changes requested: {comment}"
   approve         The user approved the pull request after reviewing it
-                  optional --comment; the user's decision: ask first, then --yes; labels -needs-review; assigns you; unassigns everyone else; comments "Approved. {comment}"
+                  optional --comment; the user's decision: ask first, then --yes; refused with the label blocked; labels -needs-review; assigns you; unassigns everyone else; comments "Approved. {comment}"
   reject          The user decided the change is not wanted
                   needs --comment; on a closed issue only if closed as not planned; the user's decision: ask first, then --yes; labels -needs-review -changes-requested -blocked; comments "{comment}"; closes as not planned
   merged          The approved pull request has been merged into main
-                  several numbers at once (merged 12 13 14) or a release's issues (release <tag> --verb merged); optional --comment; also on closed issues; labels -blocked; comments "{comment}"; closes as completed
+                  several numbers at once (merged 12 13 14) or a release's issues (release <tag> --verb merged); optional --comment; also on closed issues; refused with the label blocked; comments "{comment}"; closes as completed
 
 Every verb adds the issue to the board if it is missing and refuses a
 closed issue unless noted. A repeat is safe: an effect already in place

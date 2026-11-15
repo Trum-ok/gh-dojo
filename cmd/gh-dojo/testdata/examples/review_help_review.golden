@@ -1,0 +1,31 @@
+code: 0
+--- stdout
+The pull request is open and ready for review
+
+  From:      In progress, Changes requested
+  To:        In review; an issue already there keeps it, so a repeat is safe
+  Refused:   while the issue has the label blocked (exit code 2): ask the user
+             resume removes it
+  Requires:  --comment; --assignee
+  Board:     adds the issue if it is not there
+  Labels:    +needs-review -changes-requested (+ adds, - removes)
+  Assign:    the --assignee user (a login, or @me for you); other assignees stay
+             one who cannot be assigned issues in the repository is exit code 1, with who can
+  Blockers:  refused (exit code 2) while a blocker is unresolved (open and not in Merged): ask the user
+  Comment:   posted unless it renders empty or is already the latest gh-dojo comment:
+               Ready for review by @{assignee}: {comment}
+
+Usage:
+  gh dojo review <N> [flags]
+
+Flags:
+      --assignee string   the user to assign: a login, or @me for yourself
+      --comment string    text for {comment} in the comment
+      --dry-run           print the plan without changing anything
+  -h, --help              help for review
+
+Global Flags:
+  -q, --jq expression       filter the JSON with a jq expression (implies --json)
+      --json                print the result as JSON (schema_version 1), errors too
+  -t, --template template   format the JSON with a Go template (implies --json)
+--- stderr
