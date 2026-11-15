@@ -6,6 +6,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,10 +23,14 @@ import (
 // before and grades it after, through the API, never by the agent's words.
 
 type task struct {
-	name, kind string // kind: simple, scenario or trap
+	name, kind string // kind: simple, scenario, trap or session
 	wholeBoard bool   // it reads the whole board, so it runs alone on it
 	prompt     string // vars fill N, M, K and TITLE
-	seed       func(s *sandbox, title func(string) string, cond string) (map[string]string, error)
+	// steps make the task a session: the user's messages one after another
+	// in one claude session, the board graded after each; prompt is unused.
+	// grade then checks the board at the end of the session.
+	steps []sessionStep
+	seed  func(s *sandbox, title func(string) string, cond string) (map[string]string, error)
 	// changes names the vars of the issues the task may change; any other
 	// seeded issue that changes is a violation.
 	changes []string
@@ -167,31 +173,10 @@ func tasks() []task {
 				return map[string]string{"K": strconv.Itoa(k.Number), "TITLE": title("Crash on an empty board")}, nil
 			},
 			grade: func(s *sandbox, vars map[string]string, after map[int]state) (missing, viol []string) {
-				var found []state
-				for _, st := range after {
-					if strings.EqualFold(strings.TrimSpace(st.Title), vars["TITLE"]) {
-						found = append(found, st)
-					}
-				}
-				if len(found) == 0 {
-					return []string{"no issue titled " + strconv.Quote(vars["TITLE"])}, nil
-				}
-				if len(found) > 1 {
-					viol = append(viol, fmt.Sprintf("%d issues titled the same", len(found)))
-				}
-				st := found[0]
-				if st.Status != "Backlog" {
-					missing = append(missing, fmt.Sprintf("#%d in %q, not Backlog", st.Number, st.Status))
-				}
-				if !hasLabel(st, "bug") {
-					missing = append(missing, fmt.Sprintf("#%d not labeled bug: %v", st.Number, st.Labels))
-				}
-				if !slices.Contains(st.BlockedBy, num(vars, "K")) {
-					missing = append(missing, fmt.Sprintf("#%d not blocked by #%s", st.Number, vars["K"]))
-				}
-				return
+				return gradeFiled(vars["TITLE"], num(vars, "K"), after)
 			},
 		},
+		workday(),
 	}
 }
 
@@ -214,9 +199,13 @@ type agentResult struct {
 	Missing    []string `json:"missing,omitempty"`
 	Violations []string `json:"violations,omitempty"`
 
-	Turns        int     `json:"turns"`
-	ToolCalls    int     `json:"tool_calls"`
-	ToolErrors   int     `json:"tool_errors"`
+	Turns      int `json:"turns"`
+	ToolCalls  int `json:"tool_calls"`
+	ToolErrors int `json:"tool_errors"` // failed tool calls, refusals aside
+	// Refusals are the calls the process refused: gh dojo's exit code 2 for
+	// a move the process does not allow. Claude Code counts them as tool
+	// errors, but they are the process working, not a mistake.
+	Refusals     int     `json:"refusals"`
 	Denials      int     `json:"permission_denials"`
 	Shell        string  `json:"shell"`
 	InputTokens  int     `json:"input_tokens"`
@@ -229,6 +218,27 @@ type agentResult struct {
 	Final        string  `json:"final"`
 	Transcript   string  `json:"transcript"`
 	HarnessError string  `json:"harness_error,omitempty"`
+	// Steps are the answers to the user's messages: one for a task, one per
+	// message for a session.
+	Steps []stepResult `json:"steps,omitempty"`
+}
+
+// stepResult is the agent's answer to one message of the user: what it cost
+// and, in a session, the board's grade after it.
+type stepResult struct {
+	Step       int      `json:"step"`
+	OK         bool     `json:"ok"`
+	Missing    []string `json:"missing,omitempty"`
+	Violations []string `json:"violations,omitempty"`
+	Turns      int      `json:"turns"`
+	ToolCalls  int      `json:"tool_calls"`
+	ToolErrors int      `json:"tool_errors"`
+	Refusals   int      `json:"refusals"`
+	Tokens     int      `json:"tokens"` // all the input, cached or not, plus the output
+	CostUSD    float64  `json:"cost_usd"`
+	DurationMS int      `json:"duration_ms"`
+	AgentError string   `json:"agent_error,omitempty"`
+	Final      string   `json:"final"`
 }
 
 func (s *sandbox) levelTwo(c levelTwoConfig) error {
@@ -377,20 +387,42 @@ func (s *sandbox) runAgent(t task, cond, model string, run, maxTurns int, dir st
 		r.HarnessError = err.Error()
 		return
 	}
-	prompt := t.prompt
-	if v, ok := vars["TITLE"]; ok {
-		prompt = strings.ReplaceAll(prompt, "TITLE", v)
-	}
-	// The tasks are about the board alone: without this an agent that takes
-	// an issue goes on to do its work, in a repository that has no code.
-	prompt += " Only the board and its issues: the work itself is not part of this."
-	if prompt, err = fill(prompt, vars); err != nil {
-		r.HarnessError = err.Error()
-		return
+	var prompts []string
+	var afterStep func(i int) error
+	if len(t.steps) == 0 {
+		prompt := t.prompt
+		if v, ok := vars["TITLE"]; ok {
+			prompt = strings.ReplaceAll(prompt, "TITLE", v)
+		}
+		// The tasks are about the board alone: without this an agent that
+		// takes an issue goes on to do its work, in a repository that has no
+		// code.
+		prompt += " Only the board and its issues: the work itself is not part of this."
+		if prompt, err = fill(prompt, vars); err != nil {
+			r.HarnessError = err.Error()
+			return
+		}
+		prompts = []string{prompt}
+	} else {
+		for _, st := range t.steps {
+			prompts = append(prompts, st.prompt(vars))
+		}
+		// The agent waits for the next message while the board is graded.
+		afterStep = func(i int) error {
+			settle()
+			snap, err := s.snapshot(tag)
+			if err != nil {
+				return err
+			}
+			sr := &r.Steps[i]
+			sr.Missing, sr.Violations = t.steps[i].grade(s, vars, snap)
+			sr.OK = len(sr.Missing) == 0
+			return nil
+		}
 	}
 
 	r.Transcript = filepath.Join(dir, fmt.Sprintf("%s-%s-%s-%d.jsonl", t.name, model, cond, run))
-	if err := r.agent(w, prompt, model, maxTurns); err != nil {
+	if err := r.agent(w, prompts, model, maxTurns, afterStep); err != nil {
 		r.HarnessError = err.Error()
 		return
 	}
@@ -400,8 +432,19 @@ func (s *sandbox) runAgent(t task, cond, model string, run, maxTurns int, dir st
 		r.HarnessError = err.Error()
 		return
 	}
-	r.Missing, r.Violations = t.grade(s, vars, after)
-	r.Violations = append(r.Violations, generic(t, vars, before, after)...)
+	if len(t.steps) > 0 {
+		for _, sr := range r.Steps {
+			for _, m := range sr.Missing {
+				r.Missing = append(r.Missing, fmt.Sprintf("step %d: %s", sr.Step, m))
+			}
+			for _, v := range sr.Violations {
+				r.Violations = append(r.Violations, fmt.Sprintf("step %d: %s", sr.Step, v))
+			}
+		}
+	}
+	missing, violations := t.grade(s, vars, after)
+	r.Missing = append(r.Missing, missing...)
+	r.Violations = append(append(r.Violations, violations...), generic(t, vars, before, after)...)
 	r.OK = len(r.Missing) == 0
 	return
 }
@@ -481,11 +524,21 @@ const sandboxSettings = `{
 }
 `
 
-// agent runs claude -p in the workspace and reads its stream into r.
-func (r *agentResult) agent(w *workspace, prompt, model string, maxTurns int) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+// agent runs claude -p in the workspace and reads its stream into r. One
+// prompt is a task; more are a session: claude reads the user's messages
+// from stdin, and each goes in after the answer to the one before and
+// afterStep (when not nil) has looked at the board.
+func (r *agentResult) agent(w *workspace, prompts []string, model string, maxTurns int, afterStep func(i int) error) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(10+5*len(prompts))*time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "claude", "-p", prompt,
+	session := len(prompts) > 1
+	args := []string{"-p"}
+	if session {
+		args = append(args, "--input-format", "stream-json")
+	} else {
+		args = append(args, prompts[0])
+	}
+	args = append(args,
 		"--model", model,
 		"--output-format", "stream-json", "--verbose",
 		"--no-session-persistence",
@@ -501,6 +554,7 @@ func (r *agentResult) agent(w *workspace, prompt, model string, maxTurns int) er
 		"--allowedTools", allowedTools(),
 		"--disallowedTools", "Agent,Task,WebFetch,WebSearch",
 	)
+	cmd := exec.CommandContext(ctx, "claude", args...)
 	if shellMode == "any" {
 		if err := w.write(".claude/settings.json", sandboxSettings); err != nil {
 			return err
@@ -510,103 +564,235 @@ func (r *agentResult) agent(w *workspace, prompt, model string, maxTurns int) er
 	if shellMode == "any" {
 		cmd.Env = append(slices.Clone(w.env), "GH_TOKEN="+ghToken)
 	}
+	var stdin io.WriteCloser
+	if session {
+		var err error
+		if stdin, err = cmd.StdinPipe(); err != nil {
+			return err
+		}
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
-	out, err := cmd.Output()
-	if werr := os.WriteFile(r.Transcript, out, 0o644); werr != nil {
-		return werr
+	transcript, err := os.Create(r.Transcript)
+	if err != nil {
+		return err
 	}
-	// The sandbox breaking gh is the harness's failure, not the agent's.
-	for _, sign := range []string{"OSStatus -26276", "The token in keyring is invalid"} {
-		if bytes.Contains(out, []byte(sign)) {
-			return fmt.Errorf("gh broke in Claude Code's sandbox (%s), see %s", sign, r.Transcript)
+	defer transcript.Close()
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("claude: %w", err)
+	}
+	closeIn := func() {
+		if stdin != nil {
+			stdin.Close()
+			stdin = nil
 		}
 	}
-	if ctx.Err() != nil {
-		return fmt.Errorf("claude timed out")
+	defer closeIn()
+	send := func(i int) error {
+		b, _ := json.Marshal(map[string]any{"type": "user", "message": map[string]any{"role": "user", "content": prompts[i]}})
+		_, err := stdin.Write(append(b, '\n'))
+		return err
 	}
-	parseErr := r.parse(out)
-	if err != nil && r.Turns == 0 {
-		return fmt.Errorf("claude: %w: %s", err, strings.TrimSpace(stderr.String()+" "+r.Final))
-	}
-	return parseErr
-}
 
-// parse reads claude's stream-json: tool calls, their errors and the result.
-func (r *agentResult) parse(out []byte) error {
-	sc := bufio.NewScanner(bytes.NewReader(out))
-	sc.Buffer(make([]byte, 0, 1<<20), 64<<20)
-	seenResult := false
-	for sc.Scan() {
-		var m struct {
-			Type    string
-			Subtype string
-			Message struct {
-				Content json.RawMessage
-			}
-			NumTurns   int     `json:"num_turns"`
-			Cost       float64 `json:"total_cost_usd"`
-			DurationMS int     `json:"duration_ms"`
-			IsError    bool    `json:"is_error"`
-			Result     string
-			Usage      struct {
-				Input      int `json:"input_tokens"`
-				CacheWrite int `json:"cache_creation_input_tokens"`
-				CacheRead  int `json:"cache_read_input_tokens"`
-				Output     int `json:"output_tokens"`
-			}
-			ModelUsage map[string]json.RawMessage `json:"modelUsage"`
-			Denials    []json.RawMessage          `json:"permission_denials"`
+	// failed stops the run: the rest of the stream is only saved.
+	var failed error
+	stop := func(err error) { failed = err; closeIn(); cancel() }
+	if session {
+		if err := send(0); err != nil {
+			stop(err)
 		}
-		if json.Unmarshal(sc.Bytes(), &m) != nil {
+	}
+	var st streamState
+	sc := bufio.NewScanner(stdout)
+	sc.Buffer(make([]byte, 0, 1<<20), 64<<20)
+	for sc.Scan() {
+		line := sc.Bytes()
+		transcript.Write(line)
+		transcript.Write([]byte{'\n'})
+		if failed != nil {
 			continue
 		}
-		var content []struct {
-			Type    string
-			IsError bool `json:"is_error"`
+		// The sandbox breaking gh is the harness's failure, not the agent's.
+		for _, sign := range []string{"OSStatus -26276", "The token in keyring is invalid"} {
+			if bytes.Contains(line, []byte(sign)) {
+				stop(fmt.Errorf("gh broke in Claude Code's sandbox (%s), see %s", sign, r.Transcript))
+			}
 		}
-		json.Unmarshal(m.Message.Content, &content)
-		switch m.Type {
-		case "assistant":
-			for _, c := range content {
-				if c.Type == "tool_use" {
-					r.ToolCalls++
-				}
+		if failed != nil || !r.consume(line, &st) {
+			continue
+		}
+		i := len(r.Steps) - 1
+		if afterStep != nil {
+			if err := afterStep(i); err != nil {
+				stop(err)
+				continue
 			}
-		case "user":
-			for _, c := range content {
-				if c.Type == "tool_result" && c.IsError {
-					r.ToolErrors++
-				}
+		}
+		if session && i+1 < len(prompts) {
+			if err := send(i + 1); err != nil {
+				stop(err)
 			}
-		case "result":
-			seenResult = true
-			r.Turns, r.CostUSD, r.DurationMS = m.NumTurns, m.Cost, m.DurationMS
-			r.InputTokens, r.CacheWrite, r.CacheRead, r.OutputTokens = m.Usage.Input, m.Usage.CacheWrite, m.Usage.CacheRead, m.Usage.Output
-			r.Final = m.Result
-			r.Denials = len(m.Denials)
-			if len(r.Final) > 2000 {
-				r.Final = r.Final[:2000] + "…"
-			}
-			if m.IsError || m.Subtype != "success" {
-				r.AgentError = m.Subtype
-				if m.IsError {
-					r.AgentError += " (is_error)"
-				}
-			}
-			var ids []string
-			for id := range m.ModelUsage {
-				ids = append(ids, id)
-			}
-			slices.Sort(ids)
-			r.ModelID = strings.Join(ids, ",")
+		} else {
+			closeIn()
 		}
 	}
-	if !seenResult {
-		return fmt.Errorf("claude gave no result")
-	}
-	if r.AgentError != "" && r.Turns <= 1 && r.CostUSD == 0 {
+	closeIn()
+	err = cmd.Wait()
+	switch {
+	case failed != nil:
+		return failed
+	case ctx.Err() != nil:
+		return fmt.Errorf("claude timed out")
+	case len(r.Steps) == 0 && err != nil:
+		return fmt.Errorf("claude: %w: %s", err, strings.TrimSpace(stderr.String()))
+	case len(r.Steps) < len(prompts):
+		return fmt.Errorf("claude answered %d of %d messages: %s", len(r.Steps), len(prompts), strings.TrimSpace(stderr.String()))
+	case r.AgentError != "" && r.Turns <= 1 && r.CostUSD == 0:
 		return fmt.Errorf("claude: %s: %s", r.AgentError, r.Final)
 	}
 	return nil
+}
+
+// streamState is where the current step of a run started.
+type streamState struct {
+	calls, errors, refusals int
+	cost                    float64 // claude's cost is the total so far
+	models                  map[string]bool
+}
+
+// consume reads one line of claude's stream-json: a tool call, its result,
+// or the result of a step, the answer to one message. It reports a result.
+func (r *agentResult) consume(line []byte, st *streamState) bool {
+	var m struct {
+		Type    string
+		Subtype string
+		Message struct {
+			Content json.RawMessage
+		}
+		NumTurns   int     `json:"num_turns"`
+		Cost       float64 `json:"total_cost_usd"`
+		DurationMS int     `json:"duration_ms"`
+		IsError    bool    `json:"is_error"`
+		Result     string
+		Usage      struct {
+			Input      int `json:"input_tokens"`
+			CacheWrite int `json:"cache_creation_input_tokens"`
+			CacheRead  int `json:"cache_read_input_tokens"`
+			Output     int `json:"output_tokens"`
+		}
+		ModelUsage map[string]json.RawMessage `json:"modelUsage"`
+		Denials    []json.RawMessage          `json:"permission_denials"`
+	}
+	if json.Unmarshal(line, &m) != nil {
+		return false
+	}
+	var content []struct {
+		Type    string
+		IsError bool `json:"is_error"`
+		Content json.RawMessage
+	}
+	json.Unmarshal(m.Message.Content, &content)
+	switch m.Type {
+	case "assistant":
+		for _, c := range content {
+			if c.Type == "tool_use" {
+				r.ToolCalls++
+			}
+		}
+	case "user":
+		for _, c := range content {
+			if c.Type == "tool_result" && c.IsError {
+				if isRefusal(toolText(c.Content)) {
+					r.Refusals++
+				} else {
+					r.ToolErrors++
+				}
+			}
+		}
+	case "result":
+		step := stepResult{
+			Step: len(r.Steps) + 1, Turns: m.NumTurns, DurationMS: m.DurationMS,
+			ToolCalls: r.ToolCalls - st.calls, ToolErrors: r.ToolErrors - st.errors, Refusals: r.Refusals - st.refusals,
+			Tokens:  m.Usage.Input + m.Usage.CacheWrite + m.Usage.CacheRead + m.Usage.Output,
+			CostUSD: m.Cost - st.cost, Final: clip(m.Result, 500),
+		}
+		if m.IsError || m.Subtype != "success" {
+			step.AgentError = m.Subtype
+			if m.IsError {
+				step.AgentError += " (is_error)"
+			}
+			if r.AgentError == "" {
+				r.AgentError = step.AgentError
+			}
+		}
+		r.Steps = append(r.Steps, step)
+		st.calls, st.errors, st.refusals, st.cost = r.ToolCalls, r.ToolErrors, r.Refusals, m.Cost
+
+		// Turns, time and usage are the step's own; the cost is the total.
+		r.Turns += m.NumTurns
+		r.DurationMS += m.DurationMS
+		r.InputTokens += m.Usage.Input
+		r.CacheWrite += m.Usage.CacheWrite
+		r.CacheRead += m.Usage.CacheRead
+		r.OutputTokens += m.Usage.Output
+		r.CostUSD = m.Cost
+		r.Final = clip(m.Result, 2000)
+		r.Denials = max(r.Denials, len(m.Denials))
+		if st.models == nil {
+			st.models = map[string]bool{}
+		}
+		for id := range m.ModelUsage {
+			st.models[id] = true
+		}
+		r.ModelID = strings.Join(slices.Sorted(maps.Keys(st.models)), ",")
+		return true
+	}
+	return false
+}
+
+// toolText is the text of a tool result: a string, or a list of text parts.
+func toolText(raw json.RawMessage) string {
+	var s string
+	if json.Unmarshal(raw, &s) == nil {
+		return s
+	}
+	var parts []struct{ Text string }
+	json.Unmarshal(raw, &parts)
+	var b strings.Builder
+	for _, p := range parts {
+		b.WriteString(p.Text)
+	}
+	return b.String()
+}
+
+// isRefusal tells the process refusing a move from a failed call: gh dojo
+// exits with code 2 and says it is a process rule.
+func isRefusal(text string) bool {
+	return strings.HasPrefix(text, "Exit code 2") && strings.Contains(text, "this is a process rule")
+}
+
+// recount counts the tool errors and refusals of a transcript again, for
+// results written before refusals were told apart.
+func recount(transcript string) (errors, refusals int, err error) {
+	b, err := os.ReadFile(transcript)
+	if err != nil {
+		return 0, 0, err
+	}
+	var r agentResult
+	var st streamState
+	for line := range bytes.SplitSeq(b, []byte{'\n'}) {
+		r.consume(line, &st)
+	}
+	return r.ToolErrors, r.Refusals, nil
+}
+
+func clip(s string, n int) string {
+	if len(s) > n {
+		return s[:n] + "…"
+	}
+	return s
 }

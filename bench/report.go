@@ -41,14 +41,28 @@ func report(files []string) error {
 		}
 		return false
 	})
+	// The transcripts are the source: results written before refusals were
+	// told apart from errors count them again.
+	for i, r := range all {
+		if errs, refusals, err := recount(r.Transcript); err == nil {
+			all[i].ToolErrors, all[i].Refusals = errs, refusals
+		}
+	}
+	session := map[string]bool{}
+	for _, t := range tasks() {
+		session[t.name] = len(t.steps) > 0
+	}
 
 	type key struct{ task, model, cond string }
 	groups := map[key][]agentResult{}
 	var models, taskNames []string
 	for _, r := range all {
-		for _, k := range []key{{"", r.Model, r.Cond}, {r.Task, r.Model, r.Cond}} {
-			groups[k] = append(groups[k], r)
+		// The overall rows are the one-message tasks: a session costs as
+		// much as several of them and has tables of its own.
+		if !session[r.Task] {
+			groups[key{"", r.Model, r.Cond}] = append(groups[key{"", r.Model, r.Cond}], r)
 		}
+		groups[key{r.Task, r.Model, r.Cond}] = append(groups[key{r.Task, r.Model, r.Cond}], r)
 		if !slices.Contains(models, r.Model) {
 			models = append(models, r.Model)
 		}
@@ -65,33 +79,39 @@ func report(files []string) error {
 	}
 	fmt.Println(". Medians, with the range in brackets; tokens are all the input (cached or not) plus the output.")
 	fmt.Println()
-	header := "| Model | Condition | Runs | Success | Violations | Cost, $ | Tokens, k | Turns | Tool calls | Tool errors | Denied |"
-	sep := "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|"
+	header := "| Model | Condition | Runs | Success | Violations | Cost, $ | Tokens, k | Turns | Time, s | Tool calls | Tool errors | Refusals | Denied |"
+	sep := "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"
 	row := func(label string, rs []agentResult) string {
-		ok, viol, errs, denied := 0, 0, 0, 0
-		var cost, tok, turns, calls []float64
+		ok, viol, errs, refusals, denied := 0, 0, 0, 0, 0
+		var cost, tok, turns, secs, calls []float64
 		for _, r := range rs {
 			if r.OK {
 				ok++
 			}
 			viol += len(r.Violations)
 			errs += r.ToolErrors
+			refusals += r.Refusals
 			denied += r.Denials
 			cost = append(cost, r.CostUSD)
 			tok = append(tok, float64(r.InputTokens+r.CacheWrite+r.CacheRead+r.OutputTokens)/1000)
 			turns = append(turns, float64(r.Turns))
+			secs = append(secs, float64(r.DurationMS)/1000)
 			calls = append(calls, float64(r.ToolCalls))
 		}
-		return fmt.Sprintf("| %s | %d | %d/%d | %d | %s | %s | %s | %s | %d | %d |", label, len(rs), ok, len(rs), viol,
-			spread(cost, "%.3f"), spread(tok, "%.0f"), spread(turns, "%.0f"), spread(calls, "%.0f"), errs, denied)
+		return fmt.Sprintf("| %s | %d | %d/%d | %d | %s | %s | %s | %s | %s | %d | %d | %d |", label, len(rs), ok, len(rs), viol,
+			spread(cost, "%.3f"), spread(tok, "%.0f"), spread(turns, "%.0f"), spread(secs, "%.0f"), spread(calls, "%.0f"), errs, refusals, denied)
 	}
 	condName := map[string]string{condGh: "gh + CLAUDE.md", condDojo: "gh dojo + skill"}
-	fmt.Println(header)
-	fmt.Println(sep)
-	for _, m := range models {
-		for _, c := range allConditions {
-			if rs := groups[key{"", m, c}]; len(rs) > 0 {
-				fmt.Println(row(m+" | "+condName[c], rs))
+	if slices.ContainsFunc(all, func(r agentResult) bool { return !session[r.Task] }) {
+		fmt.Println("One-message tasks, all together:")
+		fmt.Println()
+		fmt.Println(header)
+		fmt.Println(sep)
+		for _, m := range models {
+			for _, c := range allConditions {
+				if rs := groups[key{"", m, c}]; len(rs) > 0 {
+					fmt.Println(row(m+" | "+condName[c], rs))
+				}
 			}
 		}
 	}
@@ -105,6 +125,9 @@ func report(files []string) error {
 					fmt.Println(row(m+" | "+condName[c], rs))
 				}
 			}
+		}
+		if session[t] {
+			sessionSteps(models, func(m, c string) []agentResult { return groups[key{t, m, c}] }, condName)
 		}
 		var notes []string
 		for _, m := range models {
@@ -124,6 +147,51 @@ func report(files []string) error {
 		}
 	}
 	return nil
+}
+
+// sessionSteps prints a session's running totals after each message: the
+// steps done right so far and the medians of cost, tokens, turns and time.
+// Where the conditions' lines cross is where gh dojo's skill pays off.
+func sessionSteps(models []string, runs func(model, cond string) []agentResult, condName map[string]string) {
+	fmt.Println()
+	fmt.Println("Running totals after each message: steps done right of all runs, then medians.")
+	fmt.Println()
+	fmt.Println("| Model | Condition | Step | Steps right | Cost, $ | Tokens, k | Turns | Time, s | Tool errors | Refusals |")
+	fmt.Println("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|")
+	for _, m := range models {
+		for _, c := range allConditions {
+			rs := runs(m, c)
+			steps := 0
+			for _, r := range rs {
+				steps = max(steps, len(r.Steps))
+			}
+			for i := range steps {
+				ok, total, errs, refusals := 0, 0, 0, 0
+				var cost, tok, turns, secs []float64
+				for _, r := range rs {
+					if i >= len(r.Steps) {
+						continue
+					}
+					var sc, st, su, ss float64
+					for _, p := range r.Steps[:i+1] {
+						sc += p.CostUSD
+						st += float64(p.Tokens) / 1000
+						su += float64(p.Turns)
+						ss += float64(p.DurationMS) / 1000
+						errs += p.ToolErrors
+						refusals += p.Refusals
+						total++
+						if p.OK {
+							ok++
+						}
+					}
+					cost, tok, turns, secs = append(cost, sc), append(tok, st), append(turns, su), append(secs, ss)
+				}
+				fmt.Printf("| %s | %s | %d | %d/%d | %s | %s | %s | %s | %d | %d |\n", m, condName[c], i+1, ok, total,
+					spread(cost, "%.3f"), spread(tok, "%.0f"), spread(turns, "%.0f"), spread(secs, "%.0f"), errs, refusals)
+			}
+		}
+	}
 }
 
 // spread formats the median of vs and their range.

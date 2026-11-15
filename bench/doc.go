@@ -24,10 +24,18 @@
 // words. Tasks: start, next (pick the free issue past a blocked one), wait
 // (on another issue), done-from-backlog (the process refuses it), retry-start
 // (the comment of an earlier attempt is there already), file-blocked (a new
-// bug blocked by an issue). It needs claude logged in (claude auth login) or
-// ANTHROPIC_API_KEY, and costs real tokens; run it by hand, not in CI:
+// bug blocked by an issue). And a session, workday: one claude session gets
+// eight messages one after another, the board work of a day with two traps,
+// and the board is graded after each; the report prints its running totals
+// per step, to show where the skill, loaded once, pays off. A refusal of the
+// process (gh dojo's exit code 2) is counted apart from the tool errors:
+// Claude Code reports it as one, but it is the process working.
+//
+// It needs claude logged in (claude auth login) or ANTHROPIC_API_KEY, and
+// costs real tokens; run it by hand, not in CI:
 //
 //	go run ./bench agents -shell any -models haiku,sonnet -runs 5
+//	go run ./bench agents -shell any -models haiku,sonnet -runs 5 -tasks workday
 //	go run ./bench report bench/out/agents-*/results.jsonl
 //
 // With -shell any the agent's Bash runs any command in Claude Code's sandbox
