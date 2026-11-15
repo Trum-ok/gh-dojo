@@ -1,4 +1,4 @@
-# gh-dojo
+# <picture><source media="(prefers-color-scheme: dark)" srcset="docs/media/logo-dark.svg"><img alt="" src="docs/media/logo-light.svg" width="40" height="40" align="top"></picture> gh-dojo
 
 [![CI](https://github.com/Trum-ok/gh-dojo/actions/workflows/ci.yml/badge.svg)](https://github.com/Trum-ok/gh-dojo/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Trum-ok/gh-dojo)](https://github.com/Trum-ok/gh-dojo/releases/latest)

@@ -16,6 +16,12 @@ Not Remotion: `bench-workday-*.svg`, under "Benchmark", is drawn by the
 benchmark from its results, `go run ./bench chart bench/out/agents-*/results.jsonl`
 (see [bench/doc.go](../../bench/doc.go)).
 
+Not Remotion either: the logo, a torii of dots on a 16×16 grid with an ema
+plaque between its pillars. `logo-light.svg` and `logo-dark.svg` sit in the
+README heading; the dots of the pillars shrink over the bottom six rows.
+`social-preview.png` (1280×640) is the repository's social preview, uploaded
+by hand in the repository's Settings.
+
 The gh-dojo output and comments in the stories are the text gh-dojo prints and
 posts with the kanban preset, and the GraphQL mutations are the ones it sends;
 keep them in step with the code. `src/Chat.tsx` draws the chat with the agent,
