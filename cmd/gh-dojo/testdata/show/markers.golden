@@ -1,13 +1,6 @@
 #12 Verbs
 state: open, opened ? by ghost
 board: not on the board (a verb adds it)
-milestone: none
-labels: none
-assignees: none
-blocked by: none
-blocking: none
-parent: none
-sub-issues: none
 
 description:
   - Comment with the marker `<!-- gh-dojo:<verb>:<hash> -->`; no second one is posted.

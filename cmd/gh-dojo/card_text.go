@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"fmt"
 	"regexp"
 	"slices"
@@ -69,6 +70,39 @@ type cardView struct {
 	// bodyRunes cuts the description and commentBudget is shared by the
 	// comments shown (see commentRunes); 0 prints them whole.
 	bodyRunes, commentBudget int
+	// full prints the status history a change per line and session links
+	// whole (--full).
+	full bool
+	// sessionRE matches a session link of [session] link in a comment, its
+	// ID the first group; nil when the link is the bare ID.
+	sessionRE *regexp.Regexp
+}
+
+// sessionLinkRE matches links made from the session link template (with
+// {id}), nil for the bare "{id}", which has nothing to tell an ID by.
+func sessionLinkRE(link string) *regexp.Regexp {
+	before, after, ok := strings.Cut(link, "{id}")
+	if !ok || before == "" && after == "" {
+		return nil
+	}
+	return regexp.MustCompile(regexp.QuoteMeta(before) + "([^\\s<>()\\[\\]`'\"]+)" + regexp.QuoteMeta(after))
+}
+
+// sessionTail is how many last characters of a session ID a shortened
+// session link keeps.
+const sessionTail = 8
+
+// shortSessions shortens the session links in s to "session …<tail>":
+// an agent reading the card needs no link to another agent's session, and
+// an ID costs many tokens. --full keeps them.
+func (v cardView) shortSessions(s string) string {
+	if v.full || v.sessionRE == nil {
+		return s
+	}
+	return v.sessionRE.ReplaceAllStringFunc(s, func(m string) string {
+		id := []rune(v.sessionRE.FindStringSubmatch(m)[1])
+		return "…" + string(id[max(0, len(id)-sessionTail):])
+	})
 }
 
 // card renders the full card.
@@ -82,15 +116,21 @@ func (v cardView) card(c *issue.Card) string {
 	if v.sprintField != "" {
 		line("sprint: %s", v.sprint(c))
 	}
-	line("milestone: %s", cardMilestone(c.Milestone))
-	line("labels: %s", cardNames(c.Labels))
-	line("assignees: %s", cardNames(c.Assignees))
+	// A line that would say "none" is left out.
+	some := func(label, value string) {
+		if value != "none" {
+			line("%s: %s", label, value)
+		}
+	}
+	some("milestone", cardMilestone(c.Milestone))
+	some("labels", cardNames(c.Labels))
+	some("assignees", cardNames(c.Assignees))
 	v.writeBlockers(&b, c)
 	writeBlocking(&b, c, v.def)
-	line("parent: %s", v.parent(c))
+	some("parent", v.parent(c))
 	v.writeSubIssues(&b, c)
 	if c.OnBoard() || c.BoardUnknown && len(c.History) > 0 {
-		writeHistory(&b, c)
+		writeHistory(&b, c, v.full)
 	}
 	if c.Incomplete {
 		line("note: GitHub withheld part of this issue from the token (a project or linked issue it cannot see); the rest is accurate")
@@ -113,8 +153,9 @@ func (v cardView) card(c *issue.Card) string {
 	return b.String()
 }
 
-// brief renders three lines: title; state, status, milestone (if any),
-// labels, assignees; blockers and counts. A fourth notes a partly hidden card.
+// brief renders three lines: title; state, status, milestone, labels,
+// assignees; blockers and counts. A part that would say "none" is left out.
+// A fourth line notes a partly hidden card.
 func (v cardView) brief(c *issue.Card) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s %s\n", c.Ref().String(v.def), singleLine(c.Title))
@@ -125,7 +166,13 @@ func (v cardView) brief(c *issue.Card) string {
 	if c.Milestone != nil {
 		fmt.Fprintf(&b, " · milestone: %s", cardMilestone(c.Milestone))
 	}
-	fmt.Fprintf(&b, " · labels: %s · assignees: %s\n", cardNames(c.Labels), cardNames(c.Assignees))
+	if names := cardNames(c.Labels); names != "none" {
+		fmt.Fprintf(&b, " · labels: %s", names)
+	}
+	if names := cardNames(c.Assignees); names != "none" {
+		fmt.Fprintf(&b, " · assignees: %s", names)
+	}
+	b.WriteString("\n")
 
 	var blocked string
 	unresolved := c.UnresolvedBlockers(v.resolved)
@@ -146,13 +193,11 @@ func (v cardView) brief(c *issue.Card) string {
 		}
 	case resolved > 0:
 		blocked = fmt.Sprintf("blocked by none unresolved (%d resolved)", resolved)
-	default:
-		blocked = "blocked by none"
 	}
 	if note := render.Shown(len(c.BlockedBy.Nodes), c.BlockedBy.TotalCount, ""); note != "" {
-		blocked += " (" + note + " blockers)"
+		blocked = cmp.Or(blocked, "blocked by none read") + " (" + note + " blockers)"
 	}
-	blocking := "blocking none"
+	var blocking string
 	if c.Blocking.TotalCount > 0 || len(c.Blocking.Nodes) > 0 {
 		closed := 0
 		for _, l := range c.Blocking.Nodes {
@@ -168,7 +213,14 @@ func (v cardView) brief(c *issue.Card) string {
 			blocking += " (" + note + ")"
 		}
 	}
-	fmt.Fprintf(&b, "%s · %s%s · comments: %d\n", blocked, blocking, v.briefHierarchy(c), c.Comments.TotalCount)
+	var parts []string
+	for _, p := range []string{blocked, blocking, strings.TrimPrefix(v.briefHierarchy(c), " · ")} {
+		if p != "" {
+			parts = append(parts, p)
+		}
+	}
+	parts = append(parts, fmt.Sprintf("comments: %d", c.Comments.TotalCount))
+	fmt.Fprintf(&b, "%s\n", strings.Join(parts, " · "))
 	if c.Incomplete {
 		b.WriteString("note: GitHub withheld part of this issue from the token; the rest is accurate\n")
 	}
@@ -443,10 +495,10 @@ func linkPlace(l issue.Link) string {
 }
 
 // writeLinks writes the header line of linked issues: label, counts, and a
-// note when not all were read.
+// note when not all were read; nothing when there are none.
 func writeLinks(b *strings.Builder, label string, p graph.Page[issue.Link], counts []string) {
-	if len(counts) == 0 && p.TotalCount == 0 {
-		counts = []string{"none"}
+	if len(counts) == 0 && p.TotalCount == 0 && len(p.Nodes) == 0 {
+		return
 	}
 	if note := render.Shown(len(p.Nodes), p.TotalCount, ""); note != "" {
 		counts = append(counts, note)
@@ -464,8 +516,10 @@ func writeLink(b *strings.Builder, l issue.Link, ref, about string) {
 	b.WriteString("\n")
 }
 
-// writeHistory writes the status changes on the board, oldest first.
-func writeHistory(b *strings.Builder, c *issue.Card) {
+// writeHistory writes the status changes on the board, oldest first: in
+// one line with days unless full, which writes a change per line with its
+// time.
+func writeHistory(b *strings.Builder, c *issue.Card, full bool) {
 	switch {
 	case c.HistoryUntracked:
 		b.WriteString("status history: not tracked (GitHub records changes of the built-in Status field only)\n")
@@ -476,18 +530,44 @@ func writeHistory(b *strings.Builder, c *issue.Card) {
 	case len(c.History) == 0:
 		b.WriteString("status history: none among the latest changes read; older ones are not read\n")
 		return
-	case c.HistoryTruncated:
-		b.WriteString("status history (latest changes only; older ones are not read):\n")
-	default:
-		b.WriteString("status history:\n")
 	}
-	for _, h := range c.History {
-		by := "by " + cardLogin(h.Actor)
-		if h.Automated || projectAutomation[h.Actor] {
-			by = "(automation)"
+	head := "status history"
+	if c.HistoryTruncated {
+		head += " (latest changes only; older ones are not read)"
+	}
+	automated := func(h issue.StatusChange) bool { return h.Automated || projectAutomation[h.Actor] }
+	if full {
+		b.WriteString(head + ":\n")
+		for _, h := range c.History {
+			by := "by " + cardLogin(h.Actor)
+			if automated(h) {
+				by = "(automation)"
+			}
+			fmt.Fprintf(b, "  %s %s %s\n", cardMinute(h.At), render.Transition(h.From, h.To), by)
 		}
-		fmt.Fprintf(b, "  %s %s %s\n", cardMinute(h.At), render.Transition(h.From, h.To), by)
+		return
 	}
+	// One chain: "no status → Backlog (automation, 2026-11-14) → In
+	// progress (alice, 2026-11-14)"; a change that does not start where
+	// the last one ended starts a new chain after "; ".
+	name := func(s string) string { return cmp.Or(s, "no status") }
+	var chain strings.Builder
+	last := ""
+	for i, h := range c.History {
+		if from := name(h.From); i == 0 || from != last {
+			if i > 0 {
+				chain.WriteString("; ")
+			}
+			chain.WriteString(from)
+		}
+		who := cardLogin(h.Actor)
+		if automated(h) {
+			who = "automation"
+		}
+		last = name(h.To)
+		fmt.Fprintf(&chain, " → %s (%s, %s)", last, who, cardDay(h.At))
+	}
+	fmt.Fprintf(b, "%s: %s\n", head, singleLine(chain.String()))
 }
 
 // writeComments writes the last v.comments comments, oldest first.
@@ -532,7 +612,7 @@ func (v cardView) shownComments(c *issue.Card) (shown []issue.Comment, bodies []
 	bodies = make([]string, len(shown))
 	lengths := make([]int, len(shown))
 	for i, cm := range shown {
-		bodies[i] = cleanText(cm.Body, cm.ViewerDidAuthor)
+		bodies[i] = v.shortSessions(cleanText(cm.Body, cm.ViewerDidAuthor))
 		if bodies[i] == "" {
 			bodies[i] = "(empty)"
 		}

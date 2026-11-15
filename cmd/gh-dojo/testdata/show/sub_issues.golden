@@ -4,8 +4,6 @@ code: 0
 state: open, opened 2026-11-11 by Trum-ok
 board: Ready · Size: M
 milestone: v0.0 — самохостинг
-labels: none
-assignees: none
 blocked by: none unresolved (2 resolved)
   #2 Коды выхода и короткие ошибки (internal/render) (Ready, resolved)
   #1 Каркас: Go-модуль, cobra и установка как расширение gh (Ready, resolved)
@@ -22,10 +20,7 @@ sub-issues: 1 of 5 closed, 3 unresolved
   #23 Check sub-issues in verbs (on the board, no status)
   #21 Show the hierarchy (Ready, resolved)
   acme/api#7 Expose the parent in the API (closed)
-status history:
-  2026-11-11 18:19 no status → Backlog (automation)
-  2026-11-11 18:42 Backlog → In progress by Trum-ok
-  2026-11-11 19:02 In progress → Ready by Trum-ok
+status history: no status → Backlog (automation, 2026-11-11) → In progress (Trum-ok, 2026-11-11) → Ready (Trum-ok, 2026-11-11)
 
 description:
   ## Зачем

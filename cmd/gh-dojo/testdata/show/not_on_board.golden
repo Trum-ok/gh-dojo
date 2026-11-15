@@ -4,8 +4,6 @@ code: 0
 state: open, opened 2026-11-11 by Trum-ok
 board: not on the board (a verb adds it)
 milestone: v0.0 — самохостинг
-labels: none
-assignees: none
 blocked by: none unresolved (2 resolved)
   #2 Коды выхода и короткие ошибки (internal/render) (Ready, resolved)
   #1 Каркас: Go-модуль, cobra и установка как расширение gh (Ready, resolved)
@@ -15,8 +13,6 @@ blocking: 5 open
   #7 Команда show <N>… (Ready)
   #6 Сверка конфига с доской (Ready)
   #4 Пресет kanban через embed.FS (Ready)
-parent: none
-sub-issues: none
 
 description:
   ## Зачем

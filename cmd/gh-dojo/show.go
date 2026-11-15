@@ -33,7 +33,8 @@ Prints per issue: state, board status and fields, the sprint (with
 fields.sprint), milestone, labels, assignees, blockers both ways, the
 parent issue and the sub-issues (GitHub's sub-issues), each with its board
 status, status history on the board, the description and the latest
-comments, indented. Times are UTC.
+comments, indented. A line left out means none: no milestone, labels,
+assignees, blockers, blocked issues, parent or sub-issues. Times are UTC.
 
 A blocker is resolved, no longer blocking, when it is closed or its board
 status is in statuses.resolved` + resolvedHelp() + `.
@@ -46,11 +47,17 @@ Folding, always with a note saying what is hidden:
   - the last ` + strconv.Itoa(defaultShownComments) + ` comments are printed; --comments N prints the last N,
     --comments all up to ` + strconv.Itoa(issue.MaxComments) + ` (the most gh dojo reads);
   - a description is cut at ` + strconv.Itoa(maxBodyRunes) + ` characters, and the comments shown share
-    ` + strconv.Itoa(commentBudgetRunes) + ` (` + strconv.Itoa(minCommentRunes) + ` to ` + strconv.Itoa(maxCommentRunes) + ` each); --full prints them whole.
+    ` + strconv.Itoa(commentBudgetRunes) + ` (` + strconv.Itoa(minCommentRunes) + ` to ` + strconv.Itoa(maxCommentRunes) + ` each); --full prints them whole;
+  - the status history is one line with days; --full prints a change per
+    line with its time;
+  - a session link in a comment ([session] link) keeps the last ` + strconv.Itoa(sessionTail) + `
+    characters of its ID; --full prints it whole.
 --brief prints three lines per issue (four when GitHub hid part of it):
 title; state, status, sprint, milestone, labels, assignees; blockers, the
 parent and sub-issues (when it has them) and counts.
-It takes neither --comments nor --full.
+It takes neither --comments nor --full. Several issues are printed so
+anyway, unless --comments or --full asks for their whole cards; --json has
+whole cards unless --brief.
 
 An issue is 42, "#42" (the default repository, board.repos[0]),
 owner/repo#42 or its URL; an issue outside the default repository is
@@ -59,7 +66,7 @@ printed as owner/repo#42, and so are its links.
 Several issues are read in one request (up to ` + strconv.Itoa(issue.MaxBatch) + ` issues per request),
 from any repositories. A missing issue or a pull request number is
 reported after the others are printed, with exit code 3.`,
-		Example: "  gh dojo show 42\n  gh dojo show 42 43 57 --brief\n  gh dojo show acme/api#7\n  gh dojo show 42 --comments all",
+		Example: "  gh dojo show 42\n  gh dojo show 42 43 57\n  gh dojo show 42 43 --full\n  gh dojo show acme/api#7\n  gh dojo show 42 --comments all",
 		Args:    showArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if brief {
@@ -88,7 +95,13 @@ reported after the others are printed, with exit code 3.`,
 			if readErr != nil && len(res) == 0 {
 				return readErr
 			}
-			v := cardView{statusField: cfg.StatusField(), resolved: cfg.Statuses.Resolved, comments: shown, def: repo}
+			// Several issues are brief in text unless --comments or --full
+			// asks for cards: one is usually taken, read it alone.
+			cardsAsked := full || cmd.Flags().Changed("comments")
+			briefByDefault := !brief && len(refs) > 1 && !cardsAsked && !jsonMode(cmd)
+			textBrief := brief || briefByDefault
+			v := cardView{statusField: cfg.StatusField(), resolved: cfg.Statuses.Resolved, comments: shown, def: repo,
+				full: full, sessionRE: sessionLinkRE(cfg.Session.Link)}
 			v.sprintField, v.sprintFieldID = showSprint(cmd.Context(), app, cfg)
 			if !full {
 				v.bodyRunes, v.commentBudget = maxBodyRunes, commentBudgetRunes
@@ -107,16 +120,20 @@ reported after the others are printed, with exit code 3.`,
 				for i, c := range cards {
 					switch {
 					case i == 0:
-					case brief:
+					case textBrief:
 						fmt.Fprintln(w)
 					default:
 						fmt.Fprintln(w, "\n"+cardSeparator)
 					}
-					if brief {
+					if textBrief {
 						fmt.Fprint(w, v.brief(c))
 					} else {
 						fmt.Fprint(w, v.card(c))
 					}
+				}
+				if briefByDefault {
+					fmt.Fprintf(w, "\nbrief, as for several issues: %s N prints one card, --comments N or --full all of them\n",
+						cmd.CommandPath())
 				}
 			}
 			err = showError(repo, unread, failed, readErr)

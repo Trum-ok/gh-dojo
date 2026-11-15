@@ -1,12 +1,12 @@
 code: 3
 --- stdout
 #3 Конфиг: загрузка и валидация .github/dojo.toml (internal/config)
-open · Ready · milestone: v0.0 — самохостинг · labels: none · assignees: none
+open · Ready · milestone: v0.0 — самохостинг
 blocked by none unresolved (2 resolved) · blocking 5 open · comments: 0
 
 cli/cli#2 An issue in another repository
-closed (completed) 2019-11-13 · not on the board (a verb adds it) · labels: none · assignees: none
-blocked by none · blocking none · comments: 0
+closed (completed) 2019-11-13 · not on the board (a verb adds it)
+comments: 0
 --- stderr
 error: repository Trum-ok/no-such-repo-xyz not found, or the token cannot see it
 #1 in cli/cli is a pull request; gh dojo works with issues only (fix: gh dojo list)

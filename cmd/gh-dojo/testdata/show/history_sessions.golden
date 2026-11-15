@@ -1,0 +1,33 @@
+#42 Fix login
+state: open, opened 2026-11-12 by ghost
+board: no status
+status history: no status → Backlog (automation, 2026-11-12) → In progress (alice, 2026-11-12); Waiting → Ready (bob, 2026-11-14)
+
+description: none
+
+comments (2):
+--- alice, 2026-11-12 09:30
+  Taken. Session: …491bf84f
+
+  Decision: keep it.
+--- bob, 2026-11-12 09:30
+  See (…cal_1234) and claude://other/x.
+
+### --full
+#42 Fix login
+state: open, opened 2026-11-12 by ghost
+board: no status
+status history:
+  2026-11-12 09:30 no status → Backlog (automation)
+  2026-11-12 10:30 Backlog → In progress by alice
+  2026-11-14 09:30 Waiting → Ready by bob
+
+description: none
+
+comments (2):
+--- alice, 2026-11-12 09:30
+  Taken. Session: claude://claude.ai/epitaxy/local_8b6e42f7-5194-49a1-bfe7-7e7e491bf84f
+
+  Decision: keep it.
+--- bob, 2026-11-12 09:30
+  See (claude://claude.ai/epitaxy/local_1234) and claude://other/x.

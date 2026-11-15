@@ -3,18 +3,11 @@ code: 0
 #42 Fix login redirect
 state: closed (completed) 2026-11-12, opened 2026-11-11 by Trum-ok
 board: Ready · Size: M · Sprint: Sprint 12 · Estimate: 2.5 · Target date: 2026-11-20
-milestone: none
 labels: bug, area:cli
 assignees: Trum-ok
 blocked by: none unresolved (1 resolved)
   acme/auth#7 Auth library upgrade (closed)
-blocking: none
-parent: none
-sub-issues: none
-status history (latest changes only; older ones are not read):
-  2026-11-11 18:19 no status → Backlog (automation)
-  2026-11-11 18:42 Backlog → In progress by Trum-ok
-  2026-11-11 19:02 In progress → Ready by Trum-ok
+status history (latest changes only; older ones are not read): no status → Backlog (automation, 2026-11-11) → In progress (Trum-ok, 2026-11-11) → Ready (Trum-ok, 2026-11-11)
 
 description:
   Login redirects to /home instead of the page the user came from.

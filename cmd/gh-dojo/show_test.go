@@ -47,6 +47,9 @@ func TestShow(t *testing.T) {
 		{"all_comments", "testdata/graphql/show_all_comments.json", []string{"42", "--comments", "all"}, render.ExitOK},
 		{"many", issueFixtures + "cards_3_7_9999.json", []string{"3", "7", "9999", "3"}, render.ExitNotFound},
 		{"many_brief", issueFixtures + "cards_3_7_9999.json", []string{"3", "7", "9999", "--brief"}, render.ExitNotFound},
+		// Several issues are brief unless --comments or --full asks for cards.
+		{"many_full", issueFixtures + "cards_3_7_9999.json", []string{"3", "7", "9999", "--full"}, render.ExitNotFound},
+		{"many_comments", issueFixtures + "cards_3_7_9999.json", []string{"3", "7", "9999", "--comments", "1"}, render.ExitNotFound},
 		{"mixed_brief", issueFixtures + "cards_mixed.json", []string{"42", "15", "--brief"}, render.ExitNotFound},
 		{"pull_request", issueFixtures + "card_pull_request.json", []string{"15"}, render.ExitNotFound},
 		{"not_found", issueFixtures + "card_not_found.json", []string{"9999"}, render.ExitNotFound},
@@ -378,4 +381,42 @@ func TestCardTextMarkers(t *testing.T) {
 	}
 	v := cardView{statusField: "Status", comments: 5, def: dojo}
 	testutil.Golden(t, "show/markers", []byte(v.card(c)))
+}
+
+// TestCardTextHistoryAndSessions: the status history is one chain, broken
+// where a change does not start where the last ended, and a change per
+// line with --full; session links in comments keep the tail of their ID
+// unless --full.
+func TestCardTextHistoryAndSessions(t *testing.T) {
+	at := time.Date(2026, 11, 12, 9, 30, 0, 0, time.UTC)
+	dojo := issue.Repo{Owner: "Trum-ok", Name: "gh-dojo"}
+	c := &issue.Card{
+		Repo: dojo, Number: 42, Title: "Fix login", State: issue.StateOpen, CreatedAt: at,
+		Item: &issue.Item{Values: []issue.Value{{Field: "Status", Text: "Ready"}}},
+		History: []issue.StatusChange{
+			{At: at, To: "Backlog", Actor: "github-project-automation"},
+			{At: at.Add(time.Hour), From: "Backlog", To: "In progress", Actor: "alice"},
+			{At: at.Add(48 * time.Hour), From: "Waiting", To: "Ready", Actor: "bob"},
+		},
+	}
+	c.Comments.TotalCount = 2
+	c.Comments.Nodes = []issue.Comment{
+		{Author: "alice", CreatedAt: at, ViewerDidAuthor: true,
+			Body: "Taken. Session: claude://claude.ai/epitaxy/local_8b6e42f7-5194-49a1-bfe7-7e7e491bf84f\n\n" +
+				"Decision: keep it.\n\n<!-- gh-dojo:start:0123abcd -->"},
+		{Author: "bob", CreatedAt: at, Body: "See (claude://claude.ai/epitaxy/local_1234) and claude://other/x."},
+	}
+	re := sessionLinkRE("claude://claude.ai/epitaxy/{id}")
+	v := cardView{statusField: "Status", comments: 5, def: dojo, sessionRE: re}
+	full := v
+	full.full = true
+	var b strings.Builder
+	b.WriteString(v.card(c))
+	b.WriteString("\n### --full\n")
+	b.WriteString(full.card(c))
+	testutil.Golden(t, "show/history_sessions", []byte(b.String()))
+
+	if sessionLinkRE("{id}") != nil {
+		t.Error(`sessionLinkRE("{id}") is not nil: a bare ID has nothing to tell it by`)
+	}
 }

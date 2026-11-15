@@ -1,62 +1,14 @@
 code: 3
 --- stdout
 #3 Конфиг: загрузка и валидация .github/dojo.toml (internal/config)
-state: open, opened 2026-11-11 by Trum-ok
-board: Ready · Size: M
-milestone: v0.0 — самохостинг
-labels: none
-assignees: none
-blocked by: none unresolved (2 resolved)
-  #2 Коды выхода и короткие ошибки (internal/render) (Ready, resolved)
-  #1 Каркас: Go-модуль, cobra и установка как расширение gh (Ready, resolved)
-blocking: 5 open
-  #11 Глаголы из конфига: проверки и план эффектов (internal/workflow) (Ready)
-  #8 Команда list (Ready)
-  #7 Команда show <N>… (Ready)
-  #6 Сверка конфига с доской (Ready)
-  #4 Пресет kanban через embed.FS (Ready)
-parent: none
-sub-issues: none
-status history:
-  2026-11-11 18:19 no status → Backlog (automation)
-  2026-11-11 18:42 Backlog → In progress by Trum-ok
-  2026-11-11 19:02 In progress → Ready by Trum-ok
+open · Ready · milestone: v0.0 — самохостинг
+blocked by none unresolved (2 resolved) · blocking 5 open · comments: 0
 
-description:
-  ## Зачем
-  Процесс проекта — данные в конфиге, а не код. Все команды читают конфиг.
-
-  ## Что сделать
-  - Поиск `.github/dojo.toml` вверх от текущей папки.
-  - Разбор `version`, `preset`, `[board]` (owner, project, repos, assignee), `[fields]` (`status` обязателен), `[session]` (env, link), `[verbs.*]`.
-  - Для глаголов в v0.0: `when`, `to`, `from`, `require`, `require_one_of`, `comment` (шаблон). Остальные ключи из спеки распознаются, но дают понятную ошибку «не поддерживается в этой версии», а не молча игнорируются.
-  - Ошибки валидации — код 1, с указанием ключа и допустимых значений.
-  - Сверка с доской — отдельная задача.
-
-  ## Готово, когда
-  - Пример конфига из спеки (без неподдерживаемых ключей) загружается.
-  - Тесты на отсутствие файла, неизвестный ключ, пустой `fields.status`, глагол без `when`.
-
-  Спека: `docs/spec.md`: «Модель и конфиг».
-
-comments: none
-
-========================================
 cli/cli#2 An issue in another repository
-state: closed (completed) 2019-11-13, opened 2019-10-07 by octocat
-board: not on the board (a verb adds it)
-milestone: none
-labels: none
-assignees: none
-blocked by: none
-blocking: none
-parent: none
-sub-issues: none
+closed (completed) 2019-11-13 · not on the board (a verb adds it)
+comments: 0
 
-description:
-  An issue of another repository, read in the same request.
-
-comments: none
+brief, as for several issues: gh dojo show N prints one card, --comments N or --full all of them
 --- stderr
 error: repository Trum-ok/no-such-repo-xyz not found, or the token cannot see it
 #1 in cli/cli is a pull request; gh dojo works with issues only (fix: gh dojo list)

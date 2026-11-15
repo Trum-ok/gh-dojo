@@ -42,7 +42,9 @@ sprint (with [`fields.sprint`](configuration.md#fields): `sprint: Sprint 12 (202
 parent issue and the sub-issues ([GitHub's
 sub-issues](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/adding-sub-issues)),
 each with its board status, status history on the board, the description
-and the latest comments. Times are UTC. Unresolved blockers (see
+and the latest comments. A line left out means none: a card without a
+milestone, labels, assignees, blockers, blocked issues, a parent or
+sub-issues has no line for them. Times are UTC. Unresolved blockers (see
 [`statuses.resolved`](configuration.md#statuses)) are listed first; a linked issue is shown
 with its status, "on the board, no status", "not on the board", or "status
 not read" and why, and a blocker whose status was not read counts as
@@ -52,17 +54,25 @@ a verb with [`sub_issues`](configuration.md#checks) checks. The first 20 sub-iss
 read, with a note when there are more; the closed count is GitHub's, of
 all of them (`17 of 55 closed`), and counts an issue closed for any
 reason, not planned too. A parent the token cannot read is `parent: not
-readable`, not `none`.
+readable`, not left out.
 
 Long content is folded, always with a note saying what is hidden: the last 5
 comments are printed (`--comments N` for the last N, `--comments all` for up
 to 100); the description is cut at 2000 characters and the comments shown
-share 1500. `--full` prints them whole. `--brief` prints three lines per
-issue: title; state, status, sprint, milestone, labels and assignees;
-blockers, the parent and the sub-issues (when it has them) and counts.
+share 1500. The status history is one line with days (`status history: no
+status → Backlog (automation, 2026-11-14) → In progress (alice,
+2026-11-14)`), and a [session link](configuration.md#session) in a comment
+keeps the last 8 characters of its ID (`Taken. Session: …491bf84f`).
+`--full` prints them all whole, the history a change per line with its time.
+`--brief` prints three lines per issue: title; state, status, sprint,
+milestone, labels and assignees; blockers, the parent and the sub-issues
+(when it has them) and counts.
 
 Several issues are read in one request (up to 20 issues per request), from
-any repositories: `gh dojo show 42 acme/api#7`. A missing issue, a pull
+any repositories: `gh dojo show 42 acme/api#7`. In text they are printed as
+with `--brief`, since an agent usually takes one of them and reads it alone;
+`--comments N` or `--full` prints their whole cards, and `--json` has whole
+cards unless `--brief`. A missing issue, a pull
 request number or a missing repository is reported after the others are
 printed, with exit code 3.
 

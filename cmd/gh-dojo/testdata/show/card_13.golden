@@ -4,19 +4,12 @@ code: 0
 state: open, opened 2026-11-11 by Trum-ok
 board: Ready · Size: S
 milestone: v0.0 — самохостинг
-labels: none
-assignees: none
 blocked by: none unresolved (2 resolved)
   #6 Сверка конфига с доской (Ready, resolved)
   #4 Пресет kanban через embed.FS (Ready, resolved)
 blocking: 1 open
   #14 Skill для агентов и переход на gh dojo (рубеж v0.0) (Ready)
-parent: none
-sub-issues: none
-status history:
-  2026-11-11 18:21 no status → Backlog (automation)
-  2026-11-11 19:59 Backlog → In progress by Trum-ok
-  2026-11-11 19:59 In progress → Ready by Trum-ok
+status history: no status → Backlog (automation, 2026-11-11) → In progress (Trum-ok, 2026-11-11) → Ready (Trum-ok, 2026-11-11)
 
 description:
   ## Зачем

@@ -1,6 +1,6 @@
 code: 0
 --- stdout
 #3 Конфиг: загрузка и валидация .github/dojo.toml (internal/config)
-open · Ready · milestone: v0.1 — first public release (due 2026-12-01) · labels: none · assignees: none
+open · Ready · milestone: v0.1 — first public release (due 2026-12-01)
 blocked by 5 unresolved (#1, #9, acme/auth#7, #12, #10); 2 resolved · blocking 1 open (1 closed) · comments: 0
 --- stderr

@@ -3,14 +3,10 @@ code: 0
 #42 Fix login redirect
 state: closed (completed) 2026-11-12, opened 2026-11-11 by Trum-ok
 board: Ready · Size: M · Sprint: Sprint 12 · Estimate: 2.5 · Target date: 2026-11-20
-milestone: none
 labels: bug, area:cli
 assignees: Trum-ok
 blocked by: none unresolved (1 resolved)
   acme/auth#7 Auth library upgrade (closed)
-blocking: none
-parent: none
-sub-issues: none
 status history (latest changes only; older ones are not read):
   2026-11-11 18:19 no status → Backlog (automation)
   2026-11-11 18:42 Backlog → In progress by Trum-ok

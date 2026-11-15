@@ -6,7 +6,8 @@ Prints per issue: state, board status and fields, the sprint (with
 fields.sprint), milestone, labels, assignees, blockers both ways, the
 parent issue and the sub-issues (GitHub's sub-issues), each with its board
 status, status history on the board, the description and the latest
-comments, indented. Times are UTC.
+comments, indented. A line left out means none: no milestone, labels,
+assignees, blockers, blocked issues, parent or sub-issues. Times are UTC.
 
 A blocker is resolved, no longer blocking, when it is closed or its board
 status is in statuses.resolved of .github/dojo.toml.
@@ -19,11 +20,17 @@ Folding, always with a note saying what is hidden:
   - the last 5 comments are printed; --comments N prints the last N,
     --comments all up to 100 (the most gh dojo reads);
   - a description is cut at 2000 characters, and the comments shown share
-    1500 (200 to 600 each); --full prints them whole.
+    1500 (200 to 600 each); --full prints them whole;
+  - the status history is one line with days; --full prints a change per
+    line with its time;
+  - a session link in a comment ([session] link) keeps the last 8
+    characters of its ID; --full prints it whole.
 --brief prints three lines per issue (four when GitHub hid part of it):
 title; state, status, sprint, milestone, labels, assignees; blockers, the
 parent and sub-issues (when it has them) and counts.
-It takes neither --comments nor --full.
+It takes neither --comments nor --full. Several issues are printed so
+anyway, unless --comments or --full asks for their whole cards; --json has
+whole cards unless --brief.
 
 An issue is 42, "#42" (the default repository, board.repos[0]),
 owner/repo#42 or its URL; an issue outside the default repository is
@@ -38,7 +45,8 @@ Usage:
 
 Examples:
   gh dojo show 42
-  gh dojo show 42 43 57 --brief
+  gh dojo show 42 43 57
+  gh dojo show 42 43 --full
   gh dojo show acme/api#7
   gh dojo show 42 --comments all
 
