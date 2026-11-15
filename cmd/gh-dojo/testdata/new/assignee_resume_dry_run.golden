@@ -1,0 +1,8 @@
+code: 0
+--- stdout
+dry run: new #15 "Fix login redirect"
+  create: already created by an earlier run; finishes it
+  labels: bug, area:cli already in place
+  assignees: +octocat (Trum-ok already assigned)
+  status: In progress (unchanged)
+--- stderr

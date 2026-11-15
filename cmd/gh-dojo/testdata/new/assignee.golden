@@ -1,0 +1,4 @@
+code: 0
+--- stdout
+#15 "Fix login redirect" created, labels bug, area:cli, assigned Trum-ok and octocat, no status → Backlog
+--- stderr

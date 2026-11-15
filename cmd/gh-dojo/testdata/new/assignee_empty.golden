@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: --assignee is empty: pass a login, like --assignee octocat, or @me for yourself
+fix: gh dojo new --help

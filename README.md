@@ -133,7 +133,7 @@ also be authorized for it.
 | [`show`](docs/commands.md#show) | Read issues: board status, sprint, blockers, history, description, comments |
 | [`list`](docs/commands.md#list) | One line per open issue on the board, grouped by status |
 | [`next`](docs/commands.md#next) | Issues to take: initial status, no unresolved blockers, in board order |
-| [`new`](docs/commands.md#new) | Create an issue with labels, milestone, blockers and parent, on the board, in the initial status |
+| [`new`](docs/commands.md#new) | Create an issue with labels, assignees, milestone, blockers and parent, on the board, in the initial status |
 | [`comment`](docs/commands.md#comment) | Comment without changing the status |
 | [`block`, `unblock`](docs/commands.md#block-unblock) | Add or remove blocked-by links without changing the status |
 | [`init`](docs/commands.md#init) | Write `.github/dojo.toml` for a board and check it |

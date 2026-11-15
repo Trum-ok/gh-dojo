@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: --assignee "octo cat" is not a GitHub login; pass a login, or @me for yourself
+fix: gh dojo new --help

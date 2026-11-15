@@ -1,5 +1,5 @@
 code: 0
 --- stdout
-{"schema_version":1,"error":null,"number":15,"repo":"Trum-ok/gh-dojo","title":"Fix login redirect","dry_run":false,"created":false,"labels":["bug","area:cli"],"status":"In progress","status_set":false,"unarchived":false,"milestone":null,"milestone_set":false,"blocked_by":[],"already_blocked_by":[],"parent":"Trum-ok/gh-dojo#2","parent_set":false}
+{"schema_version":1,"error":null,"number":15,"repo":"Trum-ok/gh-dojo","title":"Fix login redirect","dry_run":false,"created":false,"labels":["bug","area:cli"],"status":"In progress","status_set":false,"unarchived":false,"milestone":null,"milestone_set":false,"blocked_by":[],"already_blocked_by":[],"parent":"Trum-ok/gh-dojo#2","parent_set":false,"assigned":[],"already_assigned":[]}
 --- stderr
 warning: #15 is already a sub-issue of #2; kept it, --parent 26 not applied (to move it: gh issue edit 15 -R Trum-ok/gh-dojo --parent 26)

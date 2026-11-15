@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: --assignee names 11 users; GitHub allows 10 assignees per issue
+fix: gh dojo new --help

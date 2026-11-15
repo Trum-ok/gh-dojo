@@ -13,6 +13,10 @@ created, listing the allowed values.
 An unknown or ambiguous one fails before anything is created, listing the open
 milestones or the candidates. --milestone none is no milestone, as for a verb.
 
+--assignee assigns users by login, @me for yourself (repeatable, or
+comma-separated; GitHub allows 10). One who cannot be assigned issues in
+the repo fails before anything is created, listing who can.
+
 The body comes from --body or --body-file (a file, or - for stdin). A title
 starting with - goes after --, and every flag before the --, since anything
 after it is taken as the title: gh dojo new --type bug -- "-v is ignored".
@@ -28,23 +32,25 @@ created. A parent that does not exist, or a pull request, fails before
 anything is created (exit code 3).
 
 --repo owner/repo creates the issue in another repository of board.repos
-than the default one (board.repos[0]); labels, milestones and the repeat
-check are that repository's, and the issue is named owner/repo#N. A bare
-number in --blocked-by and --parent is still in the default repository.
+than the default one (board.repos[0]); labels, milestones, assignees and
+the repeat check are that repository's, and the issue is named owner/repo#N.
+A bare number in --blocked-by and --parent is still in the default
+repository.
 A repository not in board.repos is exit code 1, listing them.
 
 A repeat is safe: the body ends with a hidden marker of the title, and a run
 that finds it on one of the repo's 20 newest open issues, written by you,
-finishes that issue (labels, milestone, board, status, blocked-by links,
-parent) instead of creating another; a different milestone or parent it (or one
-the token cannot read) already has is kept.
+finishes that issue (labels, assignees, milestone, board, status, blocked-by
+links, parent) instead of creating another; assignees it has stay, and a
+different milestone or parent it (or one the token cannot read) already has
+is kept.
 So filing an open issue again with the same title (ignoring case and
 spacing) resumes it. If a run fails after creating the issue, it exits with
 code 5: run the same command again.
 
---dry-run reads and checks everything a run does (labels, milestone,
-blockers, parent, an issue an earlier run created) and prints the plan:
-the issue it would create, or what finishing the earlier one would do.
+--dry-run reads and checks everything a run does (labels, assignees,
+milestone, blockers, parent, an issue an earlier run created) and prints the
+plan: the issue it would create, or what finishing the earlier one would do.
 Nothing is created or changed.
 
 This project:
@@ -60,12 +66,14 @@ Examples:
   gh dojo new "Support org boards" --label enhancement --body-file - < notes.md
   gh dojo new "Release v1.2" --milestone v1.2 --blocked-by 17 --blocked-by 18
   gh dojo new "Document the export" --type documentation --parent 40
+  gh dojo new "Fix login redirect" --type bug --assignee @me
   gh dojo new "Rate limit the export" --repo acme/api --type bug
   gh dojo new "Fix login redirect" --type bug --blocked-by 17 --dry-run
   gh dojo new --type bug -- "-v is ignored by list"
 
 Flags:
       --area name          area name: adds the label <labels.area_prefix><name>; repeatable
+      --assignee login     assign a login, @me for yourself; repeatable, or comma-separated
       --blocked-by issue   the blocking issue: 12, "#12", owner/repo#12 or its URL; repeatable, or comma-separated
       --body string        issue body (markdown); one starting with - goes as --body=...
       --body-file file     read the body from file; - reads stdin

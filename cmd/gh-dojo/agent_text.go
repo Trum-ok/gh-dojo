@@ -619,7 +619,7 @@ func (d *agentDoc) writing(w *mdWriter) {
 	w.heading(1, "Creating and linking issues")
 	w.list([]string{
 		"`gh dojo new \"<title>\" --type " + typ + " --body \"…\"`: the issue, its labels, the board" + status +
-			", in one command; a long body: `--body-file <file>`, or `--body-file -` for stdin. More labels, a " +
+			", in one command; a long body: `--body-file <file>`, or `--body-file -` for stdin. More labels, assignees, a " +
 			"milestone, blockers or a parent: `gh dojo new --help`.",
 		"`gh dojo comment N \"text\"`: a comment without changing the status.",
 		"`gh dojo block N --by M` / `gh dojo unblock N --by M`: add or remove a blocked-by link without changing " +

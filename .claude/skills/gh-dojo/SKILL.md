@@ -74,7 +74,7 @@ Run a verb as `gh dojo <verb> N`; `--dry-run` prints its plan (status, links, th
 
 ## Creating and linking issues
 
-- `gh dojo new "<title>" --type <bug|enhancement|documentation|dogfood> --body "…"`: the issue, its labels, the board in `Backlog`, in one command; a long body: `--body-file <file>`, or `--body-file -` for stdin. More labels, a milestone, blockers or a parent: `gh dojo new --help`.
+- `gh dojo new "<title>" --type <bug|enhancement|documentation|dogfood> --body "…"`: the issue, its labels, the board in `Backlog`, in one command; a long body: `--body-file <file>`, or `--body-file -` for stdin. More labels, assignees, a milestone, blockers or a parent: `gh dojo new --help`.
 - `gh dojo comment N "text"`: a comment without changing the status.
 - `gh dojo block N --by M` / `gh dojo unblock N --by M`: add or remove a blocked-by link without changing the status. An existing issue becomes a sub-issue with `gh issue edit N --parent M`.
 

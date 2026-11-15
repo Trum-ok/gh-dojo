@@ -5,7 +5,7 @@
 | [`show`](#show) | Read issues: board status, sprint, blockers, history, description, comments |
 | [`list`](#list) | One line per open issue on the board, grouped by status |
 | [`next`](#next) | Issues to take: initial status, no unresolved blockers, in board order |
-| [`new`](#new) | Create an issue with labels, milestone, blockers and parent, on the board, in the initial status |
+| [`new`](#new) | Create an issue with labels, assignees, milestone, blockers and parent, on the board, in the initial status |
 | [`comment`](#comment) | Comment without changing the status |
 | [`block`, `unblock`](#block-unblock) | Add or remove blocked-by links without changing the status |
 | [`init`](#init) | Write `.github/dojo.toml` for a board and check it |
@@ -146,7 +146,7 @@ code 1).
 ## new
 
 ```sh
-gh dojo new <title> [--type T] [--area A]... [--label L]... [--milestone M] [--blocked-by N]... [--parent N] [--repo owner/repo] [--body TEXT | --body-file FILE] [--dry-run]
+gh dojo new <title> [--type T] [--area A]... [--label L]... [--assignee LOGIN]... [--milestone M] [--blocked-by N]... [--parent N] [--repo owner/repo] [--body TEXT | --body-file FILE] [--dry-run]
 ```
 
 Creates an issue, labels it, adds it to the board and sets the initial status
@@ -155,6 +155,10 @@ Creates an issue, labels it, adds it to the board and sets the initial status
 - `--type` takes one of [`labels.types`](configuration.md#labels) (or any repo label outside
   the areas when that list is empty), `--area cli` adds the label
   `<labels.area_prefix>cli`, `--label` adds any existing label;
+- `--assignee octocat` assigns a user who can be assigned issues in the
+  repository, `@me` the authenticated user (repeatable, or comma-separated;
+  GitHub allows 10). Logins are matched ignoring case, and `@me` with your
+  own login counts once;
 - `--milestone v1.2` puts the issue in the open milestone titled `v1.2`
   (ignoring case), or else in the only one whose title starts with it:
   `--milestone v0.3` for `v0.3 — extensibility`. Several such are exit
@@ -175,16 +179,18 @@ Creates an issue, labels it, adds it to the board and sets the initial status
   code 1 once the rest is done, with GitHub's reason, since re-running
   cannot help;
 - `--repo acme/api` creates it in another repository of
-  [`board.repos`](configuration.md#board) than the first: its labels, milestones and repeat
-  check are that repository's, the issue is named `acme/api#15`, and a bare
+  [`board.repos`](configuration.md#board) than the first: its labels, milestones, assignees and
+  repeat check are that repository's, the issue is named `acme/api#15`, and a bare
   `--blocked-by` or `--parent` number is still in the default repository. A repository
   not in `board.repos` is refused (exit code 1, listing them);
 - `--body-file -` reads the body from stdin. A title starting with `-` goes
   after `--`: `gh dojo new --type bug -- "-v is ignored"`.
 
 An unknown label or milestone fails before anything is created, listing the
-allowed values (exit code 1); so does a `--blocked-by` or `--parent` issue
-that does not exist, or a pull request (exit code 3).
+allowed values (exit code 1); so do `--assignee` logins that cannot be
+assigned issues in the repository, all named at once, listing who can be
+(exit code 1), and a `--blocked-by` or `--parent` issue that does not
+exist, or a pull request (exit code 3).
 
 ```console
 $ gh dojo new "Fix login redirect" --type bug --area cli
@@ -193,8 +199,10 @@ $ gh dojo new "Fix login redirect" --type bug --area cli
 
 A repeat is safe: the body ends with a hidden marker of the title, and a run
 that finds it on one of the repository's 20 newest open issues written by
-you finishes that issue (labels, milestone, board, status, blocked-by links,
-parent) instead of creating another; a different milestone or parent it
+you finishes that issue (labels, assignees, milestone, board, status,
+blocked-by links, parent) instead of creating another; assignees it has stay
+(`--assignee` only adds; one that would take it past 10 assignees is exit
+code 1 before anything is written), and a different milestone or parent it
 already has (or a parent the token cannot read) is kept, with a warning
 that names the command to change it: a verb that only sets
 `milestone = "{milestone}"` (no other effect or required argument, no
@@ -203,16 +211,17 @@ else `gh issue edit`.
 If a run fails after creating the issue, it exits with code 5: run the
 same command again.
 
-`--dry-run` reads and checks everything a run does, so an unknown label or
-a missing blocker fails the same way, and prints the plan instead of
-writing: the issue it would create, or, for one an earlier run created,
-what finishing it would do.
+`--dry-run` reads and checks everything a run does, so an unknown label, an
+assignee who cannot be assigned or a missing blocker fails the same way,
+and prints the plan instead of writing: the issue it would create, or, for
+one an earlier run created, what finishing it would do.
 
 ```console
-$ gh dojo new "Fix login redirect" --type bug --area cli --blocked-by 26 --dry-run
+$ gh dojo new "Fix login redirect" --type bug --area cli --assignee @me --blocked-by 26 --dry-run
 dry run: new "Fix login redirect"
   create: in Trum-ok/gh-dojo
   labels: bug, area:cli
+  assignees: Trum-ok
   add to the board
   status: no status → Backlog
   blocked by: #26

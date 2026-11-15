@@ -23,7 +23,9 @@ code: 0
   "blocked_by": [],
   "already_blocked_by": [],
   "parent": null,
-  "parent_set": false
+  "parent_set": false,
+  "assigned": [],
+  "already_assigned": []
 }
 
 --- stderr

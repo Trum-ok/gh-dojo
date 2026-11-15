@@ -40,7 +40,7 @@ var newFixArgs = []string{"new", "Fix login redirect", "--type", "bug", "--area"
 func TestNewContextRecorded(t *testing.T) {
 	srv := graphtest.New(t, newContextFixture)
 	repo := issue.Repo{Owner: "Trum-ok", Name: "gh-dojo"}
-	nc, err := readNewContext(context.Background(), srv.Client(), repo, "Status", nil, nil)
+	nc, err := readNewContext(context.Background(), srv.Client(), repo, "Status", nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

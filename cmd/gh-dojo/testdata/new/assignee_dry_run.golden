@@ -1,0 +1,9 @@
+code: 0
+--- stdout
+dry run: new "Fix login redirect"
+  create: in Trum-ok/gh-dojo
+  labels: bug, area:cli
+  assignees: Trum-ok and octocat
+  add to the board
+  status: no status → Backlog
+--- stderr

@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: #15 has 10 assignees; assigning octocat would make more than the 10 GitHub allows
+fix: unassign someone first (gh issue edit 15 -R Trum-ok/gh-dojo --remove-assignee <login>), or drop --assignee

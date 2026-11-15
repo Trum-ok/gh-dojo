@@ -1,0 +1,6 @@
+code: 1
+--- stdout
+--- stderr
+error: --assignee: octo-nobody and ghost cannot be assigned issues in acme/api
+allowed: ghostwriter, octocat, Trum-ok
+fix: check the logins, or give them access to acme/api
