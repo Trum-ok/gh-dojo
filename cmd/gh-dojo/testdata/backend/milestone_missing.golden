@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: plan needs --milestone
+fix: gh dojo plan 3 --milestone "<title>"

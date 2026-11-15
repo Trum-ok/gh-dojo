@@ -1,0 +1,10 @@
+code: 0
+--- stdout
+ok       version  gh dojo dev
+ok       config   .github/dojo.toml: preset kanban, 7 verbs
+ok       token    github.com as Trum-ok, with the project scope
+ok       board    Trum-ok/5 "gh-dojo": field Status and 5 statuses match
+ok       repo     Trum-ok/gh-dojo (default): visible, issues enabled
+ok       labels   Trum-ok/gh-dojo: no area labels (area:…) yet: new --area fails until one exists
+ok       verbs    Trum-ok/gh-dojo: 2 labels exist, 1 assignee can be assigned, 1 milestone is open
+--- stderr

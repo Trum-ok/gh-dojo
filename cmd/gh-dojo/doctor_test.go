@@ -86,6 +86,33 @@ types = ["bug", "Docs"]
 		// removes current assignees by ID, and the login is likely a typo.
 		{"verbs_unassign", doctorVerbsOKConfig + "\n[verbs.leave]\nwhen = \"x\"\nunassign = \"octo-nobody\"\n",
 			[]string{doctorFixtures + "ok.json", boardFixture, doctorFixtures + "verbs_unassign.json"}, render.ExitOK, 4},
+		// A milestone of the config is matched against the open ones as
+		// a verb matches it, read in the same query: v0.2 names one by its
+		// start; v9 none and v0 several are problems; "{milestone}" names
+		// nothing to check.
+		{"verbs_milestone", doctorVerbsOKConfig + `
+[verbs.ship]
+when = "Due in the agent release"
+milestone = "v0.2"
+
+[verbs.ship-later]
+when = "Due in a release without a milestone yet"
+milestone = "v9"
+
+[verbs.someday]
+when = "Due in some v0 release"
+milestone = "v0"
+
+[verbs.plan]
+when = "The issue moves to another stage"
+milestone = "{milestone}"
+`, []string{doctorFixtures + "ok.json", boardFixture, doctorFixtures + "verbs_milestone.json"}, render.ExitUsage, 4},
+		{"verbs_milestone_ok", doctorVerbsOKConfig + `
+[verbs.ship]
+when = "Due in the agent release"
+milestone = "v0.2"
+`,
+			[]string{doctorFixtures + "ok.json", boardFixture, doctorFixtures + "verbs_milestone.json"}, render.ExitOK, 4},
 		// The labels of from_labels and refuse_labels are checked too: a
 		// missing one refuses every issue or never refuses; one in another
 		// case is fine, since the checks match names regardless of case.

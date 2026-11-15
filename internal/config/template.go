@@ -15,10 +15,13 @@ const (
 	// VarAssignee is the login of the user --assignee names, as GitHub
 	// spells it; only a verb with assign = "{assignee}" may use it.
 	VarAssignee = ArgAssignee
+	// VarMilestone is the title of the milestone the verb sets, as GitHub
+	// spells it; only a verb with milestone = "{milestone}" may use it.
+	VarMilestone = ArgMilestone
 )
 
 var (
-	commentVars = []string{VarSession, VarComment, VarBy, VarAssignee}
+	commentVars = []string{VarSession, VarComment, VarBy, VarAssignee, VarMilestone}
 	linkVars    = []string{"id"}
 
 	// placeholderRE matches {name}. Other braces, such as "{}" or "{ x }",

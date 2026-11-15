@@ -1,0 +1,6 @@
+code: 1
+--- stdout
+--- stderr
+error: done does not use --milestone
+allowed: --comment
+fix: gh dojo done 3

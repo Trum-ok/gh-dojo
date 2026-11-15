@@ -221,6 +221,12 @@ func workflowIssue(c *issue.Card, def issue.Repo) workflow.Issue {
 		if f.User != nil {
 			is.AssignLogin = f.User.Login // as GitHub spells it
 		}
+		if f.Milestone != nil {
+			is.SetMilestone = f.Milestone.Title // as the repository spells it
+		}
+	}
+	if c.Milestone != nil {
+		is.Milestone = c.Milestone.Title
 	}
 	for _, cm := range c.Comments.Nodes {
 		is.Comments = append(is.Comments, workflow.Comment{Body: cm.Body, ViewerDidAuthor: cm.ViewerDidAuthor})

@@ -1,0 +1,23 @@
+code: 0
+--- stdout
+Due in the agent release
+
+  From:      any status
+  To:        the status is not changed
+  Requires:  nothing besides the issue number
+  Board:     adds the issue if it is not there
+  Milestone: v0.2 (an open milestone, by title or a start only its title has);
+             an issue in it already keeps it, so a repeat is safe
+
+Usage:
+  gh dojo ship <N> [flags]
+
+Flags:
+      --dry-run   print the plan without changing anything
+  -h, --help      help for ship
+
+Global Flags:
+  -q, --jq expression       filter the JSON with a jq expression (implies --json)
+      --json                print the result as JSON (schema_version 1), errors too
+  -t, --template template   format the JSON with a Go template (implies --json)
+--- stderr

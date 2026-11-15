@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.plan.milestone = "v{milestone}": {milestone} is the whole value, for the milestone --milestone names
+fix: milestone = "{milestone}"

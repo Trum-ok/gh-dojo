@@ -1,0 +1,16 @@
+code: 1
+--- stdout
+ok       version  gh dojo dev
+ok       config   .github/dojo.toml: preset kanban, 10 verbs
+ok       token    github.com as Trum-ok, with the project scope
+ok       board    Trum-ok/5 "gh-dojo": field Status and 5 statuses match
+ok       repo     Trum-ok/gh-dojo (default): visible, issues enabled
+ok       labels   Trum-ok/gh-dojo: no area labels (area:…) yet: new --area fails until one exists
+problem  verbs    verbs.ship-later.milestone: unknown milestone "v9": no open milestone in Trum-ok/gh-dojo has that title or one starting with it
+                  allowed: v0.0 — самохостинг, v0.1 — первый публичный релиз, v0.2 — агент и релизы, v0.3 — расширяемость
+                  fix: if it is new, create it: gh api repos/Trum-ok/gh-dojo/milestones -f title="v9", or fix verbs.ship-later.milestone
+problem  verbs    verbs.someday.milestone: milestone "v0" is ambiguous: 4 open milestones in Trum-ok/gh-dojo start with it
+                  allowed: v0.0 — самохостинг, v0.1 — первый публичный релиз, v0.2 — агент и релизы, v0.3 — расширяемость
+                  fix: write more of the title in verbs.someday.milestone
+--- stderr
+error: doctor found 2 problems; fix as shown above, then run gh dojo doctor again

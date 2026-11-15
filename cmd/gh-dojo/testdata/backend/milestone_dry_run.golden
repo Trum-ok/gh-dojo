@@ -1,0 +1,6 @@
+code: 0
+--- stdout
+dry run: plan #3 "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)"
+  milestone: v0.0 — самохостинг → v0.3 — расширяемость
+  comment: "Moved to v0.3 — расширяемость."
+--- stderr

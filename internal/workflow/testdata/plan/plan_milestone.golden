@@ -1,0 +1,5 @@
+dry run: plan #42 "Fix login redirect"
+  milestone: v0.2 → v0.3 — extensibility
+  comment: "Moved to v0.3 — extensibility."
+confirm: #42 milestone v0.2 → v0.3 — extensibility, comment left
+post: "Moved to v0.3 — extensibility.\n\n<!-- gh-dojo:plan:1c86c7b3 -->"

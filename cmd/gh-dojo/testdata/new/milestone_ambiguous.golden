@@ -1,0 +1,6 @@
+code: 1
+--- stdout
+--- stderr
+error: milestone "v0" is ambiguous: 2 open milestones in Trum-ok/gh-dojo start with it
+allowed: v0.1, v0.2
+fix: write more of the title, up to all of it

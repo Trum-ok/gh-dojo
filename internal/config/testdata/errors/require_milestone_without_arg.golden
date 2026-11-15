@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.start.require names "milestone", but verbs.start.milestone is not "{milestone}"
+fix: set milestone = "{milestone}" to set the milestone --milestone names, or remove "milestone" from verbs.start.require

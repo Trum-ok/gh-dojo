@@ -330,8 +330,8 @@ func (c *Config) buildVerb(name string, r *rawVerb) (Verb, error) {
 		return Verb{}, err
 	}
 	if v.To == "" && v.Comment == "" && len(v.AddLabels)+len(v.RemoveLabels) == 0 && !v.Assigns() && v.Unassign == "" &&
-		v.Close == "" && !v.Reopen && v.Iteration == "" && len(v.Fields) == 0 {
-		return Verb{}, c.Errorf("verbs.%s has no effect: set to, comment, labels, assign, unassign, close, reopen, iteration or field", name)
+		!v.SetsMilestone() && v.Close == "" && !v.Reopen && v.Iteration == "" && len(v.Fields) == 0 {
+		return Verb{}, c.Errorf("verbs.%s has no effect: set to, comment, labels, assign, unassign, milestone, close, reopen, iteration or field", name)
 	}
 	for _, list := range []struct {
 		key  string
@@ -352,14 +352,22 @@ func (c *Config) buildVerb(name string, r *rawVerb) (Verb, error) {
 			if list.key == "require_one_of" && slices.Contains(v.Require, arg) {
 				return Verb{}, c.Errorf("%s: %q is also in %s", key, arg, c.KeyPath(p+"require"))
 			}
+			// An argument an effect takes (assign = "{assignee}",
+			// milestone = "{milestone}") is one that effect requires.
+			effect, fromArg, taken, does := "", "", false, ""
+			switch arg {
+			case ArgAssignee:
+				effect, fromArg, taken, does = "assign", AssignFromArg, v.AssignArg, "assign the user --"+arg+" names"
+			case ArgMilestone:
+				effect, fromArg, taken, does = "milestone", MilestoneFromArg, v.MilestoneArg, "set the milestone --"+arg+" names"
+			}
 			switch {
-			case arg == ArgAssignee && list.key == "require_one_of" && v.AssignArg:
-				return Verb{}, c.Errorf("%s names %q, which %s = %q always requires", key, arg, c.KeyPath(p+"assign"), AssignFromArg).
+			case effect != "" && list.key == "require_one_of" && taken:
+				return Verb{}, c.Errorf("%s names %q, which %s = %q always requires", key, arg, c.KeyPath(p+effect), fromArg).
 					WithFix(fmt.Sprintf("remove %q from %s", arg, key))
-			case arg == ArgAssignee && !v.AssignArg:
-				return Verb{}, c.Errorf("%s names %q, but %s is not %q", key, arg, c.KeyPath(p+"assign"), AssignFromArg).
-					WithFix(fmt.Sprintf(`set assign = %q to assign the user --%s names, or remove %q from %s`,
-						AssignFromArg, ArgAssignee, arg, key))
+			case effect != "" && !taken:
+				return Verb{}, c.Errorf("%s names %q, but %s is not %q", key, arg, c.KeyPath(p+effect), fromArg).
+					WithFix(fmt.Sprintf(`set %s = %q to %s, or remove %q from %s`, effect, fromArg, does, arg, key))
 			case !v.Takes(arg):
 				return Verb{}, c.Errorf("%s names %q, but %s does not use {%s}", key, arg, c.KeyPath(p+"comment"), arg)
 			}
@@ -369,6 +377,10 @@ func (c *Config) buildVerb(name string, r *rawVerb) (Verb, error) {
 	if v.AssignArg && !slices.Contains(v.Require, ArgAssignee) {
 		// Nothing else names the user to assign.
 		v.Require = append(slices.Clone(v.Require), ArgAssignee)
+	}
+	if v.MilestoneArg && !slices.Contains(v.Require, ArgMilestone) {
+		// Nothing else names the milestone to set.
+		v.Require = append(slices.Clone(v.Require), ArgMilestone)
 	}
 	return v, nil
 }
@@ -383,7 +395,7 @@ func requires(r *rawVerb, arg string) bool {
 	return false
 }
 
-// buildEffects validates labels, assign, unassign, close, reopen, confirm, blockers,
+// buildEffects validates labels, assign, unassign, milestone, close, reopen, confirm, blockers,
 // sub_issues, iteration and field.
 func (c *Config) buildEffects(name string, r *rawVerb, v *Verb) error {
 	p := "verbs." + name + "."
@@ -414,6 +426,9 @@ func (c *Config) buildEffects(name string, r *rawVerb, v *Verb) error {
 		}
 	}
 	if err := c.buildAssign(name, r, v); err != nil {
+		return err
+	}
+	if err := c.buildMilestone(name, r.Milestone, v); err != nil {
 		return err
 	}
 	if o := r.Close; o != nil {
@@ -593,6 +608,52 @@ func (c *Config) buildAssign(name string, r *rawVerb, v *Verb) error {
 		return c.Errorf("%s uses {%s}, the --%s user, but %s is not %q",
 			c.KeyPath(p+"comment"), VarAssignee, ArgAssignee, c.KeyPath(p+"assign"), AssignFromArg).
 			WithFix(fmt.Sprintf(`set assign = %q to assign the user --%s names, or drop {%s}`, AssignFromArg, ArgAssignee, VarAssignee))
+	}
+	return nil
+}
+
+// buildMilestone validates the milestone key: the title of a milestone
+// (an open one of the issue's repository, matched when the verb runs, as
+// doctor checks it), "{milestone}" for the --milestone one, or false to
+// turn off a preset's. A title is one line without surrounding spaces and
+// without placeholders; {milestone} only stands alone.
+func (c *Config) buildMilestone(name string, o *rawOff, v *Verb) error {
+	p := "verbs." + name + "."
+	if o != nil {
+		key := c.KeyPath(p + "milestone")
+		fix := fmt.Sprintf(`write the title of an open milestone, like milestone = "v1.2", or milestone = %q to take it from --%s`,
+			MilestoneFromArg, ArgMilestone)
+		switch m := deref(o.Str); {
+		case o.Bool != nil && *o.Bool:
+			return c.Errorf("%s = true: want a milestone title, %q for the --%s one, or false to turn it off",
+				key, MilestoneFromArg, ArgMilestone).
+				WithAllowed("a milestone title", strconv.Quote(MilestoneFromArg), "false")
+		case o.Bool != nil:
+			// false: no milestone, turning off a preset's.
+		case m == MilestoneFromArg:
+			v.MilestoneArg = true
+		case strings.TrimSpace(m) == "":
+			return c.Errorf("%s is empty", key).WithFix(fix)
+		case placeholderRE.MatchString(m):
+			if ph := placeholderRE.FindStringSubmatch(m)[1]; ph != ArgMilestone {
+				return c.Errorf("%s: unknown placeholder {%s}", key, ph).
+					WithAllowed("a milestone title", strconv.Quote(MilestoneFromArg))
+			}
+			return c.Errorf("%s = %q: {%s} is the whole value, for the milestone --%s names", key, m, ArgMilestone, ArgMilestone).
+				WithFix(fmt.Sprintf(`milestone = %q`, MilestoneFromArg))
+		case strings.ContainsAny(m, "\r\n"):
+			return c.Errorf("%s must be one line", key)
+		case nameProblem(m) != "":
+			return c.Errorf("%s %s", key, nameProblem(m))
+		default:
+			v.Milestone = m
+		}
+	}
+	if !v.MilestoneArg && v.Uses(VarMilestone) {
+		return c.Errorf("%s uses {%s}, the --%s milestone, but %s is not %q",
+			c.KeyPath(p+"comment"), VarMilestone, ArgMilestone, c.KeyPath(p+"milestone"), MilestoneFromArg).
+			WithFix(fmt.Sprintf(`set milestone = %q to set the milestone --%s names, or drop {%s}`,
+				MilestoneFromArg, ArgMilestone, VarMilestone))
 	}
 	return nil
 }

@@ -65,11 +65,12 @@ type verbIssue struct {
 // those of the kind (see MarshalJSON), each always there.
 type jsonOp struct {
 	// Op is add_to_board, unarchive, reopen, set_status, set_iteration,
-	// set_fields, add_labels, remove_labels, assign, unassign,
-	// add_blocked_by, add_comment or close.
+	// set_fields, set_milestone, add_labels, remove_labels, assign,
+	// unassign, add_blocked_by, add_comment or close.
 	Op string
-	// From and To are the status (set_status) or iteration title
-	// (set_iteration) before and after; "" (null) for none.
+	// From and To are the status (set_status), iteration title
+	// (set_iteration) or milestone title (set_milestone) before and after;
+	// "" (null) for none.
 	From, To  string
 	StartDate string            // set_iteration: the start of To; "" (null) for none
 	Fields    []jsonFieldChange // set_fields
@@ -96,6 +97,8 @@ func (o jsonOp) MarshalJSON() ([]byte, error) {
 		fields = append(fields, kv{"from", orNull(o.From)}, kv{"to", orNull(o.To)}, kv{"start_date", orNull(o.StartDate)})
 	case "set_fields":
 		fields = append(fields, kv{"fields", orEmpty(o.Fields)})
+	case "set_milestone":
+		fields = append(fields, kv{"from", orNull(o.From)}, kv{"to", orNull(o.To)})
 	case "add_labels", "remove_labels":
 		fields = append(fields, kv{"labels", orEmpty(o.Labels)})
 	case "assign":
@@ -154,6 +157,8 @@ func opJSON(op workflow.Op, def string) jsonOp {
 			out.Fields = append(out.Fields, jsonFieldChange{Field: c.Field, From: orNull(c.From), To: orNull(c.To)})
 		}
 		return out
+	case workflow.SetMilestone:
+		return jsonOp{Op: "set_milestone", From: op.From, To: op.To}
 	case workflow.AddLabels:
 		return jsonOp{Op: "add_labels", Labels: op.Names}
 	case workflow.RemoveLabels:

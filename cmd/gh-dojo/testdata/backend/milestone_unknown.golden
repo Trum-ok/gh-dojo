@@ -1,0 +1,6 @@
+code: 1
+--- stdout
+--- stderr
+error: unknown milestone "v9": no open milestone in Trum-ok/gh-dojo has that title or one starting with it
+allowed: v0.0 — самохостинг, v0.1 — первый публичный релиз, v0.2 — агент и релизы, v0.3 — расширяемость
+fix: if it is new, create it: gh api repos/Trum-ok/gh-dojo/milestones -f title="v9"

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/Trum-ok/gh-dojo/internal/graph"
 )
 
 // Lookup names what a verb's effects need besides the card: label IDs by
@@ -40,12 +42,16 @@ type Lookup struct {
 	// Links are issues to read for blocked-by links (see Links), such as
 	// the issue --by names for blockers = "link".
 	Links Links
+	// Milestone is the title of a milestone to set, as given (see
+	// MatchMilestone): the repository's open milestones are read for it
+	// (the first 100, see MilestonesSelection), for the caller to match.
+	Milestone string
 }
 
 // Empty reports whether there is nothing to look up.
 func (l Lookup) Empty() bool {
 	return len(l.Labels) == 0 && l.User == "" && !l.Viewer && !l.AllLabels && !l.AssigneeIDs && !l.AllBlockers &&
-		!l.AllSubIssues && len(l.Links) == 0
+		!l.AllSubIssues && len(l.Links) == 0 && l.Milestone == ""
 }
 
 // Found is what a Lookup found. Its IDs are for mutations only; never
@@ -62,6 +68,23 @@ type Found struct {
 	// Links are the issues of Lookup.Links, in order; a missing one is
 	// Linked.Missing, and the card is still read.
 	Links []*Linked
+	// Milestones are the repository's open milestones for
+	// Lookup.Milestone, oldest first; MoreMilestones says it has more than
+	// were read (see ReadMilestones).
+	Milestones     []OpenMilestone
+	MoreMilestones bool
+	// Milestone is the open milestone Lookup.Milestone names, once the
+	// caller matched it (MatchMilestone) against all of Milestones; nil
+	// until then, or when none matches.
+	Milestone *OpenMilestone
+}
+
+// OpenMilestone is an open milestone of a repository. DueOn is RFC 3339,
+// nil without a due date.
+type OpenMilestone struct {
+	ID    string  `json:"id"` // node ID; never print it
+	Title string  `json:"title"`
+	DueOn *string `json:"dueOn"`
 }
 
 // User is a GitHub user.
@@ -73,6 +96,15 @@ type User struct {
 // assignableWindow is how many assignable users matching Lookup.User are
 // read; the login is then matched exactly among them.
 const assignableWindow = 100
+
+// MilestonesSelection reads the first 100 open milestones of a
+// repository, oldest first, as gh dojo new and a verb that sets a
+// milestone read them; past them, ReadMilestones reads them all.
+const MilestonesSelection = `milestones(first: 100, states: OPEN, orderBy: {field: NUMBER, direction: ASC}) {
+      totalCount
+      pageInfo { hasNextPage endCursor }
+      nodes { id title dueOn }
+    }`
 
 // labelsWindow is the labels selection of cardSelection; Lookup.AllLabels
 // widens it to allLabelsWindow. assigneesWindow is its assignees
@@ -103,8 +135,8 @@ const (
 // variable.
 func labelAlias(i int) string { return fmt.Sprintf("label%d", i) }
 
-// lookupQuery is cardQuery with the fields of l: aliased label lookups and
-// the assignable user below the repository, the viewer and the links at
+// lookupQuery is cardQuery with the fields of l: aliased label lookups,
+// the assignable user and the open milestones below the repository, the viewer and the links at
 // the top. It returns the extra variables too. An empty l gives cardQuery
 // itself.
 //
@@ -153,6 +185,9 @@ func (l Lookup) parts() lookupParts {
 		decls.WriteString(", $user: String!")
 		fmt.Fprintf(&repo, "\n    assignable: assignableUsers(query: $user, first: %d) { nodes { id login } }", assignableWindow)
 	}
+	if l.Milestone != "" {
+		repo.WriteString("\n    " + MilestonesSelection)
+	}
 	top := ""
 	if l.Viewer {
 		top = "  viewer { id login }\n"
@@ -187,6 +222,7 @@ func (l Lookup) widen(s string) string {
 type repoJSON struct {
 	IssueOrPullRequest *issueJSON
 	Assignable         *conn[*User]
+	Milestones         *graph.Connection[OpenMilestone]
 	labels             map[string]*labelJSON // by alias
 }
 
@@ -213,6 +249,8 @@ func (r *repoJSON) fromFields(fields map[string]json.RawMessage) error {
 			err = json.Unmarshal(raw, &r.IssueOrPullRequest)
 		case key == "assignable":
 			err = json.Unmarshal(raw, &r.Assignable)
+		case key == "milestones":
+			err = json.Unmarshal(raw, &r.Milestones)
 		case strings.HasPrefix(key, "label"):
 			if r.labels == nil {
 				r.labels = map[string]*labelJSON{}
@@ -237,6 +275,10 @@ func (l Lookup) found(r *repoJSON, viewer *User, data map[string]json.RawMessage
 			if lb := r.labels[labelAlias(i)]; lb != nil {
 				f.Labels[name] = lb.ID
 			}
+		}
+		if l.Milestone != "" && r.Milestones != nil {
+			f.Milestones = r.Milestones.Nodes
+			f.MoreMilestones = r.Milestones.PageInfo.HasNextPage
 		}
 		if l.User != "" && r.Assignable != nil {
 			for _, u := range r.Assignable.Nodes {

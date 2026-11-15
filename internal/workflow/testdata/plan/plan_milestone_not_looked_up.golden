@@ -1,0 +1,3 @@
+code: 1
+error: internal error (not your arguments): plan sets a milestone, but the milestone of #42 was not looked up
+fix: re-run the command; if it repeats, report it to the user

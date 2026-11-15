@@ -1,2 +1,2 @@
 error: .github/dojo.toml: verbs.go.require: unknown argument "reason"
-allowed: comment, by, assignee
+allowed: comment, by, assignee, milestone

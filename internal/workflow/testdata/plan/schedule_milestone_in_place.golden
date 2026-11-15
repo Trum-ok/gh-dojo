@@ -1,0 +1,4 @@
+dry run: schedule #42
+  status: In progress → Ready
+  milestone: v1.2 (unchanged)
+confirm: #42 In progress → Ready, milestone unchanged (v1.2)

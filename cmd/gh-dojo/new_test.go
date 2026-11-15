@@ -378,6 +378,23 @@ func TestNewMilestone(t *testing.T) {
 	}
 }
 
+// TestNewMilestonePrefix: --milestone v0.1 names the only open milestone
+// whose title starts so, as a verb's milestone effect matches it: no
+// request more.
+func TestNewMilestonePrefix(t *testing.T) {
+	withConfig(t, dojoConfig)
+	srv := withApp(t, boardFixture, "testdata/graphql/new_milestone_prefix.json")
+	before := warmSchema(t, srv)
+	code, out := runOut(append(slices.Clone(newFixArgs), "--milestone", "v0.1")...)
+	testutil.Golden(t, "new/milestone_prefix", out)
+	if code != render.ExitOK {
+		t.Errorf("code = %d", code)
+	}
+	if n := srv.Requests() - before; n != 4 {
+		t.Errorf("requests with a warm schema = %d, want 4 (read, createIssue, addProjectV2ItemById, status)", n)
+	}
+}
+
 // TestNewMilestoneResume: a re-run sets the milestone of a found issue
 // that has none, and keeps a different one it has, with a warning.
 func TestNewMilestoneResume(t *testing.T) {
@@ -405,14 +422,30 @@ func TestNewMilestoneResume(t *testing.T) {
 	}
 }
 
+// TestNewMilestoneKeptVerb: with a verb that sets the --milestone
+// milestone, the warning about a milestone kept names that verb, not gh
+// issue edit.
+func TestNewMilestoneKeptVerb(t *testing.T) {
+	withConfig(t, milestoneDojoConfig)
+	srv := withApp(t, boardFixture, newMilestoneKept)
+	warmSchema(t, srv)
+	code, out := runOut(append(slices.Clone(newFixArgs), "--milestone", "v0.1")...)
+	testutil.Golden(t, "new/milestone_kept_verb", out)
+	if code != render.ExitOK {
+		t.Errorf("code = %d", code)
+	}
+}
+
 // TestNewUnknownMilestone: an unknown milestone fails after the read and
-// before any write, listing the open milestones; these fixtures have no
+// before any write, listing the open milestones, and so does a start of
+// several titles, listing them; these fixtures have no
 // mutation to answer. Past the first 100, all open milestones are read.
 func TestNewUnknownMilestone(t *testing.T) {
 	tests := []struct {
 		name, fixture, milestone string
 	}{
 		{"milestone_unknown", "testdata/graphql/new_milestone_read.json", "v02"},
+		{"milestone_ambiguous", "testdata/graphql/new_milestone_read.json", "v0"},
 		{"milestone_none", "testdata/graphql/new_milestone_none.json", "v0.1"},
 		{"milestone_pages", "testdata/graphql/new_milestone_pages.json", "v1.0"},
 	}

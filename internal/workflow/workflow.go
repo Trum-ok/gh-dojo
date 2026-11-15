@@ -65,6 +65,13 @@ type Issue struct {
 	// --assignee), as GitHub spells it; the reader fills it for a verb that
 	// assigns a login. "" uses the spelling given.
 	AssignLogin string
+	// Milestone is the title of the issue's milestone, "" for none.
+	// SetMilestone is the title of the open milestone the verb sets (from
+	// the config or --milestone), as the repository spells it: the reader
+	// matches the title given against the open milestones of the issue's
+	// repository and fills it for a verb that sets a milestone.
+	Milestone    string
+	SetMilestone string
 
 	// OnBoard reports whether the issue is an item of the configured
 	// project. Status is the item's status option name, "" when the item has
@@ -209,6 +216,10 @@ type Args struct {
 	// assigns: config.Me or a login.
 	Assignee    string
 	HasAssignee bool // --assignee was given, even if blank
+	// Milestone is --milestone, the title of the open milestone a verb
+	// with milestone = "{milestone}" sets, or the start of it.
+	Milestone    string
+	HasMilestone bool // --milestone was given, even if blank
 	// Yes is --yes: the user agreed to a verb with confirm = "user".
 	Yes bool
 }
@@ -221,6 +232,8 @@ func (a Args) given(arg string) bool {
 		return a.HasBy
 	case config.ArgAssignee:
 		return a.HasAssignee
+	case config.ArgMilestone:
+		return a.HasMilestone
 	}
 	return false
 }
@@ -233,6 +246,8 @@ func (a Args) value(arg string) string {
 		return strings.TrimSpace(a.By)
 	case config.ArgAssignee:
 		return strings.TrimSpace(a.Assignee)
+	case config.ArgMilestone:
+		return strings.TrimSpace(a.Milestone)
 	}
 	return ""
 }
@@ -283,11 +298,13 @@ func NormalizeBy(s string) string {
 // so callers run it before reading the issue. Errors have exit code 1:
 //
 //   - --comment or --by given while the verb's comment template does not use
-//     it, --assignee given to a verb without assign = "{assignee}";
+//     it, --assignee given to a verb without assign = "{assignee}",
+//     --milestone to one without milestone = "{milestone}";
 //   - --yes given to a verb without confirm = "user";
 //   - an argument of require, or all of require_one_of, missing or blank;
 //   - --assignee that is neither "@me" nor a GitHub login. Whether the user
-//     can be assigned is the reader's to check.
+//     can be assigned is the reader's to check; so is whether an open
+//     milestone matches --milestone.
 //
 // A missing --yes is not an argument error: Plan sets Plan.NeedsYes.
 func CheckArgs(v config.Verb, a Args, issues ...string) error {
@@ -382,6 +399,8 @@ func placeholder(arg string) string {
 		return `"<#N or name>"`
 	case config.ArgAssignee:
 		return `"<login>"`
+	case config.ArgMilestone:
+		return `"<title>"`
 	}
 	return `"<text>"`
 }
@@ -430,7 +449,7 @@ func join(items []string, conj string) string {
 // none of), reopens it,
 // sets the target status, sets the sprint (see planIteration; a day
 // without an iteration is exit code 1) and the fields of the field effect,
-// adds and removes labels, assigns and unassigns (see planAssign), marks
+// sets the milestone (see planMilestone), adds and removes labels, assigns and unassigns (see planAssign), marks
 // the issue blocked by each of Issue.ByIssues (blockers = "link"; a pull
 // request among them is only named in the comment, with a warning), posts
 // the rendered comment unless it renders empty or the same comment is already
@@ -513,6 +532,10 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 		return nil, err
 	}
 	p.planFields(v)
+	milestone, err := p.planMilestone(v)
+	if err != nil {
+		return nil, err
+	}
 	p.planLabels(v)
 	assigned, err := p.planAssign(v, a)
 	if err != nil {
@@ -543,9 +566,10 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 	}
 
 	vars := map[string]string{
-		config.VarComment:  a.value(config.ArgComment),
-		config.VarBy:       by,
-		config.VarAssignee: assigned,
+		config.VarComment:   a.value(config.ArgComment),
+		config.VarBy:        by,
+		config.VarAssignee:  assigned,
+		config.VarMilestone: milestone,
 	}
 	noSession := false
 	if v.Uses(config.VarSession) {
@@ -665,6 +689,28 @@ func (p *Plan) planAssign(v config.Verb, a Args) (string, error) {
 		}
 	}
 	return login, nil
+}
+
+// planMilestone adds the SetMilestone op of a verb that sets a milestone
+// and returns its title, "" for none. The reader matched the title of the
+// config or --milestone against the open milestones of the issue's
+// repository (Issue.SetMilestone); an issue in that milestone already has
+// it in place. Milestone titles are unique in a repository.
+func (p *Plan) planMilestone(v config.Verb) (string, error) {
+	if !v.SetsMilestone() {
+		return "", nil
+	}
+	is := p.Issue
+	to := is.SetMilestone
+	if to == "" {
+		return "", render.Internal("%s sets a milestone, but the milestone of %s was not looked up", v.Name, is.Name())
+	}
+	if is.Milestone == to {
+		p.InPlace = append(p.InPlace, SetMilestone{From: to, To: to})
+	} else {
+		p.Ops = append(p.Ops, SetMilestone{From: is.Milestone, To: to})
+	}
+	return to, nil
 }
 
 // planLabels adds the label ops of v: labels to add that the issue lacks,

@@ -161,7 +161,8 @@ func TestAgentInstall(t *testing.T) {
 // default target, no notes. kanban is this repository's preset; custom
 // overrides it; no_preset has no statuses, so no lifecycle path.
 func TestAgentConfigs(t *testing.T) {
-	for name, cfg := range map[string]string{"kanban": dojoConfig, "custom": customConfig, "no_preset": noPresetConfig} {
+	for name, cfg := range map[string]string{"kanban": dojoConfig, "custom": customConfig, "no_preset": noPresetConfig,
+		"milestone": milestoneDojoConfig} {
 		t.Run(name, func(t *testing.T) {
 			dir := withRepo(t, cfg, nil)
 			if code, out := runOut("agent", "install"); code != render.ExitOK {

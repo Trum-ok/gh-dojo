@@ -49,9 +49,9 @@ type process struct {
 	Statuses  processStatuses   `json:"statuses"`
 	ExitCodes []processExitCode `json:"exit_codes"`
 
-	// sprint and fields say some verb sets the sprint or other board
-	// fields, for the sentence on repeats.
-	sprint, fields bool
+	// sprint, fields and milestone say some verb sets the sprint, other
+	// board fields or the milestone, for the sentence on repeats.
+	sprint, fields, milestone bool
 }
 
 // processStatuses are the statuses with a role in the process.
@@ -73,6 +73,8 @@ type processVerb struct {
 	Batch         bool     `json:"batch"`   // takes several issue numbers
 	Checks        []string `json:"checks"`  // beyond from and the arguments
 	Effects       []string `json:"effects"` // along the way, beyond the status
+
+	release bool // gh dojo release can apply it: batch, and no argument release lacks
 }
 
 type processExitCode struct {
@@ -145,6 +147,15 @@ var (
 		},
 		describeIteration,
 		describeFields,
+		func(_ *config.Config, v config.Verb) string {
+			switch {
+			case v.MilestoneArg:
+				return "sets the --" + config.ArgMilestone + " milestone"
+			case v.Milestone != "":
+				return "sets milestone " + v.Milestone
+			}
+			return ""
+		},
 		func(_ *config.Config, v config.Verb) string {
 			var signs []string
 			for _, l := range v.AddLabels {
@@ -279,6 +290,7 @@ func describeProcess(cfg *config.Config) *process {
 	for _, v := range cfg.Verbs {
 		pv := processVerb{
 			Name: v.Name, When: v.When, From: orEmpty(v.From), To: orNull(v.To), Batch: v.Batch,
+			release:  v.Batch && releaseLacks(v) == "",
 			Requires: []string{}, RequiresOneOf: []string{}, Optional: []string{}, Checks: []string{}, Effects: []string{},
 		}
 		for _, arg := range config.Args() {
@@ -305,6 +317,7 @@ func describeProcess(cfg *config.Config) *process {
 		p.Verbs = append(p.Verbs, pv)
 		p.sprint = p.sprint || v.Iteration != ""
 		p.fields = p.fields || len(v.Fields) > 0
+		p.milestone = p.milestone || v.SetsMilestone()
 	}
 	for _, c := range render.ExitCodes {
 		p.ExitCodes = append(p.ExitCodes, processExitCode{int(c.Code), c.Meaning, c.Next})
@@ -372,6 +385,9 @@ func (p *process) text() string {
 		if p.fields {
 			effects = append(effects, "fields")
 		}
+		if p.milestone {
+			effects = append(effects, "milestone")
+		}
 		effects = append(effects, "comment", "labels", "assignees", "blocked-by link", "closed or open")
 		sections = append(sections, b.String(), wrapText("Every verb adds the issue to the board if it is missing and refuses a "+
 			"closed issue unless noted. A repeat is safe: an effect already in place ("+
@@ -391,9 +407,12 @@ func (p *process) text() string {
 // effects, or "" when it has none.
 func (v processVerb) facts() string {
 	var parts []string
-	if v.Batch {
+	switch {
+	case v.release:
 		parts = append(parts, "several numbers at once ("+v.Name+" 12 13 14) or a release's issues "+
 			"(release <tag> --verb "+v.Name+")")
+	case v.Batch:
+		parts = append(parts, "several numbers at once ("+v.Name+" 12 13 14)")
 	}
 	if len(v.Requires) > 0 {
 		parts = append(parts, "needs "+strings.Join(v.Requires, " and "))

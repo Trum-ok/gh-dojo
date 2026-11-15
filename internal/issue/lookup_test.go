@@ -107,6 +107,52 @@ func TestReadAllLookupQuery(t *testing.T) {
 	}
 }
 
+// TestReadLookupMilestones reads issue #55 of the gh-dojo repo with the
+// lookup of a verb that sets a milestone: the repository's open
+// milestones come in the card's one request, and "v0.3" matches the one
+// whose title starts so.
+func TestReadLookupMilestones(t *testing.T) {
+	srv := graphtest.New(t, fixture("card_55_milestones"))
+	req := dojoStatus
+	req.Number = 55
+	req.Lookup = issue.Lookup{Milestone: "v0.3"}
+	card, err := issue.Read(context.Background(), srv.Client(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := srv.Requests(); n != 1 {
+		t.Errorf("requests = %d, want exactly 1", n)
+	}
+	f := card.Found
+	if f == nil || len(f.Milestones) == 0 || f.MoreMilestones {
+		t.Fatalf("Found = %+v, want the open milestones, all of them", f)
+	}
+	m, err := issue.MatchMilestone(req.Lookup.Milestone, f.Milestones, dojo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(m.Title, "v0.3 ") || !strings.HasPrefix(m.ID, "MI_") {
+		t.Errorf("matched %+v, want the v0.3 milestone", m)
+	}
+	if card.Milestone == nil || card.Milestone.Title != m.Title {
+		t.Errorf("card milestone %+v, want %q", card.Milestone, m.Title)
+	}
+}
+
+// TestReadAllLookupMilestonesQuery: a batch reads the open milestones once
+// per repository, below each repository field.
+func TestReadAllLookupMilestonesQuery(t *testing.T) {
+	q := &firstQuery{}
+	req := dojoStatus
+	req.Lookup = issue.Lookup{Milestone: "v1"}
+	other := issue.Repo{Owner: "acme", Name: "api"}
+	_, _ = issue.ReadRefs(context.Background(), q, req, []issue.Ref{{Repo: dojo, Number: 1}, {Repo: other, Number: 2}, {Repo: dojo, Number: 3}})
+	want := "milestones(first: 100, states: OPEN, orderBy: {field: NUMBER, direction: ASC})"
+	if n := strings.Count(q.query, want); n != 2 {
+		t.Errorf("query has %d of %q, want 2, one per repository:\n%s", n, want, q.query)
+	}
+}
+
 // queryRecorder is a graph.Querier that keeps the query and fails it.
 type queryRecorder struct{ query string }
 

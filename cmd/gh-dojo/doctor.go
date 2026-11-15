@@ -47,7 +47,9 @@ warning is followed by the command that fixes it.
   sprint   with fields.sprint set: the field is an iteration field and an
            iteration covers today
   verbs    the labels verbs add or remove exist in the default repository,
-           spelled as there, and the users they assign can be assigned
+           spelled as there, the users they assign can be assigned, and
+           each milestone a verb names is an open one there, matched as the
+           verb matches it (its title, or a start only that title has)
   agent    with [agent] set or a file agent install wrote: those files are
            up to date with the config and this gh-dojo (out of date: warn)
 
@@ -55,7 +57,8 @@ It sends one request for the token and the repositories, one more for the
 board when its schema is not cached (an hour), one for the labels of
 labels.types and labels.area_prefix when set (and, for a repository with
 over 100 labels where a type is not found, its labels page by page), and
-one for the verbs' labels and assignees when a verb has them.
+one for the verbs' labels, assignees and milestones when a verb has them
+(and, past 100 open milestones, those page by page).
 
 Exit codes: 0 when every check is ok or warns; 4 when a check failed on auth or the
 network; else 1.`,
@@ -704,6 +707,9 @@ type verbsCheck struct {
 	labels []string
 	users  []string          // distinct regardless of case
 	alias  map[string]string // label name or lowercase login → alias
+	// milestones says a verb names a milestone in the config (not
+	// "{milestone}"): the open milestones are read.
+	milestones bool
 }
 
 func newVerbsCheck(cfg *config.Config, viewer string) *verbsCheck {
@@ -727,6 +733,7 @@ func newVerbsCheck(cfg *config.Config, viewer string) *verbsCheck {
 		}
 	}
 	for _, v := range cfg.Verbs {
+		c.milestones = c.milestones || v.Milestone != ""
 		for _, login := range verbUsers(v) {
 			if login.name == config.Me {
 				login.name = viewer
@@ -757,11 +764,12 @@ func verbUsers(v config.Verb) []verbUser {
 	return out
 }
 
-func (c *verbsCheck) empty() bool { return len(c.labels) == 0 && len(c.users) == 0 }
+func (c *verbsCheck) empty() bool { return len(c.labels) == 0 && len(c.users) == 0 && !c.milestones }
 
 // query is the DoctorVerbs query: the first 100 labels of the repository
-// for their spelling, each label by its exact name, and the assignable
-// users matching each login.
+// for their spelling, each label by its exact name, the assignable users
+// matching each login, and the first 100 open milestones when a verb
+// names one.
 func (c *verbsCheck) query(repo issue.Repo) (string, map[string]any) {
 	params := []string{"$owner: String!", "$name: String!"}
 	fields := []string{"    labels(first: 100) { nodes { name } }"}
@@ -778,6 +786,9 @@ func (c *verbsCheck) query(repo issue.Repo) (string, map[string]any) {
 		fields = append(fields, fmt.Sprintf("    %s: assignableUsers(query: $%s, first: 100) { nodes { login } }", alias, alias))
 		vars[alias] = login
 	}
+	if c.milestones {
+		fields = append(fields, "    "+issue.MilestonesSelection)
+	}
 	return "query DoctorVerbs(" + strings.Join(params, ", ") + ") {\n  repository(owner: $owner, name: $name) {\n" +
 		strings.Join(fields, "\n") + "\n  }\n}", vars
 }
@@ -793,7 +804,10 @@ func (c *verbsCheck) query(repo issue.Repo) (string, map[string]any) {
 // another case is fine, as the checks match names regardless of case.
 // A user to assign who cannot be assigned fails the verb; one to unassign
 // is a warning: a verb removes current assignees by their IDs, and someone
-// who lost access may still be one, but the login is likely a typo.
+// who lost access may still be one, but the login is likely a typo. A
+// milestone of the config (not "{milestone}") that matches no open
+// milestone, or several, fails the verb, as it would fail every issue;
+// past 100 open milestones they are read page by page.
 func checkVerbs(ctx context.Context, r *doctorReport, a *App, cfg *config.Config, repos []*doctorRepo, reach bool, viewer string) {
 	c := newVerbsCheck(cfg, viewer)
 	if c.empty() {
@@ -844,8 +858,21 @@ func checkVerbs(ctx context.Context, r *doctorReport, a *App, cfg *config.Config
 		})
 	}
 
+	var open graph.Connection[issue.OpenMilestone]
+	_ = json.Unmarshal(out.Repository["milestones"], &open)
+	milestones := open.Nodes
+	if c.milestones && open.PageInfo.HasNextPage {
+		all, err := issue.ReadMilestones(ctx, a.Client, repo.Repo)
+		if err != nil {
+			r.problem("verbs", err)
+			return
+		}
+		milestones = all
+	}
+
 	repoName, problems := repo.Repo.String(), 0 // problems counts warnings too: no ok line then
 	problem := func(err error) { r.problem("verbs", err); problems++ }
+	matched := 0 // the verbs' milestones found
 	for _, v := range cfg.Verbs {
 		for _, check := range []struct {
 			key   string
@@ -886,6 +913,13 @@ func checkVerbs(ctx context.Context, r *doctorReport, a *App, cfg *config.Config
 			}
 			problem(e)
 		}
+		if v.Milestone != "" {
+			if _, err := issue.MatchMilestone(v.Milestone, milestones, repo.Repo); err != nil {
+				problem(milestoneKeyError(cfg.KeyPath("verbs."+v.Name+".milestone"), err))
+			} else {
+				matched++
+			}
+		}
 		for _, u := range verbUsers(v) {
 			key := cfg.KeyPath("verbs." + v.Name + "." + u.key)
 			name, who := u.name, u.name // the login, and how the line names it
@@ -917,6 +951,9 @@ func checkVerbs(ctx context.Context, r *doctorReport, a *App, cfg *config.Config
 		}
 		if n := len(c.users); n > 0 {
 			found = append(found, plural(n, "assignee", "assignees")+" can be assigned")
+		}
+		if matched > 0 {
+			found = append(found, plural(matched, "milestone is", "milestones are")+" open")
 		}
 		r.ok("verbs", "%s: %s", repoName, strings.Join(found, ", "))
 	}

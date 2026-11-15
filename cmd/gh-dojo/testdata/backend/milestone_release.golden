@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: release --verb plan: plan needs --milestone, which release does not take
+fix: run it on the issues themselves: gh dojo plan <N>... --milestone "<title>"

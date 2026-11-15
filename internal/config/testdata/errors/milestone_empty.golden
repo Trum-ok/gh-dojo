@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.plan.milestone is empty
+fix: write the title of an open milestone, like milestone = "v1.2", or milestone = "{milestone}" to take it from --milestone

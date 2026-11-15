@@ -125,6 +125,20 @@ when = "Hand it over and leave"
 assign = "{assignee}"
 unassign = "@me"
 
+# milestone = "{milestone}" and a milestone of the config.
+[verbs.plan]
+when = "The issue moves to another stage"
+from = ["Backlog", "In progress"]
+milestone = "{milestone}"
+comment = "Moved to {milestone}."
+batch = true
+
+[verbs.schedule]
+when = "Due in the next release"
+to = "Ready"
+from = ["In progress"]
+milestone = "v1.2"
+
 # The blockers check: begin warns, claim and check refuse.
 [verbs.begin]
 when = "Begin, even if blocked"
@@ -493,6 +507,34 @@ func TestPlan(t *testing.T) {
 			issue: onBoard("In progress")},
 		{name: "take_assignee_not_taken", verb: "take", code: render.ExitUsage, args: Args{Assignee: "bob", HasAssignee: true},
 			issue: onBoard("Backlog")},
+		// plan: milestone = "{milestone}"; the reader matched --milestone
+		// (a start of the title here) to SetMilestone.
+		{name: "plan_milestone", verb: "plan", hasOps: 2, args: Args{Milestone: " v0.3 ", HasMilestone: true},
+			issue: Issue{Number: 42, Title: "Fix login redirect", OnBoard: true, Status: "Backlog",
+				Milestone: "v0.2", SetMilestone: "v0.3 — extensibility"}},
+		{name: "plan_milestone_none", verb: "plan", hasOps: 2, args: Args{Milestone: "v0.3", HasMilestone: true},
+			issue: Issue{Number: 42, OnBoard: true, Status: "Backlog", SetMilestone: "v0.3 — extensibility"}},
+		{name: "plan_milestone_repeat", verb: "plan", noOps: true, args: Args{Milestone: "v0.3", HasMilestone: true},
+			issue: Issue{Number: 42, OnBoard: true, Status: "In progress", Milestone: "v0.3 — extensibility",
+				SetMilestone: "v0.3 — extensibility", Comments: []Comment{posted("plan", "Moved to v0.3 — extensibility.")}}},
+		// A partial run set the milestone and lost the comment: the repeat posts it alone.
+		{name: "plan_milestone_after_partial", verb: "plan", hasOps: 1, args: Args{Milestone: "v0.3", HasMilestone: true},
+			issue: Issue{Number: 42, OnBoard: true, Status: "In progress", Milestone: "v0.3 — extensibility",
+				SetMilestone: "v0.3 — extensibility"}},
+		{name: "plan_missing_milestone", verb: "plan", code: render.ExitUsage, issue: onBoard("Backlog")},
+		{name: "plan_blank_milestone", verb: "plan", code: render.ExitUsage, args: Args{Milestone: " ", HasMilestone: true},
+			issue: onBoard("Backlog")},
+		{name: "plan_milestone_not_looked_up", verb: "plan", code: render.ExitUsage, args: Args{Milestone: "v0.3", HasMilestone: true},
+			issue: onBoard("Backlog")},
+		{name: "plan_from_refused", verb: "plan", code: render.ExitDenied, args: Args{Milestone: "v0.3", HasMilestone: true},
+			issue: Issue{Number: 42, OnBoard: true, Status: "Done", SetMilestone: "v0.3 — extensibility"}},
+		{name: "take_milestone_not_taken", verb: "take", code: render.ExitUsage, args: Args{Milestone: "v0.3", HasMilestone: true},
+			issue: onBoard("Backlog")},
+		// schedule: a milestone of the config, with a status.
+		{name: "schedule_milestone", verb: "schedule", hasOps: 2,
+			issue: Issue{Number: 42, OnBoard: true, Status: "In progress", SetMilestone: "v1.2"}},
+		{name: "schedule_milestone_in_place", verb: "schedule", hasOps: 1,
+			issue: Issue{Number: 42, OnBoard: true, Status: "In progress", Milestone: "v1.2", SetMilestone: "v1.2"}},
 		// send-back: assign = true (alice), unassign = "all": alice alone.
 		{name: "send_back_all", verb: "send-back", hasOps: 2,
 			issue: Issue{Number: 42, OnBoard: true, Status: "Ready", Assignees: []string{"Alice", "bob", "carol"}}},

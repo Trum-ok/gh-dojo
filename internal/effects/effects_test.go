@@ -31,6 +31,7 @@ var (
 	}}
 	blockedBy = workflow.AddBlockedBy{Ref: "#12"}
 	blocked2  = workflow.AddBlockedBy{Ref: "acme/api#7"}
+	milestone = workflow.SetMilestone{From: "v0.2", To: "v0.3 — extensibility"}
 )
 
 var ids = effects.IDs{
@@ -42,7 +43,8 @@ var ids = effects.IDs{
 		"Estimate": {ID: "PVTF_est", Value: map[string]any{"number": 3.0}},
 		"Priority": {ID: "PVTSSF_prio", Value: map[string]any{"singleSelectOptionId": "0a877460"}},
 	},
-	Blockers: map[string]string{"#12": "I_12", "acme/api#7": "I_7"},
+	Blockers:  map[string]string{"#12": "I_12", "acme/api#7": "I_7"},
+	Milestone: "MI_3",
 }
 
 func TestBuild(t *testing.T) {
@@ -72,6 +74,8 @@ func TestBuild(t *testing.T) {
 		{"status_fields", []workflow.Op{status, setFields, comment}, ids},
 		{"status_blocked_by_comment", []workflow.Op{status, blockedBy, comment}, ids},
 		{"status_blocked_by_two", []workflow.Op{status, blockedBy, blocked2, comment}, ids},
+		{"milestone_comment", []workflow.Op{milestone, comment}, ids},
+		{"board_milestone", []workflow.Op{toBoard, milestone}, notOnBoard},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -107,6 +111,7 @@ func TestBuildDeclaresWhatItUses(t *testing.T) {
 		{closing}, {reopen}, {addLabels}, {rmLabels}, {assign}, {reopen, status, addLabels, rmLabels, assign, comment},
 		{unassign}, {unassign, assign, comment},
 		{comment, closing}, {sprint}, {unsprint}, {setFields}, {status, sprint, setFields, comment}, {blockedBy}, {status, blockedBy, comment}, {blockedBy, blocked2},
+		{milestone}, {status, setFields, milestone, addLabels, comment},
 	} {
 		m, err := effects.Build(ops, ids)
 		if err != nil {
@@ -143,6 +148,8 @@ func TestBuildErrors(t *testing.T) {
 	noIteration.Iteration = ""
 	noBlocker := ids
 	noBlocker.Blockers = nil
+	noMilestone := ids
+	noMilestone.Milestone = ""
 	for name, tt := range map[string]struct {
 		ops []workflow.Op
 		ids effects.IDs
@@ -166,6 +173,8 @@ func TestBuildErrors(t *testing.T) {
 		"no_changes":   {[]workflow.Op{workflow.SetFields{}}, ids},
 		"fields_twice": {[]workflow.Op{setFields, setFields}, ids},
 		"blocker_id":   {[]workflow.Op{blockedBy}, noBlocker},
+		"milestone_id": {[]workflow.Op{milestone}, noMilestone},
+		"milestone_2x": {[]workflow.Op{milestone, milestone}, ids},
 	} {
 		if _, err := effects.Build(tt.ops, tt.ids); err == nil {
 			t.Errorf("%s: want an error", name)
@@ -314,10 +323,10 @@ func TestItemID(t *testing.T) {
 
 func TestMissed(t *testing.T) {
 	var got []string
-	for _, op := range []workflow.Op{toBoard, unarchive, reopen, status, addLabels, rmLabels, assign, blockedBy, comment, closing} {
+	for _, op := range []workflow.Op{toBoard, unarchive, reopen, status, milestone, addLabels, rmLabels, assign, blockedBy, comment, closing} {
 		got = append(got, effects.Missed(op))
 	}
-	want := []string{"not added to the board", "not unarchived", "not reopened", "status not changed",
+	want := []string{"not added to the board", "not unarchived", "not reopened", "status not changed", "milestone not set",
 		"labels not added", "labels not removed", "not assigned", "not blocked by #12", "comment not posted", "not closed"}
 	if !slices.Equal(got, want) {
 		t.Errorf("Missed = %q, want %q", got, want)

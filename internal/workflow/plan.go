@@ -22,16 +22,17 @@ type Plan struct {
 
 	// Ops are the operations to apply, in this order, each at most once
 	// (AddBlockedBy once per blocking issue): AddToBoard or Unarchive,
-	// Reopen, SetStatus, SetIteration, SetFields, AddLabels, RemoveLabels,
-	// Unassign, Assign, AddBlockedBy, AddComment, Close. Empty when there
-	// is nothing to do.
+	// Reopen, SetStatus, SetIteration, SetFields, SetMilestone, AddLabels,
+	// RemoveLabels, Unassign, Assign, AddBlockedBy, AddComment, Close.
+	// Empty when there is nothing to do.
 	Ops []Op
 
 	StatusUnchanged bool // the issue is already in Target; no SetStatus
 	CommentPresent  bool // the same comment is the latest gh-dojo comment already; no AddComment
 	// InPlace are the verb's effects found already in place, as the ops
 	// that would have applied them: Reopen, SetIteration (From = To),
-	// SetFields (the fields already set), AddLabels, RemoveLabels,
+	// SetFields (the fields already set), SetMilestone (From = To),
+	// AddLabels, RemoveLabels,
 	// Assign, Unassign (the users not assigned, none for "all" with nobody
 	// to remove; or Kept, the user the verb assigns), AddBlockedBy, and Close with the reason the issue was
 	// closed with ("" when unknown). They are never applied; they give the "already" wording of
@@ -48,8 +49,8 @@ type Plan struct {
 }
 
 // Op is one operation of a plan: AddToBoard, Unarchive, Reopen, SetStatus,
-// SetIteration, SetFields, AddLabels, RemoveLabels, Unassign, Assign,
-// AddBlockedBy, AddComment or Close. Each kind has its
+// SetIteration, SetFields, SetMilestone, AddLabels, RemoveLabels,
+// Unassign, Assign, AddBlockedBy, AddComment or Close. Each kind has its
 // own type, its own field in the mutation (see package effects) and its
 // own words in the dry run, the confirmation line and a partial report.
 type Op interface {
@@ -137,6 +138,12 @@ type SetFields struct {
 	Changes []FieldChange
 }
 
+// SetMilestone puts the issue in the open milestone titled To. From is
+// the title of the milestone it had, "" for none.
+type SetMilestone struct {
+	From, To string
+}
+
 // FieldChange is one field of SetFields: its board name, the value read
 // ("" for none) and the value to set, as the config writes it.
 type FieldChange struct {
@@ -193,6 +200,16 @@ func (SetIteration) op()             {}
 func (f SetFields) Describe() string { return strings.Join(f.each(FieldChange.describe), ", ") }
 func (f SetFields) Effect() string   { return strings.Join(f.each(FieldChange.effect), ", ") }
 func (SetFields) op()                {}
+func (m SetMilestone) Describe() string {
+	return "milestone: " + valueTransition(m.From, m.To)
+}
+func (m SetMilestone) Effect() string {
+	if m.From == m.To { // in place: "milestone unchanged (v1.2)"
+		return "milestone unchanged (" + orNone(m.To) + ")"
+	}
+	return "milestone " + valueTransition(m.From, m.To)
+}
+func (SetMilestone) op() {}
 
 func (f SetFields) each(word func(FieldChange) string) []string {
 	out := make([]string, len(f.Changes))
@@ -275,7 +292,7 @@ func (p *Plan) Unconfirmed() error {
 }
 
 // lines returns one entry per effect, in a fixed order: board, reopen,
-// status, sprint, fields (one entry per field), labels, assignees (who is
+// status, sprint, fields (one entry per field), milestone, labels, assignees (who is
 // removed, then who is assigned, as the mutation does), blocked-by link,
 // comment, close. dry picks the dry-run wording
 // (Describe), otherwise the confirmation wording (Effect). Effects already
@@ -289,7 +306,7 @@ func (p *Plan) lines(dry bool) []string {
 	if dry {
 		pick = Op.Describe
 	}
-	var board, unarchive, reopen, status, sprint, fields, assign, unassign, blocked, comment, closing []string
+	var board, unarchive, reopen, status, sprint, fields, milestone, assign, unassign, blocked, comment, closing []string
 	var blockers, blockersInPlace []string // refs of AddBlockedBy, joined in one line each
 	var labels, labelsInPlace []string     // +name and -name
 	change := FieldChange.effect
@@ -313,6 +330,8 @@ func (p *Plan) lines(dry bool) []string {
 			sprint = append(sprint, pick(op))
 		case SetFields:
 			fields = append(fields, op.each(change)...)
+		case SetMilestone:
+			milestone = append(milestone, pick(op))
 		case AddLabels:
 			labels = append(labels, op.signs()...)
 		case RemoveLabels:
@@ -353,6 +372,8 @@ func (p *Plan) lines(dry bool) []string {
 			sprint = append(sprint, pick(op))
 		case SetFields:
 			fields = append(fields, op.each(change)...)
+		case SetMilestone:
+			milestone = append(milestone, pick(op))
 		case AddLabels:
 			labelsInPlace = append(labelsInPlace, op.signs()...)
 		case RemoveLabels:
@@ -406,7 +427,7 @@ func (p *Plan) lines(dry bool) []string {
 	}
 	board = append(board, unarchive...)
 	var out []string
-	for _, group := range [][]string{board, reopen, status, sprint, fields, label, unassign, assign, blocked, comment, closing} {
+	for _, group := range [][]string{board, reopen, status, sprint, fields, milestone, label, unassign, assign, blocked, comment, closing} {
 		out = append(out, group...)
 	}
 	return out

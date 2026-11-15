@@ -1,0 +1,32 @@
+code: 0
+--- stdout
+The issue moves to another stage
+
+  From:      any status
+  To:        the status is not changed
+  Requires:  --milestone
+  Batch:     several numbers at once: gh dojo plan 12 13 14; each issue is applied
+             on its own, a failed one is skipped, and a summary ends the run:
+             "3 of 4 done; #17: <reason>"; a re-run skips what is done
+             exit code: 0 all done; 5 some written and a re-run may finish the rest;
+             else the failures' code, 2 first, then 1, 4, 3
+  Board:     adds the issue if it is not there
+  Milestone: the open milestone --milestone names, by title or a start only its title has;
+             an issue in it already keeps it, so a repeat is safe
+             no such milestone, or several, is exit code 1, with the open ones or the candidates
+  Comment:   posted unless it renders empty or is already the latest gh-dojo comment:
+               Moved to {milestone}.
+
+Usage:
+  gh dojo plan <N>... [flags]
+
+Flags:
+      --dry-run           print the plan without changing anything
+  -h, --help              help for plan
+      --milestone title   the open milestone to set, by title or a start only its title has
+
+Global Flags:
+  -q, --jq expression       filter the JSON with a jq expression (implies --json)
+      --json                print the result as JSON (schema_version 1), errors too
+  -t, --template template   format the JSON with a Go template (implies --json)
+--- stderr

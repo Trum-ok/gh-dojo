@@ -1,0 +1,79 @@
+code: 0
+--- stdout
+Process from .github/dojo.toml (preset kanban): board Trum-ok/5, issues in Trum-ok/gh-dojo.
+Find an issue to take with gh dojo next (Backlog or no status, no unresolved blockers);
+read it with gh dojo show <N>.
+Run a verb as gh dojo <verb> <N>; --dry-run shows its plan first.
+Every command takes --json (schema_version 1), --jq and --template, as gh does.
+
+Verbs:
+  start       You begin working on the issue
+              optional --comment; warns about unresolved blockers; comments "Started. Session: {session} {comment}"
+  wait        Work is stuck: waiting for another issue or an outside decision
+              needs --by or --comment; --by N also marks it blocked by #N; comments "Waiting for {by}. {comment}"
+  ready       The work is done, verified and committed, but not released yet
+              optional --comment; comments "{comment}"
+  done        The change is released
+              several numbers at once (done 12 13 14) or a release's issues (release <tag> --verb done); optional --comment; also on closed issues; comments "{comment}"; closes as completed
+  drop        задача не нужна или дубль
+              needs --comment; on a closed issue only if closed as not planned; the user's decision: ask first, then --yes; comments "{comment}"; closes as not planned
+  review      A pull request waits for review
+              optional --comment; labels +enhancement -dogfood; assigns you; comments "{comment}"
+  revive      A closed issue is needed after all
+              also on closed issues; reopens
+  tag         Tag it
+              labels +enhancment
+  give        Hand it over
+              assigns octo-nobody
+  recase      Labels, one in another case than the repository's
+              labels +enhancement -Dogfood
+  tagcase     Tag it, in another case than the repository's
+              labels +Enhancement
+  untag       Remove a label the repository does not have
+              labels -no-such-label
+  hand        Hand it to the owner, login in lowercase
+              assigns trum-ok
+  plan        The issue moves to another stage
+              several numbers at once (plan 12 13 14); needs --milestone; sets the --milestone milestone; comments "Moved to {milestone}."
+  ship        Due in the agent release
+              sets milestone v0.2
+  ship-later  Due in a release without a milestone yet
+              sets milestone v9
+
+Every verb adds the issue to the board if it is missing and refuses a
+closed issue unless noted. A repeat is safe: an effect already in place
+(status, milestone, comment, labels, assignees, blocked-by link, closed
+or open) is skipped.
+
+Lifecycle (from → to):
+  start       Backlog, Waiting, Ready → In progress
+  wait        In progress → Waiting
+  ready       In progress, Waiting → Ready
+  done        Ready, In progress → Done; closes as completed
+  drop        any status → status unchanged; closes as not planned, asks the user first (--yes)
+  review      In progress, Ready → In review
+  revive      any status → Backlog; reopens
+  tag         any status → status unchanged
+  give        any status → status unchanged
+  recase      any status → status unchanged
+  tagcase     any status → status unchanged
+  untag       any status → status unchanged
+  hand        any status → status unchanged
+  plan        any status → status unchanged
+  ship        any status → status unchanged
+  ship-later  any status → status unchanged
+  Initial:    Backlog (new issues; also an issue with no status or not on the board)
+  Final:      Done (gh dojo list hides it unless --all)
+  Resolved:   Ready, Done (a blocker in these no longer blocks)
+
+Exit codes:
+  0  everything applied: go on
+  1  bad arguments or config: fix them as the error says
+  2  a process check refused: don't work around it; ask the user
+  3  issue or board not found: check the number (gh dojo list) or board.owner/project in .github/dojo.toml
+  4  network, rate limit or auth: retry later, or gh auth refresh -s project
+  5  partially applied: re-run the same command; it finishes the rest
+  A verb on several issues (batch) exits 0 when all are done, 5 when some were
+  written and a re-run may finish the rest, else with the code of the failed
+  ones (2 first, then 1, 4, 3); a summary names each issue not done.
+--- stderr

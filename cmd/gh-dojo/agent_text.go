@@ -262,7 +262,7 @@ func (d *agentDoc) confirmExample() string {
 		if v.To != "" && len(v.From) > 0 && v.From[0] != v.To {
 			ex := "#42 " + v.From[0] + " → " + v.To
 			// A template with text of its own comments every time.
-			if strings.TrimSpace(strings.NewReplacer("{comment}", "", "{by}", "", "{session}", "", "{assignee}", "").Replace(v.Comment)) != "" {
+			if strings.TrimSpace(strings.NewReplacer("{comment}", "", "{by}", "", "{session}", "", "{assignee}", "", "{milestone}", "").Replace(v.Comment)) != "" {
 				ex += ", comment left"
 			}
 			return ex
@@ -350,11 +350,17 @@ func (d *agentDoc) rules(v config.Verb) []string {
 			"be assigned issues in the repository is exit code 1, with the list of who can. Ask the user "+
 			"whom to assign if you do not know.", config.ArgAssignee, config.ArgAssignee))
 	}
+	if v.MilestoneArg {
+		r = append(r, fmt.Sprintf("`--%s <title>` names the open milestone to put the issue in, by its title "+
+			"or a start only that title has (`--%s v1.2`); none or several matching is exit code 1, with the open "+
+			"milestones or the candidates. Ask the user which milestone if you do not know.",
+			config.ArgMilestone, config.ArgMilestone))
+	}
 	if v.Batch {
 		r = append(r, fmt.Sprintf("It takes several numbers at once, `gh dojo %s 12 13 14`: each issue is "+
 			"checked and written on its own, one that fails is skipped, and a summary names each issue not done. "+
 			"Running the same command again touches only what is left.", v.Name))
-		if d.hasCommand("release") {
+		if d.hasCommand("release") && releaseLacks(v) == "" {
 			r = append(r, d.releaseRule(v))
 		}
 	}
@@ -585,8 +591,8 @@ func (d *agentDoc) writing(w *mdWriter) {
 	w.list([]string{
 		"`gh dojo new \"<title>\" --type " + typ + " --body \"…\"`: the issue, its labels, the board" + status +
 			", in one command. A long body: `--body-file <file>`, or `--body-file -` for stdin. More labels: " +
-			"`--label X`." + area + " `--milestone \"<title>\"`: an open milestone (an unknown one is exit code 1 " +
-			"with the list). `--blocked-by 12`: blocked from the start (repeat it, or comma-separate; an issue " +
+			"`--label X`." + area + " `--milestone \"<title>\"`: an open milestone, by its title or a start only " +
+			"that title has (none or several is exit code 1 with the list). `--blocked-by 12`: blocked from the start (repeat it, or comma-separate; an issue " +
 			"that does not exist is exit code 3, and nothing is created). `--parent 12`: a sub-issue of #12 " +
 			"(one issue; one that does not exist is exit code 3, and nothing is created). A title starting with `-` goes after " +
 			"`--`, and every flag before it: `gh dojo new " + example + " -- \"-v is ignored\"`.",

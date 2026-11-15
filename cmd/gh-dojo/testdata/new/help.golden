@@ -9,8 +9,9 @@ when labels.types is empty; --area X adds the label <labels.area_prefix>X;
 created, listing the allowed values.
 
 --milestone puts the issue in an open milestone of the repo, by title
-(ignoring case). An unknown one fails before anything is created, listing the
-open milestones.
+(ignoring case) or a start only its title has: v0.3 for "v0.3 — extensibility".
+An unknown or ambiguous one fails before anything is created, listing the open
+milestones or the candidates.
 
 The body comes from --body or --body-file (a file, or - for stdin). A title
 starting with - goes after --, and every flag before the --, since anything

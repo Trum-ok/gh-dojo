@@ -74,6 +74,7 @@ func TestDescribe(t *testing.T) {
 		{"custom", customConfig, render.ExitOK},
 		{"no_preset", noPresetConfig, render.ExitOK},
 		{"effects", effectsDojoConfig, render.ExitOK}, // confirm, close, reopen, labels, assign
+		{"milestone", milestoneDojoConfig, render.ExitOK},
 		{"broken", dojoConfig + "\n[verbs.start]\nto = 3\n", render.ExitUsage},
 		{"no_verbs", "\nversion = 1\n[board]\nowner = \"acme\"\nproject = 3\n[fields]\nstatus = \"Status\"\n", render.ExitOK},
 	}

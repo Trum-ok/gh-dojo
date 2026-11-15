@@ -76,6 +76,7 @@ type rawVerb struct {
 	Labels       *[]string  `toml:"labels"`
 	Assign       *rawAssign `toml:"assign"`
 	Unassign     *rawAssign `toml:"unassign"`
+	Milestone    *rawOff    `toml:"milestone"`
 	Close        *rawOff    `toml:"close"`
 	Reopen       *bool      `toml:"reopen"`
 	Confirm      *rawOff    `toml:"confirm"`
@@ -124,9 +125,10 @@ func (a *rawAssign) UnmarshalTOML(v any) error {
 	return nil
 }
 
-// rawOff is the value of a verb's close or confirm key: a string, or a
-// boolean, of which only false (off, to turn off a preset's value) is
-// valid; build rejects true with the values it wants.
+// rawOff is the value of a verb's close, confirm, milestone, blockers or
+// sub_issues key: a string, or a boolean, of which only false (off, to
+// turn off a preset's value) is valid; build rejects true with the values
+// it wants.
 type rawOff struct {
 	Bool *bool
 	Str  *string
@@ -156,7 +158,7 @@ func (v *rawVerb) setKeys() []string {
 		{"from_labels", v.FromLabels != nil}, {"refuse_labels", v.RefuseLabels != nil},
 		{"require", v.Require != nil}, {"require_one_of", v.RequireOneOf != nil},
 		{"comment", v.Comment != nil}, {"labels", v.Labels != nil}, {"assign", v.Assign != nil},
-		{"unassign", v.Unassign != nil}, {"close", v.Close != nil}, {"reopen", v.Reopen != nil}, {"confirm", v.Confirm != nil},
+		{"unassign", v.Unassign != nil}, {"milestone", v.Milestone != nil}, {"close", v.Close != nil}, {"reopen", v.Reopen != nil}, {"confirm", v.Confirm != nil},
 		{"iteration", v.Iteration != nil}, {"field", v.Field != nil},
 		{"blockers", v.Blockers != nil}, {"sub_issues", v.SubIssues != nil}, {"batch", v.Batch != nil},
 	} {
@@ -179,7 +181,7 @@ var (
 	releaseKeys  = []string{"keywords"}
 	verbKeys     = []string{
 		"when", "to", "from", "from_labels", "refuse_labels", "require", "require_one_of", "comment",
-		"labels", "assign", "unassign", "close", "reopen", "confirm", "iteration", "field", "blockers", "sub_issues", "batch",
+		"labels", "assign", "unassign", "milestone", "close", "reopen", "confirm", "iteration", "field", "blockers", "sub_issues", "batch",
 		"disabled",
 	}
 
@@ -468,6 +470,7 @@ func mergeVerb(m merger, name string, base, over *rawVerb) *rawVerb {
 		Labels:       pick(m, p+"labels", base.Labels, over.Labels),
 		Assign:       pick(m, p+"assign", base.Assign, over.Assign),
 		Unassign:     pick(m, p+"unassign", base.Unassign, over.Unassign),
+		Milestone:    pick(m, p+"milestone", base.Milestone, over.Milestone),
 		Close:        pick(m, p+"close", base.Close, over.Close),
 		Reopen:       pick(m, p+"reopen", base.Reopen, over.Reopen),
 		Confirm:      pick(m, p+"confirm", base.Confirm, over.Confirm),

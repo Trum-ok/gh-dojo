@@ -236,7 +236,24 @@ func releaseVerb(cmd *cobra.Command, cfg *config.Config, name string) (config.Ve
 			name, name, batchVerbsNote(cfg))
 		return config.Verb{}, e.WithFix(fmt.Sprintf("add batch = true under [verbs.%s] in %s", name, cfg.Display))
 	}
+	if arg := releaseLacks(v); arg != "" {
+		return config.Verb{}, render.Usage("release --verb %s: %s needs --%s, which release does not take", name, name, arg).
+			WithFix("run it on the issues themselves: " + workflow.Example(v, "<N>..."))
+	}
 	return v, nil
+}
+
+// releaseLacks is the argument verb v requires that release has no flag
+// for, "" for none: the user an assign = "{assignee}" verb assigns and the
+// milestone a milestone = "{milestone}" verb sets differ from release to
+// release, so release cannot run such a verb.
+func releaseLacks(v config.Verb) string {
+	for _, arg := range []string{config.ArgAssignee, config.ArgMilestone} {
+		if slices.Contains(v.Require, arg) {
+			return arg
+		}
+	}
+	return ""
 }
 
 // releaseRun is what release found, for its output.

@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.plan.comment uses {milestone}, the --milestone milestone, but verbs.plan.milestone is not "{milestone}"
+fix: set milestone = "{milestone}" to set the milestone --milestone names, or drop {milestone}

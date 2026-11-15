@@ -158,6 +158,9 @@ func dump(c *Config) string {
 		if v.AssignArg || v.Unassign != "" {
 			w("  assign_arg: %v unassign: %q", v.AssignArg, v.Unassign)
 		}
+		if v.SetsMilestone() {
+			w("  milestone: %q milestone_arg: %v", v.Milestone, v.MilestoneArg)
+		}
 	}
 	w("status refs:")
 	for _, r := range c.StatusRefs() {
@@ -288,6 +291,29 @@ when = "Pass the issue on"
 assign = "{assignee}"
 require = ["assignee"]
 unassign = true
+`},
+		// milestone sets a title of the config, or the --milestone one,
+		// which it requires; {milestone} in the comment is its title.
+		// milestone = false turns a preset's off (here: none to turn off).
+		{"milestone", presetOnly + `
+[verbs.plan]
+when = "The issue moves to another stage"
+milestone = "{milestone}"
+comment = "Moved to {milestone}. {comment}"
+batch = true
+
+[verbs.ship]
+when = "Due in the next release"
+to = "Ready"
+milestone = "v1.2 — next"
+
+[verbs.replan]
+when = "Moved, and the milestone required twice over"
+milestone = "{milestone}"
+require = ["milestone", "comment"]
+
+[verbs.done]
+milestone = false
 `},
 		// close = false and confirm = false turn a preset's values off:
 		// done moves to Done and leaves the issue open.
@@ -444,6 +470,17 @@ func TestLoadErrors(t *testing.T) {
 		{"assignee_placeholder_without_arg", presetOnly + "[verbs.start]\ncomment = \"Review: {assignee}\"\n"},
 		{"require_assignee_without_arg", presetOnly + "[verbs.start]\nrequire = [\"assignee\"]\n"},
 		{"require_one_of_assignee", presetOnly + "[verbs.wait]\nassign = \"{assignee}\"\nrequire_one_of = [\"assignee\", \"comment\"]\n"},
+		{"milestone_empty", presetOnly + "[verbs.plan]\nwhen = \"Plan it\"\nmilestone = \"\"\n"},
+		{"milestone_blank", presetOnly + "[verbs.plan]\nwhen = \"Plan it\"\nmilestone = \"  \"\n"},
+		{"milestone_spaces", presetOnly + "[verbs.plan]\nwhen = \"Plan it\"\nmilestone = \"v1.2 \"\n"},
+		{"milestone_two_lines", presetOnly + "[verbs.plan]\nwhen = \"Plan it\"\nmilestone = \"v1.2\\nv1.3\"\n"},
+		{"milestone_true", presetOnly + "[verbs.plan]\nwhen = \"Plan it\"\nmilestone = true\n"},
+		{"milestone_wrong_type", presetOnly + "[verbs.plan]\nwhen = \"Plan it\"\nmilestone = 12\n"},
+		{"milestone_unknown_placeholder", presetOnly + "[verbs.plan]\nwhen = \"Plan it\"\nmilestone = \"{assignee}\"\n"},
+		{"milestone_placeholder_in_title", presetOnly + "[verbs.plan]\nwhen = \"Plan it\"\nmilestone = \"v{milestone}\"\n"},
+		{"milestone_placeholder_without_arg", presetOnly + "[verbs.plan]\nwhen = \"Plan it\"\nmilestone = \"v1.2\"\ncomment = \"In {milestone}.\"\n"},
+		{"require_milestone_without_arg", presetOnly + "[verbs.start]\nrequire = [\"milestone\"]\n"},
+		{"require_one_of_milestone", presetOnly + "[verbs.wait]\nmilestone = \"{milestone}\"\nrequire_one_of = [\"milestone\", \"comment\"]\n"},
 		{"board_assignee_bad", "preset = \"kanban\"\n" + board + "assignee = \"me@x\"\n"},
 		{"board_assignee_at", "preset = \"kanban\"\n" + board + "assignee = \"@Me\"\n"},
 		{"close_bad_reason", presetOnly + "[verbs.done]\nclose = \"done\"\n"},

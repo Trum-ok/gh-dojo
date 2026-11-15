@@ -1,0 +1,102 @@
+{
+  "comment": "Hand-crafted from doctor_verbs_ok.json (the real API's answer for Trum-ok/gh-dojo, saved by hand), with the open milestones of internal/issue/testdata/graphql/card_55_milestones.json (recorded): the DoctorVerbs query of verbs that name milestones in the config also reads the first 100 open milestones.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "DoctorVerbs",
+      "query": "query DoctorVerbs($owner: String!, $name: String!, $label0: String!, $label1: String!, $user0: String!) {\n  repository(owner: $owner, name: $name) {\n    labels(first: 100) { nodes { name } }\n    label0: label(name: $label0) { name }\n    label1: label(name: $label1) { name }\n    user0: assignableUsers(query: $user0, first: 100) { nodes { login } }\n    milestones(first: 100, states: OPEN, orderBy: {field: NUMBER, direction: ASC}) {\n      totalCount\n      pageInfo { hasNextPage endCursor }\n      nodes { id title dueOn }\n    }\n  }\n}",
+      "variables": {
+        "label0": "enhancement",
+        "label1": "dogfood",
+        "name": "gh-dojo",
+        "owner": "Trum-ok",
+        "user0": "Trum-ok"
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "labels": {
+              "nodes": [
+                {
+                  "name": "accessibility"
+                },
+                {
+                  "name": "bug"
+                },
+                {
+                  "name": "documentation"
+                },
+                {
+                  "name": "duplicate"
+                },
+                {
+                  "name": "enhancement"
+                },
+                {
+                  "name": "good first issue"
+                },
+                {
+                  "name": "help wanted"
+                },
+                {
+                  "name": "invalid"
+                },
+                {
+                  "name": "question"
+                },
+                {
+                  "name": "wontfix"
+                },
+                {
+                  "name": "dogfood"
+                }
+              ]
+            },
+            "label0": {
+              "name": "enhancement"
+            },
+            "label1": {
+              "name": "dogfood"
+            },
+            "user0": {
+              "nodes": [
+                {
+                  "login": "Trum-ok"
+                }
+              ]
+            },
+            "milestones": {
+              "totalCount": 4,
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": "Y3Vyc29yOnYyOpIEzgEqNS8="
+              },
+              "nodes": [
+                {
+                  "id": "MI_kwDOVq9iIs4BKI_2",
+                  "title": "v0.0 — самохостинг",
+                  "dueOn": null
+                },
+                {
+                  "id": "MI_kwDOVq9iIs4BKKTc",
+                  "title": "v0.1 — первый публичный релиз",
+                  "dueOn": null
+                },
+                {
+                  "id": "MI_kwDOVq9iIs4BKRnx",
+                  "title": "v0.2 — агент и релизы",
+                  "dueOn": null
+                },
+                {
+                  "id": "MI_kwDOVq9iIs4BKjUv",
+                  "title": "v0.3 — расширяемость",
+                  "dueOn": null
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

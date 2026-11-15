@@ -1,0 +1,6 @@
+code: 1
+--- stdout
+--- stderr
+error: milestone "v0" is ambiguous: 4 open milestones in Trum-ok/gh-dojo start with it
+allowed: v0.0 — самохостинг, v0.1 — первый публичный релиз, v0.2 — агент и релизы, v0.3 — расширяемость
+fix: write more of the title, up to all of it

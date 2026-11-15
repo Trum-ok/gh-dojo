@@ -156,6 +156,7 @@ func newVerbCmd(cfg *config.Config, v config.Verb) *cobra.Command {
 			args.HasComment = cmd.Flags().Changed(config.ArgComment)
 			args.HasBy = cmd.Flags().Changed(config.ArgBy)
 			args.HasAssignee = cmd.Flags().Changed(config.ArgAssignee)
+			args.HasMilestone = cmd.Flags().Changed(config.ArgMilestone)
 			refs := argRefs(posArgs, issue.Repo{}) // validated by issueArgs
 			if len(refs) == 1 {
 				return runVerb(cmd, cfg, v, refs[0], args, dryRun)
@@ -171,6 +172,7 @@ func newVerbCmd(cfg *config.Config, v config.Verb) *cobra.Command {
 	}
 	f.StringVar(&args.By, config.ArgBy, "", byUsage)
 	f.StringVar(&args.Assignee, config.ArgAssignee, "", "the user to assign: a login, or @me for yourself")
+	f.StringVar(&args.Milestone, config.ArgMilestone, "", "the open milestone to set, by `title` or a start only its title has")
 	f.BoolVar(&dryRun, "dry-run", false, "print the plan without changing anything")
 	f.BoolVar(&args.Yes, "yes", false, "the user agreed: run a verb that is the user's decision")
 	// Flags the verb does not take stay registered but hidden, so passing
@@ -646,6 +648,15 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 		line("Reopen", "reopens a closed issue")
 	}
 	sprintHelp(cfg, v, line)
+	switch {
+	case v.MilestoneArg:
+		line("Milestone", "the open milestone --%s names, by title or a start only its title has;", config.ArgMilestone)
+		line("", "an issue in it already keeps it, so a repeat is safe")
+		line("", "no such milestone, or several, is exit code 1, with the open ones or the candidates")
+	case v.Milestone != "":
+		line("Milestone", "%s (an open milestone, by title or a start only its title has);", v.Milestone)
+		line("", "an issue in it already keeps it, so a repeat is safe")
+	}
 	if len(v.AddLabels)+len(v.RemoveLabels) > 0 {
 		var signs []string
 		for _, l := range v.AddLabels {

@@ -89,11 +89,7 @@ const newContextQuery = `query NewIssueContext($owner: String!, $repo: String!, 
       pageInfo { hasNextPage endCursor }
       nodes { id name }
     }
-    milestones(first: 100, states: OPEN, orderBy: {field: NUMBER, direction: ASC}) {
-      totalCount
-      pageInfo { hasNextPage endCursor }
-      nodes { id title dueOn }
-    }
+    ` + issue.MilestonesSelection + `
     issues(last: $window, states: OPEN, orderBy: {field: CREATED_AT, direction: ASC}) {
       nodes {
         id
@@ -149,18 +145,6 @@ const newLabelsQuery = `query RepoLabels($owner: String!, $repo: String!, $curso
       totalCount
       pageInfo { hasNextPage endCursor }
       nodes { id name }
-    }
-  }
-}`
-
-// newMilestonesQuery reads all open milestones; only needed past the first
-// 100.
-const newMilestonesQuery = `query RepoMilestones($owner: String!, $repo: String!, $cursor: String) {
-  repository(owner: $owner, name: $repo) {
-    milestones(first: 100, after: $cursor, states: OPEN, orderBy: {field: NUMBER, direction: ASC}) {
-      totalCount
-      pageInfo { hasNextPage endCursor }
-      nodes { id title dueOn }
     }
   }
 }`
@@ -437,8 +421,9 @@ when labels.types is empty; --area X adds the label <labels.area_prefix>X;
 created, listing the allowed values.
 
 --milestone puts the issue in an open milestone of the repo, by title
-(ignoring case). An unknown one fails before anything is created, listing the
-open milestones.
+(ignoring case) or a start only its title has: v0.3 for "v0.3 — extensibility".
+An unknown or ambiguous one fails before anything is created, listing the open
+milestones or the candidates.
 
 The body comes from --body or --body-file (a file, or - for stdin). A title
 starting with - goes after --, and every flag before the --, since anything
@@ -573,7 +558,7 @@ func (r *newRun) result() newResult {
 	return newResult{
 		Number: r.number, Repo: r.repo.String(), Title: singleLine(title), Created: !r.resumed,
 		Labels: orEmpty(r.labels), Status: orNull(r.status), StatusSet: r.statusSet, Unarchived: r.unarchived,
-		Milestone: r.milestone.json(), MilestoneSet: r.milestoneSet,
+		Milestone: milestoneJSON(r.milestone), MilestoneSet: r.milestoneSet,
 		BlockedBy: refList(r.linked, r.def), AlreadyBlockedBy: refList(r.linkedFound, r.def),
 		Parent: r.parentJSON(), ParentSet: r.parentSet,
 	}
@@ -768,8 +753,8 @@ func (r *newRun) run(ctx context.Context) error {
 		case found.milestone.Title != milestone.Title:
 			r.milestoneKept = milestone.Title
 			r.warnings = append(r.warnings, fmt.Sprintf(
-				"#%d already has milestone %q; kept it, --milestone %q not applied (to change it: gh issue edit %d -R %s --milestone %q)",
-				r.number, found.milestone.Title, milestone.Title, r.number, repo, milestone.Title))
+				"#%d already has milestone %q; kept it, --milestone %q not applied (to change it: %s)",
+				r.number, found.milestone.Title, milestone.Title, r.milestoneFix(repo, milestone.Title)))
 		}
 		// So does a parent, like the milestone.
 		if p := nc.Parent; p != nil {
@@ -1300,16 +1285,12 @@ type newLabel struct {
 	Name string `json:"name"`
 }
 
-// newMilestone is a repo milestone; DueOn is RFC 3339, nil without a due
-// date.
-type newMilestone struct {
-	ID    string  `json:"id"`
-	Title string  `json:"title"`
-	DueOn *string `json:"dueOn"`
-}
+// newMilestone is a repo milestone: an open one (see issue.OpenMilestone),
+// or the milestone of a recent issue, whose ID is not read.
+type newMilestone = issue.OpenMilestone
 
-// json is the milestone in new's JSON result, nil for none.
-func (m *newMilestone) json() *jsonMilestone {
+// milestoneJSON is the milestone in new's JSON result, nil for none.
+func milestoneJSON(m *newMilestone) *jsonMilestone {
 	if m == nil {
 		return nil
 	}
@@ -1627,55 +1608,37 @@ func hasPrefixFold(s, prefix string) bool {
 	return len(s) >= len(prefix) && strings.EqualFold(s[:len(prefix)], prefix)
 }
 
-// milestone returns the open milestone titled title: the exact title, else
-// one that differs only in case, as gh does. An unknown title is a usage
-// error listing the open milestones, with the closest one suggested.
+// milestoneFix is the command that puts issue r.number of repo in the
+// milestone title: a verb with milestone = "{milestone}", else gh issue
+// edit.
+func (r *newRun) milestoneFix(repo issue.Repo, title string) string {
+	for _, v := range r.cfg.Verbs {
+		if v.MilestoneArg {
+			def, err := r.App.Repo()
+			if err != nil {
+				def = issue.Repo{}
+			}
+			return fmt.Sprintf("gh dojo %s %s --%s %q", v.Name, issue.Ref{Repo: repo, Number: r.number}.Arg(def),
+				config.ArgMilestone, title)
+		}
+	}
+	return fmt.Sprintf("gh issue edit %d -R %s --milestone %q", r.number, repo, title)
+}
+
+// milestone returns the open milestone title names, matched as a verb's
+// milestone effect matches it (see issue.MatchMilestone): the title
+// regardless of case, else the only one it starts. An unknown or ambiguous
+// title is a usage error listing the open milestones or the candidates.
 func (nc *newContext) milestone(ctx context.Context, q graph.Querier, repo issue.Repo, title string) (*newMilestone, error) {
 	all := nc.Milestones.Nodes
 	if nc.Milestones.PageInfo.HasNextPage {
 		if nc.allMilestones == nil {
-			type resp struct {
-				Repository *struct {
-					Milestones graph.Connection[newMilestone] `json:"milestones"`
-				} `json:"repository"`
-			}
-			vars := map[string]any{"owner": repo.Owner, "repo": repo.Name}
-			page, err := graph.Paginate(ctx, q, newMilestonesQuery, vars, 0, func(r *resp) *graph.Connection[newMilestone] {
-				if r.Repository == nil {
-					return nil
-				}
-				return &r.Repository.Milestones
-			})
-			if err != nil {
+			var err error
+			if nc.allMilestones, err = issue.ReadMilestones(ctx, q, repo); err != nil {
 				return nil, err
 			}
-			nc.allMilestones = page.Nodes
 		}
 		all = nc.allMilestones
 	}
-	var fold *newMilestone
-	for i := range all {
-		switch {
-		case all[i].Title == title:
-			return &all[i], nil
-		case fold == nil && strings.EqualFold(all[i].Title, title):
-			fold = &all[i]
-		}
-	}
-	if fold != nil {
-		return fold, nil
-	}
-	create := fmt.Sprintf("if it is new, create it: gh api repos/%s/milestones -f title=%q", repo, title)
-	if len(all) == 0 {
-		return nil, render.Usage("unknown milestone %q: %s has no open milestones", title, repo).WithFix(create)
-	}
-	titles := make([]string, len(all))
-	for i, m := range all {
-		titles[i] = m.Title
-	}
-	msg := fmt.Sprintf("unknown milestone %q: no open milestone in %s has that title", title, repo)
-	if s := board.Suggest(title, titles); s != "" {
-		msg += fmt.Sprintf("; did you mean %q?", s)
-	}
-	return nil, render.Usage("%s", msg).WithAllowed(titles...).WithFix(create)
+	return issue.MatchMilestone(title, all, repo)
 }

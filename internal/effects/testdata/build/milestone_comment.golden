@@ -1,0 +1,12 @@
+mutation Verb($issue: ID!, $milestone: ID!, $body: String!) {
+  milestone: updateIssue(input: {id: $issue, milestoneId: $milestone}) { issue { id } }
+  comment: addComment(input: {subjectId: $issue, body: $body}) { commentEdge { node { id } } }
+}
+--- vars
+{
+  "body": "Started.\n\n<!-- gh-dojo:start:995a443b -->",
+  "issue": "I_1",
+  "milestone": "MI_3"
+}
+--- steps
+milestone, comment

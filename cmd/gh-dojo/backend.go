@@ -33,14 +33,16 @@ type githubBackend struct {
 	added map[string]string // refKey of an issue → board item added in this run
 	// allowed are the allowed values checkFound read for its errors, by
 	// kind ("labels", "assignable") and repository, so a batch reads them
-	// once per repository, not once per issue.
+	// once per repository, not once per issue; so are the open milestones
+	// of a repository with more than one card query reads ("milestones").
 	allowed map[string]allowedValues
 }
 
 // allowedValues is one read of allowed values, or why it failed.
 type allowedValues struct {
-	names []string
-	err   error
+	names      []string
+	milestones []issue.OpenMilestone
+	err        error
 }
 
 // allowedOnce returns read's answer for kind in repo, reading it once per
@@ -54,8 +56,23 @@ func (b *githubBackend) allowedOnce(kind string, repo issue.Repo, read func() ([
 	if b.allowed == nil {
 		b.allowed = map[string]allowedValues{}
 	}
-	b.allowed[key] = allowedValues{names, err}
+	b.allowed[key] = allowedValues{names: names, err: err}
 	return names, err
+}
+
+// milestonesOnce returns the open milestones of repo, read page by page
+// once per run.
+func (b *githubBackend) milestonesOnce(ctx context.Context, repo issue.Repo) ([]issue.OpenMilestone, error) {
+	key := "milestones " + strings.ToLower(repo.String())
+	if v, ok := b.allowed[key]; ok {
+		return v.milestones, v.err
+	}
+	all, err := issue.ReadMilestones(ctx, b.app.Client, repo)
+	if b.allowed == nil {
+		b.allowed = map[string]allowedValues{}
+	}
+	b.allowed[key] = allowedValues{milestones: all, err: err}
+	return all, err
 }
 
 func (b *githubBackend) ReadIssue(ctx context.Context, v config.Verb, ref issue.Ref, a workflow.Args) (workflow.Issue, error) {
@@ -181,14 +198,15 @@ func (b *githubBackend) workflowIssue(ctx context.Context, v config.Verb, lookup
 }
 
 // lookupMissing reports whether a lookup of v found nothing for every
-// issue alike: a label to add, the user to assign or the viewer is
-// missing. checkFound refuses the verb then, whatever the issue.
+// issue alike: a label to add, the user to assign, the milestone to set
+// or the viewer is missing. checkFound refuses the verb then, whatever the
+// issue.
 func lookupMissing(v config.Verb, l issue.Lookup, f *issue.Found) bool {
 	if f == nil {
 		f = &issue.Found{}
 	}
 	return slices.ContainsFunc(v.AddLabels, func(name string) bool { return f.Labels[name] == "" }) ||
-		l.User != "" && f.User == nil || l.Viewer && f.Viewer == nil
+		l.User != "" && f.User == nil || l.Viewer && f.Viewer == nil || l.Milestone != "" && f.Milestone == nil
 }
 
 // byRefs parses --by of a verb with blockers = "link" for issue target:
@@ -293,8 +311,9 @@ func unresolvedLinks(c *issue.Card, all graph.Page[issue.Link], unresolved []iss
 }
 
 // verbLookup is what the effects of v, run with a, need looked up with
-// the card: the IDs of its labels, and of the user it assigns (from the
-// config or --assignee). A verb that removes labels, or checks them
+// the card: the IDs of its labels, of the user it assigns (from the
+// config or --assignee), and the open milestones for the one it sets (from
+// the config or --milestone). A verb that removes labels, or checks them
 // (from_labels, refuse_labels), reads all of the issue's labels, so it
 // can tell one is there; a verb that unassigns reads
 // the IDs of the issue's assignees, and the viewer for "@me"; a verb that
@@ -321,13 +340,18 @@ func verbLookup(v config.Verb, a workflow.Args) issue.Lookup {
 	default:
 		l.User = login
 	}
+	l.Milestone = v.Milestone
+	if v.MilestoneArg {
+		l.Milestone = strings.TrimSpace(a.Milestone)
+	}
 	return l
 }
 
 // checkFound refuses a verb whose labels to add do not exist in the
 // repository, or whose assignee cannot be assigned there: a config error
 // (exit code 1) with the allowed values, which take one more read. None of
-// the verb's effects is applied then.
+// the verb's effects is applied then. So is one whose milestone names no
+// open milestone of the repository, or several (see matchMilestone).
 //
 // Labels are looked up by their exact name, while GitHub's names are
 // unique regardless of case. A label to remove that does not exist is in
@@ -395,8 +419,57 @@ func (b *githubBackend) checkFound(ctx context.Context, v config.Verb, l issue.L
 	case l.Viewer && f.Viewer == nil:
 		return render.Network("GitHub did not return the authenticated user for %s", config.Me).
 			WithFix(render.AuthFix)
+	case l.Milestone != "":
+		return b.matchMilestone(ctx, v, l, card, f)
 	}
 	return nil
+}
+
+// matchMilestone finds the open milestone of the card's repository that
+// the verb's milestone names (Lookup.Milestone), as gh dojo new --milestone
+// does (issue.MatchMilestone), and keeps it in f.Milestone for every card
+// of the repository. The open milestones came with the card; past the
+// first 100 they are read page by page, once per repository and run. No
+// match, or several, is exit code 1: a usage error for --milestone, a
+// config error naming the key for a title of the config.
+func (b *githubBackend) matchMilestone(ctx context.Context, v config.Verb, l issue.Lookup, card *issue.Card, f *issue.Found) error {
+	if f.Milestone != nil {
+		return nil
+	}
+	open := f.Milestones
+	if f.MoreMilestones {
+		all, err := b.milestonesOnce(ctx, card.Repo)
+		if err != nil {
+			return err
+		}
+		open = all
+	}
+	m, err := issue.MatchMilestone(l.Milestone, open, card.Repo)
+	if err == nil {
+		f.Milestone = m
+		return nil
+	}
+	if v.MilestoneArg {
+		return err
+	}
+	cfg, cerr := b.app.Config()
+	if cerr != nil {
+		return cerr
+	}
+	e := milestoneKeyError(cfg.KeyPath("verbs."+v.Name+".milestone"), err)
+	e.What = cfg.Display + ": " + e.What
+	return e
+}
+
+// milestoneKeyError is err of issue.MatchMilestone for a milestone of the
+// config, at key: it names the key, and its fix says to change it.
+func milestoneKeyError(key string, err error) *render.Error {
+	e := render.FromError(err)
+	fix := fmt.Sprintf("%s, or fix %s", e.Fix, key)
+	if errors.Is(err, issue.ErrAmbiguousMilestone) {
+		fix = "write more of the title in " + key
+	}
+	return render.Usage("%s: %s", key, e.What).WithAllowed(e.Allowed...).WithFix(fix).WithCause(err)
 }
 
 // repoLabels reads the names of all labels of repo, for an allowed list.
@@ -611,6 +684,9 @@ func (b *githubBackend) ids(ctx context.Context, p *workflow.Plan, card *issue.C
 		}
 		for login, id := range card.AssigneeIDs { // to unassign
 			ids.Users[login] = id
+		}
+		if f.Milestone != nil {
+			ids.Milestone = f.Milestone.ID
 		}
 	}
 	for _, op := range p.Ops {

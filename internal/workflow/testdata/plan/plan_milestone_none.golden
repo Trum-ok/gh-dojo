@@ -1,0 +1,5 @@
+dry run: plan #42
+  milestone: none → v0.3 — extensibility
+  comment: "Moved to v0.3 — extensibility."
+confirm: #42 milestone none → v0.3 — extensibility, comment left
+post: "Moved to v0.3 — extensibility.\n\n<!-- gh-dojo:plan:1c86c7b3 -->"

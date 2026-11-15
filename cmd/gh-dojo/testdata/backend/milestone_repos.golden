@@ -1,0 +1,8 @@
+code: 1
+--- stdout
+dry run: plan #3 "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)"
+  milestone: v0.0 — самохостинг → v0.3 — расширяемость
+  comment: "Moved to v0.3 — расширяемость."
+--- stderr
+error: dry run: 1 of 2 can be applied; acme/api#7: unknown milestone "v0.3": no open milestone in acme/api has that title or one starting with it
+fix: if it is new, create it: gh api repos/acme/api/milestones -f title="v0.3"

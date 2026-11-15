@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.plan.milestone = true: want a milestone title, "{milestone}" for the --milestone one, or false to turn it off
+allowed: a milestone title, "{milestone}", false

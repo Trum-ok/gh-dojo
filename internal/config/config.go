@@ -38,17 +38,20 @@ var ErrNoConfig = errors.New("no " + FileName + " found")
 const Version = 1
 
 // Verb arguments that require and require_one_of may name. Each is a CLI
-// flag of the verb (--comment, --by, --assignee) and a placeholder in its
-// comment template. --assignee is the login a verb with assign =
-// "{assignee}" assigns (see Verb.AssignArg); only such a verb takes it.
+// flag of the verb (--comment, --by, --assignee, --milestone) and a
+// placeholder in its comment template. --assignee is the login a verb with
+// assign = "{assignee}" assigns (see Verb.AssignArg); only such a verb
+// takes it. --milestone is the milestone a verb with milestone =
+// "{milestone}" sets (see Verb.MilestoneArg); only such a verb takes it.
 const (
-	ArgComment  = "comment"
-	ArgBy       = "by"
-	ArgAssignee = "assignee"
+	ArgComment   = "comment"
+	ArgBy        = "by"
+	ArgAssignee  = "assignee"
+	ArgMilestone = "milestone"
 )
 
 var (
-	args     = []string{ArgComment, ArgBy, ArgAssignee}
+	args     = []string{ArgComment, ArgBy, ArgAssignee, ArgMilestone}
 	builtins = []string{
 		"agent", "block", "comment", "describe", "doctor", "help", "init",
 		"list", "new", "next", "release", "show", "unblock",
@@ -121,6 +124,10 @@ const Me = "@me"
 // AssignFromArg is the value of a verb's assign key that takes the user
 // to assign from --assignee when the verb runs (Verb.AssignArg).
 const AssignFromArg = "{" + ArgAssignee + "}"
+
+// MilestoneFromArg is the value of a verb's milestone key that takes the
+// milestone to set from --milestone when the verb runs (Verb.MilestoneArg).
+const MilestoneFromArg = "{" + ArgMilestone + "}"
 
 // UnassignAll is the value of a verb's unassign key that removes every
 // assignee but the one the verb assigns.
@@ -280,7 +287,7 @@ type Verb struct {
 	When         string   // one line: when to use the verb; first line of its --help
 	To           string   // target status; "" leaves the status alone
 	From         []string // statuses the verb may start from; empty means any
-	Require      []string // arguments (ArgComment, ArgBy, ArgAssignee) that must all be given
+	Require      []string // arguments (ArgComment, ArgBy, ArgAssignee, ArgMilestone) that must all be given
 	RequireOneOf []string // arguments of which at least one must be given
 	Comment      string   // comment template (see Render); "" posts no comment
 
@@ -309,6 +316,15 @@ type Verb struct {
 	// removes nobody. unassign = true is resolved to board.assignee at
 	// load. The user the verb assigns is never removed.
 	Unassign string
+	// Milestone is the title of the open milestone the verb puts the issue
+	// in, as the config writes it: matched against the repository's open
+	// milestones when the verb runs, exactly or by a unique start, ignoring
+	// case; "" sets none, or the --milestone one when MilestoneArg is set.
+	Milestone string
+	// MilestoneArg says the verb sets the milestone --milestone names
+	// (milestone = "{milestone}"), given when the verb runs, which makes
+	// --milestone required.
+	MilestoneArg bool
 	// Close is the reason the verb closes the issue with (CloseCompleted,
 	// CloseNotPlanned, CloseDuplicate); "" leaves it open. Reopen reopens
 	// a closed issue. A verb never sets both.
@@ -386,12 +402,17 @@ func (v Verb) Uses(arg string) bool {
 // or the --assignee user.
 func (v Verb) Assigns() bool { return v.Assign != "" || v.AssignArg }
 
+// SetsMilestone reports whether the verb sets the milestone: one of the
+// config or the --milestone one.
+func (v Verb) SetsMilestone() bool { return v.Milestone != "" || v.MilestoneArg }
+
 // Takes reports whether the verb takes the argument arg on the command
 // line: its comment template uses {arg}, or, for ArgAssignee, its assign
-// effect assigns the --assignee user. A verb rejects the arguments it
+// effect assigns the --assignee user, or, for ArgMilestone, its milestone
+// effect sets the --milestone milestone. A verb rejects the arguments it
 // does not take.
 func (v Verb) Takes(arg string) bool {
-	return v.Uses(arg) || arg == ArgAssignee && v.AssignArg
+	return v.Uses(arg) || arg == ArgAssignee && v.AssignArg || arg == ArgMilestone && v.MilestoneArg
 }
 
 // StatusRef is a status name the config refers to, with the key path that

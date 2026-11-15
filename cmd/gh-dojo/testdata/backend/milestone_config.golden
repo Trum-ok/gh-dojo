@@ -1,0 +1,5 @@
+code: 0
+--- stdout
+dry run: ship #3 "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)"
+  milestone: v0.0 — самохостинг → v0.2 — агент и релизы
+--- stderr

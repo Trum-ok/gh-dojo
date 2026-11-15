@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.plan.milestone: unknown placeholder {assignee}
+allowed: a milestone title, "{milestone}"
