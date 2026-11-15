@@ -705,7 +705,7 @@ type verbsCheck struct {
 func newVerbsCheck(cfg *config.Config, viewer string) *verbsCheck {
 	c := &verbsCheck{alias: map[string]string{}}
 	for _, v := range cfg.Verbs {
-		for _, name := range append(slices.Clone(v.AddLabels), v.RemoveLabels...) {
+		for _, name := range verbLabels(v) {
 			if _, ok := c.alias[name]; !ok {
 				c.alias[name] = fmt.Sprintf("label%d", len(c.labels))
 				c.labels = append(c.labels, name)
@@ -722,6 +722,12 @@ func newVerbsCheck(cfg *config.Config, viewer string) *verbsCheck {
 		}
 	}
 	return c
+}
+
+// verbLabels are the labels v names: those it adds and removes, then
+// those its from_labels and refuse_labels check.
+func verbLabels(v config.Verb) []string {
+	return slices.Concat(v.AddLabels, v.RemoveLabels, v.FromLabels, v.RefuseLabels)
 }
 
 // verbUser is a user a verb's config names, with its key: "assign" or
@@ -772,6 +778,9 @@ func (c *verbsCheck) query(repo issue.Repo) (string, map[string]any) {
 // query, sent only when a verb has labels or names someone. A label to add
 // that is missing, or any label spelled in another case, fails the verb; a
 // label to remove that is missing never removes anything, likely a typo.
+// A label of from_labels or refuse_labels that is missing fails the verb
+// too (it would refuse every issue, or never refuse); one spelled in
+// another case is fine, as the checks match names regardless of case.
 // A user to assign who cannot be assigned fails the verb; one to unassign
 // is a warning: a verb removes current assignees by their IDs, and someone
 // who lost access may still be one, but the login is likely a typo.
@@ -828,6 +837,25 @@ func checkVerbs(ctx context.Context, r *doctorReport, a *App, cfg *config.Config
 	repoName, problems := repo.Repo.String(), 0 // problems counts warnings too: no ok line then
 	problem := func(err error) { r.problem("verbs", err); problems++ }
 	for _, v := range cfg.Verbs {
+		for _, check := range []struct {
+			key   string
+			names []string
+			never string // what a missing label makes of the check
+		}{
+			{"from_labels", v.FromLabels, v.Name + " refuses every issue"},
+			{"refuse_labels", v.RefuseLabels, "the check never refuses"},
+		} {
+			key := cfg.KeyPath("verbs." + v.Name + "." + check.key)
+			for _, name := range check.names {
+				// A check matches names regardless of case, as GitHub's
+				// label names are unique regardless of case.
+				if exists(name) || spelling(name, names) != "" {
+					continue
+				}
+				problem(render.Usage("%s: no label %q in %s, so %s", key, name, repoName, check.never).
+					WithFix(fmt.Sprintf("gh label create %q -R %s, or fix %s", name, repoName, key)))
+			}
+		}
 		key := cfg.KeyPath("verbs." + v.Name + ".labels")
 		for _, name := range append(slices.Clone(v.AddLabels), v.RemoveLabels...) {
 			if exists(name) {

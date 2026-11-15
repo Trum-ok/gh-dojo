@@ -291,6 +291,19 @@ func (d *agentDoc) rules(v config.Verb) []string {
 		r = append(r, "It is the user's decision: without `--yes` it exits with code 2. Ask the user, and "+
 			"run it again with `--yes` only if they agree; never add `--yes` on your own.")
 	}
+	if len(v.FromLabels) > 0 {
+		r = append(r, "It is refused (exit code 2) unless the issue has "+labelNames(v.FromLabels, "and", code)+
+			": `gh dojo show N` lists its labels. Ask the user rather than add a label to get it through.")
+	}
+	if len(v.RefuseLabels) > 0 {
+		s := "It is refused (exit code 2) while the issue has " + labelNames(v.RefuseLabels, "or", code) + "."
+		for _, name := range v.RefuseLabels {
+			if verbs := labelRemovers(d.cfg, v, name); len(verbs) > 0 {
+				s += " " + joinWords(quoted(verbs), "or") + " removes " + code(name) + "."
+			}
+		}
+		r = append(r, s+" Never remove a label another way to get it through; ask the user.")
+	}
 	switch v.Blockers {
 	case config.BlockersWarn:
 		r = append(r, "With an unresolved blocker it warns on stderr and still runs: read `gh dojo show N` "+

@@ -1,0 +1,3 @@
+code: 2
+error: ship cannot move #42 from In progress; it starts only from Ready
+this is a process rule: ask the user how to proceed

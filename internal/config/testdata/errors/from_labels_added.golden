@@ -1,0 +1,1 @@
+error: .github/dojo.toml: verbs.ready.from_labels names "reviewed", so verbs.ready.labels +Reviewed never adds anything; keep one

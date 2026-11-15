@@ -1,0 +1,14 @@
+code: 1
+--- stdout
+ok       version  gh dojo dev
+ok       config   .github/dojo.toml: preset kanban, 9 verbs
+ok       token    github.com as Trum-ok, with the project scope
+ok       board    Trum-ok/5 "gh-dojo": field Status and 5 statuses match
+ok       repo     Trum-ok/gh-dojo (default): visible, issues enabled
+ok       labels   Trum-ok/gh-dojo: no area labels (area:…) yet: new --area fails until one exists
+problem  verbs    verbs.resume.from_labels: no label "on-hold" in Trum-ok/gh-dojo, so resume refuses every issue
+                  fix: gh label create "on-hold" -R Trum-ok/gh-dojo, or fix verbs.resume.from_labels
+problem  verbs    verbs.ship.refuse_labels: no label "wip" in Trum-ok/gh-dojo, so the check never refuses
+                  fix: gh label create "wip" -R Trum-ok/gh-dojo, or fix verbs.ship.refuse_labels
+--- stderr
+error: doctor found 2 problems; fix as shown above, then run gh dojo doctor again

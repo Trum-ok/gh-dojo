@@ -1,0 +1,1 @@
+error: .github/dojo.toml: verbs.ready.from_labels and verbs.ready.refuse_labels both name "Blocked", so the verb would refuse every issue; keep one

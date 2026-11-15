@@ -294,8 +294,9 @@ func unresolvedLinks(c *issue.Card, all graph.Page[issue.Link], unresolved []iss
 
 // verbLookup is what the effects of v, run with a, need looked up with
 // the card: the IDs of its labels, and of the user it assigns (from the
-// config or --assignee). A verb that removes labels reads all of the
-// issue's labels, so it can tell one is there; a verb that unassigns reads
+// config or --assignee). A verb that removes labels, or checks them
+// (from_labels, refuse_labels), reads all of the issue's labels, so it
+// can tell one is there; a verb that unassigns reads
 // the IDs of the issue's assignees, and the viewer for "@me"; a verb that
 // checks blockers reads all of its blockers (GitHub allows 50), and one
 // that checks sub-issues all of them (GitHub allows 100), so a resolved
@@ -303,7 +304,7 @@ func unresolvedLinks(c *issue.Card, all graph.Page[issue.Link], unresolved []iss
 func verbLookup(v config.Verb, a workflow.Args) issue.Lookup {
 	l := issue.Lookup{
 		Labels:       append(slices.Clone(v.AddLabels), v.RemoveLabels...),
-		AllLabels:    len(v.RemoveLabels) > 0,
+		AllLabels:    len(v.RemoveLabels) > 0 || v.ChecksLabels(),
 		AssigneeIDs:  v.Unassign != "",
 		AllBlockers:  v.ChecksBlockers(),
 		AllSubIssues: v.ChecksSubIssues(),

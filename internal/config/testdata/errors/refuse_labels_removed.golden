@@ -1,0 +1,1 @@
+error: .github/dojo.toml: verbs.ready.refuse_labels names "blocked", so verbs.ready.labels -blocked never removes anything; keep one

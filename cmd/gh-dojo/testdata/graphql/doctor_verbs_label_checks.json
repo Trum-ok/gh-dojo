@@ -1,0 +1,83 @@
+{
+  "comment": "Hand-crafted from doctor_verbs_ok.json (the real API's answer for Trum-ok/gh-dojo, saved by hand): verbs that check labels (from_labels, refuse_labels, #46). Bug, a check's spelling of bug, is not found by its exact name, as label(name:) answers for Dogfood in doctor_verbs.json; on-hold and wip do not exist.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "DoctorVerbs",
+      "query": "query DoctorVerbs($owner: String!, $name: String!, $label0: String!, $label1: String!, $label2: String!, $label3: String!, $label4: String!, $label5: String!, $user0: String!) {\n  repository(owner: $owner, name: $name) {\n    labels(first: 100) { nodes { name } }\n    label0: label(name: $label0) { name }\n    label1: label(name: $label1) { name }\n    label2: label(name: $label2) { name }\n    label3: label(name: $label3) { name }\n    label4: label(name: $label4) { name }\n    label5: label(name: $label5) { name }\n    user0: assignableUsers(query: $user0, first: 100) { nodes { login } }\n  }\n}",
+      "variables": {
+        "name": "gh-dojo",
+        "owner": "Trum-ok",
+        "user0": "Trum-ok",
+        "label0": "enhancement",
+        "label1": "dogfood",
+        "label2": "bug",
+        "label3": "Bug",
+        "label4": "on-hold",
+        "label5": "wip"
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "labels": {
+              "nodes": [
+                {
+                  "name": "accessibility"
+                },
+                {
+                  "name": "bug"
+                },
+                {
+                  "name": "documentation"
+                },
+                {
+                  "name": "duplicate"
+                },
+                {
+                  "name": "enhancement"
+                },
+                {
+                  "name": "good first issue"
+                },
+                {
+                  "name": "help wanted"
+                },
+                {
+                  "name": "invalid"
+                },
+                {
+                  "name": "question"
+                },
+                {
+                  "name": "wontfix"
+                },
+                {
+                  "name": "dogfood"
+                }
+              ]
+            },
+            "label0": {
+              "name": "enhancement"
+            },
+            "label1": {
+              "name": "dogfood"
+            },
+            "label2": {
+              "name": "bug"
+            },
+            "label3": null,
+            "label4": null,
+            "label5": null,
+            "user0": {
+              "nodes": [
+                {
+                  "login": "Trum-ok"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

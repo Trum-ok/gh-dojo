@@ -68,6 +68,8 @@ type rawVerb struct {
 	When         *string    `toml:"when"`
 	To           *string    `toml:"to"`
 	From         *[]string  `toml:"from"`
+	FromLabels   *[]string  `toml:"from_labels"`
+	RefuseLabels *[]string  `toml:"refuse_labels"`
 	Require      *[]string  `toml:"require"`
 	RequireOneOf *[]string  `toml:"require_one_of"`
 	Comment      *string    `toml:"comment"`
@@ -151,6 +153,7 @@ func (v *rawVerb) setKeys() []string {
 		set  bool
 	}{
 		{"when", v.When != nil}, {"to", v.To != nil}, {"from", v.From != nil},
+		{"from_labels", v.FromLabels != nil}, {"refuse_labels", v.RefuseLabels != nil},
 		{"require", v.Require != nil}, {"require_one_of", v.RequireOneOf != nil},
 		{"comment", v.Comment != nil}, {"labels", v.Labels != nil}, {"assign", v.Assign != nil},
 		{"unassign", v.Unassign != nil}, {"close", v.Close != nil}, {"reopen", v.Reopen != nil}, {"confirm", v.Confirm != nil},
@@ -175,7 +178,7 @@ var (
 	agentKeys    = []string{"targets", "notes", "description"}
 	releaseKeys  = []string{"keywords"}
 	verbKeys     = []string{
-		"when", "to", "from", "require", "require_one_of", "comment",
+		"when", "to", "from", "from_labels", "refuse_labels", "require", "require_one_of", "comment",
 		"labels", "assign", "unassign", "close", "reopen", "confirm", "iteration", "field", "blockers", "sub_issues", "batch",
 		"disabled",
 	}
@@ -457,6 +460,8 @@ func mergeVerb(m merger, name string, base, over *rawVerb) *rawVerb {
 		When:         pick(m, p+"when", base.When, over.When),
 		To:           pick(m, p+"to", base.To, over.To),
 		From:         pick(m, p+"from", base.From, over.From),
+		FromLabels:   pick(m, p+"from_labels", base.FromLabels, over.FromLabels),
+		RefuseLabels: pick(m, p+"refuse_labels", base.RefuseLabels, over.RefuseLabels),
 		Require:      pick(m, p+"require", base.Require, over.Require),
 		RequireOneOf: pick(m, p+"require_one_of", base.RequireOneOf, over.RequireOneOf),
 		Comment:      pick(m, p+"comment", base.Comment, over.Comment),

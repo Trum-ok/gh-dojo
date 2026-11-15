@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.ready.refuse_labels: "-blocked": write the label name without -; + and - mark labels to add and remove
+fix: refuse_labels = ["blocked"]

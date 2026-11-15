@@ -153,6 +153,45 @@ when = "Finish an issue whose sub-issues are done"
 to = "Done"
 blockers = "deny"
 sub_issues = "deny"
+
+# from_labels and refuse_labels: on hold is a label. hold refuses an issue
+# on hold already, resume needs the label; resume (from any status) and
+# unstick (from Waiting) remove it, abandon too but it closes the issue,
+# so a refusal names only the first two. ship refuses either of two
+# labels, merge needs both of two.
+[verbs.hold]
+when = "Put the issue on hold"
+from = ["In progress", "Waiting"]
+labels = ["+on-hold"]
+refuse_labels = ["on-hold"]
+
+[verbs.resume]
+when = "Take the issue off hold"
+labels = ["-on-hold"]
+from_labels = ["on-hold"]
+
+[verbs.unstick]
+when = "The wait is over"
+from = ["Waiting"]
+labels = ["-on-hold"]
+
+[verbs.abandon]
+when = "Give up on the issue"
+labels = ["-on-hold"]
+close = "not_planned"
+
+[verbs.ship]
+when = "Ship it"
+to = "Done"
+from = ["Ready"]
+refuse_labels = ["on-hold", "wip"]
+
+[verbs.merge]
+when = "Merge it"
+to = "Done"
+from = ["Ready"]
+from_labels = ["approved", "tested"]
+blockers = "deny"
 `
 
 func testEngine(t *testing.T) (*Engine, *config.Config) {
@@ -217,6 +256,12 @@ func withSubIssues(is Issue, n, unread int) Issue {
 		is.UnresolvedSubIssues = append(is.UnresolvedSubIssues, Blocker{Ref: fmt.Sprintf("#%d", 50+i), Place: places[i%len(places)]})
 	}
 	is.UnreadSubIssues = unread
+	return is
+}
+
+// labelled gives is the labels names.
+func labelled(is Issue, names ...string) Issue {
+	is.Labels = append(is.Labels, names...)
 	return is
 }
 
@@ -592,6 +637,35 @@ func TestPlan(t *testing.T) {
 			issue: otherRepo(onBoard("In progress"))},
 		{name: "start_closed_other_repo", verb: "start", issue: otherRepo(Issue{Number: 42, Closed: true}),
 			code: render.ExitDenied},
+		// refuse_labels: the refusal names the label and the verbs that
+		// remove it from the issue's status without closing it.
+		{name: "hold_on_hold_refused", verb: "hold", code: render.ExitDenied,
+			issue: labelled(onBoard("In progress"), "bug", "on-hold")},
+		// Names match regardless of case; unstick runs from Waiting.
+		{name: "hold_on_hold_waiting_refused", verb: "hold", code: render.ExitDenied,
+			issue: labelled(onBoard("Waiting"), "On-Hold")},
+		{name: "hold_runs", verb: "hold", hasOps: 1, issue: labelled(onBoard("In progress"), "bug")},
+		{name: "ship_two_labels_refused", verb: "ship", code: render.ExitDenied,
+			issue: labelled(onBoard("Ready"), "wip", "on-hold")},
+		// No verb removes wip: no hint.
+		{name: "ship_wip_refused", verb: "ship", code: render.ExitDenied, issue: labelled(onBoard("Ready"), "wip")},
+		{name: "ship_runs", verb: "ship", hasOps: 1, issue: labelled(onBoard("Ready"), "bug")},
+		// Like from, the check is skipped for an issue already in the target.
+		{name: "ship_repeat_on_hold", verb: "ship", noOps: true, issue: labelled(onBoard("Done"), "on-hold")},
+		// from is checked first.
+		{name: "ship_wrong_from_on_hold", verb: "ship", code: render.ExitDenied,
+			issue: labelled(onBoard("In progress"), "on-hold")},
+		// from_labels: the refusal names the labels the issue lacks.
+		{name: "resume_not_on_hold_refused", verb: "resume", code: render.ExitDenied,
+			issue: labelled(onBoard("In progress"), "bug")},
+		{name: "resume_runs", verb: "resume", hasOps: 1, issue: labelled(onBoard("In progress"), "on-hold")},
+		{name: "merge_one_label_missing", verb: "merge", code: render.ExitDenied,
+			issue: labelled(onBoard("Ready"), "approved")},
+		{name: "merge_labels_missing", verb: "merge", code: render.ExitDenied, issue: onBoard("Ready")},
+		{name: "merge_runs", verb: "merge", hasOps: 1, issue: labelled(onBoard("Ready"), "Tested", "approved")},
+		// Labels are checked before blockers.
+		{name: "merge_labels_missing_blocked", verb: "merge", code: render.ExitDenied,
+			issue: blocked(onBoard("Ready"), 1, 0)},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

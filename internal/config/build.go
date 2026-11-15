@@ -326,6 +326,9 @@ func (c *Config) buildVerb(name string, r *rawVerb) (Verb, error) {
 	if err := c.buildEffects(name, r, &v); err != nil {
 		return Verb{}, err
 	}
+	if err := c.buildLabelChecks(name, r, &v); err != nil {
+		return Verb{}, err
+	}
 	if v.To == "" && v.Comment == "" && len(v.AddLabels)+len(v.RemoveLabels) == 0 && !v.Assigns() && v.Unassign == "" &&
 		v.Close == "" && !v.Reopen && v.Iteration == "" && len(v.Fields) == 0 {
 		return Verb{}, c.Errorf("verbs.%s has no effect: set to, comment, labels, assign, unassign, close, reopen, iteration or field", name)
@@ -452,6 +455,59 @@ func (c *Config) buildEffects(name string, r *rawVerb, v *Verb) error {
 		return err
 	}
 	return c.buildFieldValues(name, r.Field, v)
+}
+
+// buildLabelChecks validates from_labels and refuse_labels: label names,
+// without the + or - of the labels effect, each at most once regardless of
+// case (GitHub's label names are unique regardless of case), and none in
+// both lists, which would refuse every issue. A label the verb refuses
+// cannot be one it removes, nor a label it requires one it adds: that
+// effect would never change anything. It runs after buildEffects, which
+// fills the labels the verb adds and removes.
+func (c *Config) buildLabelChecks(name string, r *rawVerb, v *Verb) error {
+	p := "verbs." + name + "."
+	type named struct{ key, label string }
+	seen := map[string]named{} // folded name → the entry that names it
+	for _, list := range []struct {
+		key    string
+		src    *[]string
+		dest   *[]string
+		effect []string // the labels effect's entries the check makes moot
+		sign   string
+		does   string
+	}{
+		{"from_labels", r.FromLabels, &v.FromLabels, v.AddLabels, "+", "adds"},
+		{"refuse_labels", r.RefuseLabels, &v.RefuseLabels, v.RemoveLabels, "-", "removes"},
+	} {
+		if list.src == nil {
+			continue
+		}
+		key := c.KeyPath(p + list.key)
+		if err := c.checkList(p+list.key, *list.src); err != nil {
+			return err
+		}
+		for _, label := range *list.src {
+			if label[0] == '+' || label[0] == '-' {
+				return c.Errorf("%s: %q: write the label name without %c; + and - mark labels to add and remove", key, label, label[0]).
+					WithFix(fmt.Sprintf(`%s = [%q]`, list.key, strings.TrimLeft(label, "+-")))
+			}
+			folded := strings.ToLower(label)
+			switch prev, ok := seen[folded]; {
+			case ok && prev.key == key:
+				return c.Errorf("%s lists %q and %q: label names match regardless of case; keep one", key, prev.label, label)
+			case ok:
+				return c.Errorf("%s and %s both name %q, so the verb would refuse every issue; keep one",
+					prev.key, key, label)
+			}
+			seen[folded] = named{key, label}
+			if i := slices.IndexFunc(list.effect, func(l string) bool { return strings.EqualFold(l, label) }); i >= 0 {
+				return c.Errorf("%s names %q, so %s %s%s never %s anything; keep one",
+					key, label, c.KeyPath(p+"labels"), list.sign, list.effect[i], list.does)
+			}
+		}
+		*list.dest = slices.Clone(*list.src)
+	}
+	return nil
 }
 
 // buildAssign validates assign and unassign. assign is true

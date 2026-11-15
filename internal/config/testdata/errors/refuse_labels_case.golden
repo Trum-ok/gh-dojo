@@ -1,0 +1,1 @@
+error: .github/dojo.toml: verbs.ready.refuse_labels lists "blocked" and "Blocked": label names match regardless of case; keep one

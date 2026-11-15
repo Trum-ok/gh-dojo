@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.ready.from_labels: "+reviewed": write the label name without +; + and - mark labels to add and remove
+fix: from_labels = ["reviewed"]

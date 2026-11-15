@@ -571,6 +571,26 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 	} else {
 		line("To", "the status is not changed")
 	}
+	if n := len(v.FromLabels); n > 0 {
+		them := "it"
+		if n > 1 {
+			them = "them"
+		}
+		line("Needs", "%s on the issue; refused (exit code 2) without %s: ask the user",
+			labelNames(v.FromLabels, "and", nil), them)
+	}
+	if len(v.RefuseLabels) > 0 {
+		line("Refused", "while the issue has %s (exit code 2): ask the user", labelNames(v.RefuseLabels, "or", nil))
+		for _, name := range v.RefuseLabels {
+			if verbs := labelRemovers(cfg, v, name); len(verbs) > 0 {
+				what := name
+				if len(v.RefuseLabels) == 1 {
+					what = "it"
+				}
+				line("", "%s removes %s", joinWords(verbs, "or"), what)
+			}
+		}
+	}
 
 	var required, optional []string
 	for _, arg := range config.Args() {

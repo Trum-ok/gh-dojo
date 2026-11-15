@@ -284,6 +284,14 @@ type Verb struct {
 	RequireOneOf []string // arguments of which at least one must be given
 	Comment      string   // comment template (see Render); "" posts no comment
 
+	// FromLabels are labels the issue must all have (from_labels), and
+	// RefuseLabels labels of which it may have none (refuse_labels), in
+	// config order; the verb refuses (exit code 2) otherwise. Names match
+	// regardless of case, as GitHub's label names are unique regardless of
+	// case.
+	FromLabels   []string
+	RefuseLabels []string
+
 	// AddLabels and RemoveLabels are the labels the verb adds ("+name" in
 	// labels) and removes ("-name"), in config order.
 	AddLabels    []string
@@ -341,6 +349,10 @@ func (v Verb) ChecksBlockers() bool {
 // ChecksSubIssues reports whether the verb checks the issue's unresolved
 // sub-issues (sub_issues = "warn" or "deny").
 func (v Verb) ChecksSubIssues() bool { return v.SubIssues != "" }
+
+// ChecksLabels reports whether the verb checks the issue's labels
+// (from_labels or refuse_labels).
+func (v Verb) ChecksLabels() bool { return len(v.FromLabels)+len(v.RefuseLabels) > 0 }
 
 // OnlyClearsSprint reports whether clearing the sprint (iteration =
 // "clear") is the verb's only board effect: no status, no other fields.

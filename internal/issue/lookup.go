@@ -20,8 +20,8 @@ type Lookup struct {
 	// Viewer reads the authenticated user, for assign = "@me".
 	Viewer bool
 	// AllLabels reads up to 100 of the issue's labels (GitHub's limit per
-	// issue) instead of the card's 20, for a verb that removes labels: a
-	// label beyond the window would read as absent.
+	// issue) instead of the card's 20, for a verb that removes or checks
+	// labels: a label beyond the window would read as absent.
 	AllLabels bool
 	// AssigneeIDs reads the node IDs of the issue's assignees too
 	// (Card.AssigneeIDs), for a verb that unassigns: removing an assignee

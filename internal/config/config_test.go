@@ -152,6 +152,9 @@ func dump(c *Config) string {
 		if v.SubIssues != "" {
 			w("  sub_issues: %q", v.SubIssues)
 		}
+		if v.ChecksLabels() {
+			w("  from_labels: %q refuse_labels: %q", v.FromLabels, v.RefuseLabels)
+		}
 		if v.AssignArg || v.Unassign != "" {
 			w("  assign_arg: %v unassign: %q", v.AssignArg, v.Unassign)
 		}
@@ -201,6 +204,27 @@ iteration = "current"
 		{"blockers_deny", presetOnly + "[verbs.start]\nblockers = \"deny\"\n[verbs.wait]\nblockers = \"warn\"\n"},
 		{"sub_issues", presetOnly + "[verbs.ready]\nsub_issues = \"warn\"\n[verbs.done]\nsub_issues = \"deny\"\n"},
 		{"sub_issues_off", presetOnly + "[verbs.done]\nsub_issues = false\n"},
+		// On hold is a label: hold adds it and refuses an issue on hold
+		// already, resume needs it (in another case: names match regardless
+		// of case) and removes it, ready refuses it on top of the preset's
+		// verb, and done turns the check off with an empty list.
+		{"label_checks", presetOnly + `
+[verbs.hold]
+when = "Work is stuck"
+labels = ["+blocked"]
+refuse_labels = ["blocked"]
+
+[verbs.resume]
+when = "What held the issue is resolved"
+labels = ["-blocked"]
+from_labels = ["Blocked"]
+
+[verbs.ready]
+refuse_labels = ["blocked", "wip"]
+
+[verbs.done]
+from_labels = []
+`},
 		{"override_verb_key", presetOnly + `
 [verbs.start]
 when = "Take the issue"
@@ -436,6 +460,15 @@ func TestLoadErrors(t *testing.T) {
 		{"sub_issues_bad", presetOnly + "[verbs.done]\nsub_issues = \"link\"\n"},
 		{"sub_issues_true", presetOnly + "[verbs.done]\nsub_issues = true\n"},
 		{"sub_issues_number", presetOnly + "[verbs.done]\nsub_issues = 1\n"},
+		{"refuse_labels_sign", presetOnly + "[verbs.ready]\nrefuse_labels = [\"-blocked\"]\n"},
+		{"from_labels_sign", presetOnly + "[verbs.ready]\nfrom_labels = [\"+reviewed\"]\n"},
+		{"refuse_labels_not_list", presetOnly + "[verbs.ready]\nrefuse_labels = \"blocked\"\n"},
+		{"refuse_labels_blank", presetOnly + "[verbs.ready]\nrefuse_labels = [\"blocked\", \" \"]\n"},
+		{"refuse_labels_duplicate", presetOnly + "[verbs.ready]\nrefuse_labels = [\"blocked\", \"blocked\"]\n"},
+		{"refuse_labels_case", presetOnly + "[verbs.ready]\nrefuse_labels = [\"blocked\", \"Blocked\"]\n"},
+		{"label_checks_both", presetOnly + "[verbs.ready]\nfrom_labels = [\"blocked\"]\nrefuse_labels = [\"Blocked\"]\n"},
+		{"refuse_labels_removed", presetOnly + "[verbs.ready]\nlabels = [\"-blocked\"]\nrefuse_labels = [\"blocked\"]\n"},
+		{"from_labels_added", presetOnly + "[verbs.ready]\nlabels = [\"+Reviewed\"]\nfrom_labels = [\"reviewed\"]\n"},
 		{"blockers_link_without_by", presetOnly + "[verbs.ready]\nblockers = \"link\"\n"},
 		// kanban's wait links --by; a comment without {by} drops what it links.
 		{"blockers_link_comment_override", presetOnly + "[verbs.wait]\ncomment = \"Stuck: {comment}\"\n"},

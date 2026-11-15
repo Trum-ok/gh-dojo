@@ -86,6 +86,25 @@ types = ["bug", "Docs"]
 		// removes current assignees by ID, and the login is likely a typo.
 		{"verbs_unassign", doctorVerbsOKConfig + "\n[verbs.leave]\nwhen = \"x\"\nunassign = \"octo-nobody\"\n",
 			[]string{doctorFixtures + "ok.json", boardFixture, doctorFixtures + "verbs_unassign.json"}, render.ExitOK, 4},
+		// The labels of from_labels and refuse_labels are checked too: a
+		// missing one refuses every issue or never refuses; one in another
+		// case is fine, since the checks match names regardless of case.
+		{"verbs_label_checks", doctorVerbsOKConfig + `
+[verbs.hold]
+when = "Work is stuck"
+labels = ["+bug"]
+refuse_labels = ["Bug"]
+
+[verbs.resume]
+when = "Back to work"
+comment = "{comment}"
+from_labels = ["on-hold"]
+
+[verbs.ship]
+when = "Ship it"
+comment = "{comment}"
+refuse_labels = ["wip"]
+`, []string{doctorFixtures + "ok.json", boardFixture, doctorFixtures + "verbs_label_checks.json"}, render.ExitUsage, 4},
 		// The organization's SAML SSO blocks both the repository and the
 		// board: each gets the SSO fix.
 		{"sso", orgConfig, []string{doctorFixtures + "sso.json", boardFixtures + "org_board_saml.json"}, render.ExitNetwork, 2},

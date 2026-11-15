@@ -106,6 +106,18 @@ var (
 			return ""
 		},
 		func(_ *config.Config, v config.Verb) string {
+			if len(v.FromLabels) == 0 {
+				return ""
+			}
+			return "refused without " + labelNames(v.FromLabels, "and", nil)
+		},
+		func(_ *config.Config, v config.Verb) string {
+			if len(v.RefuseLabels) == 0 {
+				return ""
+			}
+			return "refused with " + labelNames(v.RefuseLabels, "or", nil)
+		},
+		func(_ *config.Config, v config.Verb) string {
 			switch v.Blockers {
 			case config.BlockersWarn:
 				return "warns about unresolved blockers"
@@ -191,6 +203,36 @@ var (
 		},
 	}
 )
+
+// labelNames names the labels of a from_labels or refuse_labels check:
+// "the label blocked", "the labels blocked and wip" (conj "and"); wrap,
+// when not nil, writes each name (code for the skill's markdown).
+func labelNames(names []string, conj string, wrap func(string) string) string {
+	out := slices.Clone(names)
+	if wrap != nil {
+		for i, n := range out {
+			out[i] = wrap(n)
+		}
+	}
+	if len(out) == 1 {
+		return "the label " + out[0]
+	}
+	return "the labels " + joinWords(out, conj)
+}
+
+// labelRemovers are the verbs of cfg, other than v, that remove the label
+// name without closing the issue: the process's way to take off a label
+// v's refuse_labels refuses.
+func labelRemovers(cfg *config.Config, v config.Verb, name string) []string {
+	var out []string
+	for _, o := range cfg.Verbs {
+		if o.Name != v.Name && o.Close == "" &&
+			slices.ContainsFunc(o.RemoveLabels, func(l string) bool { return strings.EqualFold(l, name) }) {
+			out = append(out, o.Name)
+		}
+	}
+	return out
+}
 
 // wrapText breaks text into lines of at most width bytes at spaces; a
 // longer word gets a line of its own.

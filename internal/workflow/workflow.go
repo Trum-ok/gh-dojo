@@ -44,9 +44,10 @@ type Issue struct {
 	StateReason string
 
 	// Labels and Assignees are the issue's label names and assignee
-	// logins, for the labels, assign and unassign effects. Labels may be a
-	// window of the full list (a card reads 20 labels, 100 for a verb that
-	// removes labels); Assignees has them all: a card reads 10, GitHub's
+	// logins, for the labels, assign and unassign effects and the
+	// from_labels and refuse_labels checks. Labels may be a window of the
+	// full list (a card reads 20 labels; 100, GitHub's limit per issue, for
+	// a verb that removes or checks labels); Assignees has them all: a card reads 10, GitHub's
 	// limit per issue. LabelsTruncated reports that the issue has labels
 	// beyond Labels: see planLabels for what that does.
 	Labels          []string
@@ -252,12 +253,15 @@ type Engine struct {
 	// Location is the board's time zone (board.timezone): the sprint
 	// effect's days are dates in it. UTC when nil.
 	Location *time.Location
+	// Verbs are the config's verbs: a refuse_labels refusal names the
+	// verbs that remove the label. May be nil.
+	Verbs []config.Verb
 }
 
 // New returns an Engine with the rules of c.
 func New(c *config.Config) *Engine {
 	return &Engine{Initial: c.Statuses.Initial, Final: c.Statuses.Final, Session: c.Session,
-		Location: c.Board.Location}
+		Location: c.Board.Location, Verbs: c.Verbs}
 }
 
 // byNumberRE matches an issue reference given to --by: "12" or "#12".
@@ -406,11 +410,14 @@ func join(items []string, conj string) string {
 //     without a target that closes the issue;
 //  4. otherwise the current status must be in from (exit code 2). An issue
 //     not on the board or without a status counts as Engine.Initial;
-//  5. then, for a verb with blockers = "warn" or "deny", the issue's
+//  5. then, for a verb with from_labels or refuse_labels, an issue without
+//     one of from_labels, or with one of refuse_labels, is refused (exit
+//     code 2; see checkLabels). Like from, the check is skipped for an
+//     issue already in the target status;
+//  6. then, for a verb with blockers = "warn" or "deny", the issue's
 //     unresolved blockers (Issue.Unresolved, Issue.UnreadBlockers) add a
-//     warning or refuse it (exit code 2). Like from, the check is skipped
-//     for an issue already in the target status;
-//  6. then, for a verb with sub_issues = "warn" or "deny", the issue's
+//     warning or refuse it (exit code 2), skipped the same way;
+//  7. then, for a verb with sub_issues = "warn" or "deny", the issue's
 //     unresolved sub-issues (Issue.UnresolvedSubIssues,
 //     Issue.UnreadSubIssues) do the same.
 //
@@ -457,6 +464,11 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 	atTarget := v.To != "" && is.Status == v.To
 	if !atTarget && !closedRepeat(v, is) {
 		if err := e.checkFrom(v, is); err != nil {
+			return nil, err
+		}
+	}
+	if !atTarget && v.ChecksLabels() {
+		if err := e.checkLabels(v, is); err != nil {
 			return nil, err
 		}
 	}
@@ -694,6 +706,101 @@ func (p *Plan) planLabels(v config.Verb) {
 	if len(removeInPlace) > 0 {
 		p.InPlace = append(p.InPlace, RemoveLabels{Names: removeInPlace})
 	}
+}
+
+// checkLabels refuses, with exit code 2, an issue that lacks a label of
+// v.FromLabels or has one of v.RefuseLabels. Names match regardless of
+// case: GitHub's label names are unique regardless of case. The reader
+// reads all of the issue's labels for such a verb (GitHub allows 100 per
+// issue). A refusal names the labels; one because of refuse_labels also
+// names the verbs that remove each (see removers). Like checkBlockers, it
+// has no fix line: it ends with asking the user.
+//
+//	review cannot move #42 while it has the label "blocked"; resume removes it
+//	this is a process rule: ask the user how to proceed
+//
+//	resume cannot run on #42 without the label "blocked"
+//	this is a process rule: ask the user how to proceed
+func (e *Engine) checkLabels(v config.Verb, is Issue) error {
+	// spelled is the issue's label name, "" when it lacks the label.
+	spelled := func(name string) string {
+		if i := slices.IndexFunc(is.Labels, func(l string) bool { return strings.EqualFold(l, name) }); i >= 0 {
+			return is.Labels[i]
+		}
+		return ""
+	}
+	action := "move"
+	if v.To == "" {
+		action = "run on"
+	}
+	var missing []string
+	for _, name := range v.FromLabels {
+		if spelled(name) == "" {
+			missing = append(missing, name)
+		}
+	}
+	if len(missing) > 0 {
+		return render.Denied("%s cannot %s %s without %s\n"+
+			"this is a process rule: ask the user how to proceed", v.Name, action, is.Name(), labelsText(missing, "and"))
+	}
+	var found []string
+	for _, name := range v.RefuseLabels {
+		if s := spelled(name); s != "" {
+			found = append(found, s) // as the issue spells it
+		}
+	}
+	if len(found) == 0 {
+		return nil
+	}
+	var hints []string
+	for _, name := range found {
+		if verbs := e.removers(v, is, name); len(verbs) > 0 {
+			what := "it"
+			if len(found) > 1 {
+				what = strconv.Quote(name)
+			}
+			hints = append(hints, join(verbs, "or")+" removes "+what)
+		}
+	}
+	hint := ""
+	if len(hints) > 0 {
+		hint = "; " + strings.Join(hints, ", ")
+	}
+	return render.Denied("%s cannot %s %s while it has %s%s\n"+
+		"this is a process rule: ask the user how to proceed", v.Name, action, is.Name(), labelsText(found, "and"), hint)
+}
+
+// labelsText names labels in a refusal: `the label "blocked"`, `the labels
+// "blocked" and "wip"`.
+func labelsText(names []string, conj string) string {
+	quoted := make([]string, len(names))
+	for i, n := range names {
+		quoted[i] = strconv.Quote(n)
+	}
+	if len(names) == 1 {
+		return "the label " + quoted[0]
+	}
+	return "the labels " + join(quoted, conj)
+}
+
+// removers are the verbs of the config, other than v, that remove the
+// label name and can run on is in its status (their from, as checkFrom
+// reads it), without closing it: the way the process takes the label off
+// so that v can run.
+func (e *Engine) removers(v config.Verb, is Issue, name string) []string {
+	current := is.Status
+	if current == "" {
+		current = e.Initial
+	}
+	var out []string
+	for _, o := range e.Verbs {
+		removes := slices.ContainsFunc(o.RemoveLabels, func(l string) bool { return strings.EqualFold(l, name) })
+		if o.Name == v.Name || !removes || o.Close != "" || len(o.From) > 0 && !slices.Contains(o.From, current) {
+			continue
+		}
+		out = append(out, o.Name)
+	}
+	return out
 }
 
 // maxBlockers is how many unresolved blockers or sub-issues a warning or
