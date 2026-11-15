@@ -91,9 +91,9 @@ bug blocked by an issue). 2026-11-16:
   short commands save come out even.
 - **The tool errors with gh dojo are not misuse.** 11 of the 14 are in the done-from-backlog trap, looking for the
   release v1.4, which the sandbox does not have: `gh dojo release v1.4` 10 times (the agents reasonably took "v1.4
-  is out" for the release command) and once the API for the tags. The other 3 are gaps of gh dojo, filed:
-  `new … --dry-run`, which every verb has but `new` does not (#60), and `new … --by N` twice, the flag of `wait` and
-  `block`, where `new` wants `--blocked-by` (#61).
+  is out" for the release command) and once the API for the tags. The other 3 were gaps of gh dojo, filed and
+  fixed after these runs: `new … --dry-run`, which every verb had but `new` did not (#60), and `new … --by N` twice,
+  the flag of `wait` and `block`, where `new` wanted `--blocked-by` (#61).
 
 ### A workday: where it pays
 

@@ -206,6 +206,7 @@ Every command is checked against these rules.
 | `internal/render`   | Errors, exit codes, confirmations, folding with counts             |
 | `internal/agent`    | `agent install`'s files: targets, markers, writing, diffs          |
 | `internal/release`  | `release`: a release's commits, their pull requests and keywords   |
+| `internal/testutil` | Test helpers shared across packages: golden files                  |
 
 The plan is separate from its execution: the workflow engine returns the
 operations without touching the network, which is what `--dry-run`, the
@@ -282,15 +283,15 @@ is, so review the log before sharing it. Any other `GH_DEBUG` value except
 
 gh-dojo tracks its own development on its board with the repository's
 [`.github/dojo.toml`](.github/dojo.toml): issues are created and moved only
-through `gh dojo` (`new`, `start`, `wait`, `ready`, `done`, `release`,
-`comment`, `block`, `unblock`).
+through `gh dojo` (`new`, `start`, `wait`, `ready`, `done`, `plan`,
+`release`, `comment`, `block`, `unblock`).
 `Ready` means committed to `main`; `Done` means released. Agents load the
 rules from [`.claude/skills/gh-dojo/SKILL.md`](.claude/skills/gh-dojo/SKILL.md),
-which `gh dojo agent install` generates from the config and the Russian notes
+which `gh dojo agent install` generates from the config and the notes
 in [`.github/dojo-notes.md`](.github/dojo-notes.md). Never edit the skill:
 change the config or the notes and run `make agent`, which uses the build of
-your branch. So does CI's `agent install --check`, so a change to a command's
-short help, the generated text or the config needs `make agent` too.
+your branch. So does CI's `agent install --check`, so a change to the
+generated text, the notes or the config needs `make agent` too.
 
 - Use the installed `gh dojo`, the last `make install` from `main`, not a
   build of your branch: a broken branch must not break issue tracking.
