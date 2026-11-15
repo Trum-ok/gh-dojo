@@ -1650,7 +1650,6 @@ func (nc *newContext) milestone(ctx context.Context, q graph.Querier, repo issue
 	all := nc.Milestones.Nodes
 	if nc.Milestones.PageInfo.HasNextPage {
 		if nc.allMilestones == nil {
-			var err error
 			rest, err := issue.ReadMilestones(ctx, q, repo, nc.Milestones.PageInfo.EndCursor)
 			if err != nil {
 				return nil, err
