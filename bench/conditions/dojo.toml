@@ -1,0 +1,20 @@
+# The process of the benchmark's condition "dojo": the kanban preset on the
+# sandbox board, with start always leaving a comment, as a team's config
+# would (the preset's comment needs a session link, which the runs have not).
+
+version = 1
+preset = "kanban"
+
+[board]
+owner = "{{.Owner}}"
+project = {{.Project}}
+repos = ["{{.Repo}}"]
+
+[labels]
+types = ["bug", "enhancement", "documentation"]
+
+[verbs.start]
+comment = """
+Started.
+
+{comment}"""

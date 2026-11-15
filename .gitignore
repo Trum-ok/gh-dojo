@@ -12,3 +12,4 @@
 
 # Local notes, not shared: CLAUDE.local.md, .claude/settings.local.json
 *.local.*
+/bench/out/
