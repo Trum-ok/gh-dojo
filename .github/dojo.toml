@@ -1,6 +1,6 @@
-# Процесс gh-dojo: задачи ведутся только через `gh dojo`.
-# Ready — сделано, проверено и закоммичено в main; Done — вошло в релиз
-# (done из пресета заодно закрывает issue как completed).
+# gh-dojo's process: issues are handled only through `gh dojo`.
+# Ready: done, checked and committed to main; Done: shipped in a release
+# (the preset's done also closes the issue as completed).
 
 version = 1
 preset = "kanban"
@@ -18,36 +18,36 @@ env = ["CLAUDE_CODE_HOST_SESSION_ID"]
 link = "claude://claude.ai/epitaxy/{id}"
 
 [verbs.start]
-when = "берёшь задачу в работу"
+when = "you take an issue to work on"
 comment = """
-Взял в работу. Сессия: {session}
+Taken. Session: {session}
 
 {comment}"""
 
 [verbs.wait]
-when = "работа встала: ждём другую задачу или внешнее решение"
+when = "work has stopped: waiting for another issue or an outside decision"
 comment = """
-Ждём {by}.
+Waiting for {by}.
 
 {comment}"""
 
 [verbs.ready]
-when = "сделано, проверено и закоммичено в main"
+when = "done, checked and committed to main"
 
 [verbs.done]
-when = "изменение вошло в релиз"
-# Done только через Ready: release оставит задачи в работе (частичный
-# коммит с Refs #N) как not ready, а не переведёт их.
+when = "the change has shipped in a release"
+# Done only from Ready: release leaves issues still in progress (a partial
+# commit with Refs #N) as not ready instead of moving them.
 from = ["Ready"]
 
-# gh dojo agent install: skill для Claude Code из этого конфига плюс наши
-# заметки (русский текст про процесс, «Чего нет в gh-dojo», версия).
+# gh dojo agent install: the Claude Code skill from this config plus our
+# notes (the process, what gh-dojo lacks, which version runs).
 [agent]
 targets = ["claude"]
 notes = ".github/dojo-notes.md"
 description = "Also load it when you notice an inconvenience in gh-dojo itself: it becomes a dogfood issue right away."
 
-# gh dojo release: мы коммитим в main без PR и пишем в коммите `Refs #N`,
-# поэтому кроме закрывающих слов GitHub релиз ищет задачи и по `Refs`.
+# gh dojo release: we commit to main without pull requests and write `Refs #N`
+# in commits, so besides GitHub's closing keywords release also looks for `Refs`.
 [release]
 keywords = ["close", "closes", "closed", "fix", "fixes", "fixed", "resolve", "resolves", "resolved", "refs"]

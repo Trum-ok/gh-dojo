@@ -1,61 +1,64 @@
-# Заметки проекта gh-dojo
+# gh-dojo project notes
 
-Этот раздел — проектные дополнения к сгенерированной части выше: файл `.github/dojo-notes.md` (`[agent] notes` в
-`.github/dojo.toml`), вставляется как есть. Сам skill не правь: поменяй конфиг или эти заметки и запусти
-`make agent` (это `go run ./cmd/gh-dojo agent install`; CI проверяет `agent install --check`).
+This section is the project's addition to the generated part above: the file `.github/dojo-notes.md` (`[agent] notes`
+in `.github/dojo.toml`), inserted as is. Don't edit the skill itself: change the config or these notes and run
+`make agent` (that is `go run ./cmd/gh-dojo agent install`; CI checks `agent install --check`).
 
-## Процесс: когда какой глагол
+## Process: which verb when
 
-- `ready` — только когда изменение **в main** (смёрджено, тесты зелёные), а не когда готово на ветке. `done` идёт
-  только из `Ready` (`from = ["Ready"]` в конфиге).
-- `done` — только когда изменение вошло в релиз; **без указания пользователя не ставь**.
-- `done` по релизу — через `gh dojo release`, когда тег `vX.Y.Z` запушен: сначала
-  `gh dojo release vX.Y.Z --verb done --dry-run`, покажи список пользователю, и только по его указанию — то же без
-  `--dry-run` (можно с `--comment "vX.Y.Z"`). Release находит задачи по `Refs #N` и закрывающим словам в коммитах
-  с прошлого тега версии (`[release] keywords` в `.github/dojo.toml`); первый релиз — с `--since c720ec9`.
-- Строка `not ready (done starts only from Ready): #41 (In progress)` в выводе release — это нормально:
-  в релиз попал частичный коммит (`Refs #41`) открытой задачи, которая ещё в работе. Release её не трогает и не
-  считает сбоем (код 0). Не двигай её руками ради релиза. Но сама она в `Done` не попадёт: её подберёт только
-  релиз, коммиты которого снова назовут её (`Refs #41`); иначе, когда она будет в `Ready` и войдёт в релиз,
-  переведи её явно: `gh dojo done 41 --comment "vX.Y.Z"` (по указанию пользователя, как любой `done`).
-- Код 2 от release — отказ, а не «not ready»: например, задача закрыта (`Fixes #12` в коммите), но не в `Ready`
-  (`#12 is closed but in In progress`). Release её не переведёт ни сейчас, ни потом — спроси пользователя.
-- В сообщении коммита пример ссылки (синтаксис, чужой репозиторий) — **в обратных кавычках**: `` `Fixes #12` ``,
-  `` `refs: #12, acme/api#3` ``. Код release не считает; без кавычек он возьмёт эти номера как задачи релиза.
-  Настоящая ссылка — без кавычек: `Refs #51`.
-- Предупреждение release вида `acme/api#3: repository acme/api not found, or the token cannot see it: left out`
-  или `#99 not found: left out` — номер есть только в тексте коммита, а задачи нет (или токен её не видит); release
-  его пропускает (код 0). Если это ложное совпадение — ничего не делай (или `--exclude acme/api#3`); если задача
-  настоящая, но токен её не видит, — скажи пользователю. Пропускаются только репозитории вне `board.repos`: свой
-  репозиторий «not found» — ошибка пачки (код 3), почти наверняка нет доступа у токена; скажи пользователю.
-- В `--comment` у `ready` и `done` полезно указать коммит или релиз: `--comment "5fc0e30"`.
+- `ready` only when the change is **in main** (merged, tests green), not when it is done on a branch. `done` starts
+  only from `Ready` (`from = ["Ready"]` in the config).
+- `done` only when the change has shipped in a release; **never without the user's word**.
+- `done` for a release goes through `gh dojo release` once the tag `vX.Y.Z` is pushed: first
+  `gh dojo release vX.Y.Z --verb done --dry-run`, show the list to the user, and only on their word run the same
+  without `--dry-run` (optionally with `--comment "vX.Y.Z"`). Release finds issues by `Refs #N` and closing keywords
+  in the commits since the previous version tag (`[release] keywords` in `.github/dojo.toml`); the first release takes
+  `--since c720ec9`.
+- A line `not ready (done starts only from Ready): #41 (In progress)` in release's output is normal: the release
+  includes a partial commit (`Refs #41`) of an open issue still in progress. Release leaves it alone and doesn't count
+  it as a failure (exit code 0). Don't move it by hand for the release. But it won't reach `Done` on its own: only a
+  release whose commits name it again (`Refs #41`) picks it up; otherwise, once it is in `Ready` and shipped in a
+  release, move it explicitly: `gh dojo done 41 --comment "vX.Y.Z"` (on the user's word, like any `done`).
+- Exit code 2 from release is a refusal, not "not ready": for example, the issue is closed (`Fixes #12` in a commit)
+  but not in `Ready` (`#12 is closed but in In progress`). Release won't move it now or later; ask the user.
+- An example reference in a commit message (syntax, another repository) goes **in backticks**: `` `Fixes #12` ``,
+  `` `refs: #12, acme/api#3` ``. Release ignores code; without backticks it takes those numbers as the release's
+  issues. A real reference goes without backticks: `Refs #51`.
+- A release warning like `acme/api#3: repository acme/api not found, or the token cannot see it: left out` or
+  `#99 not found: left out` means the number appears only in a commit's text and there is no such issue (or the token
+  can't see it); release skips it (exit code 0). If it is a false match, do nothing (or `--exclude acme/api#3`); if the
+  issue is real but the token can't see it, tell the user. Only repositories outside `board.repos` are skipped: our own
+  repository "not found" fails the batch (exit code 3), almost certainly because the token lacks access; tell the user.
+- In `--comment` for `ready` and `done` it helps to give the commit or release: `--comment "5fc0e30"`.
 
-## Неудобство → задача `dogfood`
+## Inconvenience → a `dogfood` issue
 
-Любое неудобство при работе с gh-dojo (непонятная ошибка, лишний шаг, не хватает флага, справка врёт, пришлось
-обойти через `gh`) — **сразу** заводи задачу, не откладывая и не чиня молча:
+Any inconvenience while working with gh-dojo (an unclear error, an extra step, a missing flag, help that lies, having
+to work around it with `gh`): open an issue **right away**, without putting it off or quietly fixing it:
 
 ```sh
-gh dojo new --type dogfood --body "Что делал: … Что ожидал: … Что получил: …" -- "<что неудобно, кратко>"
+gh dojo new --type dogfood --body "What I did: … What I expected: … What I got: …" -- "<what is inconvenient, briefly>"
 ```
 
-Затем продолжай основную задачу.
+Then go on with the main task.
 
-## Чего нет в gh-dojo
+## What gh-dojo lacks
 
-Здесь допустим `gh`, но только когда это нужно по задаче или просит пользователь:
+Here `gh` is allowed, but only when the task needs it or the user asks:
 
-- закрыть issue не через `done` (не нужна, дубль) или переоткрыть — `gh issue close N --reason "not planned"` /
-  `gh issue reopen N`, только по решению пользователя (глаголов `drop` и `revive` в нашем конфиге нет);
-- поправить заголовок, описание, метки или исполнителей существующей issue — `gh issue edit N …`.
+- close an issue other than through `done` (not needed, a duplicate) or reopen one:
+  `gh issue close N --reason "not planned"` / `gh issue reopen N`, only on the user's decision (our config has no
+  `drop` or `revive` verbs);
+- change the title, body, labels or assignees of an existing issue: `gh issue edit N …`.
 
-## Какая версия работает
+## Which version runs
 
-Установленный `gh dojo` — сборка последнего `make install` из main, а не текущей ветки: сломанная ветка не ломает учёт
-задач. Новое поведение из ветки в `gh dojo` не появится, пока его не смёрджат в main и не переустановят. Таблица
-команд выше собрана той сборкой, что генерировала skill, — установленная версия может от неё отставать:
+The installed `gh dojo` is the build of the last `make install` from main, not of the current branch: a broken branch
+doesn't break issue tracking. New behavior from a branch won't appear in `gh dojo` until it is merged into main and
+reinstalled. The command table above was produced by the build that generated the skill; the installed version may lag
+behind it:
 
 ```sh
-gh dojo --version   # git describe установленной сборки
-make install        # в рабочей копии на main, после мёрджа
+gh dojo --version   # git describe of the installed build
+make install        # in a working copy on main, after the merge
 ```
