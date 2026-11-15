@@ -38,6 +38,11 @@
 //	go run ./bench agents -shell any -models haiku,sonnet -runs 5 -tasks workday
 //	go run ./bench report bench/out/agents-*/results.jsonl
 //
+// The README's chart of the workday, a light and a dark SVG in docs/media,
+// is drawn from the results of workday runs:
+//
+//	go run ./bench chart bench/out/agents-*/results.jsonl
+//
 // With -shell any the agent's Bash runs any command in Claude Code's sandbox
 // (writes in its workspace, network to GitHub only); the default -shell gh
 // allows gh, jq and a few readers, and refuses without asking the shell

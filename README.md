@@ -31,6 +31,24 @@ gh-dojo is not a planner: it does no sprint planning, standups or reports,
 does not replace `gh issue` or `gh pr`, and does not change the board's own
 settings.
 
+## Benchmark
+
+Claude Code did a day of board work in one session: eight messages, two of
+them traps, the board graded after each. Against plain `gh` with a careful
+`CLAUDE.md` (the process, the board's IDs and tested command recipes), gh dojo
+took 37–44% less time and 33–44% less money, and got every step right:
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/media/bench-workday-dark.svg">
+  <img alt="Running time of one agent session after each of eight messages, median of 5 sessions. Sonnet: 51 s with gh dojo against 80 s with gh and CLAUDE.md. Haiku: 66 s against 117 s. The gap widens with every message" src="docs/media/bench-workday-light.svg">
+</picture>
+
+The gap widens with every message: with gh the agent writes GraphQL and the
+board's IDs, as above, into every command, three to four times the output
+tokens, and rereads them all later. For a task of one message the two are
+even. Preset kanban, 5 sessions per model; the tasks, numbers and limits are
+in [docs/bench.md](docs/bench.md).
+
 ## Built for agents
 
 - **Process verbs, not fields.** The agent says what happened (`start`,

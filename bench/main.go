@@ -28,6 +28,7 @@ func usage() error {
   go run ./bench ops     [flags]   level 1: board operations by plain gh and by gh dojo, no model
   go run ./bench agents  [flags]   level 2: agents with claude -p, conditions gh and dojo
   go run ./bench report  FILE...   tables from the results of agents (results.jsonl)
+  go run ./bench chart   FILE...   the README's SVGs of the workday session, from the results of agents
   go run ./bench sweep   [flags]   delete the issues the benchmark left in the sandbox`)
 }
 
@@ -47,14 +48,18 @@ func run(args []string) error {
 	parallel := fs.Int("parallel", 4, "agents: runs at once (next always runs alone on the board)")
 	fs.StringVar(&shellMode, "shell", "gh", "agents: what Bash may run: gh (gh, jq and a few readers) or any (any command, in Claude Code's sandbox: writes in the workspace, network to GitHub only)")
 	repeat := fs.Int("repeat", 3, "ops: passes over the operations; the time is their median")
+	img := fs.String("img", "docs/media", "chart: where the SVGs go")
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
 	}
 	if shellMode != "gh" && shellMode != "any" {
 		return fmt.Errorf("-shell %q, want gh or any", shellMode)
 	}
-	if args[0] == "report" {
+	switch args[0] {
+	case "report":
 		return report(fs.Args())
+	case "chart":
+		return chart(*img, fs.Args())
 	}
 	// Two benchmarks on one board delete each other's issues.
 	unlock, err := lockBoard(*out, *repo, *project)

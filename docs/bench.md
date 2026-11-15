@@ -10,7 +10,7 @@ preset kanban). Both sides are set up the way a careful team would:
 The harness and how to run it: [bench/doc.go](../bench/doc.go). Issue #50.
 
 In short: for a task of one message gh dojo does as well as plain gh with a careful `CLAUDE.md`, at the same cost.
-Over a session of eight messages it is a third cheaper and a third to 45% faster, with every step right and no
+Over a session of eight messages it takes 37–44% less time and 33–44% less money, with every step right and no
 process worked around ([a workday](#a-workday-where-it-pays)).
 
 ## Level 1: board operations, no model
@@ -123,7 +123,7 @@ with tokens and turns):
 
 What it shows:
 
-- **Over a session gh dojo is a third cheaper and a third to 45% faster:** Sonnet $0.108 against $0.162 and 51 s
+- **Over a session gh dojo takes 37–44% less time and 33–44% less money:** Sonnet $0.108 against $0.162 and 51 s
   against 80 s; Haiku $0.010 against $0.017 and 66 s against 117 s. The skill does not hold it back even at the
   first message, and the gap widens with each one: each message after the first costs Sonnet about $0.008 with gh
   dojo and $0.015 with gh.

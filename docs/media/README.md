@@ -12,6 +12,10 @@ The animated media of the [README](../../README.md), made with
   an agent with gh dojo runs one verb. Story: `src/compareScript.ts`; scene:
   `src/Compare.tsx`.
 
+Not Remotion: `bench-workday-*.svg`, under "Benchmark", is drawn by the
+benchmark from its results, `go run ./bench chart bench/out/agents-*/results.jsonl`
+(see [bench/doc.go](../../bench/doc.go)).
+
 The gh-dojo output and comments in the stories are the text gh-dojo prints and
 posts with the kanban preset, and the GraphQL mutations are the ones it sends;
 keep them in step with the code. `src/Chat.tsx` draws the chat with the agent,

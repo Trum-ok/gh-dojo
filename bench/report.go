@@ -12,41 +12,9 @@ import (
 // report prints the tables of level 2 from results.jsonl files: per model and
 // condition overall, then per task.
 func report(files []string) error {
-	if len(files) == 0 {
-		return fmt.Errorf("report: name the results.jsonl files")
-	}
-	var all []agentResult
-	for _, f := range files {
-		fh, err := os.Open(f)
-		if err != nil {
-			return err
-		}
-		sc := bufio.NewScanner(fh)
-		sc.Buffer(make([]byte, 0, 1<<20), 16<<20)
-		for sc.Scan() {
-			var r agentResult
-			if err := json.Unmarshal(sc.Bytes(), &r); err != nil {
-				fh.Close()
-				return fmt.Errorf("%s: %w", f, err)
-			}
-			all = append(all, r)
-		}
-		fh.Close()
-	}
-	var broken int
-	all = slices.DeleteFunc(all, func(r agentResult) bool {
-		if r.HarnessError != "" {
-			broken++
-			return true
-		}
-		return false
-	})
-	// The transcripts are the source: results written before refusals were
-	// told apart from errors count them again.
-	for i, r := range all {
-		if errs, refusals, err := recount(r.Transcript); err == nil {
-			all[i].ToolErrors, all[i].Refusals = errs, refusals
-		}
+	all, broken, err := load("report", files)
+	if err != nil {
+		return err
 	}
 	session := map[string]bool{}
 	for _, t := range tasks() {
@@ -192,6 +160,46 @@ func sessionSteps(models []string, runs func(model, cond string) []agentResult, 
 			}
 		}
 	}
+}
+
+// load reads results.jsonl files, leaving out the runs the harness failed:
+// it returns how many.
+func load(cmd string, files []string) (all []agentResult, broken int, err error) {
+	if len(files) == 0 {
+		return nil, 0, fmt.Errorf("%s: name the results.jsonl files", cmd)
+	}
+	for _, f := range files {
+		fh, err := os.Open(f)
+		if err != nil {
+			return nil, 0, err
+		}
+		sc := bufio.NewScanner(fh)
+		sc.Buffer(make([]byte, 0, 1<<20), 16<<20)
+		for sc.Scan() {
+			var r agentResult
+			if err := json.Unmarshal(sc.Bytes(), &r); err != nil {
+				fh.Close()
+				return nil, 0, fmt.Errorf("%s: %w", f, err)
+			}
+			all = append(all, r)
+		}
+		fh.Close()
+	}
+	all = slices.DeleteFunc(all, func(r agentResult) bool {
+		if r.HarnessError != "" {
+			broken++
+			return true
+		}
+		return false
+	})
+	// The transcripts are the source: results written before refusals were
+	// told apart from errors count them again.
+	for i, r := range all {
+		if errs, refusals, err := recount(r.Transcript); err == nil {
+			all[i].ToolErrors, all[i].Refusals = errs, refusals
+		}
+	}
+	return all, broken, nil
 }
 
 // spread formats the median of vs and their range.
