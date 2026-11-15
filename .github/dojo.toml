@@ -33,6 +33,7 @@ Waiting for {by}.
 
 [verbs.ready]
 when = "done, checked and committed to main"
+batch = true                 # ready 12 13 14: several issues at once
 
 [verbs.done]
 when = "the change has shipped in a release"

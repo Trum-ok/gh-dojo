@@ -107,6 +107,26 @@ backticks it takes those numbers as the release's issues. One a message
 names that is no issue is left out with a warning (exit code 0); any other
 mistaken match is left out with `--exclude N`.
 
+An agent moves a release's issues to Done only on the user's word: it runs
+the `--dry-run`, shows the list to the user, and once they agree runs the
+same without `--dry-run`, optionally with `--comment "vX.Y.Z"`. What the
+output means:
+
+- `not ready (done starts only from Ready): #41 (In progress)` is normal and
+  exits 0: a partial commit (`Refs #41`) of an issue still in progress.
+  Don't move it by hand for the release; once it is Ready and released, run
+  `gh dojo done 41 --comment "vX.Y.Z"`, on the user's word like any `done`.
+- Exit code 2 is a refusal, not "not ready": say, the issue is closed
+  (`Fixes #12` in a commit) but not in Ready. Release won't move it now or
+  later; ask the user.
+- A warning like `acme/api#3: repository acme/api not found, or the token
+  cannot see it: left out` or `#99 not found: left out` means a number only
+  in a commit's text that is no issue the token can see (exit code 0). A
+  false match needs nothing (or `--exclude acme/api#3`); a real issue the
+  token can't see goes to the user. Our own repository "not found" fails
+  the batch (exit code 3), almost surely a token without access: tell the
+  user.
+
 The interface, help text and documentation are in English. Texts that go
 into issues (verb `when` lines and comment templates) come from the config.
 

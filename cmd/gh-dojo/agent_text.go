@@ -24,7 +24,7 @@ type agentDoc struct {
 	// blockers check and link, confirm, batch), so a verb's line does not
 	// say it twice.
 	p     *process
-	cmds  []agentCommand // the built-in commands, for the command table
+	cmds  []agentCommand // the built-in commands, for hasCommand
 	notes string         // "" or markdown ending in a newline
 }
 
@@ -185,10 +185,9 @@ func (d *agentDoc) body(level int) string {
 		"a comment, a blocked-by link or an issue with `gh issue`, `gh project` or the API. For what gh dojo "+
 		"cannot do, such as editing an issue's title, body, labels or assignees, use `gh issue` only when the "+
 		"task needs it or the user asks.", where, cfg.Board.Owner, cfg.Board.Project, code(config.FileName), preset)
-	w.para("Start with `gh dojo describe`: the verbs, when to use each, what they need and do along the way, " +
-		"the lifecycle and the exit codes, read from the config without the network. `gh dojo <verb> --help` " +
-		"has the details of one verb. Read them rather than guess. When the setup is broken (token, board, " +
-		"config), `gh dojo doctor` names each problem with the command that fixes it.")
+	w.para("Everything below is enough for everyday work; read `gh dojo <command> --help` only when a command " +
+		"refuses or you need a flag not named here. When the setup is broken (token, board, config), " +
+		"`gh dojo doctor` names each problem with the command that fixes it.")
 
 	d.repos(w)
 	d.statuses(w)
@@ -199,16 +198,24 @@ func (d *agentDoc) body(level int) string {
 	d.session(w)
 	d.exitCodes(w)
 	d.json(w)
-	d.commands(w)
 	return w.b.String()
 }
 
+// multiRepo reports whether the board takes issues from several
+// repositories: only then does the doc explain at length how to name an
+// issue of another one.
+func (d *agentDoc) multiRepo() bool { return len(d.cfg.Board.Repos) > 1 }
+
 // repos says how commands name issues, of the default repository and of
-// others.
+// others: in one sentence when the board has one repository.
 func (d *agentDoc) repos(w *mdWriter) {
 	def := "the current repository"
 	if len(d.cfg.Board.Repos) > 0 {
 		def = code(d.cfg.Board.Repos[0])
+	}
+	if !d.multiRepo() {
+		w.para("A bare `12` or `#12` is an issue of %s; an issue of another repository is `owner/repo#12` or its URL.", def)
+		return
 	}
 	newRepo := ""
 	if d.hasCommand("new") {
@@ -235,6 +242,10 @@ func (d *agentDoc) verbs(w *mdWriter) {
 		intro += ", such as " + code(ex)
 	}
 	w.para("%s: there is no need to read the issue again.", intro)
+	if slices.ContainsFunc(d.cfg.Verbs, func(v config.Verb) bool { return v.Batch }) {
+		w.para("A verb that takes several numbers at once checks and writes each issue on its own, skips one " +
+			"that fails and names each issue not done in a summary; the same command again touches only what is left.")
+	}
 	for i, pv := range d.p.Verbs {
 		v := d.cfg.Verbs[i]
 		w.heading(2, code(v.Name))
@@ -324,7 +335,11 @@ func (d *agentDoc) rules(v config.Verb) []string {
 			"Never move the status another way.")
 	case config.BlockersLink:
 		next := d.verbsFrom(v.To)
-		s := "`--by 12` (also `#12`, `owner/repo#12` or an issue's URL; several comma-separated, " +
+		also := "`#12` or an issue's URL"
+		if d.multiRepo() {
+			also = "`#12`, `owner/repo#12` or an issue's URL"
+		}
+		s := "`--by 12` (also " + also + "; several comma-separated, " +
 			"`--by 12,13`) also marks the issue blocked by #12. Text (`--by \"the user's decision\"`) only goes " +
 			"into the comment; issues mixed with text are an error (exit code 1); a pull request is named " +
 			"in the comment without a link."
@@ -357,10 +372,10 @@ func (d *agentDoc) rules(v config.Verb) []string {
 			config.ArgMilestone, config.ArgMilestone))
 	}
 	if v.Batch {
-		r = append(r, fmt.Sprintf("It takes several numbers at once, `gh dojo %s 12 13 14`: each issue is "+
-			"checked and written on its own, one that fails is skipped, and a summary names each issue not done. "+
-			"Running the same command again touches only what is left.", v.Name))
-		if d.hasCommand("release") && releaseLacks(v) == "" {
+		r = append(r, fmt.Sprintf("It takes several numbers at once: `gh dojo %s 12 13 14`.", v.Name))
+		// A release finishes issues: only a verb that does is pointed there.
+		finishes := v.Close != "" || slices.Contains(d.cfg.Statuses.Final, v.To)
+		if finishes && d.hasCommand("release") && releaseLacks(v) == "" {
 			r = append(r, d.releaseRule(v))
 		}
 	}
@@ -373,33 +388,11 @@ func (d *agentDoc) rules(v config.Verb) []string {
 	return r
 }
 
-// releaseRule says how gh dojo release applies batch verb v to the
-// issues of a release, with the keywords of the config.
+// releaseRule points to gh dojo release for batch verb v: its details
+// are in release --help, needed only when a release is made.
 func (d *agentDoc) releaseRule(v config.Verb) string {
-	found := "the merged pull requests of its commits close"
-	if k := d.cfg.Release.Keywords; len(k) > 0 {
-		found += ", or its commit messages name after " + strings.Join(quoted(k), ", ")
-	}
 	return fmt.Sprintf("For a release, `gh dojo release <tag> --verb %s --dry-run` lists the issues the release "+
-		"includes (those %s), how each was found and its plan; without `--dry-run` it runs `%s` on them as one "+
-		"batch. An open issue whose status it does not start from is listed as not ready and left out, not "+
-		"failed; only a later release whose commits name it again picks it up, so once it is ready run `gh dojo "+
-		"%s N` on it. A closed issue it does not start from is refused (exit code 2): ask the user. The start is "+
-		"the previous version tag; the first release needs `--since <tag or commit>`.%s",
-		v.Name, found, v.Name, v.Name, d.messageRule())
-}
-
-// messageRule says, when commit messages count for a release, how release
-// reads their numbers and how to write an example of one; "" without
-// keywords.
-func (d *agentDoc) messageRule() string {
-	if len(d.cfg.Release.Keywords) == 0 {
-		return ""
-	}
-	return " A number only commit messages name that is no issue (a pull request, a missing issue, or one of a " +
-		"repository outside `board.repos` not found or hidden from the token) is left out with a warning, not " +
-		"failed; `--exclude N` leaves out any issue found by mistake. In a commit message, put an example of an " +
-		"issue reference in backticks (`` `Fixes #12` ``): code does not count."
+		"includes and its plan; read `gh dojo release --help` before you run it.", v.Name)
 }
 
 // verbsFrom lists the verbs that can start from status s.
@@ -532,18 +525,18 @@ func (d *agentDoc) reading(w *mdWriter) {
 	if d.cfg.SprintField() != "" {
 		listFilters += ", `--sprint current`"
 	}
-	items := []string{
-		"`gh dojo show N` before you work on an issue: its status, " + sprint + "milestone, labels, blockers both " +
-			"ways (unresolved first, each with its board status), its parent and sub-issues (the same way), " +
-			"status history, description and the last 5 " +
-			"comments. `gh dojo show 12 13 --brief` prints three lines per issue, `--comments all` the whole " +
-			"thread (up to 100), `--full` everything uncut.",
-	}
+	var items []string
 	if d.hasCommand("next") {
 		items = append(items, d.nextItem())
 	}
-	items = append(items, "`gh dojo list`: the open issues on the board, grouped by status; closed issues and "+
-		"final statuses are hidden and counted. Filters: "+listFilters+", `--all`, `--limit 100`.")
+	items = append(items,
+		"`gh dojo show N` before you work on an issue: its status, "+sprint+"milestone, labels, blockers both "+
+			"ways (unresolved first, each with its board status), its parent and sub-issues (the same way), "+
+			"status history, description and the last 5 comments; a line left out means none. Several numbers, "+
+			"`gh dojo show 12 13`, print three lines per issue: read the one you take alone. `--comments all` prints "+
+			"the whole thread (up to 100), `--full` everything uncut.",
+		"`gh dojo list`: an overview of the board, when the user asks for one: the open issues grouped by status; "+
+			"closed issues and final statuses are hidden and counted. Filters: "+listFilters+", `--all`, `--limit 100`.")
 	w.heading(1, "Reading")
 	w.list(items)
 }
@@ -587,6 +580,10 @@ func (d *agentDoc) writing(w *mdWriter) {
 	if p := cfg.Labels.AreaPrefix; p != "" {
 		area = " `--area X` adds the label " + code(p+"X") + "."
 	}
+	otherRepo := ""
+	if d.multiRepo() {
+		otherRepo = " Another repository's issue is `owner/repo#12` or its URL."
+	}
 	w.heading(1, "Creating and linking issues")
 	w.list([]string{
 		"`gh dojo new \"<title>\" --type " + typ + " --body \"…\"`: the issue, its labels, the board" + status +
@@ -598,8 +595,7 @@ func (d *agentDoc) writing(w *mdWriter) {
 			"`--`, and every flag before it: `gh dojo new " + example + " -- \"-v is ignored\"`.",
 		"`gh dojo comment N \"text\"`, or `gh dojo comment N --body-file -`: a comment without changing the status.",
 		"`gh dojo block N --by M` marks N blocked by M without changing the status; `gh dojo unblock N --by M` " +
-			"removes that. `--by` repeats or takes a comma-separated list; another repository's issue is " +
-			"`owner/repo#12` or its URL. A link already there (or already gone) is not an error: the line says " +
+			"removes that. `--by` repeats or takes a comma-separated list." + otherRepo + " A link already there (or already gone) is not an error: the line says " +
 			"`already`. A pull request cannot block (exit code 3), nor can an issue N blocks (a cycle, exit code 1).",
 		"An existing issue becomes a sub-issue with `gh issue edit N --parent M` (`--remove-parent` undoes it): " +
 			"gh-dojo has no command for it, since the link changes no status.",
@@ -631,20 +627,13 @@ func (d *agentDoc) session(w *mdWriter) {
 		"set the verb warns and still runs.", codes(env))
 }
 
+// exitCodes says what to do on an error in a few sentences: the error's
+// own fix: line covers the rest.
 func (d *agentDoc) exitCodes(w *mdWriter) {
 	w.heading(1, "Exit codes")
-	var b strings.Builder
-	b.WriteString("| Code | Meaning | What to do |\n|------|---------|------------|")
-	for _, c := range render.ExitCodes {
-		fmt.Fprintf(&b, "\n| %d | %s | %s |", c.Code, c.Meaning, c.Next)
-	}
-	w.block(b.String())
-	w.para("On an error, read its `error:`, `allowed:` and `fix:` lines. Never work around exit code 2: do not " +
-		"move the status another way, ask the user. On 4 and 5, run the same command again (on 4, a bit later).")
-	if slices.ContainsFunc(d.cfg.Verbs, func(v config.Verb) bool { return v.Batch }) {
-		w.para("A verb on several issues exits 0 when all are done, 5 when some were written and running it " +
-			"again may finish the rest, else with the code of the failed ones (2 first, then 1, 4, 3).")
-	}
+	w.para("On an error, read its `error:`, `allowed:` and `fix:` lines and do what `fix:` says. Exit code 2 is a " +
+		"process check refusing: never work around it (do not move the status another way); ask the user. On 4 " +
+		"(network, rate limit or auth) and 5 (partially applied), run the same command again, on 4 a bit later.")
 }
 
 func (d *agentDoc) json(w *mdWriter) {
@@ -660,17 +649,4 @@ func (d *agentDoc) json(w *mdWriter) {
 		"gh dojo list --jq '.issues[] | select(.status == \"" + status + "\") | .number'\n" +
 		"gh dojo show 42 --jq '.issues[0].blocked_by[] | select(.resolved | not) | .ref'\n" +
 		"```")
-}
-
-func (d *agentDoc) commands(w *mdWriter) {
-	w.heading(1, "Commands")
-	var b strings.Builder
-	b.WriteString("| Command | What it does |\n|---------|--------------|")
-	for _, c := range d.cmds {
-		fmt.Fprintf(&b, "\n| `gh dojo %s` | %s |", c.name, c.short)
-	}
-	if len(d.p.Verbs) > 0 {
-		fmt.Fprintf(&b, "\n| `gh dojo <verb>` | The verbs above: %s |", strings.Join(d.cfg.VerbNames(), ", "))
-	}
-	w.block(b.String())
 }
