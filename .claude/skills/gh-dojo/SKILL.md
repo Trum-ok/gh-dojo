@@ -64,7 +64,7 @@ Run a verb as `gh dojo <verb> N`; `--dry-run` prints its plan (status, links, th
 
 `gh dojo plan N…`: Backlog, In progress, Waiting, Ready → status unchanged; needs --milestone; sets the --milestone milestone.
 
-- `--milestone <title>`, or a start only that title has (`--milestone v1.2`): ask the user which milestone if you do not know.
+- `--milestone <title>`, or a start only that title has (`--milestone v1.2`): ask the user which milestone if you do not know. `--milestone none` takes the issue out of its milestone.
 
 ## Reading
 
