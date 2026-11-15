@@ -59,6 +59,9 @@ type verbIssue struct {
 	Warnings []string `json:"warnings"`  // also printed on stderr
 	// Error is why the issue failed, or what stopped a partial write.
 	Error *jsonError `json:"error"`
+	// Card is the issue as show --json has it, as read before the verb's
+	// changes; null without --show or when the issue was not read.
+	Card *showCard `json:"card"`
 }
 
 // jsonOp is one effect of a plan. Op names its kind; the other fields are

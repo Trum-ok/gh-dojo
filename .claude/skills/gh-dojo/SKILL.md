@@ -24,7 +24,7 @@ A bare `12` or `#12` is an issue of `Trum-ok/gh-dojo`; an issue of another repos
 
 ## Verbs
 
-Run a verb as `gh dojo <verb> N`; `--dry-run` prints its plan (status, links, the comment it would post) without changing anything. A verb adds the issue to the board if it is missing and refuses a closed issue unless noted. It confirms in one line, such as `#42 Backlog → In progress, comment left`: there is no need to read the issue again.
+Run a verb as `gh dojo <verb> N`; `--dry-run` prints its plan (status, links, the comment it would post) without changing anything, and `--show` also prints the issue's card, as `gh dojo show N` does. A verb adds the issue to the board if it is missing and refuses a closed issue unless noted. It confirms in one line, such as `#42 Backlog → In progress, comment left`: there is no need to read the issue again.
 
 `N…` takes several numbers at once: one that fails is skipped and named in the summary.
 
@@ -34,7 +34,7 @@ Run a verb as `gh dojo <verb> N`; `--dry-run` prints its plan (status, links, th
 
 `gh dojo start N`: Backlog, Waiting, Ready → In progress; optional --comment; comments "Taken. Session: {session} {comment}".
 
-- With an unresolved blocker it warns on stderr and still runs: read `gh dojo show N` and decide whether to take the issue, or ask the user.
+- With an unresolved blocker it warns on stderr and still runs: read the card (`--show`) and decide whether to keep the issue, or ask the user.
 
 ### `wait`
 
@@ -68,8 +68,8 @@ Run a verb as `gh dojo <verb> N`; `--dry-run` prints its plan (status, links, th
 
 ## Reading
 
-- `gh dojo next`: what to take next, the open issues in `Backlog` or without a status, with no unresolved blocker, in board order, 5 by default (`--limit N`). The blocked ones are hidden and counted; `--all` shows them with their blockers. Filters: `--mine`, `--label <label>`. Once you pick one, `gh dojo show N`, then `gh dojo start N`.
-- `gh dojo show N` before you work on an issue: its status, milestone, labels, blockers both ways (unresolved first, each with its board status), its parent and sub-issues (the same way), status history, description and the last 5 comments; a line left out means none. Several numbers, `gh dojo show 12 13`, print three lines per issue: read the one you take alone. `--comments all` prints the whole thread (up to 100), `--full` everything uncut.
+- `gh dojo next`: what to take next, the open issues in `Backlog` or without a status, with no unresolved blocker, in board order, 5 by default (`--limit N`). The blocked ones are hidden and counted; `--all` shows them with their blockers. Filters: `--mine`, `--label <label>`. Once you pick one, `gh dojo start N --show`: it takes the issue and prints its card.
+- `gh dojo show N` before you work on an issue (to take it as well, `gh dojo start N --show` prints the same card): its status, milestone, labels, blockers both ways (unresolved first, each with its board status), its parent and sub-issues (the same way), status history, description and the last 5 comments; a line left out means none. Several numbers, `gh dojo show 12 13`, print three lines per issue: read the one you take alone. `--comments all` prints the whole thread (up to 100), `--full` everything uncut.
 - `gh dojo list`: an overview of the board, when the user asks for one: the open issues grouped by status; closed issues and final statuses are hidden and counted; `Ready` is one line of numbers, `--status Ready` lists them with titles. Filters: `--status "<status>"`, `--status none`, `--mine`, `--label <label>`, `--all`, `--limit 100`.
 
 ## Creating and linking issues

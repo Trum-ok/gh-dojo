@@ -26,7 +26,8 @@ code: 0
       "in_place": [],
       "needs_yes": true,
       "warnings": [],
-      "error": null
+      "error": null,
+      "card": null
     }
   ],
   "summary": {

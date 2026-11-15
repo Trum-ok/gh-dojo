@@ -32,7 +32,8 @@ code: 2
       "in_place": [],
       "needs_yes": false,
       "warnings": [],
-      "error": null
+      "error": null,
+      "card": null
     },
     {
       "number": 7,
@@ -54,7 +55,8 @@ code: 2
       "in_place": [],
       "needs_yes": false,
       "warnings": [],
-      "error": null
+      "error": null,
+      "card": null
     },
     {
       "number": 9,
@@ -76,7 +78,8 @@ code: 2
       ],
       "needs_yes": false,
       "warnings": [],
-      "error": null
+      "error": null,
+      "card": null
     },
     {
       "number": 17,
@@ -93,7 +96,8 @@ code: 2
         "message": "done cannot move #17 from Backlog; it starts only from Ready or In progress\nthis is a process rule: ask the user how to proceed",
         "allowed": [],
         "fix": null
-      }
+      },
+      "card": null
     }
   ],
   "summary": {

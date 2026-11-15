@@ -19,6 +19,7 @@ Flags:
       --comment string   text for {comment} in the comment
       --dry-run          print the plan without changing anything
   -h, --help             help for note
+      --show             also print the issue's card, as gh dojo show N does, from the same read
 
 Global Flags:
   -q, --jq expression       filter the JSON with a jq expression (implies --json)

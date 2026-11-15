@@ -37,7 +37,8 @@ code: 4
         "message": "GitHub rejected the token (HTTP 401)",
         "allowed": [],
         "fix": "gh auth refresh -s project"
-      }
+      },
+      "card": null
     },
     {
       "number": 2,
@@ -64,7 +65,8 @@ code: 4
         "message": "not attempted: GitHub rejected the token (HTTP 401)",
         "allowed": [],
         "fix": "gh auth refresh -s project"
-      }
+      },
+      "card": null
     },
     {
       "number": 3,
@@ -86,7 +88,8 @@ code: 4
       ],
       "needs_yes": false,
       "warnings": [],
-      "error": null
+      "error": null,
+      "card": null
     },
     {
       "number": 4,
@@ -113,7 +116,8 @@ code: 4
         "message": "not attempted: GitHub rejected the token (HTTP 401)",
         "allowed": [],
         "fix": "gh auth refresh -s project"
-      }
+      },
+      "card": null
     }
   ],
   "summary": {

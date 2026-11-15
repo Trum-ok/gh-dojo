@@ -235,7 +235,8 @@ func (d *agentDoc) verbs(w *mdWriter) {
 		return
 	}
 	intro := "Run a verb as `gh dojo <verb> N`; `--dry-run` prints its plan (status, links, " +
-		"the comment it would post) without changing anything. A verb adds the issue to the board if it " +
+		"the comment it would post) without changing anything, and `--show` also prints the issue's card, " +
+		"as `gh dojo show N` does. A verb adds the issue to the board if it " +
 		"is missing and refuses a closed issue unless noted. It confirms in one line"
 	if ex := d.confirmExample(); ex != "" {
 		intro += ", such as " + code(ex)
@@ -345,8 +346,8 @@ func (d *agentDoc) rules(v config.Verb) []string {
 	}
 	switch v.Blockers {
 	case config.BlockersWarn:
-		r = append(r, "With an unresolved blocker it warns on stderr and still runs: read `gh dojo show N` "+
-			"and decide whether to take the issue, or ask the user.")
+		r = append(r, "With an unresolved blocker it warns on stderr and still runs: read the card (`--show`) "+
+			"and decide whether to keep the issue, or ask the user.")
 	case config.BlockersDeny:
 		r = append(r, "It is refused (exit code 2) while a blocker is unresolved: `gh dojo show N` lists them. "+
 			"Never move the status another way.")
@@ -526,7 +527,7 @@ func (d *agentDoc) reading(w *mdWriter) {
 		items = append(items, d.nextItem())
 	}
 	items = append(items,
-		"`gh dojo show N` before you work on an issue: its status, "+sprint+"milestone, labels, blockers both "+
+		"`gh dojo show N` before you work on an issue"+d.takeNote()+": its status, "+sprint+"milestone, labels, blockers both "+
 			"ways (unresolved first, each with its board status), its parent and sub-issues (the same way), "+
 			"status history, description and the last 5 comments; a line left out means none. Several numbers, "+
 			"`gh dojo show 12 13`, print three lines per issue: read the one you take alone. `--comments all` prints "+
@@ -563,6 +564,28 @@ func (d *agentDoc) hasCommand(name string) bool {
 	return slices.ContainsFunc(d.cmds, func(c agentCommand) bool { return c.name == name })
 }
 
+// takeVerb is the verb that takes an issue: the first one from the
+// initial status, "" when none.
+func (d *agentDoc) takeVerb() string {
+	if d.cfg.Statuses.Initial == "" {
+		return ""
+	}
+	if take := d.verbsFrom(d.cfg.Statuses.Initial); len(take) > 0 {
+		return take[0]
+	}
+	return ""
+}
+
+// takeNote points show's reader at the take verb's --show: taking an
+// issue and reading it is one command (#57).
+func (d *agentDoc) takeNote() string {
+	take := d.takeVerb()
+	if take == "" {
+		return ""
+	}
+	return " (to take it as well, " + code("gh dojo "+take+" N --show") + " prints the same card)"
+}
+
 // nextItem explains gh dojo next, when this build has it.
 func (d *agentDoc) nextItem() string {
 	cfg := d.cfg
@@ -576,11 +599,11 @@ func (d *agentDoc) nextItem() string {
 	}
 	s := "`gh dojo next`: what to take next, the open issues " + where + ", with no unresolved blocker, in " +
 		"board order, 5 by default (`--limit N`). The blocked ones are hidden and counted; `--all` shows them " +
-		"with their blockers. Filters: " + filters + ". Once you pick one, `gh dojo show N`"
-	if take := d.verbsFrom(cfg.Statuses.Initial); cfg.Statuses.Initial != "" && len(take) > 0 {
-		s += ", then " + code("gh dojo "+take[0]+" N")
+		"with their blockers. Filters: " + filters + "."
+	if take := d.takeVerb(); take != "" {
+		s += " Once you pick one, " + code("gh dojo "+take+" N --show") + ": it takes the issue and prints its card."
 	}
-	return s + "."
+	return s
 }
 
 func (d *agentDoc) writing(w *mdWriter) {

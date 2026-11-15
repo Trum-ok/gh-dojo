@@ -35,7 +35,8 @@ code: 0
       "warnings": [
         "#43 has unresolved blockers: #41 (In progress)"
       ],
-      "error": null
+      "error": null,
+      "card": null
     }
   ],
   "summary": {

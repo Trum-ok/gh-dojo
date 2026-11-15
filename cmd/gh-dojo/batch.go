@@ -53,7 +53,7 @@ import (
 // A stale schema is retried once per run, as for one issue (see
 // retryStale): the schema is dropped and the issues it failed are re-read
 // in one request, then planned and applied afresh.
-func runBatch(cmd *cobra.Command, cfg *config.Config, v config.Verb, refs []issue.Ref, args workflow.Args, dryRun bool) error {
+func runBatch(cmd *cobra.Command, cfg *config.Config, v config.Verb, refs []issue.Ref, args workflow.Args, dryRun, show bool) error {
 	if err := workflow.CheckArgs(v, args, refArgs(refs, issue.Repo{})...); err != nil {
 		return err
 	}
@@ -66,10 +66,13 @@ func runBatch(cmd *cobra.Command, cfg *config.Config, v config.Verb, refs []issu
 		return err
 	}
 	if refs = inRepo(refs, def); len(refs) == 1 { // 12 and owner/repo#12 of the default repository
-		return runVerb(cmd, cfg, v, refs[0], args, dryRun)
+		return runVerb(cmd, cfg, v, refs[0], args, dryRun, show)
 	}
 	if !v.Batch { // issueArgs let one number in two forms through
 		return notBatch(cmd, cfg, v, len(refs))
+	}
+	if show {
+		return showOne(len(refs))
 	}
 	b := newBatchRun(cmd, be, cfg, v, args, def)
 	items, err := b.run(cmd.Context(), refs, dryRun)

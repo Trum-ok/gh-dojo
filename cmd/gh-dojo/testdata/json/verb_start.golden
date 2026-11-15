@@ -39,7 +39,8 @@ code: 0
       "warnings": [
         "#3 has unresolved blockers: #2 (not on the board), #1 (not on the board)"
       ],
-      "error": null
+      "error": null,
+      "card": null
     }
   ],
   "summary": {

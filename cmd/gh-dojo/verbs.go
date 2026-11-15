@@ -139,8 +139,8 @@ func newVerbCmds() ([]*cobra.Command, error) {
 
 func newVerbCmd(cfg *config.Config, v config.Verb) *cobra.Command {
 	var (
-		args   workflow.Args
-		dryRun bool
+		args         workflow.Args
+		dryRun, show bool
 	)
 	use := v.Name + " <N>"
 	if v.Batch {
@@ -159,9 +159,9 @@ func newVerbCmd(cfg *config.Config, v config.Verb) *cobra.Command {
 			args.HasMilestone = cmd.Flags().Changed(config.ArgMilestone)
 			refs := argRefs(posArgs, issue.Repo{}) // validated by issueArgs
 			if len(refs) == 1 {
-				return runVerb(cmd, cfg, v, refs[0], args, dryRun)
+				return runVerb(cmd, cfg, v, refs[0], args, dryRun, show)
 			}
-			return runBatch(cmd, cfg, v, refs, args, dryRun)
+			return runBatch(cmd, cfg, v, refs, args, dryRun, show)
 		},
 	}
 	f := cmd.Flags()
@@ -174,6 +174,7 @@ func newVerbCmd(cfg *config.Config, v config.Verb) *cobra.Command {
 	f.StringVar(&args.Assignee, config.ArgAssignee, "", "the user to assign: a login, or @me for yourself")
 	f.StringVar(&args.Milestone, config.ArgMilestone, "", "the open milestone to set, by `title` or a start only its title has")
 	f.BoolVar(&dryRun, "dry-run", false, "print the plan without changing anything")
+	f.BoolVar(&show, showFlag, false, "also print the issue's card, as gh dojo show N does, from the same read")
 	f.BoolVar(&args.Yes, "yes", false, "the user agreed: run a verb that is the user's decision")
 	// Flags the verb does not take stay registered but hidden, so passing
 	// one gets workflow's precise error instead of "unknown flag".
@@ -192,7 +193,8 @@ func newVerbCmd(cfg *config.Config, v config.Verb) *cobra.Command {
 // bad arguments or the network, is the command's alone; once the issue
 // was read (or found missing), its JSON is a verb result for it, as for
 // one issue of a batch, also when it is refused (outcome "failed").
-func runVerb(cmd *cobra.Command, cfg *config.Config, v config.Verb, ref issue.Ref, args workflow.Args, dryRun bool) error {
+// show prints the issue's card too (see shownCard).
+func runVerb(cmd *cobra.Command, cfg *config.Config, v config.Verb, ref issue.Ref, args workflow.Args, dryRun, show bool) error {
 	if err := workflow.CheckArgs(v, args, ref.Arg(issue.Repo{})); err != nil {
 		return err
 	}
@@ -213,9 +215,10 @@ func runVerb(cmd *cobra.Command, cfg *config.Config, v config.Verb, ref issue.Re
 		return err
 	}
 	repo := backendRepo(be)
-	none := func(io.Writer) {} // the text of a failed issue is its error
+	// The text of a failed issue is its error, and the card with --show.
+	card := newShownCard(ctx, cfg, be, def, v, it, show)
 	if it.run == nil {
-		return emitResult(cmd, verbJSON(v.Name, repo, dryRun, []*batchItem{it}), none, it.err)
+		return emitResult(cmd, card.json(verbJSON(v.Name, repo, dryRun, []*batchItem{it})), card.alone(false), it.err)
 	}
 	run, plan := it.run, it.run.first
 	run.stderr = cmd.ErrOrStderr()
@@ -223,19 +226,23 @@ func runVerb(cmd *cobra.Command, cfg *config.Config, v config.Verb, ref issue.Re
 		render.Warn(cmd.ErrOrStderr(), "%s", w)
 	}
 	if dryRun {
-		return emit(cmd, verbJSON(v.Name, repo, true, []*batchItem{it}), func(w io.Writer) {
+		return emit(cmd, card.json(verbJSON(v.Name, repo, true, []*batchItem{it})), func(w io.Writer) {
 			fmt.Fprintln(w, plan.DryRun())
+			card.write(w, true, false)
 		})
 	}
 	if it.err = plan.Unconfirmed(); it.err != nil {
-		return emitResult(cmd, verbJSON(v.Name, repo, false, []*batchItem{it}), none, it.err)
+		return emitResult(cmd, card.json(verbJSON(v.Name, repo, false, []*batchItem{it})), card.alone(false), it.err)
 	}
 	it.err = run.applyFresh(ctx, be, func() (*workflow.Plan, error) { return readPlan(ctx, be, engine, v, ref, args) })
 	// A partial write prints what it applied as JSON; its text is the error.
-	return emitWrite(cmd, verbJSON(v.Name, repo, false, []*batchItem{it}), func(w io.Writer) {
-		if it.err == nil {
-			fmt.Fprintln(w, run.applied().Confirm())
+	return emitWrite(cmd, card.json(verbJSON(v.Name, repo, false, []*batchItem{it})), func(w io.Writer) {
+		if it.err != nil {
+			card.write(w, false, it.wrote())
+			return
 		}
+		fmt.Fprintln(w, run.applied().Confirm())
+		card.write(w, true, it.wrote())
 	}, it.err, it.wrote())
 }
 

@@ -100,12 +100,8 @@ reported after the others are printed, with exit code 3.`,
 			cardsAsked := full || cmd.Flags().Changed("comments")
 			briefByDefault := !brief && len(refs) > 1 && !cardsAsked && !jsonMode(cmd)
 			textBrief := brief || briefByDefault
-			v := cardView{statusField: cfg.StatusField(), resolved: cfg.Statuses.Resolved, comments: shown, def: repo,
-				full: full, sessionRE: sessionLinkRE(cfg.Session.Link)}
+			v := newCardView(cfg, repo, shown, full)
 			v.sprintField, v.sprintFieldID = showSprint(cmd.Context(), app, cfg)
-			if !full {
-				v.bodyRunes, v.commentBudget = maxBodyRunes, commentBudgetRunes
-			}
 			var cards []*issue.Card
 			var failed []issue.Result
 			for _, r := range res {

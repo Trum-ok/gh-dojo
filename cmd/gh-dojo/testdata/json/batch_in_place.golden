@@ -37,7 +37,8 @@ code: 0
       "in_place": [],
       "needs_yes": false,
       "warnings": [],
-      "error": null
+      "error": null,
+      "card": null
     },
     {
       "number": 3,
@@ -59,7 +60,8 @@ code: 0
       ],
       "needs_yes": false,
       "warnings": [],
-      "error": null
+      "error": null,
+      "card": null
     }
   ],
   "summary": {

@@ -27,7 +27,8 @@ code: 3
         "message": "issue #9 not found in acme/shop",
         "allowed": [],
         "fix": null
-      }
+      },
+      "card": null
     }
   ],
   "summary": {

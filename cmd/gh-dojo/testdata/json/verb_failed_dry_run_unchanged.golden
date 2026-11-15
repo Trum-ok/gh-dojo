@@ -27,7 +27,8 @@ code: 0
       ],
       "needs_yes": false,
       "warnings": [],
-      "error": null
+      "error": null,
+      "card": null
     }
   ],
   "summary": {

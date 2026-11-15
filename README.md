@@ -96,7 +96,7 @@ also be authorized for it.
    gh dojo next            # issues to take: Backlog or no status, not blocked
    gh dojo list            # open issues on the board, grouped by status
    gh dojo show 42         # read an issue before working on it
-   gh dojo start 42        # Backlog → In progress, with a comment
+   gh dojo start 42        # Backlog → In progress, with a comment; --show prints the card too
    gh dojo wait 42 --by 17 # In progress → Waiting, blocked by #17, "Waiting for #17."
    gh dojo ready 42        # → Ready: done and committed, not released
    gh dojo done 42 43      # → Done and closed: released

@@ -18,6 +18,7 @@ Flags:
       --comment string   text for {comment} in the comment
       --dry-run          print the plan without changing anything
   -h, --help             help for drop
+      --show             also print the issue's card, as gh dojo show N does, from the same read
       --yes              the user agreed: run a verb that is the user's decision
 
 Global Flags:

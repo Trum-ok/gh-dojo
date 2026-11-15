@@ -44,7 +44,8 @@ code: 5
         "message": "#3 comment left; status not changed: GitHub token is missing a required scope (project); gh auth refresh -s project, then re-run the same command",
         "allowed": [],
         "fix": "gh auth refresh -s project"
-      }
+      },
+      "card": null
     }
   ],
   "summary": {

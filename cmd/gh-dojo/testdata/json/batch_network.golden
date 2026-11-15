@@ -42,7 +42,8 @@ code: 5
       "in_place": [],
       "needs_yes": false,
       "warnings": [],
-      "error": null
+      "error": null,
+      "card": null
     },
     {
       "number": 7,
@@ -69,7 +70,8 @@ code: 5
         "message": "GitHub write failed (HTTP 502); it may have been applied, re-run the command to check",
         "allowed": [],
         "fix": null
-      }
+      },
+      "card": null
     },
     {
       "number": 9,
@@ -101,7 +103,8 @@ code: 5
       "in_place": [],
       "needs_yes": false,
       "warnings": [],
-      "error": null
+      "error": null,
+      "card": null
     }
   ],
   "summary": {

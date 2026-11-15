@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: --show prints the card of one issue, got 2 issues
+fix: drop --show, then gh dojo show with the numbers

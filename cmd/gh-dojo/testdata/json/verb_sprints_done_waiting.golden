@@ -27,7 +27,8 @@ code: 2
         "message": "done cannot move #43 from Waiting; it starts only from Ready or In progress\nthis is a process rule: ask the user how to proceed",
         "allowed": [],
         "fix": null
-      }
+      },
+      "card": null
     }
   ],
   "summary": {

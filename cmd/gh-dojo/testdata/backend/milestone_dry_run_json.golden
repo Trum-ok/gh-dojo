@@ -1,4 +1,4 @@
 code: 0
 --- stdout
-{"schema_version":1,"error":null,"verb":"plan","default_repo":"Trum-ok/gh-dojo","dry_run":true,"issues":[{"number":3,"repo":"Trum-ok/gh-dojo","title":"Конфиг: загрузка и валидация .github/dojo.toml (internal/config)","outcome":"planned","planned":[{"op":"set_milestone","from":"v0.0 — самохостинг","to":"v0.3 — расширяемость"},{"op":"add_comment","body":"Moved to v0.3 — расширяемость."}],"applied":[],"in_place":[],"needs_yes":false,"warnings":[],"error":null}],"summary":{"total":1,"done":1,"written":0,"failed":0,"not_attempted":0}}
+{"schema_version":1,"error":null,"verb":"plan","default_repo":"Trum-ok/gh-dojo","dry_run":true,"issues":[{"number":3,"repo":"Trum-ok/gh-dojo","title":"Конфиг: загрузка и валидация .github/dojo.toml (internal/config)","outcome":"planned","planned":[{"op":"set_milestone","from":"v0.0 — самохостинг","to":"v0.3 — расширяемость"},{"op":"add_comment","body":"Moved to v0.3 — расширяемость."}],"applied":[],"in_place":[],"needs_yes":false,"warnings":[],"error":null,"card":null}],"summary":{"total":1,"done":1,"written":0,"failed":0,"not_attempted":0}}
 --- stderr

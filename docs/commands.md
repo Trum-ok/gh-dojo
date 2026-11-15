@@ -402,7 +402,7 @@ notes, the generator or a command's short help, run `make agent`.
 ## Process verbs
 
 ```sh
-gh dojo <verb> <N> [--comment TEXT] [--by N|TEXT] [--assignee LOGIN] [--milestone TITLE] [--yes] [--dry-run]
+gh dojo <verb> <N> [--comment TEXT] [--by N|TEXT] [--assignee LOGIN] [--milestone TITLE] [--yes] [--dry-run] [--show]
 gh dojo <verb> <N>... [flags]     # a verb with batch = true, such as done
 ```
 
@@ -464,6 +464,29 @@ this is the user's decision: ask the user, and re-run with --yes only if they ag
 
 $ gh dojo drop 42 --comment "Duplicate of #17." --yes
 #42 comment left, closed as not planned
+```
+
+`--show` also prints the issue's card, as [`show`](#show) prints one issue,
+so taking an issue and reading it is one command, `gh dojo start 42 --show`,
+not two. The card is the one the verb read to plan it, so the flag costs no
+request. It follows the confirmation line or the dry-run plan; when the verb
+changed the issue, the card is the issue as it was before, under `card as
+read before start:`, and the confirmation line says what changed. A verb
+that refuses the issue (exit code 2), needs `--yes` or writes it in part
+prints the card alone, its error on stderr, as long as the issue was read.
+`--show` takes one issue: a batch verb given several numbers refuses it,
+and `gh dojo show 12 13` reads them. In `--json` the issue's `card` is the
+card of [`show --json`](output.md#json-output), `null` without `--show`.
+
+```console
+$ gh dojo start 42 --show
+#42 Backlog → In progress, comment left
+
+card as read before start:
+#42 Fix login redirect
+state: open, opened 2026-11-10 by alice
+board: Backlog
+...
 ```
 
 The board's built-in workflows run after the verb and may change the status

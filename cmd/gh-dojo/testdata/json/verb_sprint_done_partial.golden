@@ -45,7 +45,8 @@ code: 5
         "message": "#42 Ready → Done; sprint not set: GitHub denied access; gh auth refresh -s project, then re-run the same command",
         "allowed": [],
         "fix": "gh auth refresh -s project"
-      }
+      },
+      "card": null
     }
   ],
   "summary": {

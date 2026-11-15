@@ -39,7 +39,8 @@ code: 4
         "message": "GitHub write failed (HTTP 502); it may have been applied, re-run the command to check",
         "allowed": [],
         "fix": null
-      }
+      },
+      "card": null
     }
   ],
   "summary": {
