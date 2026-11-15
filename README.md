@@ -425,7 +425,7 @@ ok       verbs    octocat/shop: 2 labels exist, 1 assignee can be assigned
 | `repo` | Each repository of [`board.repos`](#board), or the current one, is visible with issues enabled; a warning when `board.repos` spells one otherwise than GitHub does |
 | `labels` | With [`labels.types`](#labels) or `labels.area_prefix` set, in each repository of the `repo` check: every type label exists (missing is a problem, since `new --type` fails on it, fixed by `gh label create`; spelled in another case is `warn`, since `new` matches labels regardless of case, fixed by `gh label edit`), and how many labels start with the area prefix. None is `warn` when `.github/dojo.toml` sets the prefix, since `new --area` finds nothing (create one, or set the prefix to `""`); with the prefix from a preset, which many teams never use, it is a note on the `ok` line. Past 100 labels the area count is a lower bound ("at least"), and none found is "could not confirm" rather than a warning |
 | `sprint` | With [`fields.sprint`](#fields): an iteration covers today, a date in [`board.timezone`](#board) |
-| `verbs` | When verbs have labels or assignees: the labels exist in the default repository, spelled exactly as there, and the users can be assigned |
+| `verbs` | When verbs have labels or assignees: the labels exist in the default repository, spelled exactly as there (those of `from_labels` and `refuse_labels` in any case, as the checks match them), and the users can be assigned |
 | `agent` | With [`[agent]`](#agent) set (and `targets` not empty), or a file with a gh-dojo marker: the files [`agent install`](#agent-install) writes are up to date (`agent install --check`, without the diff). Out of date or missing is `warn`, since the text also depends on the gh-dojo version; a hand-written skill under `[agent]` is a problem |
 
 It sends one request for the token and the repositories, one more for the
@@ -459,7 +459,7 @@ longest way from the initial status to a final one along the verbs (a status
 a verb can jump over in parentheses); the initial, final and resolved
 statuses; each verb with its `when`, the statuses it moves between, its
 arguments, checks and effects, and the rules behind them (ask the user before
-`--yes`, don't work around a refused blockers check, what `--by` links,
+`--yes`, don't work around a refused blockers or labels check, what `--by` links,
 several numbers at once); `show`, `next` and `list`; `new`, `comment`,
 `block` and `unblock`; safe repeats; the session link; exit codes; JSON; and
 a table of the commands of the gh-dojo that wrote them, so a command added in
@@ -531,7 +531,8 @@ and, in one command:
    has no `to`, only on an issue closed with its reason), that its status is one
    of the verb's `from` statuses (no status, or not on the board, counts as
    [`statuses.initial`](#statuses)), that the required arguments are given,
-   the user's go-ahead (`confirm`) and the issue's blockers (`blockers`);
+   the user's go-ahead (`confirm`), the issue's labels (`from_labels`,
+   `refuse_labels`) and its blockers (`blockers`);
 2. adds the issue to the board if it is not there;
 3. applies its [effects](#effects): reopens it, sets the status and the
    sprint, sets other board fields, adds and removes labels, assigns and
@@ -862,6 +863,8 @@ commands (`show`, `list`, `new`, `comment`, `describe`, `init`, `doctor`,
 |------------------|--------|---------|
 | `when`           | —      | Required. One line saying when to use the verb; the first line of its `--help` |
 | `from`           | check  | Statuses the verb may start from; empty or missing means any |
+| `from_labels`    | check  | Labels the issue must all have: `["blocked"]` |
+| `refuse_labels`  | check  | Labels of which the issue may have none: `["blocked"]` |
 | `require`        | check  | Arguments that must all be given: `comment`, `by`, `assignee` |
 | `require_one_of` | check  | Arguments of which at least one must be given |
 | `blockers`       | check or effect | `"warn"` or `"deny"`: check the issue's unresolved blockers; `"link"`: `--by N` also marks it blocked by #N |
@@ -891,8 +894,19 @@ rejected with "not supported in this version".
 #### Checks
 
 - **from**: the issue's status must be one of them. It is skipped for an
-  issue already in the verb's `to`, so a repeat is safe; so are `blockers`
-  and `sub_issues`.
+  issue already in the verb's `to`, so a repeat is safe; so are
+  `from_labels`, `refuse_labels`, `blockers` and `sub_issues`.
+- **from_labels**, **refuse_labels**: the issue must have every label of
+  `from_labels` and none of `refuse_labels`, or the verb refuses with exit
+  code 2, naming the labels and the verbs that remove one it refuses (those
+  that run from the issue's status without closing it). This is how a
+  state kept in a label, such as on hold, holds back other verbs (see
+  [`examples/review.toml`](examples/review.toml)). Names are written
+  without `+` or `-` and match regardless of case, as GitHub's label names
+  do; a verb reads all of the issue's labels for them. A label may not be
+  in both lists, nor be one the verb refuses and removes, or requires and
+  adds. Checked after `from`, before `blockers`; `--dry-run` refuses the
+  same way.
 - **require**, **require_one_of**: without the arguments, exit code 1.
 - **blockers** `"warn"` and `"deny"` look at the issue's unresolved
   blockers: open, and not in one of [`statuses.resolved`](#statuses); a
@@ -937,7 +951,7 @@ rejected with "not supported in this version".
   written, with the repository's labels as the allowed values (create it
   with `gh label create`; a name that differs only in case gets the spelling
   to use instead). A label to remove that the repository does not have is in
-  place, unless the issue has it in another case. A verb that removes labels
+  place, unless the issue has it in another case. A verb that removes or checks labels
   reads up to 100 of the issue's labels, GitHub's limit per issue.
   [`gh dojo doctor`](#doctor) checks every verb's labels.
 - **assign**: adds one user and keeps the other assignees. `"@me"` is the
@@ -1019,6 +1033,7 @@ off a key the preset sets:
 | `batch` | `batch = false` |
 | `iteration` | `iteration = ""` |
 | `from` | `from = []` (any status) |
+| `from_labels`, `refuse_labels` | `from_labels = []`, `refuse_labels = []` |
 | `labels` | `labels = []` |
 | a whole verb | `disabled = true`, alone in its table |
 
@@ -1180,13 +1195,18 @@ to decide.
 | Verb              | Moves to          | From                                | Also |
 |-------------------|-------------------|-------------------------------------|------|
 | `start`           | In progress       | Backlog                             | refused while a blocker is unresolved; assigns the author |
-| `hold`            | status unchanged  | In progress, Changes requested      | label `+blocked`; `--by 17` marks it blocked by #17 |
-| `resume`          | status unchanged  | In progress, Changes requested      | label `-blocked`; refused while a blocker is unresolved |
-| `review`          | In review         | In progress, Changes requested      | needs `--comment` (the pull request) and `--assignee` (the reviewer); labels; assigns the reviewer |
+| `hold`            | status unchanged  | In progress, Changes requested      | label `+blocked`, refused if on hold already; `--by 17` marks it blocked by #17 |
+| `resume`          | status unchanged  | In progress, Changes requested      | label `-blocked`, only on an issue on hold; refused while a blocker is unresolved |
+| `review`          | In review         | In progress, Changes requested      | refused on hold; needs `--comment` (the pull request) and `--assignee` (the reviewer); labels; assigns the reviewer |
 | `request-changes` | Changes requested | In review                           | needs `--comment`; labels; back to the author alone: the reviewer is unassigned |
-| `approve`         | Approved          | In review                           | the user's decision (`--yes`); back to the author alone |
-| `reject`          | status unchanged  | In progress, In review, Changes requested, Approved | the user's decision; closes as not planned |
-| `merged`          | Merged            | Approved                            | closes as completed; several issues at once |
+| `approve`         | Approved          | In review                           | refused on hold; the user's decision (`--yes`); back to the author alone |
+| `reject`          | status unchanged  | In progress, In review, Changes requested, Approved | the user's decision; closes as not planned, on hold or not |
+| `merged`          | Merged            | Approved                            | refused on hold; closes as completed; several issues at once |
+
+On hold is the label `blocked`, not a status, so a held issue keeps its
+status and `resume` leaves it there: `refuse_labels = ["blocked"]` keeps
+`review`, `approve`, `merged` and `hold` itself off it, `from_labels =
+["blocked"]` runs `resume` only on it.
 
 `reject` closes and has no `to`, so on an issue closed as not planned its
 `from` is not checked: it runs as a repeat and posts its comment only if it
@@ -1203,14 +1223,15 @@ To write your own:
    `new` sets no status and `next` refuses to run, and without `resolved`
    only a closed blocker is resolved. On top of a preset, set only what
    differs, add verbs, and drop the preset's with `disabled = true`.
-3. A verb is a `when` line, [checks](#checks) (`from`, `require`,
-   `require_one_of`, `blockers`, `sub_issues`, `confirm`) and [effects](#effects) (`to`,
+3. A verb is a `when` line, [checks](#checks) (`from`, `from_labels`,
+   `refuse_labels`, `require`, `require_one_of`, `blockers`, `sub_issues`,
+   `confirm`) and [effects](#effects) (`to`,
    `labels`, `assign`, `unassign`, `comment`, `close`, `reopen`,
    `iteration`, `field`, the `blockers` link). A verb without `to` leaves
    the status alone, like `hold` above; one with `confirm = "user"` waits
    for a person.
 4. Check it: [`gh dojo doctor`](#doctor) against the board and the
-   repositories (statuses, the labels verbs add and remove, the users they
+   repositories (statuses, the labels verbs add, remove and check, the users they
    assign and unassign by login, the type and area labels), `gh dojo
    describe` for the process
    as an agent reads it, `gh dojo <verb> N --dry-run` for a verb's plan on a
