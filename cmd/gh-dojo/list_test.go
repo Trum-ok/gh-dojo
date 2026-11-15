@@ -35,6 +35,10 @@ func TestList(t *testing.T) {
 		{name: "recorded_status", fixtures: []string{boardFixture, itemsFixture},
 			args: []string{"--status", "In progress", "--status", "Backlog"}, requests: 2},
 		{name: "recorded_limit", fixtures: []string{boardFixture, itemsFixture}, args: []string{"--limit", "8"}, requests: 2},
+		// Ready is resolved: one line of numbers, cut by --limit like any group,
+		// and listed with titles when --status names it.
+		{name: "recorded_limit_folded", fixtures: []string{boardFixture, itemsFixture}, args: []string{"--limit", "4"}, requests: 2},
+		{name: "recorded_ready", fixtures: []string{boardFixture, itemsFixture}, args: []string{"--status", "Ready"}, requests: 2},
 		// The hand-crafted board: schema + two pages of items.
 		{name: "default", fixtures: []string{boardFixture, itemsTwoPagesFixture}, requests: 3},
 		{name: "all", fixtures: []string{boardFixture, itemsTwoPagesFixture}, args: []string{"--all"}, requests: 3},

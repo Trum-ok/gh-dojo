@@ -1,0 +1,11 @@
+code: 0
+--- stdout
+Ready (6)
+  #1 Каркас: Go-модуль, cobra и установка как расширение gh
+  #2 Коды выхода и короткие ошибки (internal/render)
+  #3 Конфиг: загрузка и валидация .github/dojo.toml (internal/config)
+  #4 Пресет kanban через embed.FS
+  #5 GraphQL-клиент и схема доски с кэшем (internal/graph, internal/board)
+  #6 Сверка конфига с доской
+filtered out: 8 issues not matching --status
+--- stderr

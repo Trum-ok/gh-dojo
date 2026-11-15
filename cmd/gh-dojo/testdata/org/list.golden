@@ -3,13 +3,7 @@ code: 0
 Backlog (2)
   #13 Доска и .github/dojo.toml для самого gh-dojo
   #14 Skill для агентов и переход на gh dojo (рубеж v0.0)
-Ready (6)
-  #1 Каркас: Go-модуль, cobra и установка как расширение gh
-  #2 Коды выхода и короткие ошибки (internal/render)
-  #3 Конфиг: загрузка и валидация .github/dojo.toml (internal/config)
-  #4 Пресет kanban через embed.FS
-  #5 GraphQL-клиент и схема доски с кэшем (internal/graph, internal/board)
-  #6 Сверка конфига с доской
+Ready (6; titles: --status Ready): #1 #2 #3 #4 #5 #6
 In progress (6)
   #7 Команда show <N>…
   #8 Команда list

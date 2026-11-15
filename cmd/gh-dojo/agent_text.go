@@ -532,9 +532,30 @@ func (d *agentDoc) reading(w *mdWriter) {
 			"`gh dojo show 12 13`, print three lines per issue: read the one you take alone. `--comments all` prints "+
 			"the whole thread (up to 100), `--full` everything uncut.",
 		"`gh dojo list`: an overview of the board, when the user asks for one: the open issues grouped by status; "+
-			"closed issues and final statuses are hidden and counted. Filters: "+listFilters+", `--all`, `--limit 100`.")
+			"closed issues and final statuses are hidden and counted"+d.foldedList()+". Filters: "+listFilters+
+			", `--all`, `--limit 100`.")
 	w.heading(1, "Reading")
 	w.list(items)
+}
+
+// foldedList says which statuses list prints as one line of numbers (see
+// list.folded), "" when none.
+func (d *agentDoc) foldedList() string {
+	var folded []string
+	for _, st := range d.cfg.Statuses.Resolved {
+		if !slices.Contains(d.cfg.Statuses.Final, st) {
+			folded = append(folded, st)
+		}
+	}
+	if len(folded) == 0 {
+		return ""
+	}
+	is := " is one line of numbers"
+	if len(folded) > 1 {
+		is = " are one line of numbers each"
+	}
+	return "; " + strings.Join(quoted(folded), " and ") + is + ", `--status " + statusArg(folded[0]) +
+		"` lists them with titles"
 }
 
 // hasCommand reports whether this build has the built-in command name.

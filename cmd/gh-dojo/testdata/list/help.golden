@@ -5,6 +5,9 @@ in board order, issues without a status first.
 
 Closed issues and issues in a final status (statuses.final) are hidden and
 counted; --all shows them, and so does --status naming a final status.
+Issues in a resolved status that is not final (statuses.resolved, such as
+Ready: done, waiting for a release) are one line of numbers; --status
+naming that status, or --all, lists them with their titles.
 Filters combine with AND; the issues they leave out are counted. Only
 issues are listed: draft issues and pull requests on the board are counted.
 

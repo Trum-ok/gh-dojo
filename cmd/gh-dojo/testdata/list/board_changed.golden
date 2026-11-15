@@ -2,7 +2,6 @@ code: 0
 --- stdout
 Backlog (1)
   #1 First
-Ready (1)
-  #2 Second
+Ready (1; titles: --status Ready): #2
 --- stderr
 warning: the board changed while it was read (2 items read, GitHub reports 3); run again for an exact list

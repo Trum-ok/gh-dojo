@@ -1,0 +1,8 @@
+code: 0
+--- stdout
+Backlog (2)
+  #13 Доска и .github/dojo.toml для самого gh-dojo
+  #14 Skill для агентов и переход на gh dojo (рубеж v0.0)
+Ready (6; titles: --status Ready): #1 #2
+showing 4 of 14, use --limit 14; not shown: Ready 4, In progress 6
+--- stderr

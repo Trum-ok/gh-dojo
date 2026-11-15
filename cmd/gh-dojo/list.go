@@ -72,6 +72,9 @@ func newListCmd() (*cobra.Command, error) {
 			"in board order, issues without a status first.\n\n" +
 			"Closed issues and issues in a final status (statuses.final) are hidden and\n" +
 			"counted; --all shows them, and so does --status naming a final status.\n" +
+			"Issues in a resolved status that is not final (statuses.resolved, such as\n" +
+			"Ready: done, waiting for a release) are one line of numbers; --status\n" +
+			"naming that status, or --all, lists them with their titles.\n" +
 			"Filters combine with AND; the issues they leave out are counted. Only\n" +
 			"issues are listed: draft issues and pull requests on the board are counted.",
 		Example: `  gh dojo list
@@ -508,6 +511,15 @@ func (l *list) write(w io.Writer, repo string, cfg *config.Config, o *listOpts) 
 		if n == 0 {
 			continue
 		}
+		if l.folded(g, cfg, o) {
+			refs := make([]string, n)
+			for i, it := range g.items[:n] {
+				refs[i] = itemRef(it, repo)
+			}
+			fmt.Fprintf(w, "%s (%d; titles: --status %s): %s\n", statusName(g.status), len(g.items),
+				statusArg(g.status), strings.Join(refs, " "))
+			continue
+		}
 		fmt.Fprintf(w, "%s (%d)\n", statusName(g.status), len(g.items))
 		for _, it := range g.items[:n] {
 			fmt.Fprintln(w, "  "+itemLine(it, repo))
@@ -551,6 +563,22 @@ func (l *list) write(w io.Writer, repo string, cfg *config.Config, o *listOpts) 
 	}
 }
 
+// folded reports whether group g prints as one line of numbers: its status
+// is resolved but not final (done, its issues waiting for a release), and
+// neither --status nor --all asks for it.
+func (l *list) folded(g *listGroup, cfg *config.Config, o *listOpts) bool {
+	return g.status != "" && !o.all && slices.Contains(cfg.Statuses.Resolved, g.status) &&
+		!slices.Contains(cfg.Statuses.Final, g.status) && !slices.Contains(o.want, g.status)
+}
+
+// statusArg is status s as a --status value, quoted when it has a space.
+func statusArg(s string) string {
+	if strings.ContainsAny(s, " \t\"'") {
+		return strconv.Quote(s)
+	}
+	return s
+}
+
 func statusName(s string) string {
 	if s == "" {
 		return "No status"
@@ -563,10 +591,7 @@ func statusName(s string) string {
 // maxLineLabels labels.
 func itemLine(it board.Item, repo string) string {
 	var b strings.Builder
-	if !strings.EqualFold(it.Repo, repo) || repo == "" {
-		b.WriteString(it.Repo)
-	}
-	b.WriteString("#" + strconv.Itoa(it.Number) + " ")
+	b.WriteString(itemRef(it, repo) + " ")
 	b.WriteString(strings.Join(strings.Fields(it.Title), " "))
 	if it.State == issue.StateClosed {
 		b.WriteString(" (closed)")
@@ -585,6 +610,15 @@ func itemLine(it board.Item, repo string) string {
 		fmt.Fprintf(&b, " +%d more", more)
 	}
 	return b.String()
+}
+
+// itemRef names an issue: "#12", owner/name#12 outside the default
+// repository.
+func itemRef(it board.Item, repo string) string {
+	if !strings.EqualFold(it.Repo, repo) || repo == "" {
+		return it.Repo + "#" + strconv.Itoa(it.Number)
+	}
+	return "#" + strconv.Itoa(it.Number)
 }
 
 func plural(n int, one, many string) string {

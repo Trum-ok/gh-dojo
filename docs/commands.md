@@ -91,6 +91,13 @@ counted. Only issues are listed: draft issues and pull requests on the board
 are counted. At most `--limit` issues are printed (default 50), with the
 total.
 
+Issues in a status that is resolved but not final
+([`statuses.resolved`](configuration.md#statuses), such as Ready: done and waiting for a
+release) pile up until a release, so their group is one line of numbers:
+`Ready (6; titles: --status Ready): #34 #46 #51 #52 #53 #55`. `--status`
+naming that status, or `--all`, lists them with their titles. `--json` always
+has every issue.
+
 `--sprint` needs [`fields.sprint`](configuration.md#fields) and keeps the issues in one
 iteration: `current` (the one covering today in [`board.timezone`](configuration.md#board)),
 a title, or `none` (no sprint). The first line names the iteration with its
