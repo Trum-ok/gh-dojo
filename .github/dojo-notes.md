@@ -1,13 +1,8 @@
 # gh-dojo project notes
 
-This section is the project's addition to the generated part above: the file `.github/dojo-notes.md` (`[agent] notes`
-in `.github/dojo.toml`), inserted as is. Don't edit the skill itself: change the config or these notes and run
-`make agent` (that is `go run ./cmd/gh-dojo agent install`; CI checks `agent install --check`).
-
 ## Process: which verb when
 
-- `ready` only when the change is **in main** (merged, tests green), not when it is done on a branch. Several at
-  once: `gh dojo ready 12 13 14`.
+- `ready` only when the change is **in main** (merged, tests green), not when it is done on a branch.
 - `done` only when the change has shipped in a release; **never without the user's word**. For a release, read
   "Releases" in `CONTRIBUTING.md` first: how `gh dojo release` finds the issues and what its output means.
 - In `--comment` for `ready` and `done` it helps to give the commit or release: `--comment "5fc0e30"`.
@@ -34,12 +29,5 @@ Here `gh` is allowed, but only when the task needs it or the user asks:
 
 ## Which version runs
 
-The installed `gh dojo` is the build of the last `make install` from main, not of the current branch: a broken branch
-doesn't break issue tracking. New behavior from a branch won't appear in `gh dojo` until it is merged into main and
-reinstalled. The text above was produced by the build that generated the skill; the installed version may lag behind
-it:
-
-```sh
-gh dojo --version   # git describe of the installed build
-make install        # in a working copy on main, after the merge
-```
+`gh dojo` is the build of the last `make install` on main (`gh dojo --version`): a branch's changes reach it only
+after the merge and a reinstall.

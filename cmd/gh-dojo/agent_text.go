@@ -195,7 +195,6 @@ func (d *agentDoc) body(level int) string {
 	d.reading(w)
 	d.writing(w)
 	d.repeats(w)
-	d.session(w)
 	d.exitCodes(w)
 	d.json(w)
 	return w.b.String()
@@ -235,7 +234,7 @@ func (d *agentDoc) verbs(w *mdWriter) {
 		w.para("This project has no verbs: they are added under `[verbs]` in %s.", code(config.FileName))
 		return
 	}
-	intro := "Run a verb as `gh dojo <verb> N` (`N`, `#N` or `owner/repo#N`); `--dry-run` prints its plan (status, links, " +
+	intro := "Run a verb as `gh dojo <verb> N`; `--dry-run` prints its plan (status, links, " +
 		"the comment it would post) without changing anything. A verb adds the issue to the board if it " +
 		"is missing and refuses a closed issue unless noted. It confirms in one line"
 	if ex := d.confirmExample(); ex != "" {
@@ -243,8 +242,7 @@ func (d *agentDoc) verbs(w *mdWriter) {
 	}
 	w.para("%s: there is no need to read the issue again.", intro)
 	if slices.ContainsFunc(d.cfg.Verbs, func(v config.Verb) bool { return v.Batch }) {
-		w.para("A verb that takes several numbers at once checks and writes each issue on its own, skips one " +
-			"that fails and names each issue not done in a summary; the same command again touches only what is left.")
+		w.para("`N…` takes several numbers at once: one that fails is skipped and named in the summary.")
 	}
 	for i, pv := range d.p.Verbs {
 		v := d.cfg.Verbs[i]
@@ -257,7 +255,11 @@ func (d *agentDoc) verbs(w *mdWriter) {
 		if pv.To != nil {
 			to = *pv.To
 		}
-		line := code("gh dojo "+v.Name+" N") + ": " + from + " → " + to
+		n := " N"
+		if v.Batch {
+			n = " N…"
+		}
+		line := code("gh dojo "+v.Name+n) + ": " + from + " → " + to
 		if facts := d.facts(v, pv); facts != "" {
 			line += "; " + facts
 		}
@@ -284,14 +286,29 @@ func (d *agentDoc) confirmExample() string {
 
 // facts is describe's line of the verb, with the whole comment template
 // in place of its first characters.
+// A template that is only {comment}, which is optional, says so instead:
+// "comments only with --comment".
 func (d *agentDoc) facts(v config.Verb, pv processVerb) string {
 	pv.Effects = slices.Clone(pv.Effects)
+	only := commentOnly(v)
 	for i, e := range pv.Effects {
 		if strings.HasPrefix(e, `comments "`) {
 			pv.Effects[i] = `comments "` + singleLine(v.Comment) + `"`
+			if only {
+				pv.Effects[i] = "comments only with --" + config.ArgComment
+			}
 		}
 	}
+	if only {
+		pv.Optional = slices.DeleteFunc(slices.Clone(pv.Optional), func(o string) bool { return o == "--"+config.ArgComment })
+	}
 	return pv.facts()
+}
+
+// commentOnly reports whether v's comment is only an optional {comment}.
+func commentOnly(v config.Verb) bool {
+	return strings.TrimSpace(v.Comment) == "{"+config.ArgComment+"}" && !slices.Contains(v.Require, config.ArgComment) &&
+		!slices.Contains(v.RequireOneOf, config.ArgComment)
 }
 
 // rules says what an agent must do about the verb's checks and effects
@@ -334,19 +351,8 @@ func (d *agentDoc) rules(v config.Verb) []string {
 		r = append(r, "It is refused (exit code 2) while a blocker is unresolved: `gh dojo show N` lists them. "+
 			"Never move the status another way.")
 	case config.BlockersLink:
-		next := d.verbsFrom(v.To)
-		also := "`#12` or an issue's URL"
-		if d.multiRepo() {
-			also = "`#12`, `owner/repo#12` or an issue's URL"
-		}
-		s := "`--by 12` (also " + also + "; several comma-separated, " +
-			"`--by 12,13`) also marks the issue blocked by #12. Text (`--by \"the user's decision\"`) only goes " +
-			"into the comment; issues mixed with text are an error (exit code 1); a pull request is named " +
-			"in the comment without a link."
-		if v.To != "" && len(next) > 0 {
-			s += " Once the blocker is resolved, go on with " + strings.Join(quoted(next), " or ") + "."
-		}
-		r = append(r, s)
+		r = append(r, "`--by 12` also marks the issue blocked by #12; text (`--by \"the user's decision\"`) only "+
+			"goes into the comment.")
 	}
 	switch v.SubIssues {
 	case config.BlockersWarn:
@@ -361,29 +367,19 @@ func (d *agentDoc) rules(v config.Verb) []string {
 			"moves count as resolved: they go first, and the parent is refused only if one of them is.", v.Name))
 	}
 	if v.AssignArg {
-		r = append(r, fmt.Sprintf("`--%s <login>` names the user to assign (`--%s @me` is you); one who cannot "+
-			"be assigned issues in the repository is exit code 1, with the list of who can. Ask the user "+
-			"whom to assign if you do not know.", config.ArgAssignee, config.ArgAssignee))
+		r = append(r, fmt.Sprintf("`--%s <login>` (`@me` is you): ask the user whom to assign if you do not know.",
+			config.ArgAssignee))
 	}
 	if v.MilestoneArg {
-		r = append(r, fmt.Sprintf("`--%s <title>` names the open milestone to put the issue in, by its title "+
-			"or a start only that title has (`--%s v1.2`); none or several matching is exit code 1, with the open "+
-			"milestones or the candidates. Ask the user which milestone if you do not know.",
-			config.ArgMilestone, config.ArgMilestone))
+		r = append(r, fmt.Sprintf("`--%s <title>`, or a start only that title has (`--%s v1.2`): ask the user "+
+			"which milestone if you do not know.", config.ArgMilestone, config.ArgMilestone))
 	}
 	if v.Batch {
-		r = append(r, fmt.Sprintf("It takes several numbers at once: `gh dojo %s 12 13 14`.", v.Name))
 		// A release finishes issues: only a verb that does is pointed there.
 		finishes := v.Close != "" || slices.Contains(d.cfg.Statuses.Final, v.To)
 		if finishes && d.hasCommand("release") && releaseLacks(v) == "" {
 			r = append(r, d.releaseRule(v))
 		}
-	}
-	if strings.TrimSpace(v.Comment) == "{"+config.ArgComment+"}" && !slices.Contains(v.Require, config.ArgComment) {
-		r = append(r, "It comments only when given `--comment`.")
-	}
-	if v.Close != "" {
-		r = append(r, "An issue closed already stays closed as it is.")
 	}
 	return r
 }
@@ -568,37 +564,22 @@ func (d *agentDoc) nextItem() string {
 
 func (d *agentDoc) writing(w *mdWriter) {
 	cfg := d.cfg
-	typ, example := "<label>", "--label bug"
+	typ := "<label>"
 	if t := cfg.Labels.Types; len(t) > 0 {
-		typ, example = "<"+strings.Join(t, "|")+">", "--type "+t[0]
+		typ = "<" + strings.Join(t, "|") + ">"
 	}
 	status := ""
 	if cfg.Statuses.Initial != "" {
 		status = " in " + code(cfg.Statuses.Initial)
 	}
-	area := ""
-	if p := cfg.Labels.AreaPrefix; p != "" {
-		area = " `--area X` adds the label " + code(p+"X") + "."
-	}
-	otherRepo := ""
-	if d.multiRepo() {
-		otherRepo = " Another repository's issue is `owner/repo#12` or its URL."
-	}
 	w.heading(1, "Creating and linking issues")
 	w.list([]string{
 		"`gh dojo new \"<title>\" --type " + typ + " --body \"…\"`: the issue, its labels, the board" + status +
-			", in one command. A long body: `--body-file <file>`, or `--body-file -` for stdin. More labels: " +
-			"`--label X`." + area + " `--milestone \"<title>\"`: an open milestone, by its title or a start only " +
-			"that title has (none or several is exit code 1 with the list). `--blocked-by 12`: blocked from the start (repeat it, or comma-separate; an issue " +
-			"that does not exist is exit code 3, and nothing is created). `--parent 12`: a sub-issue of #12 " +
-			"(one issue; one that does not exist is exit code 3, and nothing is created). A title starting with `-` goes after " +
-			"`--`, and every flag before it: `gh dojo new " + example + " -- \"-v is ignored\"`.",
-		"`gh dojo comment N \"text\"`, or `gh dojo comment N --body-file -`: a comment without changing the status.",
-		"`gh dojo block N --by M` marks N blocked by M without changing the status; `gh dojo unblock N --by M` " +
-			"removes that. `--by` repeats or takes a comma-separated list." + otherRepo + " A link already there (or already gone) is not an error: the line says " +
-			"`already`. A pull request cannot block (exit code 3), nor can an issue N blocks (a cycle, exit code 1).",
-		"An existing issue becomes a sub-issue with `gh issue edit N --parent M` (`--remove-parent` undoes it): " +
-			"gh-dojo has no command for it, since the link changes no status.",
+			", in one command; a long body: `--body-file <file>`, or `--body-file -` for stdin. More labels, a " +
+			"milestone, blockers or a parent: `gh dojo new --help`.",
+		"`gh dojo comment N \"text\"`: a comment without changing the status.",
+		"`gh dojo block N --by M` / `gh dojo unblock N --by M`: add or remove a blocked-by link without changing " +
+			"the status. An existing issue becomes a sub-issue with `gh issue edit N --parent M`.",
 	})
 }
 
@@ -608,23 +589,6 @@ func (d *agentDoc) repeats(w *mdWriter) {
 		"a comment that is already the latest from gh-dojo; `comment` does not post its last comment again; " +
 		"`block` and `unblock` skip links that are already as asked; `new` with the same title finishes the " +
 		"issue it created instead of creating another.")
-}
-
-func (d *agentDoc) session(w *mdWriter) {
-	env := d.cfg.Session.Env
-	if len(env) == 0 {
-		return
-	}
-	uses := false
-	for _, v := range d.cfg.Verbs {
-		uses = uses || strings.Contains(v.Comment, "{session}")
-	}
-	if !uses {
-		return
-	}
-	w.heading(1, "Session")
-	w.para("`{session}` in a comment is a link to your agent session, from %s (the first one set). When none is "+
-		"set the verb warns and still runs.", codes(env))
 }
 
 // exitCodes says what to do on an error in a few sentences: the error's
@@ -638,15 +602,6 @@ func (d *agentDoc) exitCodes(w *mdWriter) {
 
 func (d *agentDoc) json(w *mdWriter) {
 	w.heading(1, "JSON")
-	status := "<status>"
-	if len(d.cfg.Statuses.Resolved) > 0 {
-		status = d.cfg.Statuses.Resolved[0]
-	}
-	w.para("Every command takes `--json`, `--jq '<expression>'` and `--template`, as gh does; an error is then " +
-		"JSON too (`error` with `exit_code`, `message`, `allowed`, `fix`), with the same exit code. Use it to " +
-		"pick values out of the output; for everyday work the text is shorter.")
-	w.block("```sh\n" +
-		"gh dojo list --jq '.issues[] | select(.status == \"" + status + "\") | .number'\n" +
-		"gh dojo show 42 --jq '.issues[0].blocked_by[] | select(.resolved | not) | .ref'\n" +
-		"```")
+	w.para("Every command takes `--json`, `--jq` and `--template`, as gh does, for picking values out; " +
+		"for everyday work the text is shorter.")
 }

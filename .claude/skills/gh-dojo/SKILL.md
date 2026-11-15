@@ -24,9 +24,9 @@ A bare `12` or `#12` is an issue of `Trum-ok/gh-dojo`; an issue of another repos
 
 ## Verbs
 
-Run a verb as `gh dojo <verb> N` (`N`, `#N` or `owner/repo#N`); `--dry-run` prints its plan (status, links, the comment it would post) without changing anything. A verb adds the issue to the board if it is missing and refuses a closed issue unless noted. It confirms in one line, such as `#42 Backlog → In progress, comment left`: there is no need to read the issue again.
+Run a verb as `gh dojo <verb> N`; `--dry-run` prints its plan (status, links, the comment it would post) without changing anything. A verb adds the issue to the board if it is missing and refuses a closed issue unless noted. It confirms in one line, such as `#42 Backlog → In progress, comment left`: there is no need to read the issue again.
 
-A verb that takes several numbers at once checks and writes each issue on its own, skips one that fails and names each issue not done in a summary; the same command again touches only what is left.
+`N…` takes several numbers at once: one that fails is skipped and named in the summary.
 
 ### `start`
 
@@ -42,36 +42,29 @@ A verb that takes several numbers at once checks and writes each issue on its ow
 
 `gh dojo wait N`: In progress → Waiting; needs --by or --comment; comments "Waiting for {by}. {comment}".
 
-- `--by 12` (also `#12` or an issue's URL; several comma-separated, `--by 12,13`) also marks the issue blocked by #12. Text (`--by "the user's decision"`) only goes into the comment; issues mixed with text are an error (exit code 1); a pull request is named in the comment without a link. Once the blocker is resolved, go on with `start` or `ready` or `plan`.
+- `--by 12` also marks the issue blocked by #12; text (`--by "the user's decision"`) only goes into the comment.
 
 ### `ready`
 
 **When:** done, checked and committed to main
 
-`gh dojo ready N`: In progress, Waiting → Ready; optional --comment; comments "{comment}".
-
-- It takes several numbers at once: `gh dojo ready 12 13 14`.
-- It comments only when given `--comment`.
+`gh dojo ready N…`: In progress, Waiting → Ready; comments only with --comment.
 
 ### `done`
 
 **When:** the change has shipped in a release
 
-`gh dojo done N`: Ready → Done; optional --comment; also on closed issues; comments "{comment}"; closes as completed.
+`gh dojo done N…`: Ready → Done; also on closed issues; comments only with --comment; closes as completed.
 
-- It takes several numbers at once: `gh dojo done 12 13 14`.
 - For a release, `gh dojo release <tag> --verb done --dry-run` lists the issues the release includes and its plan; read `gh dojo release --help` before you run it.
-- It comments only when given `--comment`.
-- An issue closed already stays closed as it is.
 
 ### `plan`
 
 **When:** the issue moves to another stage
 
-`gh dojo plan N`: Backlog, In progress, Waiting, Ready → status unchanged; needs --milestone; sets the --milestone milestone.
+`gh dojo plan N…`: Backlog, In progress, Waiting, Ready → status unchanged; needs --milestone; sets the --milestone milestone.
 
-- `--milestone <title>` names the open milestone to put the issue in, by its title or a start only that title has (`--milestone v1.2`); none or several matching is exit code 1, with the open milestones or the candidates. Ask the user which milestone if you do not know.
-- It takes several numbers at once: `gh dojo plan 12 13 14`.
+- `--milestone <title>`, or a start only that title has (`--milestone v1.2`): ask the user which milestone if you do not know.
 
 ## Reading
 
@@ -81,18 +74,13 @@ A verb that takes several numbers at once checks and writes each issue on its ow
 
 ## Creating and linking issues
 
-- `gh dojo new "<title>" --type <bug|enhancement|documentation|dogfood> --body "…"`: the issue, its labels, the board in `Backlog`, in one command. A long body: `--body-file <file>`, or `--body-file -` for stdin. More labels: `--label X`. `--area X` adds the label `area:X`. `--milestone "<title>"`: an open milestone, by its title or a start only that title has (none or several is exit code 1 with the list). `--blocked-by 12`: blocked from the start (repeat it, or comma-separate; an issue that does not exist is exit code 3, and nothing is created). `--parent 12`: a sub-issue of #12 (one issue; one that does not exist is exit code 3, and nothing is created). A title starting with `-` goes after `--`, and every flag before it: `gh dojo new --type bug -- "-v is ignored"`.
-- `gh dojo comment N "text"`, or `gh dojo comment N --body-file -`: a comment without changing the status.
-- `gh dojo block N --by M` marks N blocked by M without changing the status; `gh dojo unblock N --by M` removes that. `--by` repeats or takes a comma-separated list. A link already there (or already gone) is not an error: the line says `already`. A pull request cannot block (exit code 3), nor can an issue N blocks (a cycle, exit code 1).
-- An existing issue becomes a sub-issue with `gh issue edit N --parent M` (`--remove-parent` undoes it): gh-dojo has no command for it, since the link changes no status.
+- `gh dojo new "<title>" --type <bug|enhancement|documentation|dogfood> --body "…"`: the issue, its labels, the board in `Backlog`, in one command; a long body: `--body-file <file>`, or `--body-file -` for stdin. More labels, a milestone, blockers or a parent: `gh dojo new --help`.
+- `gh dojo comment N "text"`: a comment without changing the status.
+- `gh dojo block N --by M` / `gh dojo unblock N --by M`: add or remove a blocked-by link without changing the status. An existing issue becomes a sub-issue with `gh issue edit N --parent M`.
 
 ## Repeats are safe
 
 Run the same command again after an error: a verb does not set a status that is already set, nor post a comment that is already the latest from gh-dojo; `comment` does not post its last comment again; `block` and `unblock` skip links that are already as asked; `new` with the same title finishes the issue it created instead of creating another.
-
-## Session
-
-`{session}` in a comment is a link to your agent session, from `CLAUDE_CODE_HOST_SESSION_ID` (the first one set). When none is set the verb warns and still runs.
 
 ## Exit codes
 
@@ -100,23 +88,13 @@ On an error, read its `error:`, `allowed:` and `fix:` lines and do what `fix:` s
 
 ## JSON
 
-Every command takes `--json`, `--jq '<expression>'` and `--template`, as gh does; an error is then JSON too (`error` with `exit_code`, `message`, `allowed`, `fix`), with the same exit code. Use it to pick values out of the output; for everyday work the text is shorter.
-
-```sh
-gh dojo list --jq '.issues[] | select(.status == "Ready") | .number'
-gh dojo show 42 --jq '.issues[0].blocked_by[] | select(.resolved | not) | .ref'
-```
+Every command takes `--json`, `--jq` and `--template`, as gh does, for picking values out; for everyday work the text is shorter.
 
 # gh-dojo project notes
 
-This section is the project's addition to the generated part above: the file `.github/dojo-notes.md` (`[agent] notes`
-in `.github/dojo.toml`), inserted as is. Don't edit the skill itself: change the config or these notes and run
-`make agent` (that is `go run ./cmd/gh-dojo agent install`; CI checks `agent install --check`).
-
 ## Process: which verb when
 
-- `ready` only when the change is **in main** (merged, tests green), not when it is done on a branch. Several at
-  once: `gh dojo ready 12 13 14`.
+- `ready` only when the change is **in main** (merged, tests green), not when it is done on a branch.
 - `done` only when the change has shipped in a release; **never without the user's word**. For a release, read
   "Releases" in `CONTRIBUTING.md` first: how `gh dojo release` finds the issues and what its output means.
 - In `--comment` for `ready` and `done` it helps to give the commit or release: `--comment "5fc0e30"`.
@@ -143,12 +121,5 @@ Here `gh` is allowed, but only when the task needs it or the user asks:
 
 ## Which version runs
 
-The installed `gh dojo` is the build of the last `make install` from main, not of the current branch: a broken branch
-doesn't break issue tracking. New behavior from a branch won't appear in `gh dojo` until it is merged into main and
-reinstalled. The text above was produced by the build that generated the skill; the installed version may lag behind
-it:
-
-```sh
-gh dojo --version   # git describe of the installed build
-make install        # in a working copy on main, after the merge
-```
+`gh dojo` is the build of the last `make install` on main (`gh dojo --version`): a branch's changes reach it only
+after the merge and a reinstall.
