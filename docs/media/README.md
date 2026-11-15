@@ -6,18 +6,18 @@ The animated media of the [README](../../README.md), made with
 - `demo-*.gif`, at the top: the user asks an agent to take #42; the agent runs
   `gh dojo start`, `wait` and `ready`, and the card moves on the board with a
   comment for each step. Story: `src/script.ts`; scene: `src/Demo.tsx`,
-  `src/Board.tsx`.
-- `compare-*.gif`, under "Why": asked to move #42, still in Backlog, to Ready,
-  an agent with plain `gh` moves it silently, and an agent with gh dojo is
-  refused and asks the user. Story: `src/compareScript.ts`; scene:
+  `src/Board.tsx`, `src/Thread.tsx` (the issue's timeline).
+- `compare-*.gif`, under "Why": told that #42 is stuck until #12 lands, an
+  agent with plain `gh` writes GraphQL and carries node IDs between calls, and
+  an agent with gh dojo runs one verb. Story: `src/compareScript.ts`; scene:
   `src/Compare.tsx`.
 
-The command output, errors and comments in the stories are the text gh-dojo
-prints and posts with the kanban preset, and `gh project item-edit` prints
-nothing when stdout is not a terminal; keep them in step with the code.
-`src/Transcript.tsx` draws an agent session, `src/theme.ts` has GitHub's light
-and dark colors. `render.sh` renders all four GIFs (Remotion, then ffmpeg for
-the palette); `make demo` in the repository root runs it.
+The gh-dojo output and comments in the stories are the text gh-dojo prints and
+posts with the kanban preset, and the GraphQL mutations are the ones it sends;
+keep them in step with the code. `src/Chat.tsx` draws the chat with the agent,
+`src/theme.ts` has GitHub's light and dark colors. `render.sh` renders all
+four GIFs (lossless frames from Remotion, then ffmpeg for the palette); `make
+demo` in the repository root runs it.
 
 Preview and edit in Remotion Studio:
 

@@ -6,7 +6,7 @@ import type { Theme } from "./theme";
 export const confirmation = (t: Theme) => {
   const Confirmation = (text: string) => {
     const m = /^(#\d+)( )?([^→,]*)(→ )?([^,]*)(.*)$/.exec(text);
-    if (!m) return <span style={{ color: t.term.fg }}>{text}</span>;
+    if (!m) return <span style={{ color: t.term.muted }}>{text}</span>;
     const [, ref, sp = "", from, arrow = "", to, rest] = m;
     return (
       <span>

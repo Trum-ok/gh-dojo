@@ -6,7 +6,7 @@ import { DURATION as DEMO_DURATION } from "./script";
 
 // Each scene in two themes: the README picks one with <picture> and
 // prefers-color-scheme. The durations come from the scripts.
-const FPS = 30;
+const FPS = 25; // GIFs play it as is: 4 hundredths of a second a frame, none dropped
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -18,7 +18,7 @@ export const RemotionRoot: React.FC = () => {
           durationInFrames={Math.round(DEMO_DURATION * FPS)}
           fps={FPS}
           width={1280}
-          height={790}
+          height={720}
           defaultProps={{ theme: "light" as const }}
         />
         <Composition
@@ -27,7 +27,7 @@ export const RemotionRoot: React.FC = () => {
           durationInFrames={Math.round(DEMO_DURATION * FPS)}
           fps={FPS}
           width={1280}
-          height={790}
+          height={720}
           defaultProps={{ theme: "dark" as const }}
         />
       </Folder>
@@ -38,7 +38,7 @@ export const RemotionRoot: React.FC = () => {
           durationInFrames={Math.round(COMPARE_DURATION * FPS)}
           fps={FPS}
           width={1280}
-          height={510}
+          height={600}
           defaultProps={{ theme: "light" as const }}
         />
         <Composition
@@ -47,7 +47,7 @@ export const RemotionRoot: React.FC = () => {
           durationInFrames={Math.round(COMPARE_DURATION * FPS)}
           fps={FPS}
           width={1280}
-          height={510}
+          height={600}
           defaultProps={{ theme: "dark" as const }}
         />
       </Folder>

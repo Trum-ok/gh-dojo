@@ -1,16 +1,17 @@
 import React from "react";
 import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { Board } from "./Board";
+import { ChatPanel } from "./Chat";
 import { mono, sans } from "./fonts";
 import { confirmation } from "./format";
-import { DURATION, FADE, lines } from "./script";
+import { DURATION, FADE, msgs } from "./script";
 import { themes } from "./theme";
-import { Transcript } from "./Transcript";
+import { Thread } from "./Thread";
 
 export type DemoProps = { theme: "light" | "dark" };
 
-// The main demo: the user asks for an issue, the agent works it through
-// gh dojo, and the board follows.
+// The main demo: the user asks the agent for an issue in a chat, the agent
+// works it through gh dojo, and the board follows.
 export const Demo: React.FC<DemoProps> = ({ theme }) => {
   const t = themes[theme];
   const frame = useCurrentFrame();
@@ -23,18 +24,14 @@ export const Demo: React.FC<DemoProps> = ({ theme }) => {
 
   return (
     <AbsoluteFill style={{ backgroundColor: t.canvas, fontFamily: sans }}>
-      <AbsoluteFill style={{ padding: 28, gap: 22, opacity }}>
-        <Transcript
-          t={t}
-          mono={mono}
-          title="agent session · acme/shop"
-          lines={lines}
-          fontSize={20}
-          height={350}
-          indentTools
-          format={confirmation(t)}
-        />
-        <Board t={t} mono={mono} />
+      <AbsoluteFill style={{ padding: 28, gap: 20, flexDirection: "row", opacity }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <ChatPanel t={t} mono={mono} title="Agent · acme/shop" msgs={msgs} format={confirmation(t)} />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <Board t={t} />
+          <Thread t={t} mono={mono} />
+        </div>
       </AbsoluteFill>
     </AbsoluteFill>
   );

@@ -1,46 +1,55 @@
 // The story of the main demo. Command output and comments are the real text
 // gh-dojo prints and posts with the kanban preset (internal/config/presets/kanban.toml).
-import { AGENT, CMD, Timeline, USER } from "./timeline";
+import { Chat } from "./timeline";
 
-const tl = new Timeline()
+const chat = new Chat()
+  .wait(0.4)
+  .user("Take #42, the CSV export.")
   .wait(0.5)
-  .line("user", "Take #42, the CSV export.", USER)
-  .wait(0.7)
-  .line("cmd", "gh dojo start 42", CMD)
-  .wait(0.45)
+  .agent("On it.")
+  .wait(0.2)
+  .tool("gh dojo start 42", ["#42 Backlog → In progress, comment left"])
   .mark("start")
-  .line("out", "#42 Backlog → In progress, comment left")
-  .wait(1.5)
-  .line("agent", "The export needs the payments API from #12. Waiting for it.", AGENT)
-  .wait(0.4)
-  .line("cmd", "gh dojo wait 42 --by 12", CMD)
-  .wait(0.45)
+  .wait(1.6)
+  .agent("The export needs the payments API from #12, so I'll wait for it.")
+  .wait(0.3)
+  .tool("gh dojo wait 42 --by 12", ["#42 In progress → Waiting, blocked by #12, comment left"])
   .mark("wait")
-  .line("out", "#42 In progress → Waiting, blocked by #12, comment left")
-  .wait(1.0)
+  .wait(1.2)
   .mark("resolved") // #12 is finished elsewhere: it reaches Ready and no longer blocks #42
-  .wait(1.3)
-  .line("agent", "#12 is ready. The export is done and committed as a1b2c3d.", AGENT)
-  .wait(0.4)
-  .line("cmd", "gh dojo ready 42 --comment a1b2c3d", CMD)
-  .wait(0.45)
+  .wait(1.7)
+  .agent("#12 is ready. The export is done and committed as a1b2c3d.")
+  .wait(0.3)
+  .tool("gh dojo ready 42 --comment a1b2c3d", ["#42 Waiting → Ready, comment left"])
   .mark("ready")
-  .line("out", "#42 Waiting → Ready, comment left")
-  .wait(2.4);
+  .wait(1.3)
+  .agent("#42 is in Ready.")
+  .wait(2.6);
 
-export const lines = tl.lines;
+export const msgs = chat.msgs;
 export const FADE = 0.35;
-export const DURATION = tl.t + FADE;
+export const DURATION = chat.t + FADE;
 
-const { start, wait, resolved, ready } = tl.marks;
+const { start, wait, resolved, ready } = chat.marks;
 export const WAIT_AT = wait;
 export const BLOCKER_RESOLVED = resolved;
 
-// What each verb posts on #42, and when it shows up.
-export const comments = [
-  { at: start, body: "Started. Session: claude://claude.ai/epitaxy/7f3a…" },
-  { at: wait, body: "Waiting for #12." },
-  { at: ready, body: "a1b2c3d" },
+// What each verb does to #42, in the order gh-dojo does it: the status, the
+// blocked-by link, the comment.
+export type Entry = { at: number } & (
+  | { kind: "moved"; from: string; to: string }
+  | { kind: "blocked"; by: string }
+  | { kind: "comment"; body: string }
+);
+
+export const thread: Entry[] = [
+  { at: start + 0.1, kind: "moved", from: "Backlog", to: "In progress" },
+  { at: start + 0.3, kind: "comment", body: "Started. Session: claude://claude.ai/epitaxy/7f3a…" },
+  { at: wait + 0.1, kind: "moved", from: "In progress", to: "Waiting" },
+  { at: wait + 0.25, kind: "blocked", by: "#12" },
+  { at: wait + 0.4, kind: "comment", body: "Waiting for #12." },
+  { at: ready + 0.1, kind: "moved", from: "Waiting", to: "Ready" },
+  { at: ready + 0.3, kind: "comment", body: "a1b2c3d" },
 ];
 
 export const columns = [
@@ -72,7 +81,7 @@ export const cards: Card[] = [
   },
   {
     id: "43",
-    title: "Dark mode for settings",
+    title: "Dark mode",
     label: "feature",
     moves: [
       { at: 0, col: 0, slot: 1 },
@@ -81,7 +90,7 @@ export const cards: Card[] = [
   },
   {
     id: "44",
-    title: "Retry failed webhooks",
+    title: "Webhook retries",
     label: "bug",
     moves: [
       { at: 0, col: 0, slot: 2 },
@@ -99,7 +108,7 @@ export const cards: Card[] = [
   },
   {
     id: "38",
-    title: "Fix flaky login test",
+    title: "Flaky login test",
     label: "bug",
     moves: [
       { at: 0, col: 1, slot: 1 },

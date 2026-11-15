@@ -24,7 +24,7 @@ it into commands:
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/media/compare-dark.gif">
-  <img alt="Asked to move #42, still in Backlog, to Ready: an agent with gh runs gh project item-edit, which succeeds silently, and the card skips In progress with no comment; an agent with gh dojo runs gh dojo ready 42, is refused with exit code 2 and an error naming the allowed statuses, and asks the user" src="docs/media/compare-light.gif">
+  <img alt="Told that #42 is stuck until #12 lands, an agent with gh writes GraphQL queries and mutations, carrying node IDs between five calls, and leaves no comment; an agent with gh dojo runs gh dojo wait 42 --by 12, which sets the status, links the blocker and comments in one line" src="docs/media/compare-light.gif">
 </picture>
 
 - **Process verbs, not fields.** The agent says what happened (`start`,
