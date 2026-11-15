@@ -69,6 +69,7 @@ when = "The issue is not needed or a duplicate"
 close = "not_planned"        # completed, not_planned or duplicate
 require = ["comment"]        # without a template, --comment is the comment
 confirm = "user"             # runs only with --yes, after asking the user
+unassign = "all"             # everyone; or true (board.assignee), "@me" or a login
 
 [verbs.revive]
 when = "A closed issue is needed after all"
@@ -80,6 +81,9 @@ when = "The change is released"
 to = "Done"
 iteration = "by_status_date:Ready"  # the sprint in which it became Ready
 batch = true                 # gh dojo ship 12 13 14
+from_labels = ["approved"]   # labels the issue must all have
+refuse_labels = ["on-hold"]  # labels of which it may have none
+sub_issues = "deny"          # refuse while a sub-issue is unresolved; or "warn"
 
 [verbs.plan]
 when = "The issue is taken into the current sprint"
@@ -595,13 +599,14 @@ To write your own:
 3. A verb is a `when` line, [checks](#checks) (`from`, `from_labels`,
    `refuse_labels`, `require`, `require_one_of`, `blockers`, `sub_issues`,
    `confirm`) and [effects](#effects) (`to`,
-   `labels`, `assign`, `unassign`, `comment`, `close`, `reopen`,
+   `labels`, `assign`, `unassign`, `milestone`, `comment`, `close`, `reopen`,
    `iteration`, `field`, the `blockers` link). A verb without `to` leaves
    the status alone, like `hold` above; one with `confirm = "user"` waits
    for a person.
 4. Check it: [`gh dojo doctor`](commands.md#doctor) against the board and the
    repositories (statuses, the labels verbs add, remove and check, the users they
-   assign and unassign by login, the type and area labels), `gh dojo
+   assign and unassign by login, the milestones they name, the type and area
+   labels), `gh dojo
    describe` for the process
    as an agent reads it, `gh dojo <verb> N --dry-run` for a verb's plan on a
    real issue. Then [`gh dojo agent install`](commands.md#agent-install) writes the
@@ -609,9 +614,6 @@ To write your own:
 
 What the config cannot say yet, and the example works around:
 
-- On hold is the `blocked` label, not a state: no check reads labels, so
-  `review`, `approve` and `merged` still run on an issue on hold. `resume`,
-  `reject` and `merged` remove the label.
 - `confirm = "user"` is the person the agent works for saying yes, not the
   reviewer: gh-dojo does not check that the pull request was approved.
 - `request-changes` and `approve` hand the issue back by removing everyone
