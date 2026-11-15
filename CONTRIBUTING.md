@@ -130,6 +130,63 @@ output means:
 The interface, help text and documentation are in English. Texts that go
 into issues (verb `when` lines and comment templates) come from the config.
 
+## Design principles
+
+Every command is checked against these rules.
+
+1. **Process verbs, not fields.** The agent says what happened (`start`,
+   `wait`, `ready`), not which field to set. It never sees node IDs, field
+   names or option IDs.
+2. **Rules are data, the mechanism is code.** A project's process lives in
+   its config and changes without a new release. What the config cannot
+   express is not a reason to make the format more complex.
+3. **One line of confirmation.** A write prints what was, what is now and
+   what was done along the way: `#42 Backlog → In progress, comment left`.
+   The agent need not re-read the issue to check.
+4. **An error names the next step.** What is wrong, the allowed values and
+   the command to run. No stack traces, no raw GraphQL responses.
+5. **Repeats are safe.** Agents repeat commands after errors: a repeat never
+   creates a second issue or comment, and a partially applied command says
+   what is already done and finishes the rest.
+6. **Fewest requests.** See below.
+7. **Nothing hidden silently.** A cut list says how much it cut, a filter
+   counts what it hid.
+8. **Self-describing.** `--help` and `describe` show this project's verbs and
+   when to use each: the agent needs no outside documentation.
+
+### Requests and retries
+
+- Reading a card is one GraphQL request; a verb on an issue already on the
+  board is two with a warm cache (read, then one mutation with all its
+  effects). An issue not on the board takes three, `new` four (read,
+  `createIssue`, add to the board, the rest): GraphQL cannot feed one
+  mutation field's result into another in the same document, and setting a
+  status needs the item ID only `addProjectV2ItemById` returns.
+  `createIssue` with `projectV2Ids` is not used: GitHub adds the item
+  asynchronously and does not return its ID (#17).
+- The board schema is cached for an hour (see
+  [Checked against the board](docs/configuration.md#checked-against-the-board)).
+- Queries are retried on 5xx and secondary rate limits with exponential
+  backoff, at most `MaxAttempts` sends (`internal/graph/graph.go`).
+  Mutations are sent once: re-running the command re-reads the state and
+  finishes what is left.
+- Auth comes only from gh's token (or `GH_TOKEN`); gh-dojo stores no secrets,
+  never prints the token and sends no telemetry.
+
+### Decisions
+
+- **No MCP server.** The target agents have a shell, and a CLI costs fewer
+  tokens and works in any of them. A local MCP server would only serve agents
+  without a shell; revisit if one asks.
+- **`release` goes through pull requests**, so it works with any merge
+  strategy (squash, merge, rebase); commit keywords are the fallback.
+- **The generated skill is loaded into every session, so it repeats
+  nothing:** it does not point to `describe` (the same text) or list the
+  commands; of the exit codes it covers only what to do on 2, 4 and 5 (an
+  error's `fix:` line covers the rest); other repositories get detail only
+  with several `board.repos`, and `release` one line pointing to its
+  `--help`. Keep it that way when changing `internal/agent`.
+
 ## Layout
 
 | Package             | Responsible for                                                    |

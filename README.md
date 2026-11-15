@@ -27,6 +27,10 @@ process in the repository as data, and turns it into commands:
   <img alt="Told that #42 is stuck until #12 lands, an agent with gh writes GraphQL queries and mutations, carrying node IDs between five calls, and leaves no comment; an agent with gh dojo runs gh dojo wait 42 --by 12, which sets the status, links the blocker and comments in one line" src="docs/media/compare-light.gif">
 </picture>
 
+gh-dojo is not a planner: it does no sprint planning, standups or reports,
+does not replace `gh issue` or `gh pr`, and does not change the board's own
+settings.
+
 ## Built for agents
 
 - **Process verbs, not fields.** The agent says what happened (`start`,
@@ -165,8 +169,8 @@ gh-dojo tracks its own development with gh-dojo: its board is driven by
 [`agent install`](docs/commands.md#agent-install) generated from it,
 [`.claude/skills/gh-dojo/SKILL.md`](.claude/skills/gh-dojo/SKILL.md). The
 config (`version = 1`) and the JSON output (`schema_version: 1`) are
-versioned. Next, v0.3: hooks for rules the config cannot express, and
-sub-issues. See the [releases](https://github.com/Trum-ok/gh-dojo/releases).
+versioned. Next, v0.3 with sub-issues. See the
+[releases](https://github.com/Trum-ok/gh-dojo/releases).
 
 ## License
 
