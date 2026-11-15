@@ -61,14 +61,14 @@ Started. Session: {session}
 
 # On hold is a label, not a status, so the issue keeps its status: hold
 # adds the label and resume removes it (reject too, closing the issue).
-# review, approve and merged refuse an issue on hold (exit code 2), and so
-# does hold itself; resume runs only on one.
+# review, approve and merged refuse an issue on hold (exit code 2). hold
+# and resume check no label, so a repeat of either finishes what a partly
+# applied run left; on an issue not on hold, resume removes nothing.
 
 [verbs.hold]
 when = "Work is stuck: waiting for another issue or an outside decision"
 from = ["In progress", "Changes requested"]   # no `to`: the status stays
 labels = ["+blocked"]
-refuse_labels = ["blocked"]  # already on hold
 blockers = "link"            # --by 17 also marks the issue blocked by #17
 require_one_of = ["by", "comment"]
 comment = """
@@ -80,7 +80,6 @@ On hold until {by}.
 when = "What held the issue is resolved"
 from = ["In progress", "Changes requested"]
 labels = ["-blocked"]
-from_labels = ["blocked"]    # only an issue on hold
 blockers = "deny"            # refuse while a blocker is still open
 comment = "{comment}"
 

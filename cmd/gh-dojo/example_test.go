@@ -82,11 +82,11 @@ func TestExampleReview(t *testing.T) {
 		}
 	})
 
-	// The help of the verbs that check the label blocked: hold and review
-	// refuse it, naming resume, which needs it.
+	// The help of verbs that refuse the label blocked names resume, which
+	// removes it.
 	t.Run("help", func(t *testing.T) {
 		withConfig(t, toml)
-		for _, verb := range []string{"hold", "resume", "review"} {
+		for _, verb := range []string{"review", "merged"} {
 			code, out := runOut(verb, "--help")
 			if code != render.ExitOK {
 				t.Errorf("%s --help: exit code = %d, want 0\n%s", verb, code, out)

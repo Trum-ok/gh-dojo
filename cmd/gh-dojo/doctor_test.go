@@ -90,9 +90,13 @@ types = ["bug", "Docs"]
 		// missing one refuses every issue or never refuses; one in another
 		// case is fine, since the checks match names regardless of case.
 		{"verbs_label_checks", doctorVerbsOKConfig + `
-[verbs.hold]
-when = "Work is stuck"
+[verbs.tag]
+when = "It is a bug"
 labels = ["+bug"]
+
+[verbs.poke]
+when = "Ask how it goes"
+comment = "{comment}"
 refuse_labels = ["Bug"]
 
 [verbs.resume]

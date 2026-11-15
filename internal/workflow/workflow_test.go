@@ -154,21 +154,25 @@ to = "Done"
 blockers = "deny"
 sub_issues = "deny"
 
-# from_labels and refuse_labels: on hold is a label. hold refuses an issue
-# on hold already, resume needs the label; resume (from any status) and
-# unstick (from Waiting) remove it, abandon too but it closes the issue,
-# so a refusal names only the first two. ship refuses either of two
-# labels, merge needs both of two.
-[verbs.hold]
-when = "Put the issue on hold"
+# from_labels and refuse_labels: on hold is a label. poke refuses an issue
+# on hold, remind runs only on one; resume (from any status) and unstick
+# (from Waiting) remove the label, abandon too but it closes the issue, so
+# a refusal names only the first two. ship refuses either of two labels,
+# merge needs both of two.
+[verbs.poke]
+when = "Ask whoever has it how it goes"
 from = ["In progress", "Waiting"]
-labels = ["+on-hold"]
+comment = "How is it going?"
 refuse_labels = ["on-hold"]
+
+[verbs.remind]
+when = "Remind that the issue is on hold"
+comment = "Still on hold."
+from_labels = ["on-hold"]
 
 [verbs.resume]
 when = "Take the issue off hold"
 labels = ["-on-hold"]
-from_labels = ["on-hold"]
 
 [verbs.unstick]
 when = "The wait is over"
@@ -639,12 +643,12 @@ func TestPlan(t *testing.T) {
 			code: render.ExitDenied},
 		// refuse_labels: the refusal names the label and the verbs that
 		// remove it from the issue's status without closing it.
-		{name: "hold_on_hold_refused", verb: "hold", code: render.ExitDenied,
+		{name: "poke_on_hold_refused", verb: "poke", code: render.ExitDenied,
 			issue: labelled(onBoard("In progress"), "bug", "on-hold")},
 		// Names match regardless of case; unstick runs from Waiting.
-		{name: "hold_on_hold_waiting_refused", verb: "hold", code: render.ExitDenied,
+		{name: "poke_on_hold_waiting_refused", verb: "poke", code: render.ExitDenied,
 			issue: labelled(onBoard("Waiting"), "On-Hold")},
-		{name: "hold_runs", verb: "hold", hasOps: 1, issue: labelled(onBoard("In progress"), "bug")},
+		{name: "poke_runs", verb: "poke", hasOps: 1, issue: labelled(onBoard("In progress"), "bug")},
 		{name: "ship_two_labels_refused", verb: "ship", code: render.ExitDenied,
 			issue: labelled(onBoard("Ready"), "wip", "on-hold")},
 		// No verb removes wip: no hint.
@@ -656,9 +660,9 @@ func TestPlan(t *testing.T) {
 		{name: "ship_wrong_from_on_hold", verb: "ship", code: render.ExitDenied,
 			issue: labelled(onBoard("In progress"), "on-hold")},
 		// from_labels: the refusal names the labels the issue lacks.
-		{name: "resume_not_on_hold_refused", verb: "resume", code: render.ExitDenied,
+		{name: "remind_not_on_hold_refused", verb: "remind", code: render.ExitDenied,
 			issue: labelled(onBoard("In progress"), "bug")},
-		{name: "resume_runs", verb: "resume", hasOps: 1, issue: labelled(onBoard("In progress"), "on-hold")},
+		{name: "remind_runs", verb: "remind", hasOps: 1, issue: labelled(onBoard("In progress"), "on-hold")},
 		{name: "merge_one_label_missing", verb: "merge", code: render.ExitDenied,
 			issue: labelled(onBoard("Ready"), "approved")},
 		{name: "merge_labels_missing", verb: "merge", code: render.ExitDenied, issue: onBoard("Ready")},

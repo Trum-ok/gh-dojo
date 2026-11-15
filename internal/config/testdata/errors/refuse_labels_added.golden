@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.hold.refuse_labels names "blocked", which verbs.hold.labels adds (+Blocked): the check would refuse a re-run that finishes a partly applied run
+fix: remove "blocked" from verbs.hold.refuse_labels; adding the label again changes nothing

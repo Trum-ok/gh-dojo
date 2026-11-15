@@ -1,0 +1,4 @@
+dry run: poke #42 "Fix login redirect"
+  comment: "How is it going?"
+confirm: #42 comment left
+post: "How is it going?\n\n<!-- gh-dojo:poke:99d03074 -->"

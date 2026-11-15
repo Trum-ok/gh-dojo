@@ -41,15 +41,14 @@ verb hold
   require: [] require_one_of: []
   comment: ""
   labels: add=["blocked"] remove=[] assign: "" close: "" reopen: false confirm: false
-  from_labels: [] refuse_labels: ["blocked"]
-verb resume
-  when: What held the issue is resolved
+verb ship
+  when: Ship the approved change
   to: ""
   from: []
   require: [] require_one_of: []
   comment: ""
-  labels: add=[] remove=["blocked"] assign: "" close: "" reopen: false confirm: false
-  from_labels: ["Blocked"] refuse_labels: []
+  labels: add=["shipped"] remove=[] assign: "" close: "" reopen: false confirm: false
+  from_labels: ["Approved"] refuse_labels: []
 status refs:
   "Backlog"    statuses.initial (from preset kanban)
   "Done"       statuses.final (from preset kanban)

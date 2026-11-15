@@ -38,18 +38,16 @@ Run a verb as `gh dojo <verb> N` (`N`, `#N` or `owner/repo#N`); `--dry-run` prin
 
 **When:** Work is stuck: waiting for another issue or an outside decision
 
-`gh dojo hold N`: In progress, Changes requested → status unchanged; needs --by or --comment; refused with the label blocked; labels +blocked; comments "On hold until {by}. {comment}".
+`gh dojo hold N`: In progress, Changes requested → status unchanged; needs --by or --comment; labels +blocked; comments "On hold until {by}. {comment}".
 
-- It is refused (exit code 2) while the issue has the label `blocked`. `resume` removes `blocked`. Never remove a label another way to get it through; ask the user.
 - `--by 12` (also `#12`, `owner/repo#12` or an issue's URL; several comma-separated, `--by 12,13`) also marks the issue blocked by #12. Text (`--by "the user's decision"`) only goes into the comment; issues mixed with text are an error (exit code 1); a pull request is named in the comment without a link.
 
 ### `resume`
 
 **When:** What held the issue is resolved
 
-`gh dojo resume N`: In progress, Changes requested → status unchanged; optional --comment; refused without the label blocked; labels -blocked; comments "{comment}".
+`gh dojo resume N`: In progress, Changes requested → status unchanged; optional --comment; labels -blocked; comments "{comment}".
 
-- It is refused (exit code 2) unless the issue has the label `blocked`: `gh dojo show N` lists its labels. Ask the user rather than add a label to get it through.
 - It is refused (exit code 2) while a blocker is unresolved: `gh dojo show N` lists them. Never move the status another way.
 - It comments only when given `--comment`.
 

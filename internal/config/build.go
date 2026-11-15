@@ -460,24 +460,29 @@ func (c *Config) buildEffects(name string, r *rawVerb, v *Verb) error {
 // buildLabelChecks validates from_labels and refuse_labels: label names,
 // without the + or - of the labels effect, each at most once regardless of
 // case (GitHub's label names are unique regardless of case), and none in
-// both lists, which would refuse every issue. A label the verb refuses
-// cannot be one it removes, nor a label it requires one it adds: that
-// effect would never change anything. It runs after buildEffects, which
-// fills the labels the verb adds and removes.
+// both lists, which would refuse every issue. A checked label cannot be
+// in the verb's own labels effect either. One it requires and adds, or
+// refuses and removes, is an effect that never changes anything. One it
+// refuses and adds, or requires and removes, makes the check refuse the
+// verb's own re-run after a partly applied run, which must finish what
+// the run left undone. It runs after buildEffects, which fills the labels
+// the verb adds and removes.
 func (c *Config) buildLabelChecks(name string, r *rawVerb, v *Verb) error {
 	p := "verbs." + name + "."
 	type named struct{ key, label string }
 	seen := map[string]named{} // folded name → the entry that names it
 	for _, list := range []struct {
-		key    string
-		src    *[]string
-		dest   *[]string
-		effect []string // the labels effect's entries the check makes moot
-		sign   string
-		does   string
+		key  string
+		src  *[]string
+		dest *[]string
+		// moot are the labels effect's entries the check makes moot,
+		// with their sign and verb; rerun those that would make it
+		// refuse a re-run.
+		moot, rerun                   []string
+		mootSign, rerunSign, mootDoes string
 	}{
-		{"from_labels", r.FromLabels, &v.FromLabels, v.AddLabels, "+", "adds"},
-		{"refuse_labels", r.RefuseLabels, &v.RefuseLabels, v.RemoveLabels, "-", "removes"},
+		{"from_labels", r.FromLabels, &v.FromLabels, v.AddLabels, v.RemoveLabels, "+", "-", "adds"},
+		{"refuse_labels", r.RefuseLabels, &v.RefuseLabels, v.RemoveLabels, v.AddLabels, "-", "+", "removes"},
 	} {
 		if list.src == nil {
 			continue
@@ -500,9 +505,20 @@ func (c *Config) buildLabelChecks(name string, r *rawVerb, v *Verb) error {
 					prev.key, key, label)
 			}
 			seen[folded] = named{key, label}
-			if i := slices.IndexFunc(list.effect, func(l string) bool { return strings.EqualFold(l, label) }); i >= 0 {
+			same := func(l string) bool { return strings.EqualFold(l, label) }
+			labelsKey := c.KeyPath(p + "labels")
+			if i := slices.IndexFunc(list.moot, same); i >= 0 {
 				return c.Errorf("%s names %q, so %s %s%s never %s anything; keep one",
-					key, label, c.KeyPath(p+"labels"), list.sign, list.effect[i], list.does)
+					key, label, labelsKey, list.mootSign, list.moot[i], list.mootDoes)
+			}
+			if i := slices.IndexFunc(list.rerun, same); i >= 0 {
+				does, again := "adds", "adding the label again changes nothing"
+				if list.rerunSign == "-" {
+					does, again = "removes", "removing a label the issue lacks changes nothing"
+				}
+				return c.Errorf("%s names %q, which %s %s (%s%s): the check would refuse a re-run that finishes a partly applied run",
+					key, label, labelsKey, does, list.rerunSign, list.rerun[i]).
+					WithFix(fmt.Sprintf("remove %q from %s; %s", label, key, again))
 			}
 		}
 		*list.dest = slices.Clone(*list.src)

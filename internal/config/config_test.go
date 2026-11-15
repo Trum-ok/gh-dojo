@@ -204,20 +204,18 @@ iteration = "current"
 		{"blockers_deny", presetOnly + "[verbs.start]\nblockers = \"deny\"\n[verbs.wait]\nblockers = \"warn\"\n"},
 		{"sub_issues", presetOnly + "[verbs.ready]\nsub_issues = \"warn\"\n[verbs.done]\nsub_issues = \"deny\"\n"},
 		{"sub_issues_off", presetOnly + "[verbs.done]\nsub_issues = false\n"},
-		// On hold is a label: hold adds it and refuses an issue on hold
-		// already, resume needs it (in another case: names match regardless
-		// of case) and removes it, ready refuses it on top of the preset's
-		// verb, and done turns the check off with an empty list.
+		// On hold is a label: hold adds it, ready refuses it on top of the
+		// preset's verb, ship needs approved and adds another label, and
+		// done turns the check off with an empty list.
 		{"label_checks", presetOnly + `
 [verbs.hold]
 when = "Work is stuck"
 labels = ["+blocked"]
-refuse_labels = ["blocked"]
 
-[verbs.resume]
-when = "What held the issue is resolved"
-labels = ["-blocked"]
-from_labels = ["Blocked"]
+[verbs.ship]
+when = "Ship the approved change"
+labels = ["+shipped"]
+from_labels = ["Approved"]
 
 [verbs.ready]
 refuse_labels = ["blocked", "wip"]
@@ -469,6 +467,10 @@ func TestLoadErrors(t *testing.T) {
 		{"label_checks_both", presetOnly + "[verbs.ready]\nfrom_labels = [\"blocked\"]\nrefuse_labels = [\"Blocked\"]\n"},
 		{"refuse_labels_removed", presetOnly + "[verbs.ready]\nlabels = [\"-blocked\"]\nrefuse_labels = [\"blocked\"]\n"},
 		{"from_labels_added", presetOnly + "[verbs.ready]\nlabels = [\"+Reviewed\"]\nfrom_labels = [\"reviewed\"]\n"},
+		// The check would refuse the verb's own re-run after a partly
+		// applied run: hold on hold, resume off it.
+		{"refuse_labels_added", presetOnly + "[verbs.hold]\nwhen = \"x\"\nlabels = [\"+Blocked\"]\nrefuse_labels = [\"blocked\"]\n"},
+		{"from_labels_removed", presetOnly + "[verbs.resume]\nwhen = \"x\"\nlabels = [\"-blocked\"]\nfrom_labels = [\"blocked\"]\n"},
 		{"blockers_link_without_by", presetOnly + "[verbs.ready]\nblockers = \"link\"\n"},
 		// kanban's wait links --by; a comment without {by} drops what it links.
 		{"blockers_link_comment_override", presetOnly + "[verbs.wait]\ncomment = \"Stuck: {comment}\"\n"},

@@ -1,0 +1,3 @@
+code: 2
+error: poke cannot run on #42 while it has the label "on-hold"; resume removes it
+this is a process rule: ask the user how to proceed

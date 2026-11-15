@@ -1,3 +1,0 @@
-code: 2
-error: hold cannot run on #42 while it has the label "On-Hold"; resume or unstick removes it
-this is a process rule: ask the user how to proceed

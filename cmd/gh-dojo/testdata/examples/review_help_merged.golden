@@ -1,0 +1,33 @@
+code: 0
+--- stdout
+The approved pull request has been merged into main
+
+  From:      Approved
+  To:        Merged; an issue already there keeps it, so a repeat is safe
+  Refused:   while the issue has the label blocked (exit code 2): ask the user
+             resume removes it
+  Requires:  nothing besides the issue numbers
+  Optional:  --comment
+  Batch:     several numbers at once: gh dojo merged 12 13 14; each issue is applied
+             on its own, a failed one is skipped, and a summary ends the run:
+             "3 of 4 done; #17: <reason>"; a re-run skips what is done
+             exit code: 0 all done; 5 some written and a re-run may finish the rest;
+             else the failures' code, 2 first, then 1, 4, 3
+  Board:     adds the issue if it is not there
+  Close:     closes the issue as completed; an issue already closed stays as it is
+  Comment:   posted unless it renders empty or is already the latest gh-dojo comment:
+               {comment}
+
+Usage:
+  gh dojo merged <N>... [flags]
+
+Flags:
+      --comment string   text for {comment} in the comment
+      --dry-run          print the plan without changing anything
+  -h, --help             help for merged
+
+Global Flags:
+  -q, --jq expression       filter the JSON with a jq expression (implies --json)
+      --json                print the result as JSON (schema_version 1), errors too
+  -t, --template template   format the JSON with a Go template (implies --json)
+--- stderr

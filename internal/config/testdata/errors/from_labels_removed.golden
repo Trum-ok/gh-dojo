@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.resume.from_labels names "blocked", which verbs.resume.labels removes (-blocked): the check would refuse a re-run that finishes a partly applied run
+fix: remove "blocked" from verbs.resume.from_labels; removing a label the issue lacks changes nothing
