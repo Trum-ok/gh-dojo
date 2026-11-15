@@ -9,3 +9,6 @@
 
 # agent worktrees
 .claude/worktrees/
+
+# Local notes, not shared: CLAUDE.local.md, docs/spec.local.md, .claude/settings.local.json
+*.local.*
