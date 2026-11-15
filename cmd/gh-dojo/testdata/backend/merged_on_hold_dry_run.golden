@@ -4,5 +4,5 @@ dry run: merged #32 "Refund to a gift card"
   status: Merged (unchanged)
   close: already closed as completed
 --- stderr
-error: dry run: 1 of 2 can be applied; #30: merged cannot move #30 while it has the label "blocked"
+error: dry run: 1 of 2 can be applied; #30: merged cannot move #30 while it has the label "blocked", resume removes it
 this is a process rule: ask the user how to proceed

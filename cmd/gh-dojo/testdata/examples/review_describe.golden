@@ -32,7 +32,7 @@ skipped.
 Lifecycle (from → to):
   start           Backlog → In progress
   hold            In progress, Changes requested → status unchanged
-  resume          In progress, Changes requested → status unchanged
+  resume          In progress, Changes requested, Approved → status unchanged
   review          In progress, Changes requested → In review
   request-changes In review → Changes requested
   approve         In review → Approved; asks the user first (--yes)

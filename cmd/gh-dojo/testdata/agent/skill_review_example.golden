@@ -46,7 +46,7 @@ Run a verb as `gh dojo <verb> N` (`N`, `#N` or `owner/repo#N`); `--dry-run` prin
 
 **When:** What held the issue is resolved
 
-`gh dojo resume N`: In progress, Changes requested → status unchanged; optional --comment; labels -blocked; comments "{comment}".
+`gh dojo resume N`: In progress, Changes requested, Approved → status unchanged; optional --comment; labels -blocked; comments "{comment}".
 
 - It is refused (exit code 2) while a blocker is unresolved: `gh dojo show N` lists them. Never move the status another way.
 - It comments only when given `--comment`.

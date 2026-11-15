@@ -64,6 +64,8 @@ Started. Session: {session}
 # review, approve and merged refuse an issue on hold (exit code 2). hold
 # and resume check no label, so a repeat of either finishes what a partly
 # applied run left; on an issue not on hold, resume removes nothing.
+# resume also runs in Approved: an approved issue labelled blocked by hand
+# gets back to merged without being rejected.
 
 [verbs.hold]
 when = "Work is stuck: waiting for another issue or an outside decision"
@@ -78,7 +80,7 @@ On hold until {by}.
 
 [verbs.resume]
 when = "What held the issue is resolved"
-from = ["In progress", "Changes requested"]
+from = ["In progress", "Changes requested", "Approved"]
 labels = ["-blocked"]
 blockers = "deny"            # refuse while a blocker is still open
 comment = "{comment}"

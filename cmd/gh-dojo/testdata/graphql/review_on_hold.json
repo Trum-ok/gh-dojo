@@ -1,5 +1,5 @@
 {
-  "comment": "Hand-crafted from review_example.json (itself from internal/issue/testdata/graphql/card_3.json, recorded): issues on hold, labelled blocked, that the verbs of examples/review.toml refuse (refuse_labels, #46). #29 in Changes requested, on hold: review refuses it, and names resume, which removes the label. merged 30 32 reads both cards in one request, with all their labels: #30 approved and on hold is refused, #32 merged and closed already is in place, so nothing is written. Read twice: for the dry run, then the run.",
+  "comment": "Hand-crafted from review_example.json (itself from internal/issue/testdata/graphql/card_3.json, recorded): issues on hold, labelled blocked, that the verbs of examples/review.toml refuse (refuse_labels, #46). #29 in Changes requested, on hold: review refuses it, and names resume, which removes the label. merged 30 32 reads both cards in one request, with all their labels: #30 approved and on hold is refused, naming resume, which also runs in Approved, #32 merged and closed already is in place, so nothing is written. Read twice: for the dry run, then the run.",
   "handcrafted": true,
   "interactions": [
     {

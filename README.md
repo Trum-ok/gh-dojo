@@ -526,13 +526,14 @@ other effects and the comment template.
 A verb takes one issue number (several with [`batch = true`](#several-issues-at-once))
 and, in one command:
 
-1. checks that the issue is open (a verb that moves it to a final status,
-   closes it or reopens it also runs on a closed one; one that closes and
-   has no `to`, only on an issue closed with its reason), that its status is one
-   of the verb's `from` statuses (no status, or not on the board, counts as
-   [`statuses.initial`](#statuses)), that the required arguments are given,
-   the user's go-ahead (`confirm`), the issue's labels (`from_labels`,
-   `refuse_labels`) and its blockers (`blockers`);
+1. checks, in this order, that the required arguments are given, that the
+   issue is open (a verb that moves it to a final status, closes it or
+   reopens it also runs on a closed one; one that closes and has no `to`,
+   only on an issue closed with its reason), that its status is one of the
+   verb's `from` statuses (no status, or not on the board, counts as
+   [`statuses.initial`](#statuses)), the issue's labels (`from_labels`,
+   `refuse_labels`), its blockers (`blockers`) and sub-issues
+   (`sub_issues`), and the user's go-ahead (`confirm`);
 2. adds the issue to the board if it is not there;
 3. applies its [effects](#effects): reopens it, sets the status and the
    sprint, sets other board fields, adds and removes labels, assigns and
@@ -898,17 +899,22 @@ rejected with "not supported in this version".
   `from_labels`, `refuse_labels`, `blockers` and `sub_issues`.
 - **from_labels**, **refuse_labels**: the issue must have every label of
   `from_labels` and none of `refuse_labels`, or the verb refuses with exit
-  code 2, naming the labels and the verbs that remove one it refuses (those
-  that run from the issue's status without closing it). This is how a
+  code 2, naming the labels and the verbs that add one it needs or remove
+  one it refuses (those that can run on the issue as it stands, in its
+  status and open or closed, without closing it). This is how a
   state kept in a label, such as on hold, holds back other verbs (see
   [`examples/review.toml`](examples/review.toml)). Names are written
   without `+` or `-` and match regardless of case, as GitHub's label names
-  do; a verb reads all of the issue's labels for them. A label may not be
+  do; a verb reads up to 100 of the issue's labels for them, GitHub's limit
+  per issue; should GitHub report more, a checked label not among those
+  read refuses the verb as unknown. A label may not be
   in both lists, nor in the verb's own `labels`: one it requires and adds,
   or refuses and removes, never changes anything, and one it refuses and
   adds, or requires and removes, would refuse the verb's own re-run after
   a partly applied run, which must finish the rest. Checked after `from`,
-  before `blockers`; `--dry-run` refuses the same way.
+  before `blockers`; skipped, like `from`, for an issue already in the
+  verb's `to`, but not for the repeat of a verb without `to` that closes
+  the issue; `--dry-run` refuses the same way.
 - **require**, **require_one_of**: without the arguments, exit code 1.
 - **blockers** `"warn"` and `"deny"` look at the issue's unresolved
   blockers: open, and not in one of [`statuses.resolved`](#statuses); a
@@ -1198,7 +1204,7 @@ to decide.
 |-------------------|-------------------|-------------------------------------|------|
 | `start`           | In progress       | Backlog                             | refused while a blocker is unresolved; assigns the author |
 | `hold`            | status unchanged  | In progress, Changes requested      | label `+blocked`; `--by 17` marks it blocked by #17 |
-| `resume`          | status unchanged  | In progress, Changes requested      | label `-blocked`; refused while a blocker is unresolved |
+| `resume`          | status unchanged  | In progress, Changes requested, Approved | label `-blocked`; refused while a blocker is unresolved |
 | `review`          | In review         | In progress, Changes requested      | refused on hold; needs `--comment` (the pull request) and `--assignee` (the reviewer); labels; assigns the reviewer |
 | `request-changes` | Changes requested | In review                           | needs `--comment`; labels; back to the author alone: the reviewer is unassigned |
 | `approve`         | Approved          | In review                           | refused on hold; the user's decision (`--yes`); back to the author alone |
@@ -1209,7 +1215,9 @@ On hold is the label `blocked`, not a status, so a held issue keeps its
 status and `resume` leaves it there: `refuse_labels = ["blocked"]` keeps
 `review`, `approve` and `merged` off it. `hold` and `resume` check no
 label, so a repeat of either finishes what a partly applied run left; on
-an issue not on hold, `resume` removes nothing.
+an issue not on hold, `resume` removes nothing. `resume` also runs in
+Approved, so an approved issue labelled `blocked` by hand has a way back
+to `merged` other than `reject`; the refusals name it.
 
 `reject` closes and has no `to`, so on an issue closed as not planned its
 `from` is not checked: it runs as a repeat and posts its comment only if it
