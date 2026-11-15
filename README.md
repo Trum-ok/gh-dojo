@@ -169,8 +169,9 @@ gh-dojo tracks its own development with gh-dojo: its board is driven by
 [`agent install`](docs/commands.md#agent-install) generated from it,
 [`.claude/skills/gh-dojo/SKILL.md`](.claude/skills/gh-dojo/SKILL.md). The
 config (`version = 1`) and the JSON output (`schema_version: 1`) are
-versioned. Next, v0.3 with sub-issues. See the
-[releases](https://github.com/Trum-ok/gh-dojo/releases).
+versioned. See the [releases](https://github.com/Trum-ok/gh-dojo/releases);
+what comes next, such as hooks for verbs or several agents on one board, is
+still an [open question](https://github.com/Trum-ok/gh-dojo/issues?q=is%3Aopen+label%3Aquestion).
 
 ## License
 

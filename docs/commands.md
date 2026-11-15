@@ -388,7 +388,7 @@ and its command list), not on where it runs. So pin the version that checks
 them in CI, and run `agent install` with that version when you upgrade:
 
 ```yaml
-- run: gh extension install Trum-ok/gh-dojo --pin v0.2.0
+- run: gh extension install Trum-ok/gh-dojo --pin v0.3.0
   env:
     GH_TOKEN: ${{ github.token }}
 - run: gh dojo agent install --check
