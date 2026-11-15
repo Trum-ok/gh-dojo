@@ -18,7 +18,8 @@
 Issues are written `42` or `#42` for the default repository (the first of
 [`board.repos`](configuration.md#board)), and `owner/repo#42` or the issue's URL for any
 other: in a verb, a batch, `show`, `comment`, both sides of `block` and
-`unblock`, `wait --by` and `new --blocked-by`. A repository outside
+`unblock`, `wait --by`, `new --blocked-by` and `--parent`, and `release
+--exclude`. A repository outside
 `board.repos` is accepted too, since the command names it; a verb adds its
 issue to the board like any other. The text names an issue of the default
 repository `#42` and any other `owner/repo#42`; the JSON names every issue
@@ -64,9 +65,10 @@ status → Backlog (automation, 2026-11-14) → In progress (alice,
 2026-11-14)`), and a [session link](configuration.md#session) in a comment
 keeps the last 8 characters of its ID (`Taken. Session: …491bf84f`).
 `--full` prints them all whole, the history a change per line with its time.
-`--brief` prints three lines per issue: title; state, status, sprint,
-milestone, labels and assignees; blockers, the parent and the sub-issues
-(when it has them) and counts.
+`--brief` prints three lines per issue (four when GitHub hid part of it):
+title; state, status, sprint, milestone, labels and assignees; blockers,
+the parent and the sub-issues (when it has them) and counts. It takes
+neither `--comments` nor `--full` (exit code 1).
 
 Several issues are read in one request (up to 20 issues per request), from
 any repositories: `gh dojo show 42 acme/api#7`. In text they are printed as
@@ -293,9 +295,10 @@ gh dojo describe
 
 Prints the project's process in a few lines per verb, short enough for an
 agent's context: when to use each verb, the arguments it needs or takes, what
-it checks and does along the way (comment, sprint, labels, assignee, closing
-or reopening, blocked-by links, the blockers check, closed issues, the
-user's go-ahead), then the lifecycle (from → to), the initial, final and
+it checks and does along the way (comment, sprint, other board fields,
+milestone, labels, assignees, closing or reopening, blocked-by links, the
+label, blockers and sub-issues checks, closed issues, the user's go-ahead),
+then the lifecycle (from → to), the initial, final and
 resolved statuses, and the exit codes; with an initial status it points at
 [`next`](#next) to find an issue. It reads only the config, never the
 network; a missing or broken config is an error (exit code 1).
@@ -364,16 +367,21 @@ read, so the rules are written once, in the config:
 | `copilot` | A section of `.github/copilot-instructions.md` |
 
 The instructions are in English and say what `describe` says, with what an
-agent should do about it: use only `gh dojo` for issues; the lifecycle, the
-longest way from the initial status to a final one along the verbs (a status
-a verb can jump over in parentheses); the initial, final and resolved
-statuses; each verb with its `when`, the statuses it moves between, its
-arguments, checks and effects, and the rules behind them (ask the user before
-`--yes`, don't work around a refused blockers or labels check, what `--by` links,
-several numbers at once); `show`, `next` and `list`; `new`, `comment`,
-`block` and `unblock`; safe repeats; the session link; exit codes; JSON; and
-a table of the commands of the gh-dojo that wrote them, so a command added in
-a later version shows up there by itself. The skill's `description` names the
+agent should do about it: use only `gh dojo` for issues; how to name an
+issue of another repository (at length only with several `board.repos`);
+the lifecycle, the longest way from the initial status to a final one along
+the verbs (a status a verb can jump over in parentheses); the initial, final
+and resolved statuses; each verb with its `when`, the statuses it moves
+between, its arguments, checks and effects, and the rules behind them (ask
+the user before `--yes`, don't work around a refused blockers or labels
+check, what `--by` links, ask which assignee or milestone when unknown,
+several numbers at once, and for a batch verb that finishes issues one line
+pointing at `release --help`); `next`, `show` and `list`; `new`, `comment`,
+`block` and `unblock`; safe repeats; what to do on exit codes 2, 4 and 5
+(an error's `fix:` line covers the rest); and JSON. Since the skill is
+loaded into every session, it repeats nothing: no command table and no
+pointer to `describe`. A command it mentions (`next`, `new`, `release`) is
+named only when the gh-dojo that wrote it has it. The skill's `description` names the
 repository, the board and the verbs, and [`[agent] description`](configuration.md#agent)
 adds to it. The markdown file [`[agent] notes`](configuration.md#agent) names is appended as
 it is, in the project's language, for what the config cannot say.
@@ -417,7 +425,7 @@ them in CI, and run `agent install` with that version when you upgrade:
 [`doctor`](#doctor) only warns about files out of date: the installed
 gh-dojo may be a different version than the one in CI. In this repository
 CI checks with the build of the branch, so after changing the config, the
-notes, the generator or a command's short help, run `make agent`.
+notes or the generator, run `make agent`.
 
 ## Process verbs
 
@@ -530,7 +538,7 @@ exit code. [`release`](#release) runs it on the issues of a release.
 ## release
 
 ```sh
-gh dojo release <ref> --verb <verb> [--since <ref>] [--exclude N] [--dry-run] [--yes] [--comment TEXT]
+gh dojo release <ref> --verb <verb> [--since <ref>] [--exclude N]... [--dry-run] [--yes] [--comment TEXT] [--by TEXT]
 ```
 
 Once a release is tagged, runs a verb with [`batch = true`](output.md#several-issues-at-once)

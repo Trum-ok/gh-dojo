@@ -139,7 +139,8 @@ partial write (the result says what was applied, the error what was not),
 mismatch or without `--project`. `--jq` and `--template` apply to the error
 object as well, so `.error.exit_code` works on every output. The error is
 also printed as the usual short block on stderr, and warnings stay on stderr
-(`list`, `show` and a verb's issues also carry them in `warnings`).
+(`list`, `next`, `show`, `release` and a verb's issues also carry them in
+`warnings`).
 
 **Stability.** Every object has `"schema_version": 1` first and `"error"`
 second. Field names are snake_case. Every key is always there: lists are
