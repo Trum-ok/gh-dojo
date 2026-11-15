@@ -9,7 +9,7 @@ LDFLAGS := -X main.version=$(VERSION)
 # last path element must be gh-dojo.
 INSTALL_DIR ?= $(HOME)/.local/share/gh-dojo/$(BIN)
 
-.PHONY: build test vet golden agent dist install
+.PHONY: build test vet golden agent dist install demo
 
 build:
 	go build -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/gh-dojo
@@ -35,6 +35,11 @@ agent:
 # does (script/build-release.sh), stamped with VERSION.
 dist:
 	script/build-release.sh $(VERSION)
+
+# Render the README media (docs/media/*.gif) from its Remotion project; needs
+# Node and ffmpeg. See docs/media/README.md.
+demo:
+	cd docs/media && { [ -d node_modules ] || npm ci; } && ./render.sh
 
 # The installed gh dojo is a symlink to INSTALL_DIR, not to the working copy,
 # so a broken branch never breaks it.

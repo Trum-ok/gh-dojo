@@ -10,17 +10,22 @@ verbs over GitHub Projects v2. An agent runs `gh dojo start 42`, and gh-dojo
 knows the board's fields, statuses and rules from the repository's
 `.github/dojo.toml`.
 
-```console
-$ gh dojo start 42
-#42 Backlog → In progress, comment left
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/media/demo-dark.gif">
+  <img alt="The user asks an agent to take #42. The agent runs gh dojo start 42, wait 42 --by 12 and ready 42; each prints one line, and issue #42 moves on the board from Backlog to In progress, Waiting and Ready with a comment for each step" src="docs/media/demo-light.gif">
+</picture>
 
-**Why.** With plain `gh`, moving an issue on a Projects board means
-`gh project item-edit` or GraphQL with project, field and option IDs. Agents
-spend turns looking those up, read verbose output and invent the process as
-they go: they forget to leave a reason for waiting or move an issue from the
-wrong status. gh-dojo keeps the process in the repository as data, and turns
-it into commands:
+**Why.** With plain `gh`, an agent can set any board field to any value
+(`gh project item-edit`, or GraphQL with project, field and option IDs on
+older `gh`), and nothing tells it the process. Agents invent it as they go:
+they forget to leave a reason for waiting or move an issue from the wrong
+status. gh-dojo keeps the process in the repository as data, and turns it
+into commands:
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/media/compare-dark.gif">
+  <img alt="Asked to move #42, still in Backlog, to Ready: an agent with gh runs gh project item-edit, which succeeds silently, and the card skips In progress with no comment; an agent with gh dojo runs gh dojo ready 42, is refused with exit code 2 and an error naming the allowed statuses, and asks the user" src="docs/media/compare-light.gif">
+</picture>
 
 - **Process verbs, not fields.** The agent says what happened (`start`,
   `wait`, `ready`); the verb knows the target status, the allowed starting
@@ -1432,7 +1437,9 @@ notes in [`.github/dojo-notes.md`](.github/dojo-notes.md).
 See [CONTRIBUTING.md](CONTRIBUTING.md) for building, tests, golden files,
 GraphQL fixtures and releases. `go test ./...` loads every `toml` block in
 this README and every file in [`examples/`](examples), so they stay valid
-configs.
+configs. The animations in this README are [Remotion](https://www.remotion.dev/)
+videos in [`docs/media/`](docs/media); `make demo` renders them again (needs
+Node and ffmpeg).
 
 ## Roadmap
 
