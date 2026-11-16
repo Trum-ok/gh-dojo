@@ -476,23 +476,12 @@ func (b *githubBackend) matchMilestone(ctx context.Context, v config.Verb, l iss
 		if cerr != nil {
 			return cerr
 		}
-		e := milestoneKeyError(cfg.KeyPath("verbs."+v.Name+".milestone"), err)
+		e := issue.MilestoneKeyError(cfg.KeyPath("verbs."+v.Name+".milestone"), err)
 		e.What = cfg.Display + ": " + e.What
 		err = e
 	}
 	f.MilestoneErr = err
 	return err
-}
-
-// milestoneKeyError is err of issue.MatchMilestone for a milestone of the
-// config, at key: it names the key, and its fix says to change it.
-func milestoneKeyError(key string, err error) *render.Error {
-	e := render.FromError(err)
-	fix := fmt.Sprintf("%s, or fix %s", e.Fix, key)
-	if errors.Is(err, issue.ErrAmbiguousMilestone) {
-		fix = "write more of the title in " + key
-	}
-	return render.Usage("%s: %s", key, e.What).WithAllowed(e.Allowed...).WithFix(fix).WithCause(err)
 }
 
 // repoLabels reads the names of all labels of repo, for an allowed list.

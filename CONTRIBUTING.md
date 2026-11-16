@@ -243,6 +243,7 @@ Every command is checked against these rules.
 | `internal/graph`    | GraphQL client over go-gh: retries, pagination, error mapping      |
 | `internal/render`   | Errors, exit codes, confirmations, folding with counts             |
 | `internal/agent`    | `agent install`'s files: targets, markers, writing, diffs          |
+| `internal/doctor`   | `doctor`'s checks of the setup and its report                      |
 | `internal/release`  | `release`: a release's commits, their pull requests and keywords   |
 | `internal/testutil` | Test helpers shared across packages: golden files                  |
 
