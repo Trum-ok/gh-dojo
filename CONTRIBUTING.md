@@ -237,9 +237,9 @@ Every command is checked against these rules.
 | `cmd/gh-dojo`       | Entry point; cobra commands, verbs built from the config           |
 | `internal/config`   | Loading and validating `.github/dojo.toml`; embedded presets        |
 | `internal/board`    | Board schema for user and org projects, its cache, config checks   |
-| `internal/workflow` | Verb checks and the effect plan                                    |
-| `internal/effects`  | Effects → one GraphQL mutation                                     |
-| `internal/issue`    | Reading issues (cards) and batches of them                         |
+| `internal/workflow` | Verb checks and the effect plan; `new`'s checks and plan           |
+| `internal/effects`  | Effects → one GraphQL mutation; `new`'s mutations                  |
+| `internal/issue`    | Reading issues (cards) and batches of them; what `new` reads       |
 | `internal/graph`    | GraphQL client over go-gh: retries, pagination, error mapping      |
 | `internal/render`   | Errors, exit codes, confirmations, folding with counts             |
 | `internal/agent`    | `agent install`'s files: targets, markers, writing, diffs          |

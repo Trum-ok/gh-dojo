@@ -116,26 +116,3 @@ func TestParseAssignees(t *testing.T) {
 		t.Errorf("parseAssignees = %q, want %q", got, want)
 	}
 }
-
-// TestNewContextQueryAssignees: without --assignee the read is
-// newContextQuery as recorded; with it, each login is looked up under its
-// own alias, @me reads the viewer, and the recent issues their assignees.
-func TestNewContextQueryAssignees(t *testing.T) {
-	if q := newContextQueryWith(nil, false, nil); q != newContextQuery {
-		t.Errorf("without assignees the query changed:\n%s", q)
-	}
-	q := newContextQueryWith(nil, false, []string{"@me", "octocat", "monalisa"})
-	for _, want := range []string{
-		"$window: Int!, $assignee0: String!, $assignee1: String!)",
-		"    assignee0: assignableUsers(query: $assignee0, first: 100) { nodes { id login } }\n    assignee1: assignableUsers(query: $assignee1",
-		newIssueAssignees,
-		"  viewer { id login }\n}",
-	} {
-		if !strings.Contains(q, want) {
-			t.Errorf("query lacks %q:\n%s", want, q)
-		}
-	}
-	if strings.Contains(q, "assignee2") {
-		t.Errorf("@me got an alias:\n%s", q)
-	}
-}

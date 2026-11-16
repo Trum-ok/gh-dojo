@@ -40,14 +40,14 @@ var newFixArgs = []string{"new", "Fix login redirect", "--type", "bug", "--area"
 func TestNewContextRecorded(t *testing.T) {
 	srv := graphtest.New(t, newContextFixture)
 	repo := issue.Repo{Owner: "Trum-ok", Name: "gh-dojo"}
-	nc, err := readNewContext(context.Background(), srv.Client(), repo, "Status", nil, nil, nil)
+	nc, err := issue.ReadNewContext(context.Background(), srv.Client(), issue.NewRequest{Repo: repo, StatusField: "Status"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if nc.RepoID == "" || len(nc.Issues) == 0 || len(nc.Issues) > newDedupWindow {
+	if nc.RepoID == "" || len(nc.Issues) == 0 || len(nc.Issues) > issue.NewDedupWindow {
 		t.Errorf("repo %q, %d issues", nc.RepoID, len(nc.Issues))
 	}
-	if !slices.ContainsFunc(nc.Labels.Nodes, func(l newLabel) bool { return l.Name == "bug" }) {
+	if !slices.ContainsFunc(nc.Labels.Nodes, func(l issue.Label) bool { return l.Name == "bug" }) {
 		t.Errorf("labels = %v, want bug among them", nc.Labels.Nodes)
 	}
 	if len(nc.Milestones.Nodes) == 0 || nc.Milestones.Nodes[0].ID == "" || nc.Milestones.Nodes[0].Title == "" {

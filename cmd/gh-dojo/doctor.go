@@ -562,11 +562,11 @@ func (f *labelsFound) has(name string) bool {
 func allLabels(ctx context.Context, q graph.Querier, repo issue.Repo) (*labelsFound, error) {
 	type resp struct {
 		Repository *struct {
-			Labels graph.Connection[newLabel] `json:"labels"`
+			Labels graph.Connection[issue.Label] `json:"labels"`
 		} `json:"repository"`
 	}
 	vars := map[string]any{"owner": repo.Owner, "repo": repo.Name}
-	page, err := graph.Paginate(ctx, q, newLabelsQuery, vars, 0, func(r *resp) *graph.Connection[newLabel] {
+	page, err := graph.Paginate(ctx, q, issue.LabelsQuery, vars, 0, func(r *resp) *graph.Connection[issue.Label] {
 		if r.Repository == nil {
 			return nil
 		}
