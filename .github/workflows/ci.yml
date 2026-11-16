@@ -14,8 +14,8 @@ jobs:
   checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
       - name: Format
@@ -38,6 +38,8 @@ jobs:
         run: |
           script/build-release.sh v0.0.0-ci
           dist/gh-dojo_v0.0.0-ci_linux-amd64 --version | grep -Fx "gh dojo version v0.0.0-ci"
+          (cd dist && sha256sum -c --strict gh-dojo_v0.0.0-ci_checksums.txt)
+          test "$(wc -l <dist/gh-dojo_v0.0.0-ci_checksums.txt)" -eq 6
       # The agent skill is generated from .github/dojo.toml by this branch's
       # build: a config or command change without `make agent` fails here.
       - name: Agent instructions
@@ -57,8 +59,8 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
       - name: Test

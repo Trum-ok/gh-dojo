@@ -90,6 +90,21 @@ darwin, linux and windows for amd64 and arm64 with the tag stamped into
 `gh dojo --version`, and publishes them as a GitHub release for
 `gh extension install`. A tag with a `-` (`v0.1.0-rc.1`) makes a prerelease.
 
+Next to the binaries the release has `gh-dojo_<tag>_checksums.txt`, their
+SHA-256 sums, and every asset has a build provenance attestation: a
+statement, signed through Sigstore with the workflow's OIDC identity, that
+`release.yml` of this repository built that file from the tagged commit.
+Anyone can check a downloaded binary against it:
+
+```sh
+gh release download v0.5.0 --repo Trum-ok/gh-dojo --pattern '*darwin-arm64'
+gh attestation verify gh-dojo_v0.5.0_darwin-arm64 --repo Trum-ok/gh-dojo
+```
+
+The actions in the workflows are pinned to commit SHAs, with the version in
+a comment: a tag or branch can be moved to other code, a SHA cannot.
+Dependabot updates the SHA and the comment together.
+
 Once the tag is pushed, its issues move to Done with the installed
 `gh dojo`: `gh dojo release vX.Y.Z --verb done --dry-run` lists them (found
 through `Refs #N` and closing keywords in the commits since the previous

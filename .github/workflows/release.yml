@@ -4,13 +4,21 @@ name: Release
 # arm64 and publishes the binaries as a GitHub release, which is what
 # `gh extension install Trum-ok/gh-dojo` downloads. A tag with a "-" (for
 # example v0.1.0-rc.1) becomes a prerelease. The tag is stamped into
-# `gh dojo --version` by script/build-release.sh.
+# `gh dojo --version` by script/build-release.sh, which also writes the
+# SHA-256 sums of the binaries.
+#
+# Every asset gets a build provenance attestation: a Sigstore-signed
+# statement that this workflow built it from this repository at the tagged
+# commit. `gh attestation verify <file> --repo Trum-ok/gh-dojo` checks it
+# (see CONTRIBUTING.md, Releases).
 on:
   push:
     tags: ["v*"]
 
 permissions:
-  contents: write
+  contents: write     # create the release and upload its assets
+  id-token: write     # sign the attestations through Sigstore
+  attestations: write # store them on the repository
 
 concurrency:
   group: release-${{ github.ref }}
@@ -19,13 +27,14 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
       - name: Test
         run: go test ./...
-      - uses: cli/gh-extension-precompile@v2
+      - uses: cli/gh-extension-precompile@76961aa3bd1123d0a6fd42d0a41aca0696937c39 # v2.2.0
         with:
           go_version_file: go.mod
           build_script_override: script/build-release.sh
+          generate_attestations: true
