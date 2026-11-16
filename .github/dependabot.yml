@@ -1,7 +1,8 @@
 version: 2
 updates:
   - package-ecosystem: gomod
-    directory: /
+    # tools: the linters CI runs (tools/go.mod)
+    directories: [/, /tools]
     schedule:
       interval: weekly
     groups:

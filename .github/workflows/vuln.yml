@@ -1,0 +1,31 @@
+name: govulncheck
+
+# Known vulnerabilities in the code gh-dojo calls, its modules and the Go
+# standard library it is built with. Daily as well as on changes: a new
+# vulnerability is published while the code stays the same. govulncheck
+# reports only what the code can reach; a vulnerable module whose affected
+# functions are not called shows in the log but does not fail the run.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "41 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  govulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # go.mod's go line picks the latest patch release, the one a release
+      # would be built with, so standard library fixes are checked too.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          check-latest: true
+      - name: govulncheck
+        run: make vuln

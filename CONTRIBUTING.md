@@ -8,6 +8,8 @@ Requires Go (the version in `go.mod`) and `gh`.
 make build    # ./gh-dojo, stamped with git describe
 make test     # go test ./...
 make vet      # go vet ./...
+make lint     # staticcheck, also as Windows and macOS see the code
+make vuln     # govulncheck: known vulnerabilities the code can reach
 make dist     # release binaries for all platforms into dist/
 make agent    # regenerate the agent skill from .github/dojo.toml
 make install  # build and install as the gh dojo extension (see below)
@@ -19,11 +21,24 @@ videos in [`docs/media/`](docs/media).
 
 CI (`.github/workflows/ci.yml`) runs on pushes to `main` and on pull
 requests. Once, on Linux: `gofmt -l .` must print nothing, then
-`go mod tidy -diff`, `go vet ./...` (also with `GOOS=windows` and
-`GOOS=darwin`), `go vet -tags e2e ./e2e`, the release build, and
-`agent install --check` with that build (see below). On Ubuntu, macOS and Windows:
-`go test ./...` (with `-race` on Ubuntu) and `go build ./...`. Run the
-checks and `go test -race ./...` before sending a change.
+`go mod tidy -diff` (for `tools/` too), `go vet ./...` (also with
+`GOOS=windows` and `GOOS=darwin`), `go vet -tags e2e ./e2e`, `make lint`,
+the release build, and `agent install --check` with that build (see below).
+On Ubuntu, macOS and Windows: `go test ./...` (with `-race` on Ubuntu) and
+`go build ./...`. Run the checks, `make lint` and `go test -race ./...`
+before sending a change.
+
+The linters are pinned in `tools/go.mod`, a module of their own, so they add
+nothing to gh-dojo's dependencies; dependabot updates them with the rest.
+`make lint` and `make vuln` build them into `.tools/`. A staticcheck finding
+is fixed, not silenced; if one is wrong, a `//lint:ignore <check> <reason>`
+on that line says why.
+
+`.github/workflows/vuln.yml` runs `make vuln` on pushes to `main`, on pull
+requests and daily, with the latest patch release of Go, since vulnerabilities
+are published while the code stays the same. It fails only on a
+vulnerability the code can reach; a vulnerable module whose affected code is
+never called is listed in the log, and dependabot updates it.
 
 Code and tests must work on all three: build paths with `path/filepath`,
 show them to users with `filepath.ToSlash`, and keep OS error texts out of

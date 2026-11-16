@@ -4,6 +4,9 @@
 /gh-dojo.tmp
 /dist/
 
+# Linters built by make tools
+/.tools/
+
 # IDE
 .idea/
 

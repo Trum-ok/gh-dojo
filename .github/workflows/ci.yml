@@ -25,13 +25,18 @@ jobs:
             echo "gofmt needed on:"; echo "$unformatted"; exit 1
           fi
       - name: Tidy
-        run: go mod tidy -diff
+        run: |
+          go mod tidy -diff
+          (cd tools && go mod tidy -diff)
       - name: Vet
         run: |
           go vet ./...
           GOOS=windows go vet ./...
           GOOS=darwin go vet ./...
           go vet -tags e2e ./e2e
+      # staticcheck, pinned in tools/go.mod, on the same systems as vet.
+      - name: Staticcheck
+        run: make lint
       # The same script the release workflow runs, so a broken release build
       # shows up before a tag is pushed.
       - name: Release build

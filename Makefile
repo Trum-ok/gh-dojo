@@ -9,7 +9,7 @@ LDFLAGS := -X main.version=$(VERSION)
 # last path element must be gh-dojo.
 INSTALL_DIR ?= $(HOME)/.local/share/gh-dojo/$(BIN)
 
-.PHONY: build test vet golden agent dist install demo
+.PHONY: build test vet lint vuln tools golden agent dist install demo
 
 build:
 	go build -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/gh-dojo
@@ -19,6 +19,26 @@ test:
 
 vet:
 	go vet ./...
+
+# The linters, at the versions pinned in tools/go.mod, built for this machine
+# into .tools/ so they can check the code as other systems see it (GOOS).
+TOOLS := $(CURDIR)/.tools
+
+tools:
+	go build -modfile=tools/go.mod -o $(TOOLS)/ \
+		honnef.co/go/tools/cmd/staticcheck golang.org/x/vuln/cmd/govulncheck
+
+# staticcheck on every system CI vets, and on the e2e tests.
+lint: tools
+	$(TOOLS)/staticcheck ./...
+	GOOS=windows $(TOOLS)/staticcheck ./...
+	GOOS=darwin $(TOOLS)/staticcheck ./...
+	$(TOOLS)/staticcheck -tags e2e ./e2e
+
+# Known vulnerabilities in the code gh-dojo calls, its modules and the Go
+# standard library it is built with.
+vuln: tools
+	$(TOOLS)/govulncheck ./...
 
 # Rewrite golden files under testdata/ with the current output; review the
 # diff before committing. Refused when CI is set.
