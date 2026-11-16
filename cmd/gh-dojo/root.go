@@ -11,6 +11,7 @@ import (
 	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 // Adding a command: create a new file in this package that defines a
@@ -89,6 +90,7 @@ func buildRoot(ctors []constructor) (*cobra.Command, error) {
 	}
 	// --version is gh-dojo's own, not cobra's, so it prints JSON too.
 	root.Flags().BoolP("version", "v", false, "version for gh dojo")
+	cobra.AddTemplateFunc("flagUsages", flagUsages)
 	root.SetUsageTemplate(rootUsageTemplate(root.UsageTemplate()))
 	addOutputFlags(root)
 	root.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
@@ -152,12 +154,35 @@ const rootSectionsAnnotation = "gh-dojo:sections"
 
 // rootUsageTemplate adds the root help sections to cobra's usage template,
 // right before the flags. Subcommands inherit the template, so it prints
-// them only for the root.
+// them only for the root. The flag lists go through flagUsages.
 func rootUsageTemplate(tmpl string) string {
 	const flags = "{{if .HasAvailableLocalFlags}}"
 	sections := `{{if not .HasParent}}{{index .Annotations "` + rootSectionsAnnotation + `"}}{{end}}`
-	return strings.Replace(tmpl, flags, sections+flags, 1)
+	tmpl = strings.Replace(tmpl, flags, sections+flags, 1)
+	tmpl = strings.ReplaceAll(tmpl, ".LocalFlags.FlagUsages", "flagUsages .LocalFlags")
+	return strings.ReplaceAll(tmpl, ".InheritedFlags.FlagUsages", "flagUsages .InheritedFlags")
 }
+
+// flagUsages is fs.FlagUsages with a boolean flag shown as --json, not as
+// pflag 1.1's --json[=true|false]: a bare --json is how it is used, and
+// help is read by agents, so the suffix only costs tokens. pflag adds it to
+// a "bool" value that has IsBoolFlag; the copies rendered here hide that
+// method, which parsing never sees, and the rest of the line is unchanged.
+func flagUsages(fs *pflag.FlagSet) string {
+	shown := pflag.NewFlagSet(fs.Name(), pflag.ContinueOnError)
+	shown.SortFlags = fs.SortFlags
+	fs.VisitAll(func(f *pflag.Flag) {
+		c := *f
+		if c.Value.Type() == "bool" {
+			c.Value = plainBool{c.Value}
+		}
+		shown.AddFlag(&c)
+	})
+	return shown.FlagUsages()
+}
+
+// plainBool is a boolean flag value without IsBoolFlag, see flagUsages.
+type plainBool struct{ pflag.Value }
 
 // exitCodesHelp lists the exit codes with what to do next, for the root
 // help.
