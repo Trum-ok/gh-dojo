@@ -355,7 +355,10 @@ func (r *verbRun) partial(missed []workflow.Op, cause, err error) error {
 	}
 	e := render.FromError(err)
 	next := "re-run the same command"
-	if fix := strings.TrimSpace(e.Fix); fix != "" {
+	switch fix := strings.TrimSpace(e.Fix); {
+	case e.Wait != "": // a rate limit: its fix already says to wait, then re-run
+		next = "wait " + e.Wait + ", then " + next
+	case fix != "":
 		next = fix + ", then " + next
 	}
 	return render.Partial("%s; %s: %s; %s", r.applied().Confirm(), missedText(missed, cause), reason(err), next).

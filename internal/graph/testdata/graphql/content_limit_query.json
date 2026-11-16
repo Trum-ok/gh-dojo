@@ -1,0 +1,18 @@
+{
+  "comment": "GitHub's limit on creating content over HTTP: 403 with Retry-After longer than MaxRetryWait, so the query is not retried. Message from https://github.com/orgs/community/discussions/32120",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "Viewer",
+      "query": "query Viewer { viewer { login } }",
+      "status": 403,
+      "headers": {
+        "Retry-After": "60"
+      },
+      "response": {
+        "documentation_url": "https://docs.github.com/free-pro-team@latest/rest/overview/rate-limits-for-the-rest-api#about-secondary-rate-limits",
+        "message": "You have exceeded a secondary rate limit and have been temporarily blocked from content creation. Please retry your request again later."
+      }
+    }
+  ]
+}

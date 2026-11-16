@@ -30,7 +30,19 @@ func TestComment(t *testing.T) {
 	}
 }
 
-// TestCommentDryRun: the dry run reads the card and posts nothing (the
+// TestCommentContentLimit (#67): GitHub's limit on creating content is
+// exit code 4 with the wait, not "rejected the request" (exit 1).
+func TestCommentContentLimit(t *testing.T) {
+	withConfig(t, dojoConfig)
+	withApp(t, boardFixture, card3Fixture, "testdata/graphql/comment_content_limit.json")
+	code, out := runOut("comment", "3", "  Reproduced on main.\n")
+	testutil.Golden(t, "comment/content_limit", out)
+	if code != render.ExitNetwork {
+		t.Errorf("code = %d, want %d", code, render.ExitNetwork)
+	}
+}
+
+// TestCommentDryRun:the dry run reads the card and posts nothing (the
 // fixtures have no AddComment to answer): the text it would post, or that
 // it is the last comment already.
 func TestCommentDryRun(t *testing.T) {

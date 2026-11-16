@@ -60,6 +60,12 @@ func TestErrorFormat(t *testing.T) {
 		{"graphql_rate_limited", &api.GraphQLError{Errors: []api.GraphQLErrorItem{{Type: "NOT_FOUND", Message: "x"}, {Type: "RATE_LIMITED", Message: "API rate limit exceeded"}}}, ExitNetwork},
 		{"graphql_wrapped", fmt.Errorf("move #42: %w", &api.GraphQLError{Errors: []api.GraphQLErrorItem{{Message: "Argument 'fieldId' on InputObject has an invalid value (PVTF_lADOBn1234567zM4A)"}}}), ExitUsage},
 		{"http_secondary_rate_limit", &api.HTTPError{StatusCode: 403, Message: "You have exceeded a secondary rate limit. Please wait a few minutes before you try again.", RequestURL: mustURL("https://api.github.com/graphql")}, ExitNetwork},
+		// GitHub's limit on creating content: UNPROCESSABLE "was submitted
+		// too quickly" in a 200 (cli/cli#4801), a 403 over HTTP.
+		{"graphql_content_limit", &api.GraphQLError{Errors: []api.GraphQLErrorItem{{Type: "UNPROCESSABLE", Message: "was submitted too quickly", Path: []any{"addComment"}}}}, ExitNetwork},
+		{"graphql_secondary_rate_limit", &api.GraphQLError{Errors: []api.GraphQLErrorItem{{Message: "You have exceeded a secondary rate limit. Please wait a few minutes before you try again."}}}, ExitNetwork},
+		{"http_content_limit", &api.HTTPError{StatusCode: 403, Message: "You have exceeded a secondary rate limit and have been temporarily blocked from content creation. Please retry your request again later.", Headers: http.Header{"Retry-After": {"60"}}, RequestURL: mustURL("https://api.github.com/graphql")}, ExitNetwork},
+		{"http_content_limit_no_retry_after", &api.HTTPError{StatusCode: 403, Message: "You have exceeded a secondary rate limit and have been temporarily blocked from content creation. Please retry your request again later.", RequestURL: mustURL("https://api.github.com/graphql")}, ExitNetwork},
 		{"http_retry_after", &api.HTTPError{StatusCode: 403, Message: "Forbidden", Headers: http.Header{"Retry-After": {"60"}}, RequestURL: mustURL("https://api.github.com/graphql")}, ExitNetwork},
 		{"http_403_forbidden", &api.HTTPError{StatusCode: 403, Message: "Resource not accessible by integration", RequestURL: mustURL("https://api.github.com/graphql")}, ExitNetwork},
 		{"http_422_id", &api.HTTPError{StatusCode: 422, Message: "Validation failed for PVT_kwHOAbc12345", RequestURL: mustURL("https://api.github.com/x")}, ExitUsage},

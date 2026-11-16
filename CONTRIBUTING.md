@@ -200,6 +200,14 @@ Every command is checked against these rules.
   backoff, at most `MaxAttempts` sends (`internal/graph/graph.go`).
   Mutations are sent once: re-running the command re-reads the state and
   finishes what is left.
+- GitHub's limit on creating content (issues, comments; a secondary rate
+  limit) is exit code 4 whose fix says to wait (`Retry-After` when GitHub
+  gives one, else "a few minutes") before the re-run, and a partial run
+  (exit 5) keeps that wait. GitHub gives it no type of its own: in a 200
+  GraphQL answer it is `UNPROCESSABLE` "was submitted too quickly", over
+  HTTP a 403 "…blocked from content creation", and `createIssue` may answer
+  with no issue and no error at all (#67). So `render.IsContentLimit`
+  matches GitHub's wording; add a phrase there when GitHub words it anew.
 - Auth comes only from gh's token (or `GH_TOKEN`); gh-dojo stores no secrets,
   never prints the token and sends no telemetry.
 

@@ -1,0 +1,27 @@
+{
+  "comment": "GitHub's limit on creating content inside a 200 GraphQL answer: type UNPROCESSABLE, \"was submitted too quickly\", the field nulled. Shape from https://github.com/cli/cli/issues/4801 (createIssue there).",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "AddComment",
+      "query": "mutation AddComment($subject: ID!, $body: String!) {\n  addComment(input: {subjectId: $subject, body: $body}) { clientMutationId }\n}",
+      "variables": {
+        "subject": "I_kwDOexample",
+        "body": "hello"
+      },
+      "response": {
+        "data": {
+          "addComment": null
+        },
+        "errors": [
+          {
+            "type": "UNPROCESSABLE",
+            "path": ["addComment"],
+            "locations": [{"line": 2, "column": 3}],
+            "message": "was submitted too quickly"
+          }
+        ]
+      }
+    }
+  ]
+}

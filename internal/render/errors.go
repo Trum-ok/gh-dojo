@@ -65,7 +65,11 @@ type Error struct {
 	What    string   // what is wrong; one line, at most 3
 	Allowed []string // optional: the values that would have been accepted
 	Fix     string   // optional: a command to run next; never cut, dropped if too long
-	Cause   error    // optional: underlying error, never printed
+	// Wait is how long to wait before re-running ("a few minutes", "60s"),
+	// "" for at once: a rate limit sets it, and a partial report built
+	// from the error keeps it next to its "re-run the same command".
+	Wait  string
+	Cause error // optional: underlying error, never printed
 }
 
 // New returns an Error with the given code and message.
@@ -225,6 +229,8 @@ func fromHTTP(err *api.HTTPError) *Error {
 		return NotFound("GitHub API: not found")
 	case s == http.StatusUnauthorized:
 		return Network("GitHub API: %s", msg).WithFix(AuthFix)
+	case (s == http.StatusTooManyRequests || s == http.StatusForbidden) && IsContentLimit(err.Message):
+		return ContentLimited(err.Headers.Get("Retry-After"))
 	case s == http.StatusTooManyRequests, s == http.StatusForbidden && isRateLimit(err):
 		return rateLimited(err.Headers.Get("Retry-After"))
 	case s == http.StatusForbidden:
@@ -253,6 +259,63 @@ func rateLimited(retryAfter string) *Error {
 	return Network("GitHub API rate limit exceeded; retry later")
 }
 
+// ContentLimitWait is how long to wait after GitHub's content creation
+// limit when it does not say: it gives no Retry-After inside a GraphQL
+// answer, and reports of the limit clearing range from a minute to several.
+const ContentLimitWait = "a few minutes"
+
+// ContentLimited reports GitHub's secondary rate limit on creating content
+// (issues, comments, pull requests): exit code 4, with how long to wait
+// from retryAfter (seconds) when it is known. Mutations are never resent
+// (see internal/graph), so the fix is a later re-run.
+func ContentLimited(retryAfter string) *Error {
+	wait := ContentLimitWait
+	if secs, err := strconv.Atoi(strings.TrimSpace(retryAfter)); err == nil && secs > 0 {
+		wait = strconv.Itoa(secs) + "s"
+	}
+	e := Network("GitHub's limit on creating issues and comments was hit").
+		WithFix("wait " + wait + ", then re-run the same command")
+	e.Wait = wait
+	return e
+}
+
+// IsContentLimit reports whether msg, an error message from GitHub, is
+// about its secondary rate limit on creating content. GitHub gives this
+// limit no type of its own: in a GraphQL answer (HTTP 200) it is an error
+// of the generic type UNPROCESSABLE with the message "was submitted too
+// quickly", over HTTP a 403 "You have exceeded a secondary rate limit and
+// have been temporarily blocked from content creation". So the text is
+// the only sign; the phrases are GitHub's own.
+func IsContentLimit(msg string) bool {
+	msg = strings.ToLower(msg)
+	return strings.Contains(msg, "submitted too quickly") || strings.Contains(msg, "content creation")
+}
+
+// GraphQLLimit returns the error for a rate limit among the GraphQL errors
+// of err, nil when none is: RATE_LIMITED (the primary limit), a content
+// creation limit (IsContentLimit), or a secondary rate limit reported by
+// its message.
+func GraphQLLimit(err *api.GraphQLError) *Error {
+	if err == nil {
+		return nil
+	}
+	for _, item := range err.Errors {
+		if item.Type == "RATE_LIMITED" {
+			return rateLimited("")
+		}
+	}
+	for _, item := range err.Errors {
+		msg := strings.ToLower(item.Message)
+		switch {
+		case IsContentLimit(msg):
+			return ContentLimited("")
+		case strings.Contains(msg, "secondary rate limit"), strings.Contains(msg, "abuse detection"):
+			return rateLimited("")
+		}
+	}
+	return nil
+}
+
 // fromGraphQL maps GraphQL errors by type, looking at all of them: rate
 // limits first, then missing scopes, then not found. Messages of other types
 // are never printed, since they can carry queries, field names and node IDs.
@@ -267,8 +330,8 @@ func fromGraphQL(err *api.GraphQLError) *Error {
 		}
 		return api.GraphQLErrorItem{}, false
 	}
-	if _, ok := has("RATE_LIMITED"); ok {
-		return rateLimited("")
+	if e := GraphQLLimit(err); e != nil {
+		return e
 	}
 	if item, ok := has("INSUFFICIENT_SCOPES"); ok {
 		return Network("%s", safeMessage(item.Message, "GitHub token lacks a required scope")).WithFix(AuthFix)

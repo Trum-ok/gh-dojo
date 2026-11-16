@@ -160,6 +160,52 @@ func TestMutationIsNotRetried(t *testing.T) {
 	}
 }
 
+// TestContentLimit: GitHub's limit on creating content is exit code 4 with
+// how long to wait, on a query and on a mutation, inside a 200 GraphQL
+// answer and over HTTP. Nothing is resent, and a mutation it refused is
+// not "may have been applied": GitHub refuses before writing.
+func TestContentLimit(t *testing.T) {
+	const addComment = `mutation AddComment($subject: ID!, $body: String!) {
+  addComment(input: {subjectId: $subject, body: $body}) { clientMutationId }
+}`
+	vars := map[string]any{"subject": "I_kwDOexample", "body": "hello"}
+	for _, tt := range []struct {
+		fixture string
+		run     func(c *graph.Client) error
+	}{
+		{"content_limit_query", func(c *graph.Client) error {
+			return c.Query(context.Background(), viewerQuery, nil, nil)
+		}},
+		{"content_limit_mutation", func(c *graph.Client) error {
+			return c.Mutate(context.Background(), addComment, vars, nil)
+		}},
+		{"content_limit_mutation_403", func(c *graph.Client) error {
+			return c.Mutate(context.Background(), addComment, vars, nil)
+		}},
+	} {
+		t.Run(tt.fixture, func(t *testing.T) {
+			srv := graphtest.New(t, fixture(tt.fixture))
+			err := tt.run(srv.Client())
+			assertError(t, err, render.ExitNetwork, "errors/"+tt.fixture)
+			if errors.Is(err, graph.ErrUnknownOutcome) {
+				t.Error("a refused write is marked graph.ErrUnknownOutcome")
+			}
+			if !graph.AffectsAll(err) {
+				t.Error("AffectsAll = false: a batch would go on into the same limit")
+			}
+			if render.FromError(err).Wait == "" {
+				t.Error("Wait is empty: a partial report would say to re-run at once")
+			}
+			if n := srv.Requests(); n != 1 {
+				t.Errorf("requests = %d, want 1", n)
+			}
+			if s := srv.Sleeps(); len(s) != 0 {
+				t.Errorf("sleeps = %v, want none", s)
+			}
+		})
+	}
+}
+
 func TestMutationWithGarbledResponse(t *testing.T) {
 	srv := graphtest.New(t, fixture("set_status_html_200"))
 	err := srv.Client().Mutate(context.Background(), setStatus, setStatusVars, nil)
@@ -443,6 +489,8 @@ func TestAffectsAll(t *testing.T) {
 		{"403", &api.HTTPError{StatusCode: http.StatusForbidden}, true},
 		{"429", &api.HTTPError{StatusCode: http.StatusTooManyRequests}, true},
 		{"rate_limited", gql("RATE_LIMITED", ""), true},
+		{"content_limit", gql("UNPROCESSABLE", "was submitted too quickly"), true},
+		{"unprocessable", gql("UNPROCESSABLE", "Title can't be blank"), false},
 		{"scopes", gql("INSUFFICIENT_SCOPES", ""), true},
 		{"forbidden", gql("FORBIDDEN", ""), true},
 		{"saml", gql("", "Resource protected by organization SAML enforcement."), true},

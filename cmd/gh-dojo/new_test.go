@@ -314,7 +314,29 @@ func TestNewLostCreate(t *testing.T) {
 	}
 }
 
-// TestNewSameTitle: the marker hashes the title alone, case and spacing
+// TestNewContentLimit (#67): createIssue refused by GitHub's limit on
+// creating content, as an error or as no issue and no error, is exit code
+// 4 with the wait, not an internal error to re-run at once; nothing more
+// is sent, not even a re-read.
+func TestNewContentLimit(t *testing.T) {
+	for _, name := range []string{"content_limit", "no_issue"} {
+		t.Run(name, func(t *testing.T) {
+			withConfig(t, dojoConfig)
+			srv := withApp(t, boardFixture, "testdata/graphql/new_"+name+".json")
+			before := warmSchema(t, srv)
+			code, out := runOut(newFixArgs...)
+			testutil.Golden(t, "new/"+name, out)
+			if code != render.ExitNetwork {
+				t.Errorf("code = %d, want %d", code, render.ExitNetwork)
+			}
+			if n := srv.Requests() - before; n != 2 {
+				t.Errorf("requests = %d, want 2 (read, create)", n)
+			}
+		})
+	}
+}
+
+// TestNewSameTitle:the marker hashes the title alone, case and spacing
 // folded, so another body under the same title resumes the open issue.
 func TestNewSameTitle(t *testing.T) {
 	withConfig(t, dojoConfig)

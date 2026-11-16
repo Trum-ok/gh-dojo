@@ -1,0 +1,5 @@
+code: 4
+--- stdout
+--- stderr
+error: GitHub created no issue and gave no reason, as it does when its limit on creating issues and comments is hit
+fix: wait a few minutes, then re-run the same command

@@ -1,0 +1,34 @@
+{
+  "comment": "Hand-crafted: addComment on issue #3 (card_3.json) refused by GitHub's content limit. GitHub's limit on creating content as an error of type UNPROCESSABLE, \"was submitted too quickly\", the field nulled: shape from https://github.com/cli/cli/issues/4801. Never sent to GitHub.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "AddComment",
+      "query": "mutation AddComment($subject: ID!, $body: String!) {\n  addComment(input: {subjectId: $subject, body: $body}) {\n    commentEdge { node { id } }\n  }\n}",
+      "variables": {
+        "subject": "I_kwDOVq9iIs8AAAABeZKr9A",
+        "body": "Reproduced on main.\n\n<!-- gh-dojo:comment:cd834e33 -->"
+      },
+      "response": {
+        "data": {
+          "addComment": null
+        },
+        "errors": [
+          {
+            "type": "UNPROCESSABLE",
+            "path": [
+              "addComment"
+            ],
+            "locations": [
+              {
+                "line": 2,
+                "column": 3
+              }
+            ],
+            "message": "was submitted too quickly"
+          }
+        ]
+      }
+    }
+  ]
+}

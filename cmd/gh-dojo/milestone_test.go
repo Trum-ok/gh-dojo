@@ -121,7 +121,21 @@ func TestVerbMilestonePartial(t *testing.T) {
 	)
 }
 
-// TestVerbMilestoneClosed: #3 is in v0.3, closed since the verb set it.
+// TestVerbContentLimit (#67): GitHub's limit on creating content refuses
+// the comment after the milestone is set: exit 5 naming both and saying to
+// wait before the re-run. The re-run, which posts the comment alone, is
+// refused again: exit 4 with the wait, not "rejected the request" (exit 1).
+// The third run posts it.
+func TestVerbContentLimit(t *testing.T) {
+	srv, before := withMilestoneApp(t, verbFixture("milestone_content_limit"))
+	checkRuns(t, srv, before,
+		runs{[]string{"plan", "3", "--milestone", "v0.3"}, render.ExitPartial, 2, "content_limit_partial"},
+		runs{[]string{"plan", "3", "--milestone", "v0.3"}, render.ExitNetwork, 2, "content_limit_rerun"},
+		runs{[]string{"plan", "3", "--milestone", "v0.3"}, render.ExitOK, 2, "milestone_partial_rerun"},
+	)
+}
+
+// TestVerbMilestoneClosed:#3 is in v0.3, closed since the verb set it.
 // Named by its whole title, in any case, it is in place, though no open
 // milestone matches any more: the repeat writes nothing.
 func TestVerbMilestoneClosed(t *testing.T) {

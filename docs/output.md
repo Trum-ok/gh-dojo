@@ -34,6 +34,17 @@ error: #42 labels +in-review, assigned octocat, comment left; status not changed
 fix: gh auth refresh -s project
 ```
 
+A rate limit says how long to wait before the re-run, in its `fix:` and in
+a partial write's message: GitHub's limit on creating issues and comments,
+hit after many of them in a short time, waits as long as GitHub's
+`Retry-After` says, else a few minutes:
+
+```console
+$ gh dojo ready 66 --comment cc5ff46
+error: #66 In progress → Ready; comment not posted: GitHub's limit on creating issues and comments was hit; wait a few minutes, then re-run the same command
+fix: wait a few minutes, then re-run the same command
+```
+
 ## Several issues at once
 
 A verb with `batch = true` takes several issue numbers; other verbs take

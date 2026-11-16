@@ -233,6 +233,11 @@ func (c *Client) describe(err error, mutation bool) *render.Error {
 		}
 		return render.FromError(httpErr)
 	case errors.As(err, &gqlErr) && gqlErr != nil:
+		if e := render.GraphQLLimit(gqlErr); e != nil {
+			// A limit refuses the write before it is applied: re-running
+			// later is safe and needs no "may have been applied".
+			return e
+		}
 		if unfinished(gqlErr) {
 			if mutation {
 				return mayHaveApplied("GitHub did not finish it")
@@ -278,8 +283,8 @@ func describeGraphQL(err *api.GraphQLError) *render.Error {
 		}
 		return api.GraphQLErrorItem{}, false
 	}
-	if _, ok := has("RATE_LIMITED"); ok {
-		return render.FromError(err)
+	if e := render.GraphQLLimit(err); e != nil {
+		return e
 	}
 	if item, ok := has("INSUFFICIENT_SCOPES"); ok {
 		return render.Network("GitHub token is missing a required scope%s", scopesHint(item.Message)).WithFix(render.AuthFix)
@@ -437,7 +442,8 @@ func IsCycle(err error) bool {
 
 // AffectsAll reports whether err is about the token or the run rather than
 // the request: the token rejected or missing a scope, access denied (SSO,
-// OAuth app restrictions), a primary or secondary rate limit, or the run
+// OAuth app restrictions), a primary or secondary rate limit (the limit on
+// creating content too: it holds for the next issue's comment), or the run
 // interrupted. The same request for another issue would fail alike, so a
 // run over several issues stops sending.
 func AffectsAll(err error) bool {
@@ -450,9 +456,12 @@ func AffectsAll(err error) bool {
 		s := httpErr.StatusCode
 		return s == http.StatusUnauthorized || s == http.StatusForbidden || s == http.StatusTooManyRequests
 	case errors.As(err, &gqlErr) && gqlErr != nil:
+		if render.GraphQLLimit(gqlErr) != nil {
+			return true
+		}
 		for _, item := range gqlErr.Errors {
 			switch {
-			case item.Type == "RATE_LIMITED", item.Type == "INSUFFICIENT_SCOPES", item.Type == "FORBIDDEN",
+			case item.Type == "INSUFFICIENT_SCOPES", item.Type == "FORBIDDEN",
 				samlFailure(item), strings.Contains(strings.ToLower(item.Message), "oauth app access restrictions"):
 				return true
 			}

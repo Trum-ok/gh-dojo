@@ -1274,6 +1274,18 @@ func recheckPause(ctx context.Context) bool {
 	}
 }
 
+// noIssueCreated is the error for a createIssue answer with no issue and
+// no error: GitHub answers so when its limit on creating content is hit
+// (seen on this repository, #67, while addComment got the limit's error).
+// So it is exit code 4 with the limit's wait, not an internal error to
+// re-run at once. Should GitHub have created the issue after all, a
+// re-run finds it by its marker.
+func noIssueCreated() *render.Error {
+	e := render.ContentLimited("")
+	e.What = "GitHub created no issue and gave no reason, as it does when its limit on creating issues and comments is hit"
+	return e
+}
+
 // recheck re-reads the newest issues after a lost createIssue answer and
 // returns the issue with marker, or nil when it is not there or the read
 // fails.
@@ -1321,7 +1333,7 @@ func (r *newRun) create(ctx context.Context, repoID, body string, labels []newLa
 	err := r.Client.Mutate(ctx, newCreateMutation, vars, &out)
 	if out.Create == nil || out.Create.Issue == nil || out.Create.Issue.Number == 0 {
 		if err == nil {
-			err = render.Internal("createIssue returned no issue")
+			err = noIssueCreated()
 		}
 		return err
 	}
@@ -1642,7 +1654,10 @@ func (r *newRun) partial(err error) error {
 			WithFix("gh dojo show " + strings.TrimPrefix(r.name(), "#")).WithCause(err)
 	}
 	fix := fmt.Sprintf("re-run the same gh dojo new command: it finds %s and finishes it", r.name())
-	if e.Fix != "" && e.Fix != render.InternalFix {
+	switch {
+	case e.Wait != "": // a rate limit: its fix already says to wait, then re-run
+		fix = "wait " + e.Wait + ", then " + fix
+	case e.Fix != "" && e.Fix != render.InternalFix:
 		fix = e.Fix + "; then re-run the same gh dojo new command"
 	}
 	return render.Partial("%s %s, but %s\n%s", r.name(), what, step, why).WithFix(fix).WithCause(err)
