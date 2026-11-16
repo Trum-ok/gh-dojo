@@ -69,9 +69,5 @@ func joinWords(words []string, conj string) string {
 	return strings.Join(words[:len(words)-1], ", ") + " " + conj + " " + words[len(words)-1]
 }
 
-func hasPrefixFold(s, prefix string) bool {
-	return len(s) >= len(prefix) && strings.EqualFold(s[:len(prefix)], prefix)
-}
-
 // runes is the length of s in runes.
 func runes(s string) int { return utf8.RuneCountInString(s) }

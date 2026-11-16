@@ -14,6 +14,7 @@ import (
 
 	"github.com/Trum-ok/gh-dojo/internal/board"
 	"github.com/Trum-ok/gh-dojo/internal/config"
+	"github.com/Trum-ok/gh-dojo/internal/doctor"
 	"github.com/Trum-ok/gh-dojo/internal/graph"
 	"github.com/Trum-ok/gh-dojo/internal/graph/graphtest"
 	"github.com/Trum-ok/gh-dojo/internal/render"
@@ -336,13 +337,13 @@ status = "Status"
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := &doctorReport{}
-	checkSprint(r, cfg, s, testNow, nil) // no fields.sprint: no line
+	r := &doctor.Report{}
+	doctor.CheckSprint(r, cfg, s, testNow, nil) // no fields.sprint: no line
 	sprints, err := config.Parse([]byte(sprintsPresetConfig), ".github/dojo.toml")
 	if err != nil {
 		t.Fatal(err)
 	}
-	checkSprint(r, sprints, s, testNow, nil) // the sprints preset's Sprint field
+	doctor.CheckSprint(r, sprints, s, testNow, nil) // the sprints preset's Sprint field
 	for _, tt := range []struct {
 		field string
 		now   time.Time
@@ -354,7 +355,7 @@ status = "Status"
 		{"Nope", testNow}, // board.Problems reports a missing field
 	} {
 		cfg.Fields["sprint"] = tt.field
-		checkSprint(r, cfg, s, tt.now, nil)
+		doctor.CheckSprint(r, cfg, s, tt.now, nil)
 	}
 
 	// A cached schema without today's iteration is re-read once: Sprint
@@ -371,9 +372,9 @@ status = "Status"
 	}
 	refetches := 0
 	refetch := func() (*board.Schema, error) { refetches++; return s, nil }
-	checkSprint(r, cfg, &stale, testNow, refetch)
+	doctor.CheckSprint(r, cfg, &stale, testNow, refetch)
 	stale.Cached = false
-	checkSprint(r, cfg, &stale, testNow, refetch)
+	doctor.CheckSprint(r, cfg, &stale, testNow, refetch)
 	if refetches != 1 {
 		t.Errorf("%d re-reads of the board, want 1 (for the cached schema only)", refetches)
 	}
@@ -392,37 +393,10 @@ sprint = "Sprint"
 	if err != nil {
 		t.Fatal(err)
 	}
-	checkSprint(r, tz, s, time.Date(2026, 11, 22, 22, 30, 0, 0, time.UTC), nil)
+	doctor.CheckSprint(r, tz, s, time.Date(2026, 11, 22, 22, 30, 0, 0, time.UTC), nil)
 	var b strings.Builder
-	r.write(&b)
+	writeDoctor(&b, r)
 	testutil.Golden(t, "doctor/sprint", []byte(b.String()))
-}
-
-// TestDoctorLabelsFound: label names come from the first page and the
-// searches; they are complete only when the first page has every label.
-func TestDoctorLabelsFound(t *testing.T) {
-	c := &labelsCheck{types: []string{"bug"}, prefix: "area:"}
-	for _, tt := range []struct {
-		name     string
-		answer   string
-		names    int
-		complete bool
-	}{
-		{"one page", `{"labels": {"totalCount": 2, "nodes": [{"name": "bug"}, {"name": "area:cli"}]},
-			"type0": {"nodes": [{"name": "bug"}]}, "area": {"nodes": [{"name": "area:cli"}]}}`, 2, true},
-		// Search found these past the first page, but not necessarily all.
-		{"more labels", `{"labels": {"totalCount": 101, "nodes": [{"name": "x"}]},
-			"type0": {"nodes": [{"name": "Bug"}]}, "area": {"nodes": [{"name": "area:cli"}, {"name": "area:db"}]}}`, 4, false},
-		{"repository null", `null`, 0, true},
-	} {
-		f := c.found(json.RawMessage(tt.answer))
-		if len(f.names) != tt.names || f.complete != tt.complete {
-			t.Errorf("%s: %d names, complete %v; want %d, %v", tt.name, len(f.names), f.complete, tt.names, tt.complete)
-		}
-	}
-	if f := c.found(json.RawMessage(`{"type0": {"nodes": [{"name": "Bug"}]}}`)); !f.has("bug") || f.has("bugs") {
-		t.Error("has: want a match regardless of case, and only of the whole name")
-	}
 }
 
 // withClient makes newApp use c and a private schema cache.
@@ -461,59 +435,3 @@ assign = true
 when = "Hand it to the owner"
 assign = "trum-ok"
 `
-
-// TestVerbsCheckLabels: doctor looks up each label verbs add or remove by
-// its exact spelling, and a label a check names only when no entry names
-// it in any case, so +bug and Bug are one label; checks come after the
-// effects whatever the verb order.
-func TestVerbsCheckLabels(t *testing.T) {
-	cfg, err := config.Parse([]byte(verbDojoConfig+`
-[verbs.poke]
-when = "Ask how it goes"
-comment = "{comment}"
-refuse_labels = ["Bug", "wip"]
-
-[verbs.tag]
-when = "It is a bug"
-labels = ["+bug", "-triage"]
-from_labels = ["WIP", "ready"]
-
-[verbs.retag]
-when = "It is a Bug"
-labels = ["+Bug"]
-`), ".github/dojo.toml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := []string{"bug", "triage", "Bug", "wip", "ready"}
-	if got := newVerbsCheck(cfg, "Trum-ok").labels; !slices.Equal(got, want) {
-		t.Errorf("labels = %q, want %q", got, want)
-	}
-}
-
-// TestVerbsCheckUsers: doctor checks the users verbs assign and unassign
-// by login or "@me" (the viewer), each once regardless of case; --assignee
-// and unassign = "all" name nobody to check.
-func TestVerbsCheckUsers(t *testing.T) {
-	cfg, err := config.Parse([]byte(verbDojoConfig+`
-[verbs.pass]
-when = "Pass it on"
-assign = "{assignee}"
-unassign = "@me"
-
-[verbs.hand-back]
-when = "Back to the author alone"
-assign = "Octocat"
-unassign = "all"
-
-[verbs.leave]
-when = "Octocat leaves"
-unassign = "octocat"
-`), ".github/dojo.toml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := newVerbsCheck(cfg, "Trum-ok").users; !slices.Equal(got, []string{"Trum-ok", "Octocat"}) {
-		t.Errorf("users = %q, want Trum-ok (@me) and Octocat", got)
-	}
-}

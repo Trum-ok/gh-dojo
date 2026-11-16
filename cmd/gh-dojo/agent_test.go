@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/Trum-ok/gh-dojo/internal/config"
+	"github.com/Trum-ok/gh-dojo/internal/doctor"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/Trum-ok/gh-dojo/internal/testutil"
 )
@@ -329,7 +330,7 @@ func TestAgentHelp(t *testing.T) {
 // on the gh-dojo version too); a hand-written skill under [agent] is a
 // problem with the same fix as install's.
 func TestDoctorAgent(t *testing.T) {
-	check := func() []doctorCheck {
+	check := func() []doctor.Check {
 		t.Helper()
 		cfg, err := loadConfig()
 		if err != nil {
@@ -339,9 +340,9 @@ func TestDoctorAgent(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		r := &doctorReport{}
+		r := &doctor.Report{}
 		checkAgentFiles(r, cfg, root)
-		if err := r.err(); err != nil && r.Checks[0].Result != checkProblem {
+		if err := r.Err(); err != nil && r.Checks[0].Result != doctor.ResultProblem {
 			t.Errorf("a %s is an error: %v", r.Checks[0].Result, err)
 		}
 		return r.Checks
@@ -361,13 +362,13 @@ func TestDoctorAgent(t *testing.T) {
 
 	withRepo(t, dojoConfig+"[agent]\ntargets = [\"claude\", \"agents-md\"]\n", map[string]string{"AGENTS.md": "# Agents\n"})
 	got := check()
-	if len(got) != 1 || got[0].Result != checkWarn || got[0].Fix == nil || *got[0].Fix != "gh dojo agent install" ||
+	if len(got) != 1 || got[0].Result != doctor.ResultWarn || got[0].Fix == nil || *got[0].Fix != "gh dojo agent install" ||
 		got[0].Detail != "not up to date with .github/dojo.toml or this gh-dojo version: "+
 			".claude/skills/gh-dojo/SKILL.md (missing), AGENTS.md (out of date)" {
 		t.Errorf("stale: %+v", got)
 	}
 	runOut("agent", "install")
-	if got := check(); len(got) != 1 || got[0].Result != checkOK || got[0].Detail != ".claude/skills/gh-dojo/SKILL.md, AGENTS.md: up to date" {
+	if got := check(); len(got) != 1 || got[0].Result != doctor.ResultOK || got[0].Detail != ".claude/skills/gh-dojo/SKILL.md, AGENTS.md: up to date" {
 		t.Errorf("up to date: %+v", got)
 	}
 
@@ -375,13 +376,13 @@ func TestDoctorAgent(t *testing.T) {
 	dir := withRepo(t, dojoConfig, map[string]string{skillPath: "# Mine\n"})
 	runOut("agent", "install", "--agent", "agents-md")
 	writeRepoFile(t, dir, "AGENTS.md", strings.Replace(readRepoFile(t, dir, "AGENTS.md"), "Verbs", "Words", 1))
-	if got := check(); len(got) != 1 || got[0].Result != checkWarn || !strings.HasSuffix(got[0].Detail, ": AGENTS.md (out of date)") {
+	if got := check(); len(got) != 1 || got[0].Result != doctor.ResultWarn || !strings.HasSuffix(got[0].Detail, ": AGENTS.md (out of date)") {
 		t.Errorf("marked AGENTS.md: %+v", got)
 	}
 
 	withRepo(t, dojoConfig+"[agent]\ntargets = [\"claude\"]\n", map[string]string{skillPath: "# Mine\n"})
 	got = check()
-	if len(got) != 1 || got[0].Result != checkProblem || got[0].Fix == nil || !strings.HasPrefix(*got[0].Fix, "move what is worth keeping") {
+	if len(got) != 1 || got[0].Result != doctor.ResultProblem || got[0].Fix == nil || !strings.HasPrefix(*got[0].Fix, "move what is worth keeping") {
 		t.Errorf("hand-written: %+v", got)
 	}
 }
