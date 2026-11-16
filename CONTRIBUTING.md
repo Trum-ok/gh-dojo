@@ -239,6 +239,7 @@ Every command is checked against these rules.
 | `internal/board`    | Board schema for user and org projects, its cache, config checks   |
 | `internal/workflow` | Verb checks and the effect plan; `new`'s checks and plan           |
 | `internal/effects`  | Effects → one GraphQL mutation; `new`'s mutations                  |
+| `internal/batch`    | Running a verb on its issues: one by one, retries, the summary     |
 | `internal/issue`    | Reading issues (cards) and batches of them; what `new` reads       |
 | `internal/graph`    | GraphQL client over go-gh: retries, pagination, error mapping      |
 | `internal/render`   | Errors, exit codes, confirmations, folding with counts             |

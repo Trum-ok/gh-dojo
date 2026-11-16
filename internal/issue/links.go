@@ -1,6 +1,7 @@
 package issue
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -123,6 +124,40 @@ func (r Ref) Same(o Ref) bool { return r.Number == o.Number && sameRepo(r.Repo, 
 
 func sameRepo(a, b Repo) bool {
 	return strings.EqualFold(a.Owner, b.Owner) && strings.EqualFold(a.Name, b.Name)
+}
+
+// CompareRefs orders issues of the default repository first, by number,
+// then the others by repository and number.
+func CompareRefs(def Repo) func(a, b Ref) int {
+	return func(a, b Ref) int {
+		ad, bd := a.Same(Ref{Repo: def, Number: a.Number}), b.Same(Ref{Repo: def, Number: b.Number})
+		switch {
+		case ad != bd && ad:
+			return -1
+		case ad != bd:
+			return 1
+		}
+		if c := cmp.Compare(strings.ToLower(a.Repo.String()), strings.ToLower(b.Repo.String())); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.Number, b.Number)
+	}
+}
+
+// MaxRefNames is how many issues an error line names.
+const MaxRefNames = 10
+
+// RefNames lists issues as "#9, acme/api#10", naming at most MaxRefNames.
+func RefNames(refs []Ref, def Repo) string {
+	names := make([]string, 0, min(len(refs), MaxRefNames))
+	for _, r := range refs[:min(len(refs), MaxRefNames)] {
+		names = append(names, r.String(def))
+	}
+	s := strings.Join(names, ", ")
+	if n := len(refs) - len(names); n > 0 {
+		s += fmt.Sprintf(" and %d more", n)
+	}
+	return s
 }
 
 // BlockingWindow is how many of an issue's links are read each way for

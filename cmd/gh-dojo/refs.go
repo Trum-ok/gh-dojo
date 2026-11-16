@@ -1,8 +1,6 @@
 package main
 
 import (
-	"cmp"
-	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -105,37 +103,13 @@ func refKey(r issue.Ref) string {
 
 // compareRefs orders issues of the default repository first, by number,
 // then the others by repository and number.
-func compareRefs(def issue.Repo) func(a, b issue.Ref) int {
-	return func(a, b issue.Ref) int {
-		ad, bd := a.Same(issue.Ref{Repo: def, Number: a.Number}), b.Same(issue.Ref{Repo: def, Number: b.Number})
-		switch {
-		case ad != bd && ad:
-			return -1
-		case ad != bd:
-			return 1
-		}
-		if c := cmp.Compare(strings.ToLower(a.Repo.String()), strings.ToLower(b.Repo.String())); c != 0 {
-			return c
-		}
-		return cmp.Compare(a.Number, b.Number)
-	}
-}
+func compareRefs(def issue.Repo) func(a, b issue.Ref) int { return issue.CompareRefs(def) }
 
 // maxErrorRefs is how many issues an error line names.
-const maxErrorRefs = 10
+const maxErrorRefs = issue.MaxRefNames
 
 // refNames lists issues as "#9, acme/api#10", naming at most maxErrorRefs.
-func refNames(refs []issue.Ref, def issue.Repo) string {
-	names := make([]string, 0, min(len(refs), maxErrorRefs))
-	for _, r := range refs[:min(len(refs), maxErrorRefs)] {
-		names = append(names, r.String(def))
-	}
-	s := strings.Join(names, ", ")
-	if n := len(refs) - len(names); n > 0 {
-		s += fmt.Sprintf(" and %d more", n)
-	}
-	return s
-}
+func refNames(refs []issue.Ref, def issue.Repo) string { return issue.RefNames(refs, def) }
 
 // fullRef names an issue in full, "owner/name#12", as the JSON does.
 func fullRef(r issue.Ref) string { return r.Repo.String() + "#" + strconv.Itoa(r.Number) }

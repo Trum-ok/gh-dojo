@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Trum-ok/gh-dojo/internal/batch"
 	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/effects"
 	"github.com/Trum-ok/gh-dojo/internal/graph"
@@ -87,7 +88,7 @@ func (b *githubBackend) ReadIssue(ctx context.Context, v config.Verb, ref issue.
 // ReadIssues reads the cards of refs with the lookups of v once per
 // request (see issue.ReadRefs): for one issue, the request ReadIssue
 // sends.
-func (b *githubBackend) ReadIssues(ctx context.Context, v config.Verb, refs []issue.Ref, a workflow.Args) ([]IssueRead, error) {
+func (b *githubBackend) ReadIssues(ctx context.Context, v config.Verb, refs []issue.Ref, a workflow.Args) ([]batch.Read, error) {
 	def, err := b.app.Repo()
 	if err != nil {
 		return nil, err
@@ -100,7 +101,7 @@ func (b *githubBackend) ReadIssues(ctx context.Context, v config.Verb, refs []is
 		}
 		lookup.Links = issue.Links(bys)
 	}
-	out := make([]IssueRead, len(refs))
+	out := make([]batch.Read, len(refs))
 	var read []issue.Ref
 	for i, ref := range refs {
 		ref = ref.In(def)
@@ -628,8 +629,8 @@ func (b *githubBackend) Apply(ctx context.Context, p *workflow.Plan) ([]workflow
 		done    []workflow.Op
 		ignored error // an error next to a result for every field
 	)
-	for _, batch := range effects.Batches(p.Ops) {
-		m, err := effects.Build(batch, ids)
+	for _, ops := range effects.Batches(p.Ops) {
+		m, err := effects.Build(ops, ids)
 		switch {
 		case err != nil && len(done) == 0:
 			return nil, render.Internal("cannot build the mutation for %s", p.Issue.Name()).WithCause(err)
@@ -637,7 +638,7 @@ func (b *githubBackend) Apply(ctx context.Context, p *workflow.Plan) ([]workflow
 			// An earlier mutation answered without an ID this one needs,
 			// such as the new board item.
 			return done, render.Network("GitHub's answer lacked an ID the next write needs").
-				WithCause(errors.Join(errNotSent, err))
+				WithCause(errors.Join(batch.ErrNotSent, err))
 		}
 		var data map[string]json.RawMessage
 		err = b.app.Client.Mutate(ctx, m.Query, m.Vars, &data)
@@ -658,10 +659,6 @@ func (b *githubBackend) Apply(ctx context.Context, p *workflow.Plan) ([]workflow
 	}
 	return done, ignored
 }
-
-// errNotSent marks an Apply error after which the remaining ops were never
-// sent, so they are known not to have happened.
-var errNotSent = errors.New("not sent")
 
 // remember keeps the board item this run added for issue ref: a re-read
 // right after the write may not show it yet.

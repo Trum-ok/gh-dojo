@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/Trum-ok/gh-dojo/internal/batch"
 	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/graph"
 	"github.com/Trum-ok/gh-dojo/internal/issue"
@@ -177,15 +178,15 @@ func runRelease(cmd *cobra.Command, ref string, o *releaseOpts) error {
 		})
 	}
 	b := newBatchRun(cmd, be, cfg, v, o.args, def)
-	b.keep = res.keep(cmd)
+	b.Keep = res.keep(cmd)
 	out := cmd.OutOrStdout()
 	// Once the issues are read and planned: the numbers a message names
 	// that are no issue are left out (keep), and so are the issues not
 	// ready.
-	b.before = func(items []*batchItem) []*batchItem {
+	b.Before = func(items []*batch.Item) []*batch.Item {
 		n := len(items)
 		items = res.ready(v, items)
-		if !b.json {
+		if !b.JSON {
 			fmt.Fprintln(out, res.head(n))
 			for _, line := range []string{res.excludedLine(), res.notReadyLine(v)} {
 				if line != "" {
@@ -198,16 +199,16 @@ func runRelease(cmd *cobra.Command, ref string, o *releaseOpts) error {
 		}
 		return items
 	}
-	items, err := b.run(ctx, refs, o.dryRun)
+	items, err := b.Do(ctx, refs, o.dryRun)
 	if err != nil {
 		return err
 	}
 	var summary error
 	if len(items) > 0 { // none: the head line said why
-		summary = b.summary(items, o.dryRun)
+		summary = b.Summary(items, o.dryRun)
 	}
 	return emitWrite(cmd, res.json(v.Name, backendRepo(be), o.dryRun, items, append(warnings, res.skipWarnings...)),
-		func(io.Writer) {}, summary, slices.ContainsFunc(items, (*batchItem).wrote))
+		func(io.Writer) {}, summary, slices.ContainsFunc(items, (*batch.Item).Wrote))
 }
 
 // releaseVerb is the verb --verb names: one with batch = true.
@@ -340,25 +341,25 @@ func (r *releaseRun) excludedLine() string {
 // ("Fixes #12" in a commit, by hand) out of the process, and no later
 // release would move it; the user decides. The verb's other refusals (a
 // blocker, the user's go-ahead) fail the batch as well.
-func (r *releaseRun) ready(v config.Verb, items []*batchItem) []*batchItem {
-	var out []*batchItem
+func (r *releaseRun) ready(v config.Verb, items []*batch.Item) []*batch.Item {
+	var out []*batch.Item
 	for _, it := range items {
-		if it.err == nil || it.read == nil || !errors.Is(it.err, workflow.ErrFrom) {
+		if it.Err == nil || it.Issue == nil || !errors.Is(it.Err, workflow.ErrFrom) {
 			out = append(out, it)
 			continue
 		}
-		where := placeOf(*it.read)
-		if it.read.Closed {
+		where := placeOf(*it.Issue)
+		if it.Issue.Closed {
 			in := "in " + where
-			if !it.read.OnBoard || it.read.Status == "" {
+			if !it.Issue.OnBoard || it.Issue.Status == "" {
 				in = where
 			}
-			it.fail(render.Denied("%s is closed but %s; %s\nthis is a process rule: ask the user how to proceed",
-				it.ref.String(r.def), in, fromRule(v)).WithCause(it.err))
+			it.Fail(render.Denied("%s is closed but %s; %s\nthis is a process rule: ask the user how to proceed",
+				it.Ref.String(r.def), in, fromRule(v)).WithCause(it.Err))
 			out = append(out, it)
 			continue
 		}
-		r.skipped = append(r.skipped, releaseSkipped{found: r.foundOf(it.ref), reason: skipNotReady, status: where})
+		r.skipped = append(r.skipped, releaseSkipped{found: r.foundOf(it.Ref), reason: skipNotReady, status: where})
 	}
 	return out
 }
@@ -430,8 +431,8 @@ func (r *releaseRun) foundOf(ref issue.Ref) release.Found {
 // issue a merged pull request closes is GitHub's link: if it cannot be
 // read, the batch fails as any batch does. A pull request found through a
 // closing reference cannot happen.
-func (r *releaseRun) keep(cmd *cobra.Command) func(IssueRead) bool {
-	return func(read IssueRead) bool {
+func (r *releaseRun) keep(cmd *cobra.Command) func(batch.Read) bool {
+	return func(read batch.Read) bool {
 		f := r.foundOf(read.Ref)
 		name := f.Ref.String(r.def)
 		var reason, w string
@@ -502,9 +503,9 @@ func (r *releaseRun) noIssues() string {
 //
 //	#5: PR #12
 //	acme/api#3: commit 1a2b3c4
-func (r *releaseRun) list(w io.Writer, items []*batchItem) {
+func (r *releaseRun) list(w io.Writer, items []*batch.Item) {
 	for _, it := range items {
-		fmt.Fprintf(w, "  %s: %s\n", it.ref.String(r.def), r.sources(r.foundOf(it.ref)))
+		fmt.Fprintf(w, "  %s: %s\n", it.Ref.String(r.def), r.sources(r.foundOf(it.Ref)))
 	}
 }
 
@@ -587,7 +588,7 @@ type releaseSkip struct {
 	FoundBy []releaseSource `json:"found_by"`
 }
 
-func (r *releaseRun) json(verb, repo string, dry bool, items []*batchItem, warnings []string) releaseResult {
+func (r *releaseRun) json(verb, repo string, dry bool, items []*batch.Item, warnings []string) releaseResult {
 	v := verbJSON(verb, repo, dry, items)
 	out := releaseResult{
 		Verb: v.Verb, DefaultRepo: v.DefaultRepo, DryRun: dry,
@@ -598,7 +599,7 @@ func (r *releaseRun) json(verb, repo string, dry bool, items []*batchItem, warni
 		Issues: []releaseIssue{}, Skipped: []releaseSkip{}, Summary: v.Summary, Warnings: orEmpty(warnings),
 	}
 	for i, it := range items {
-		out.Issues = append(out.Issues, releaseIssue{verbIssue: v.Issues[i], FoundBy: sourcesJSON(r.foundOf(it.ref))})
+		out.Issues = append(out.Issues, releaseIssue{verbIssue: v.Issues[i], FoundBy: sourcesJSON(r.foundOf(it.Ref))})
 	}
 	for _, s := range r.skipped {
 		out.Skipped = append(out.Skipped, releaseSkip{Number: s.found.Ref.Number, Repo: s.found.Ref.Repo.String(), Ref: fullRef(s.found.Ref), Reason: s.reason, Status: orNull(s.status),

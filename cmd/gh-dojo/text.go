@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/spf13/cobra"
@@ -71,3 +72,6 @@ func joinWords(words []string, conj string) string {
 func hasPrefixFold(s, prefix string) bool {
 	return len(s) >= len(prefix) && strings.EqualFold(s[:len(prefix)], prefix)
 }
+
+// runes is the length of s in runes.
+func runes(s string) int { return utf8.RuneCountInString(s) }

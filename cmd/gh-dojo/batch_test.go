@@ -13,6 +13,7 @@ import (
 
 	"github.com/cli/go-gh/v2/pkg/api"
 
+	"github.com/Trum-ok/gh-dojo/internal/batch"
 	"github.com/Trum-ok/gh-dojo/internal/board"
 	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/graph"
@@ -371,7 +372,7 @@ func (f *staleReadBackend) SchemaCached() bool { return f.resets == 0 }
 
 func (f *staleReadBackend) Reset() error { f.resets++; return nil }
 
-func (f *staleReadBackend) ReadIssues(ctx context.Context, v config.Verb, refs []issue.Ref, a workflow.Args) ([]IssueRead, error) {
+func (f *staleReadBackend) ReadIssues(ctx context.Context, v config.Verb, refs []issue.Ref, a workflow.Args) ([]batch.Read, error) {
 	out, err := f.fakeBackend.ReadIssues(ctx, v, refs, a)
 	for i := range out {
 		if f.stale[out[i].Ref.Number] && f.resets == 0 {
@@ -383,7 +384,7 @@ func (f *staleReadBackend) ReadIssues(ctx context.Context, v config.Verb, refs [
 
 // TestBatchStaleRead: issues whose read failed on the cached schema are
 // read once more with a fresh one, before anything is written, as
-// readPlanFresh does for one issue: one read for the batch, one for the
+// batch.ReadPlan does for one issue: one read for the batch, one for the
 // stale issues.
 func TestBatchStaleRead(t *testing.T) {
 	withConfig(t, verbsConfig)
@@ -433,9 +434,9 @@ func checkSummaryCounts(t *testing.T, out string, lo, hi int) {
 	_, line, _ := strings.Cut(out, "error: ")
 	line, _, _ = strings.Cut(line, "\n")
 	// The error block cuts a line at 200 runes; the summary stays within
-	// maxSummaryRunes, so the cut never hides an issue.
-	if utf8.RuneCountInString(line) > maxSummaryRunes {
-		t.Errorf("summary line over %d runes, the error block may cut it:\n%s", maxSummaryRunes, line)
+	// batch.MaxSummaryRunes, so the cut never hides an issue.
+	if utf8.RuneCountInString(line) > batch.MaxSummaryRunes {
+		t.Errorf("summary line over %d runes, the error block may cut it:\n%s", batch.MaxSummaryRunes, line)
 	}
 	named := map[int]bool{}
 	for _, m := range regexp.MustCompile(`#(\d+)`).FindAllStringSubmatch(line, -1) {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/Trum-ok/gh-dojo/internal/batch"
 	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/issue"
 	"github.com/Trum-ok/gh-dojo/internal/render"
@@ -38,7 +39,7 @@ type shownCard struct {
 
 // newShownCard is the card of it for --show, nil without the flag or when
 // the issue was not read.
-func newShownCard(ctx context.Context, cfg *config.Config, be Backend, def issue.Repo, v config.Verb, it *batchItem, show bool) *shownCard {
+func newShownCard(ctx context.Context, cfg *config.Config, be Backend, def issue.Repo, v config.Verb, it *batch.Item, show bool) *shownCard {
 	if !show {
 		return nil
 	}
@@ -57,13 +58,13 @@ func newShownCard(ctx context.Context, cfg *config.Config, be Backend, def issue
 
 // itemCard is the card a verb read for it: the first read, the one it
 // planned from; nil when it was not read.
-func itemCard(it *batchItem) *issue.Card {
+func itemCard(it *batch.Item) *issue.Card {
 	var is *workflow.Issue
 	switch {
-	case it.run != nil:
-		is = &it.run.first.Issue
-	case it.read != nil:
-		is = it.read
+	case it.Writes != nil:
+		is = &it.Writes.First.Issue
+	case it.Issue != nil:
+		is = it.Issue
 	default:
 		return nil
 	}
