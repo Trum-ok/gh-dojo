@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/Trum-ok/gh-dojo/internal/batch"
 	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/issue"
 	"github.com/Trum-ok/gh-dojo/internal/render"
@@ -121,9 +121,9 @@ func (f *fakeBackend) issue(ref issue.Ref) (workflow.Issue, error) {
 	return is, nil
 }
 
-func (f *fakeBackend) ReadIssues(_ context.Context, _ config.Verb, refs []issue.Ref, _ workflow.Args) ([]IssueRead, error) {
+func (f *fakeBackend) ReadIssues(_ context.Context, _ config.Verb, refs []issue.Ref, _ workflow.Args) ([]batch.Read, error) {
 	f.reads++
-	out := make([]IssueRead, len(refs))
+	out := make([]batch.Read, len(refs))
 	for i, ref := range refs {
 		out[i].Ref = ref.In(fakeRepo)
 		switch {
@@ -364,23 +364,5 @@ func TestConfigErrors(t *testing.T) {
 			}
 			testutil.Golden(t, "config/"+tt.name, out)
 		})
-	}
-}
-
-// TestMissing: ops left to send compare by content, not kind. After a
-// stale-ID retry the re-plan may add a label the first attempt did not
-// (+b after +a): it is still sent.
-func TestMissing(t *testing.T) {
-	done := []workflow.Op{workflow.AddLabels{Names: []string{"a"}}, workflow.AddComment{Body: "x", Marker: "m"}}
-	ops := []workflow.Op{
-		workflow.AddLabels{Names: []string{"b"}},
-		workflow.AddLabels{Names: []string{"a"}},
-		workflow.AddComment{Body: "x", Marker: "m"},
-		workflow.SetStatus{From: "Ready", To: "Done"},
-	}
-	got := missing(ops, done)
-	want := []workflow.Op{workflow.AddLabels{Names: []string{"b"}}, workflow.SetStatus{From: "Ready", To: "Done"}}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("missing = %v, want %v", got, want)
 	}
 }

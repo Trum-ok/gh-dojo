@@ -6,17 +6,12 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"reflect"
 	"slices"
 	"strings"
 	"sync"
 
-	"github.com/cli/go-gh/v2/pkg/api"
-
-	"github.com/Trum-ok/gh-dojo/internal/board"
+	"github.com/Trum-ok/gh-dojo/internal/batch"
 	"github.com/Trum-ok/gh-dojo/internal/config"
-	"github.com/Trum-ok/gh-dojo/internal/effects"
-	"github.com/Trum-ok/gh-dojo/internal/graph"
 	"github.com/Trum-ok/gh-dojo/internal/issue"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/Trum-ok/gh-dojo/internal/workflow"
@@ -87,13 +82,13 @@ type Backend interface {
 	ReadIssue(ctx context.Context, v config.Verb, ref issue.Ref, a workflow.Args) (workflow.Issue, error)
 	// ReadIssues reads issues refs like ReadIssue, for a verb with batch =
 	// true: one request per issue.MaxBatch issues, of any repositories,
-	// with what v looks up read once in each. It returns one IssueRead per number, in order; an
+	// with what v looks up read once in each. It returns one batch.Read per number, in order; an
 	// issue that fails alone (not found, a pull request, its board place
 	// or sprint not read, the issue --by names) has its own Err. err fails them all:
 	// a config error of v (a label to add missing in the repo) or a
 	// request that read nothing. A request that fails after earlier ones
 	// read their issues is the Err of each issue it did not read.
-	ReadIssues(ctx context.Context, v config.Verb, refs []issue.Ref, a workflow.Args) ([]IssueRead, error)
+	ReadIssues(ctx context.Context, v config.Verb, refs []issue.Ref, a workflow.Args) ([]batch.Read, error)
 	// Apply applies every op of a non-empty plan, finding the issue's node
 	// IDs in p.Issue.Ref. It returns the ops GitHub confirmed, also with an
 	// error: the rest of p.Ops did not take effect, or their outcome is
@@ -107,18 +102,6 @@ type Backend interface {
 	// Reset drops the cached board schema after GitHub rejected one of its
 	// IDs, so the next ReadIssue and Apply use a fresh one.
 	Reset() error
-}
-
-// IssueRead is one issue of ReadIssues: its state, or why it cannot be
-// planned.
-type IssueRead struct {
-	Ref   issue.Ref
-	Issue workflow.Issue
-	Err   error
-	// Cause says Err is because the issue is not there: no such issue,
-	// a pull request, or its repository not found (issue.Cause); "" for
-	// any other error.
-	Cause issue.Cause
 }
 
 // newBackend returns the backend for cfg: GitHub through one App per run,
@@ -210,40 +193,40 @@ func runVerb(cmd *cobra.Command, cfg *config.Config, v config.Verb, ref issue.Re
 	ctx := cmd.Context()
 	engine := workflow.New(cfg)
 	engine.Getenv = getenv
-	it, err := readPlanFresh(ctx, be, engine, v, ref, args)
+	it, err := batch.ReadPlan(ctx, be, engine, v, ref, args)
 	if err != nil {
 		return err
 	}
 	repo := backendRepo(be)
 	// The text of a failed issue is its error, and the card with --show.
 	card := newShownCard(ctx, cfg, be, def, v, it, show)
-	if it.run == nil {
-		return emitResult(cmd, card.json(verbJSON(v.Name, repo, dryRun, []*batchItem{it})), card.alone(false), it.err)
+	if it.Writes == nil {
+		return emitResult(cmd, card.json(verbJSON(v.Name, repo, dryRun, []*batch.Item{it})), card.alone(false), it.Err)
 	}
-	run, plan := it.run, it.run.first
-	run.stderr = cmd.ErrOrStderr()
+	run, plan := it.Writes, it.Writes.First
+	run.Stderr = cmd.ErrOrStderr()
 	for _, w := range plan.Warnings {
 		render.Warn(cmd.ErrOrStderr(), "%s", w)
 	}
 	if dryRun {
-		return emit(cmd, card.json(verbJSON(v.Name, repo, true, []*batchItem{it})), func(w io.Writer) {
+		return emit(cmd, card.json(verbJSON(v.Name, repo, true, []*batch.Item{it})), func(w io.Writer) {
 			fmt.Fprintln(w, plan.DryRun())
 			card.write(w, true, false)
 		})
 	}
-	if it.err = plan.Unconfirmed(); it.err != nil {
-		return emitResult(cmd, card.json(verbJSON(v.Name, repo, false, []*batchItem{it})), card.alone(false), it.err)
+	if it.Err = plan.Unconfirmed(); it.Err != nil {
+		return emitResult(cmd, card.json(verbJSON(v.Name, repo, false, []*batch.Item{it})), card.alone(false), it.Err)
 	}
-	it.err = run.applyFresh(ctx, be, func() (*workflow.Plan, error) { return readPlan(ctx, be, engine, v, ref, args) })
+	it.Err = run.ApplyFresh(ctx, be, func() (*workflow.Plan, error) { return readPlan(ctx, be, engine, v, ref, args) })
 	// A partial write prints what it applied as JSON; its text is the error.
-	return emitWrite(cmd, card.json(verbJSON(v.Name, repo, false, []*batchItem{it})), func(w io.Writer) {
-		if it.err != nil {
-			card.write(w, false, it.wrote())
+	return emitWrite(cmd, card.json(verbJSON(v.Name, repo, false, []*batch.Item{it})), func(w io.Writer) {
+		if it.Err != nil {
+			card.write(w, false, it.Wrote())
 			return
 		}
-		fmt.Fprintln(w, run.applied().Confirm())
-		card.write(w, true, it.wrote())
-	}, it.err, it.wrote())
+		fmt.Fprintln(w, run.Applied().Confirm())
+		card.write(w, true, it.Wrote())
+	}, it.Err, it.Wrote())
 }
 
 // backendRepo is the default repository of be, owner/name, for the JSON;
@@ -256,181 +239,8 @@ func backendRepo(be Backend) string {
 	return r.String()
 }
 
-// applyFresh applies r.first. When GitHub rejects a board ID from the
-// schema cache, part of the plan may have been applied: it drops the
-// cache, re-plans with replan and applies what is left, once. A transport
-// failure is never retried here: its outcome is unknown and the agent
-// re-runs the command. The error is r.partial's.
-func (r *verbRun) applyFresh(ctx context.Context, be Backend, replan func() (*workflow.Plan, error)) error {
-	plan := r.first
-	err := r.apply(ctx, be, plan)
-	switch {
-	case err == nil:
-		return nil
-	case !board.IsStale(err):
-		return r.partial(missing(plan.Ops, r.done), err, err)
-	}
-	if rerr := be.Reset(); rerr != nil {
-		return r.partial(missing(plan.Ops, r.done), err, err)
-	}
-	fresh, perr := replan()
-	if perr != nil {
-		return r.partial(missing(plan.Ops, r.done), err, perr)
-	}
-	// What the first attempt confirmed is not sent again, even if the
-	// re-read does not show it yet.
-	fresh.Ops = missing(fresh.Ops, r.done)
-	r.fresh = fresh
-	if err := r.apply(ctx, be, fresh); err != nil {
-		return r.partial(missing(fresh.Ops, r.done), err, err)
-	}
-	return nil
-}
-
-// verbRun is what one verb command applied, across a stale-ID retry.
-type verbRun struct {
-	first  *workflow.Plan // planned from the state the command found
-	fresh  *workflow.Plan // the re-plan of a retry; nil without one
-	done   []workflow.Op  // ops GitHub confirmed, from both attempts
-	stderr io.Writer
-}
-
-// apply applies p and records what GitHub confirmed. An error with every
-// op of p confirmed is a warning.
-func (r *verbRun) apply(ctx context.Context, be Backend, p *workflow.Plan) error {
-	if p.Empty() {
-		return nil
-	}
-	done, err := be.Apply(ctx, p)
-	r.done = append(r.done, done...)
-	if err != nil && len(missing(p.Ops, done)) == 0 {
-		render.Warn(r.stderr, "GitHub reported an error after applying every change: %s", reason(err))
-		return nil
-	}
-	return err
-}
-
-// applied is the plan of what this command did, for the confirmation
-// line: the first plan's starting state with the confirmed ops. After a
-// retry, an effect the re-read found in place counts as such, unless this
-// command applied it.
-func (r *verbRun) applied() *workflow.Plan {
-	shown := *r.first
-	shown.Ops = r.done
-	if r.fresh != nil {
-		shown.StatusUnchanged = r.first.StatusUnchanged ||
-			r.fresh.StatusUnchanged && !hasKind(r.done, workflow.SetStatus{})
-		shown.CommentPresent = r.first.CommentPresent ||
-			r.fresh.CommentPresent && !hasKind(r.done, workflow.AddComment{})
-		shown.InPlace = slices.Clone(r.first.InPlace)
-		for _, op := range r.fresh.InPlace {
-			if !hasKind(r.done, op) && !hasKind(shown.InPlace, op) {
-				shown.InPlace = append(shown.InPlace, op)
-			}
-		}
-	}
-	return &shown
-}
-
-// partial reports a failed write. With nothing confirmed, err itself is
-// the answer. Otherwise it is exit code 5, naming what was done and what
-// was not:
-//
-//	#42 comment left; status not changed: GitHub token is missing a required scope (project); gh auth refresh -s project, then re-run the same command
-//
-// The re-run re-reads the issue, so its plan leaves out what is done; but
-// a blocked-by link GitHub refused as a dependency cycle is exit code 1,
-// since a re-run would fail the same way. cause
-// is the error of the write that left missed undone: per-field GraphQL
-// errors or ops never sent (errNotSent) mean they did not happen, a lost
-// answer (timeout, 5xx) that they are unconfirmed. err is what stopped the command, and gives the reason.
-func (r *verbRun) partial(missed []workflow.Op, cause, err error) error {
-	if len(r.done) == 0 {
-		return err
-	}
-	if graph.IsCycle(err) {
-		// Re-running cannot help: the link makes a cycle through other issues.
-		return render.Usage("%s; %s: %s", r.applied().Confirm(), missedWords(missed), reason(err)).
-			WithFix("gh dojo show " + strings.TrimPrefix(r.first.Issue.Name(), "#")).WithCause(err)
-	}
-	e := render.FromError(err)
-	next := "re-run the same command"
-	switch fix := strings.TrimSpace(e.Fix); {
-	case e.Wait != "": // a rate limit: its fix already says to wait, then re-run
-		next = "wait " + e.Wait + ", then " + next
-	case fix != "":
-		next = fix + ", then " + next
-	}
-	return render.Partial("%s; %s: %s; %s", r.applied().Confirm(), missedText(missed, cause), reason(err), next).
-		WithFix(e.Fix).WithCause(err)
-}
-
-// missedWords says what ops did not take effect: "status not changed, comment not posted".
-func missedWords(missed []workflow.Op) string {
-	words := make([]string, len(missed))
-	for i, op := range missed {
-		words[i] = effects.Missed(op)
-	}
-	return strings.Join(words, ", ")
-}
-
-// missedText says what of missed did not take effect, after a write that
-// failed with cause (see partial): the effects not done, or "the rest is
-// unconfirmed".
-func missedText(missed []workflow.Op, cause error) string {
-	var gqlErr *api.GraphQLError
-	if (errors.As(cause, &gqlErr) || errors.Is(cause, errNotSent)) && len(missed) > 0 {
-		return missedWords(missed)
-	}
-	return "the rest is unconfirmed"
-}
-
 // reason is the first clause of an error's message, for a partial report.
-func reason(err error) string {
-	what, _, _ := strings.Cut(render.FromError(err).What, "\n")
-	what, _, _ = strings.Cut(what, ";")
-	return strings.TrimSpace(what)
-}
-
-// missing returns the ops of ops that are not among done, compared by
-// content: a re-plan may hold an op of a kind already done with other
-// values, such as a label to add that the first plan did not have, and
-// that one is still to send. SetFields compares field by field, since
-// GitHub may set some fields of one and not others (see effects.Outcome).
-func missing(ops, done []workflow.Op) []workflow.Op {
-	var out []workflow.Op
-	for _, op := range ops {
-		if set, ok := op.(workflow.SetFields); ok {
-			if rest := missingFields(set, done); len(rest.Changes) > 0 {
-				out = append(out, rest)
-			}
-			continue
-		}
-		if !slices.ContainsFunc(done, func(d workflow.Op) bool { return reflect.DeepEqual(d, op) }) {
-			out = append(out, op)
-		}
-	}
-	return out
-}
-
-// missingFields returns the changes of set that no SetFields of done has.
-func missingFields(set workflow.SetFields, done []workflow.Op) workflow.SetFields {
-	var rest workflow.SetFields
-	for _, c := range set.Changes {
-		if !slices.ContainsFunc(done, func(d workflow.Op) bool {
-			got, ok := d.(workflow.SetFields)
-			return ok && slices.ContainsFunc(got.Changes, func(g workflow.FieldChange) bool { return reflect.DeepEqual(g, c) })
-		}) {
-			rest.Changes = append(rest.Changes, c)
-		}
-	}
-	return rest
-}
-
-// hasKind reports whether ops has an op of the same kind as op.
-func hasKind(ops []workflow.Op, op workflow.Op) bool {
-	return slices.ContainsFunc(ops, func(o workflow.Op) bool { return reflect.TypeOf(o) == reflect.TypeOf(op) })
-}
+func reason(err error) string { return render.Reason(err) }
 
 // readPlan reads issue ref and plans verb v on it.
 func readPlan(ctx context.Context, be Backend, e *workflow.Engine, v config.Verb, ref issue.Ref, args workflow.Args) (*workflow.Plan, error) {
@@ -439,58 +249,6 @@ func readPlan(ctx context.Context, be Backend, e *workflow.Engine, v config.Verb
 		return nil, err
 	}
 	return e.Plan(v, is, args)
-}
-
-// schemaCacher is a Backend whose board schema may come from the cache.
-type schemaCacher interface {
-	// SchemaCached reports whether the schema in use came from the cache.
-	SchemaCached() bool
-}
-
-// readPlanFresh reads issue ref as runBatch reads each issue and plans v
-// on it, once more with a fresh board schema when the one used came from
-// the cache and may explain the failure (board.IsStale): say, no
-// iteration for today, added on the board since the schema was cached.
-// Nothing was written yet, so a retry is safe.
-//
-// err fails the command, with nothing read (the network, a config error
-// of v); the issue's own failure (not found, a refusal) is the item's
-// err, with read set once the issue was read.
-func readPlanFresh(ctx context.Context, be Backend, e *workflow.Engine, v config.Verb, ref issue.Ref, args workflow.Args) (*batchItem, error) {
-	it, err := readPlanItem(ctx, be, e, v, ref, args)
-	failed := err
-	if err == nil {
-		failed = it.err
-	}
-	if c, ok := be.(schemaCacher); failed == nil || !ok || !c.SchemaCached() || !board.IsStale(failed) {
-		return it, err
-	}
-	if be.Reset() != nil {
-		return it, err
-	}
-	return readPlanItem(ctx, be, e, v, ref, args)
-}
-
-// readPlanItem is one try of readPlanFresh.
-func readPlanItem(ctx context.Context, be Backend, e *workflow.Engine, v config.Verb, ref issue.Ref, args workflow.Args) (*batchItem, error) {
-	reads, err := be.ReadIssues(ctx, v, []issue.Ref{ref}, args)
-	if err != nil {
-		return nil, err
-	}
-	if len(reads) != 1 {
-		return nil, render.Internal("read %d issues for %s", len(reads), ref.String(issue.Repo{}))
-	}
-	it := &batchItem{ref: reads[0].Ref}
-	if r := reads[0]; r.Err != nil {
-		it.fail(r.Err)
-	} else if p, err := e.Plan(v, r.Issue, args); err != nil {
-		it.read = &r.Issue
-		it.fail(err)
-	} else {
-		it.read = &r.Issue
-		it.run = &verbRun{first: p}
-	}
-	return it, nil
 }
 
 // issueArg accepts exactly one issue number.

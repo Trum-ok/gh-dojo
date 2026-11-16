@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/Trum-ok/gh-dojo/internal/batch"
 	"github.com/Trum-ok/gh-dojo/internal/workflow"
 )
 
@@ -211,10 +212,10 @@ func inPlaceJSON(p *workflow.Plan, def string) []jsonOp {
 
 // verbJSON is the JSON of verb v run on items of repo ("" when not
 // known); dry for a dry run.
-func verbJSON(v, repo string, dry bool, items []*batchItem) verbResult {
+func verbJSON(v, repo string, dry bool, items []*batch.Item) verbResult {
 	r := verbResult{Verb: v, DefaultRepo: orNull(repo), DryRun: dry, Issues: []verbIssue{}, Summary: verbSummary{Total: len(items)}}
 	for _, it := range items {
-		is := it.json(dry, repo)
+		is := itemJSON(it, dry, repo)
 		switch is.Outcome {
 		case outcomePartial, outcomeFailed:
 			r.Summary.Failed++
@@ -231,20 +232,20 @@ func verbJSON(v, repo string, dry bool, items []*batchItem) verbResult {
 	return r
 }
 
-// json is the issue's part of a verb's JSON; def is the default
+// itemJSON is the issue's part of a verb's JSON; def is the default
 // repository.
-func (it *batchItem) json(dry bool, def string) verbIssue {
+func itemJSON(it *batch.Item, dry bool, def string) verbIssue {
 	out := verbIssue{
-		Number: it.ref.Number, Repo: it.ref.Repo.String(), Outcome: outcomeFailed, Planned: []jsonOp{}, Applied: []jsonOp{}, InPlace: []jsonOp{},
-		Warnings: []string{}, Error: errorJSON(it.err),
+		Number: it.Ref.Number, Repo: it.Ref.Repo.String(), Outcome: outcomeFailed, Planned: []jsonOp{}, Applied: []jsonOp{}, InPlace: []jsonOp{},
+		Warnings: []string{}, Error: errorJSON(it.Err),
 	}
-	if it.read != nil {
-		out.Title = orNull(singleLine(it.read.Title))
+	if it.Issue != nil {
+		out.Title = orNull(singleLine(it.Issue.Title))
 	}
-	if it.run == nil {
+	if it.Writes == nil {
 		return out
 	}
-	first := it.run.first
+	first := it.Writes.First
 	out.Title = orNull(singleLine(first.Issue.Title))
 	out.Planned = opsJSON(first.Ops, def)
 	out.NeedsYes = first.NeedsYes
@@ -252,7 +253,7 @@ func (it *batchItem) json(dry bool, def string) verbIssue {
 	if dry {
 		out.InPlace = inPlaceJSON(first, def)
 		switch {
-		case it.err != nil:
+		case it.Err != nil:
 		case first.Empty():
 			out.Outcome = outcomeUnchanged
 		default:
@@ -260,16 +261,16 @@ func (it *batchItem) json(dry bool, def string) verbIssue {
 		}
 		return out
 	}
-	shown := it.run.applied()
-	out.Applied = opsJSON(it.run.done, def)
+	shown := it.Writes.Applied()
+	out.Applied = opsJSON(it.Writes.Done, def)
 	out.InPlace = inPlaceJSON(shown, def)
 	switch {
-	case it.skipped:
+	case it.Skipped:
 		out.Outcome = outcomeNotAttempted
-	case it.err != nil && len(it.run.done) > 0:
+	case it.Err != nil && len(it.Writes.Done) > 0:
 		out.Outcome = outcomePartial
-	case it.err != nil:
-	case len(it.run.done) > 0:
+	case it.Err != nil:
+	case len(it.Writes.Done) > 0:
 		out.Outcome = outcomeApplied
 	default:
 		out.Outcome = outcomeUnchanged

@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/spf13/cobra"
@@ -67,3 +68,6 @@ func joinWords(words []string, conj string) string {
 	}
 	return strings.Join(words[:len(words)-1], ", ") + " " + conj + " " + words[len(words)-1]
 }
+
+// runes is the length of s in runes.
+func runes(s string) int { return utf8.RuneCountInString(s) }

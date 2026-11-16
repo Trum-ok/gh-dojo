@@ -2,6 +2,7 @@ package issue_test
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 
@@ -201,5 +202,25 @@ func TestLinksError(t *testing.T) {
 		if got := render.FromError(err); got.Code != render.ExitNotFound || got.What != tt.what || got.Fix != tt.fix {
 			t.Errorf("LinksError = %d %q (fix %q)\nwant %q (fix %q)", got.Code, got.What, got.Fix, tt.what, tt.fix)
 		}
+	}
+}
+
+// TestRefNames: issues of the default repository first, by number, then
+// the others by repository regardless of case; at most MaxRefNames named,
+// the rest counted.
+func TestRefNames(t *testing.T) {
+	def := issue.Repo{Owner: "acme", Name: "shop"}
+	api, web := issue.Repo{Owner: "acme", Name: "api"}, issue.Repo{Owner: "Acme", Name: "Web"}
+	refs := []issue.Ref{{Repo: web, Number: 1}, {Repo: def, Number: 9}, {Repo: api, Number: 3}, {Repo: def, Number: 2}}
+	slices.SortFunc(refs, issue.CompareRefs(def))
+	if got := issue.RefNames(refs, def); got != "#2, #9, acme/api#3, Acme/Web#1" {
+		t.Errorf("RefNames = %q", got)
+	}
+	var many []issue.Ref
+	for n := 1; n <= issue.MaxRefNames+3; n++ {
+		many = append(many, issue.Ref{Repo: def, Number: n})
+	}
+	if got := issue.RefNames(many, def); !strings.HasSuffix(got, ", #10 and 3 more") {
+		t.Errorf("RefNames = %q, want 10 named and 3 more", got)
 	}
 }

@@ -244,3 +244,19 @@ func mustURL(s string) *url.URL {
 	}
 	return u
 }
+
+// TestReason: the first clause of the first line of an error's message.
+func TestReason(t *testing.T) {
+	for _, tt := range []struct {
+		err  error
+		want string
+	}{
+		{Usage("status not changed; ask the user\nfix it"), "status not changed"},
+		{Denied(" done cannot move #4 \nthis is a process rule"), "done cannot move #4"},
+		{errors.New("plain"), "plain"},
+	} {
+		if got := Reason(tt.err); got != tt.want {
+			t.Errorf("Reason(%q) = %q, want %q", tt.err, got, tt.want)
+		}
+	}
+}

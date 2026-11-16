@@ -173,6 +173,14 @@ func joinAllowed(values []string) string {
 	return s
 }
 
+// Reason is the first clause of an error's message, for a line that
+// names several outcomes: a partial report, a batch summary.
+func Reason(err error) string {
+	what, _, _ := strings.Cut(FromError(err).What, "\n")
+	what, _, _ = strings.Cut(what, ";")
+	return strings.TrimSpace(what)
+}
+
 // WriteError prints err to w as a short error block and returns the exit
 // code. A nil err prints nothing and returns ExitOK.
 func WriteError(w io.Writer, err error) Code {
