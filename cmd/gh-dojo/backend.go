@@ -288,9 +288,7 @@ func byIssues(v config.Verb, card *issue.Card, def issue.Repo) (out []workflow.B
 
 // selfBlock is the error for an issue named as its own blocker by flag.
 func selfBlock(target issue.Ref, def issue.Repo, flag string) error {
-	name := target.String(def)
-	return render.Usage("%s names %s itself; an issue cannot block itself", flag, name).
-		WithFix(fmt.Sprintf("pass the issues that block %s, not %s itself", name, name))
+	return workflow.SelfBlockError(target.String(def), flag)
 }
 
 // cycleError is the error for a blocker ref of issue target that target
@@ -298,9 +296,7 @@ func selfBlock(target issue.Ref, def issue.Repo, flag string) error {
 // GitHub refuses. Nothing is written; gh dojo show lists target's links
 // both ways.
 func cycleError(target issue.Ref, def issue.Repo, ref, flag string) error {
-	name := target.String(def)
-	return render.Usage("%s %s: %s already blocks %s, so %s cannot block %s too (a cycle)", flag, ref, name, ref, ref, name).
-		WithFix("gh dojo show " + target.Arg(def))
+	return workflow.CycleError(target.String(def), target.Arg(def), ref, flag)
 }
 
 // unresolvedLinks returns the unresolved ones among the card's linked
@@ -503,11 +499,11 @@ func milestoneKeyError(key string, err error) *render.Error {
 func repoLabels(ctx context.Context, q graph.Querier, repo issue.Repo) ([]string, error) {
 	type resp struct {
 		Repository *struct {
-			Labels graph.Connection[newLabel] `json:"labels"`
+			Labels graph.Connection[issue.Label] `json:"labels"`
 		} `json:"repository"`
 	}
 	vars := map[string]any{"owner": repo.Owner, "repo": repo.Name}
-	page, err := graph.Paginate(ctx, q, newLabelsQuery, vars, 0, func(r *resp) *graph.Connection[newLabel] {
+	page, err := graph.Paginate(ctx, q, issue.LabelsQuery, vars, 0, func(r *resp) *graph.Connection[issue.Label] {
 		if r.Repository == nil {
 			return nil
 		}

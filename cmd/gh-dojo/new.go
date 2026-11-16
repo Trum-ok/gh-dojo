@@ -27,7 +27,12 @@ import (
 // gh dojo new creates an issue with its labels, on the board, in the
 // initial status.
 //
-// Requests with a warm schema cache: one read (newContextQuery: repo ID,
+// Its plan is separate from its execution, as a verb's: the read is
+// issue.ReadNewContext, the checks and the plan workflow.CheckNew and
+// workflow.PlanNew (no network), the mutations effects'; this file parses
+// the flags, applies the plan (newRun.apply) and prints the result.
+//
+// Requests with a warm schema cache: one read (issue.ReadNewContext: repo ID,
 // labels, open milestones, recent issues, the --blocked-by and --parent
 // issues, and the --assignee users), createIssue (with its labels,
 // milestone, parent and assignees), addProjectV2ItemById, then the status
@@ -49,8 +54,8 @@ import (
 // later) and an item found there is used.
 //
 // Retries are safe (principle 5): the body ends with a hidden marker
-// <!-- gh-dojo:new:<hash> --> of the normalized title (newDedupKey), and the
-// read looks for it among the repo's newDedupWindow newest open issues,
+// <!-- gh-dojo:new:<hash> --> of the normalized title (workflow.NewDedupKey), and the
+// read looks for it among the repo's issue.NewDedupWindow newest open issues,
 // keeping those the viewer wrote. A match is resumed instead of created
 // again: missing labels and --assignee users are added (assignees it has
 // stay), the --milestone is set if it has none (a
@@ -59,7 +64,7 @@ import (
 // links it lacks are added, and so is the --parent if it has no parent (a
 // different one stays, with a warning). So filing an open
 // issue again with the same title within the window resumes it. An issue
-// that dropped out of the window (newDedupWindow newer open issues in the
+// that dropped out of the window (issue.NewDedupWindow newer open issues in the
 // repo, by anyone) or was closed is created again.
 //
 // Nothing is written twice within a run either: a lost createIssue answer
@@ -69,208 +74,10 @@ import (
 
 func init() { register(newNewCmd) }
 
-const (
-	// newMarkerVerb names new's marker: <!-- gh-dojo:new:<hash> -->.
-	newMarkerVerb = "new"
-	// newDedupWindow is how many of the repo's newest open issues are
-	// searched for the marker ($window of newContextQuery).
-	newDedupWindow = 20
-)
-
 // newRecheckDelay is the pause before re-reading after a lost createIssue
 // answer or a refused addProjectV2ItemById, so the issue or its board item,
 // if there, shows up. Tests set it to 0.
 var newRecheckDelay = time.Second
-
-// newContextQuery reads what new needs before writing: the repo ID, its
-// labels (by name, for the allowed lists), its open milestones (for
-// --milestone) and the newest open issues, to find one a failed run already
-// created. $status is the board's status field name.
-const newContextQuery = `query NewIssueContext($owner: String!, $repo: String!, $status: String!, $window: Int!) {
-  repository(owner: $owner, name: $repo) {
-    id
-    labels(first: 100, orderBy: {field: NAME, direction: ASC}) {
-      totalCount
-      pageInfo { hasNextPage endCursor }
-      nodes { id name }
-    }
-    ` + issue.MilestonesSelection + `
-    issues(last: $window, states: OPEN, orderBy: {field: CREATED_AT, direction: ASC}) {
-      nodes {
-        id
-        number
-        title
-        body
-        viewerDidAuthor
-        labels(first: 50) { nodes { name } }
-        milestone { title dueOn }
-        projectItems(first: 20) {
-          nodes {
-            id
-            isArchived
-            project { id }
-            fieldValueByName(name: $status) { ... on ProjectV2ItemFieldSingleSelectValue { name } }
-          }
-        }
-      }
-    }
-  }
-}`
-
-// newContextQueryWith is newContextQuery that also reads links, the
-// --blocked-by and --parent issues (see issue.Links), and, with parent
-// (the last link), how many sub-issues it has and the parent of each
-// recent issue, so a resumed one shows whether it has one; with assignees
-// (the --assignee logins), each login among the repository's assignable
-// users (aliased assignee0, assignee1...), the viewer for config.Me, and
-// the assignees of each recent issue. Without any of them it is
-// newContextQuery itself.
-//
-//	query NewIssueContext(..., $assignee0: String!, $link0Owner: String!, ...) {
-//	  repository(owner: $owner, name: $repo) {
-//	    ...
-//	    assignee0: assignableUsers(query: $assignee0, first: 100) { nodes { id login } }
-//	    issues(...) { nodes { ... assignees(first: 10) { totalCount nodes { login } } ... } }
-//	  }
-//	  link0: repository(...) { ... }
-//	  viewer { id login }
-//	}
-func newContextQueryWith(links issue.Links, parent bool, assignees []string) string {
-	q := newContextQuery
-	issueFields := newIssueMilestone
-	sub := -1
-	if parent {
-		issueFields += newIssueParent
-		sub = len(links) - 1
-	}
-	if len(assignees) > 0 {
-		issueFields += newIssueAssignees
-	}
-	q = strings.Replace(q, newIssueMilestone, issueFields, 1)
-	logins, viewer := newAssigneeLogins(assignees)
-	var decls, repoFields strings.Builder
-	for i := range logins {
-		alias := assigneeAlias(i)
-		fmt.Fprintf(&decls, ", $%s: String!", alias)
-		fmt.Fprintf(&repoFields, "    %s: assignableUsers(query: $%s, first: %d) { nodes { id login } }\n", alias, alias, newAssignableWindow)
-	}
-	decls.WriteString(links.Decls())
-	if decls.Len() > 0 {
-		q = strings.Replace(q, "$window: Int!)", "$window: Int!"+decls.String()+")", 1)
-	}
-	if repoFields.Len() > 0 {
-		q = strings.Replace(q, newIssuesField, repoFields.String()+newIssuesField, 1)
-	}
-	if len(links) == 0 && !viewer {
-		return q
-	}
-	q = strings.TrimSuffix(q, "}") + links.FieldsCountingSubIssues(sub)
-	if viewer {
-		q += "  viewer { id login }\n"
-	}
-	return q + "}"
-}
-
-// newIssueMilestone is the milestone of a recent issue in newContextQuery;
-// newIssueParent its parent, read after it for --parent, and
-// newIssueAssignees its assignees (GitHub allows 10), for --assignee.
-// newIssuesField starts the recent issues, which the assignable users for
-// --assignee go before.
-const (
-	newIssueMilestone = "        milestone { title dueOn }\n"
-	newIssueParent    = "        parent { id number repository { nameWithOwner } }\n"
-	newIssueAssignees = "        assignees(first: 10) { totalCount nodes { login } }\n"
-	newIssuesField    = "    issues(last: $window"
-)
-
-// newAssignableWindow is how many assignable users matching an --assignee
-// login are read; the login is then matched among them, ignoring case.
-const newAssignableWindow = 100
-
-// assigneeAlias is the alias of the i-th --assignee login's lookup in
-// newContextQueryWith, and the name of its variable.
-func assigneeAlias(i int) string { return fmt.Sprintf("assignee%d", i) }
-
-// newAssigneeLogins splits the --assignee values into the logins to look
-// up among the assignable users, in order, and whether config.Me is among
-// them (the viewer is read for it).
-func newAssigneeLogins(assignees []string) (logins []string, viewer bool) {
-	for _, a := range assignees {
-		if a == config.Me {
-			viewer = true
-		} else {
-			logins = append(logins, a)
-		}
-	}
-	return logins, viewer
-}
-
-// newLabelsQuery reads all repo labels; only needed past the first 100.
-const newLabelsQuery = `query RepoLabels($owner: String!, $repo: String!, $cursor: String) {
-  repository(owner: $owner, name: $repo) {
-    labels(first: 100, after: $cursor, orderBy: {field: NAME, direction: ASC}) {
-      totalCount
-      pageInfo { hasNextPage endCursor }
-      nodes { id name }
-    }
-  }
-}`
-
-// newCreateMutation creates the issue with its labels, milestone, parent
-// and assignees ($milestone, $parent and $assignees omitted for none). It
-// is put on the board by newAddToBoardMutation, not projectV2Ids (see the
-// top of the file).
-const newCreateMutation = `mutation CreateIssue($repo: ID!, $title: String!, $body: String!, $labels: [ID!], $milestone: ID, $parent: ID, $assignees: [ID!]) {
-  createIssue(input: {repositoryId: $repo, title: $title, body: $body, labelIds: $labels, milestoneId: $milestone, parentIssueId: $parent, assigneeIds: $assignees}) {
-    issue { id number }
-  }
-}`
-
-// newAddLabelsMutation adds labels a resumed issue lacks.
-const newAddLabelsMutation = `mutation AddLabels($issue: ID!, $labels: [ID!]!) {
-  addLabelsToLabelable(input: {labelableId: $issue, labelIds: $labels}) { clientMutationId }
-}`
-
-// newSetMilestoneMutation sets the milestone of a resumed issue that has
-// none.
-const newSetMilestoneMutation = `mutation SetMilestone($issue: ID!, $milestone: ID!) {
-  updateIssue(input: {id: $issue, milestoneId: $milestone}) { issue { id } }
-}`
-
-// newUnarchiveMutation restores a resumed issue's archived board item.
-const newUnarchiveMutation = `mutation Unarchive($project: ID!, $item: ID!) {
-  unarchiveProjectV2Item(input: {projectId: $project, itemId: $item}) { item { id } }
-}`
-
-// newAddToBoardMutation adds the issue to the board, or returns its item if
-// it is there already.
-const newAddToBoardMutation = `mutation AddToBoard($project: ID!, $issue: ID!) {
-  addProjectV2ItemById(input: {projectId: $project, contentId: $issue}) { item { id } }
-}`
-
-// newBoardItemsQuery re-reads an issue's board items after
-// addProjectV2ItemById was refused. $status is the board's status field name.
-const newBoardItemsQuery = `query IssueBoardItems($issue: ID!, $status: String!) {
-  node(id: $issue) {
-    ... on Issue {
-      projectItems(first: 20) {
-        nodes {
-          id
-          isArchived
-          project { id }
-          fieldValueByName(name: $status) { ... on ProjectV2ItemFieldSingleSelectValue { name } }
-        }
-      }
-    }
-  }
-}`
-
-// newSetStatusMutation sets the status of a board item.
-const newSetStatusMutation = `mutation SetStatus($project: ID!, $item: ID!, $field: ID!, $option: String!) {
-  updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field, value: {singleSelectOptionId: $option}}) {
-    projectV2Item { id }
-  }
-}`
 
 // newOptions are the arguments of gh dojo new.
 type newOptions struct {
@@ -352,7 +159,7 @@ func newNewCmd() (*cobra.Command, error) {
 			if err != nil {
 				return err
 			}
-			if err := checkNewFlags(cfg, o); err != nil {
+			if err := workflow.CheckNewFlags(cfg, workflow.NewLabels{Type: o.Type, Areas: o.Areas, Labels: o.Labels}); err != nil {
 				return err // before any request
 			}
 			if f.Changed(assigneeFlag) {
@@ -424,17 +231,14 @@ func newNewCmd() (*cobra.Command, error) {
 
 // blockedByFlag is new's flag naming the blocking issues; --by is taken
 // for it too.
-const blockedByFlag = "blocked-by"
+const blockedByFlag = workflow.NewBlockedByFlag
 
 // parentFlag is new's flag naming the parent issue.
-const parentFlag = "parent"
+const parentFlag = workflow.NewParentFlag
 
 // assigneeFlag is new's flag naming the users to assign, as a verb's
 // --assignee.
-const assigneeFlag = config.ArgAssignee
-
-// maxAssignees is how many assignees GitHub allows on an issue.
-const maxAssignees = 10
+const assigneeFlag = workflow.NewAssigneeFlag
 
 // parseAssignees parses the --assignee values: logins, repeated or
 // comma-separated, config.Me for the authenticated user, without
@@ -468,8 +272,8 @@ func parseAssignees(values []string, help string) ([]string, error) {
 				WithFix(help)
 		}
 	}
-	if len(out) > maxAssignees {
-		return nil, render.Usage("--%s names %d users; GitHub allows %d assignees per issue", assigneeFlag, len(out), maxAssignees).
+	if len(out) > workflow.MaxAssignees {
+		return nil, render.Usage("--%s names %d users; GitHub allows %d assignees per issue", assigneeFlag, len(out), workflow.MaxAssignees).
 			WithFix(help)
 	}
 	return out, nil
@@ -752,29 +556,6 @@ func (r *newRun) parentJSON() *string {
 	return orNull(fullRef(r.parent.In(r.def)))
 }
 
-// checkNewFlags rejects, without a request, a --type outside labels.types
-// and --area without labels.area_prefix.
-func checkNewFlags(cfg *config.Config, o newOptions) error {
-	if len(o.Areas) > 0 && cfg.Labels.AreaPrefix == "" {
-		return cfg.Errorf("--area needs labels.area_prefix, which is not set; pass the label with --label instead").
-			WithFix("gh dojo new --help")
-	}
-	if o.Type == "" || len(cfg.Labels.Types) == 0 {
-		return nil
-	}
-	if slices.ContainsFunc(cfg.Labels.Types, func(t string) bool { return strings.EqualFold(t, o.Type) }) {
-		return nil
-	}
-	return render.Usage("unknown type %q", o.Type).WithAllowed(cfg.Labels.Types...).
-		WithFix("gh dojo new --help")
-}
-
-// newDedupKey is what new's marker hashes: the title with whitespace
-// collapsed and case folded.
-func newDedupKey(title string) string {
-	return strings.ToLower(strings.Join(strings.Fields(title), " "))
-}
-
 // newRun is one attempt of new; its fields after run say how far it got.
 type newRun struct {
 	*App
@@ -803,9 +584,9 @@ type newRun struct {
 	statusSet  bool   // the status was set to the initial one now
 	noInitial  bool   // statuses.initial is empty: no status was set
 
-	milestone     *newMilestone // the issue's milestone, nil for none
-	milestoneSet  bool          // set to --milestone now
-	milestoneKept string        // the --milestone not applied: a resumed issue had another
+	milestone     *issue.OpenMilestone // the issue's milestone, nil for none
+	milestoneSet  bool                 // set to --milestone now
+	milestoneKept string               // the --milestone not applied: a resumed issue had another
 
 	repo        issue.Repo      // the issue's repository: --repo, or the default one
 	def         issue.Repo      // the default repository, which output names issues relative to
@@ -859,21 +640,27 @@ func (r *newRun) run(ctx context.Context) error {
 	}
 
 	r.repo, r.def = repo, def
-	nc, err := readNewContext(ctx, r.Client, repo, statusField.Name, r.opts.Blockers, r.opts.Parent, r.opts.Assignees)
+	logins, viewer := newAssigneeLogins(r.opts.Assignees)
+	nc, err := issue.ReadNewContext(ctx, r.Client, issue.NewRequest{Repo: repo, StatusField: statusField.Name,
+		Blockers: r.opts.Blockers, Parent: r.opts.Parent, Logins: logins, Viewer: viewer})
 	if err != nil {
 		return err
 	}
-	labels, err := nc.resolve(ctx, r.Client, r.cfg, repo, r.opts)
+	labels, err := r.resolveLabels(ctx, nc)
 	if err != nil {
 		return err
 	}
-	var milestone *newMilestone
+	var milestone *issue.OpenMilestone
 	if r.opts.Milestone != "" {
-		if milestone, err = nc.milestone(ctx, r.Client, repo, r.opts.Milestone); err != nil {
+		all, err := nc.AllMilestones(ctx, r.Client, repo)
+		if err != nil {
+			return err
+		}
+		if milestone, err = issue.MatchMilestone(r.opts.Milestone, all, repo); err != nil {
 			return err
 		}
 	}
-	assignees, err := nc.assignees(ctx, r.Client, repo, r.opts.Assignees)
+	assignees, err := r.resolveAssignees(ctx, nc)
 	if err != nil {
 		return err
 	}
@@ -883,238 +670,308 @@ func (r *newRun) run(ctx context.Context) error {
 	if err := parentError(nc.Parent, def); err != nil {
 		return err
 	}
-	for _, l := range labels {
-		r.labels = append(r.labels, l.Name)
-	}
+	r.labels = issue.LabelNames(labels)
 
-	marker := workflow.Marker(newMarkerVerb, newDedupKey(r.opts.Title))
-	found := nc.find(marker, s.ID)
-	// A parent with as many sub-issues as GitHub allows takes no more: no
-	// re-run would help, so nothing is written.
-	if p := nc.Parent; p != nil && p.SubIssues >= issue.MaxSubIssues &&
-		(found == nil || found.parentID == "" && !found.parentHidden) {
-		return render.Usage("--%s %s has %d sub-issues, as many as GitHub allows", parentFlag, p.Ref.String(def), p.SubIssues).
-			WithFix("pass another parent, or drop --" + parentFlag)
+	in := newInput{nc: nc, labels: labels, milestone: milestone, assignees: assignees, initial: initial}
+	marker := workflow.NewMarker(r.opts.Title)
+	found := nc.Find(marker, s.ID)
+	req, state := r.request(in, found), r.foundState(found, false)
+	if err := workflow.CheckNew(req, state); err != nil {
+		return err
 	}
-	if found != nil {
-		for _, l := range nc.Links {
-			switch {
-			case l.ID == found.ID:
-				return selfBlock(issue.Ref{Repo: repo, Number: found.Number}, def, "--"+blockedByFlag)
-			case l.BlockedBy(found.ID):
-				return cycleError(issue.Ref{Repo: repo, Number: found.Number}, def, l.Ref.String(def), "--"+blockedByFlag)
-			}
-		}
-		if p := nc.Parent; p != nil && p.ID == found.ID {
-			name := issue.Ref{Repo: repo, Number: found.Number}.String(def)
-			return render.Usage("--%s names %s itself; an issue cannot be its own parent", parentFlag, name).
-				WithFix("pass the issue " + name + " is a part of")
-		}
-		// An issue with as many assignees as GitHub allows takes no more: no
-		// re-run would help, so nothing is written.
-		if missing, _ := found.missingAssignees(assignees); len(missing) > 0 && found.assigneesTotal+len(missing) > maxAssignees {
-			name := issue.Ref{Repo: repo, Number: found.Number}.String(def)
-			return render.Usage("%s has %d assignees; assigning %s would make more than the %d GitHub allows",
-				name, found.assigneesTotal, joinWords(loginsOf(missing), "and"), maxAssignees).
-				WithFix(fmt.Sprintf("unassign someone first (gh issue edit %d -R %s --remove-assignee <login>), or drop --%s",
-					found.Number, repo, assigneeFlag))
-		}
-		r.resumed = true
-	} else if !r.opts.DryRun {
-		if err := r.create(ctx, nc.RepoID, withMarker(r.opts.Body, marker), labels, milestone, nc.Parent, assignees); err != nil {
+	plan := workflow.PlanNew(r.cfg, req, state)
+	r.resumed = plan.Resumed
+	if plan.Create && !r.opts.DryRun {
+		if err := r.create(ctx, nc.RepoID, withMarker(r.opts.Body, marker), in); err != nil {
 			if r.number != 0 || !errors.Is(err, graph.ErrUnknownOutcome) {
 				return err
 			}
-			// The answer was lost: look once whether the issue was created.
+			// The answer was lost: look once whether the issue was created,
+			// and finish it if so.
 			if found = r.recheck(ctx, repo, statusField.Name, marker, s.ID); found == nil {
 				return err
 			}
 			r.warnings = append(r.warnings, fmt.Sprintf("GitHub's answer to creating the issue was lost; found %s on a re-read", issue.Ref{Repo: repo, Number: found.Number}.String(def)))
+			plan = workflow.PlanNew(r.cfg, r.request(in, found), r.foundState(found, true))
 		}
 	}
-	var missing []string // label IDs the found issue lacks
-	setMilestone := false
-	var addParent *issue.Linked // the --parent a found issue lacks
-	var assign []*issue.User    // the --assignee users a found issue lacks
+	r.warnings = append(r.warnings, plan.Warnings...)
 	if found != nil {
-		r.number, r.id, r.title = found.Number, found.ID, found.title
-		r.itemID, r.archived, r.status = found.itemID, found.archived, found.status
-		r.milestone = found.milestone
-		// Assignees it has stay: --assignee only adds.
-		assign, r.assignedFound = found.missingAssignees(assignees)
-		for _, l := range labels {
-			if !slices.ContainsFunc(found.labels, func(n string) bool { return strings.EqualFold(n, l.Name) }) {
-				missing = append(missing, l.ID)
-				r.labelsMissing = append(r.labelsMissing, l.Name)
-			}
-		}
-		// A milestone the issue already has stays, like its status: someone
-		// may have set it on purpose.
-		switch {
-		case milestone == nil:
-		case found.milestone == nil:
-			setMilestone = true
-		case found.milestone.Title != milestone.Title:
-			r.milestoneKept = milestone.Title
-			r.warnings = append(r.warnings, fmt.Sprintf(
-				"#%d already has milestone %q; kept it, --milestone %q not applied (to change it: %s)",
-				r.number, found.milestone.Title, milestone.Title, r.milestoneFix(repo, milestone.Title)))
-		}
-		// So does a parent, like the milestone.
+		r.number, r.id, r.title = found.Number, found.ID, found.Title
+		r.itemID, r.archived, r.status = found.ItemID, found.Archived, found.Status
+		r.milestone = found.Milestone
+		r.assignedFound = plan.AlreadyAssigned
+		r.labelsMissing = plan.Labels
+		r.milestoneKept = plan.MilestoneKept
 		if p := nc.Parent; p != nil {
-			r.parent = found.parent
-			switch {
-			case found.parentID == p.ID:
-			case found.parentHidden:
-				// It has a parent the token cannot read: addSubIssue would
-				// fail, or move it from a parent nobody here can see.
-				r.parentKept, r.parentHidden = &p.Ref, true
-				r.warnings = append(r.warnings, fmt.Sprintf(
-					"%s has a parent the token cannot read; kept it, --%s %s not applied (to see it: gh issue view %d -R %s)",
-					r.name(), parentFlag, p.Ref.Arg(def), r.number, repo))
-			case found.parentID == "":
-				addParent = p
-			default:
-				r.parentKept = &p.Ref
-				// gh takes the parent's number in the issue's repository,
-				// else its URL.
-				arg := fmt.Sprintf("https://%s/%s/issues/%d", clientHost(), p.Ref.Repo, p.Ref.Number)
-				if p.Ref.Same(issue.Ref{Repo: repo, Number: p.Ref.Number}) {
-					arg = strconv.Itoa(p.Ref.Number)
-				}
-				r.warnings = append(r.warnings, fmt.Sprintf(
-					"%s is already a sub-issue of %s; kept it, --%s %s not applied (to move it: gh issue edit %d -R %s --parent %s)",
-					r.name(), r.parentName(found.parent), parentFlag, p.Ref.Arg(def), r.number, repo, arg))
+			r.parent = found.Parent
+			if plan.ParentKept {
+				r.parentKept, r.parentHidden = &p.Ref, plan.ParentHidden
 			}
 		}
 	}
 	if r.opts.DryRun {
-		r.planDry(milestone, setMilestone, initial, nc.Links, nc.Parent, addParent, assignees, assign)
+		r.planDry(plan, in)
 		return nil
 	}
+	return r.apply(ctx, s, statusField, plan, in)
+}
 
-	if len(missing) > 0 {
-		vars := map[string]any{"issue": r.id, "labels": missing}
-		if err := r.Client.Mutate(ctx, newAddLabelsMutation, vars, nil); err != nil {
+// newInput is what new resolved against the repository: the context read,
+// the labels, the --milestone (nil for none), the --assignee users and the
+// initial status (nil for none).
+type newInput struct {
+	nc        *issue.NewContext
+	labels    []issue.Label
+	milestone *issue.OpenMilestone
+	assignees []*issue.User
+	initial   *board.Option
+}
+
+// resolveLabels maps --type, --area and --label to labels of the issue's
+// repository (see workflow.ResolveNewLabels), reading all of them only
+// when one is not among the first page.
+func (r *newRun) resolveLabels(ctx context.Context, nc *issue.NewContext) ([]issue.Label, error) {
+	want := workflow.NewLabels{Type: r.opts.Type, Areas: r.opts.Areas, Labels: r.opts.Labels}
+	labels, complete := nc.Labels.Nodes, !nc.Labels.PageInfo.HasNextPage
+	for {
+		names, more, err := workflow.ResolveNewLabels(r.cfg, want, issue.LabelNames(labels), complete, r.repo.String())
+		if err != nil {
+			return nil, err
+		}
+		if !more {
+			out := make([]issue.Label, len(names))
+			for i, n := range names {
+				out[i] = labels[slices.IndexFunc(labels, func(l issue.Label) bool { return l.Name == n })]
+			}
+			return out, nil
+		}
+		if labels, err = nc.AllLabels(ctx, r.Client, r.repo); err != nil {
+			return nil, err
+		}
+		complete = true
+	}
+}
+
+// resolveAssignees resolves the --assignee logins to users who can be
+// assigned issues in the issue's repository (see
+// issue.NewContext.MatchAssignees). Logins that cannot be assigned are one
+// usage error (exit code 1) naming them all, with the repository's
+// assignable users as the allowed values, which takes one more read.
+func (r *newRun) resolveAssignees(ctx context.Context, nc *issue.NewContext) ([]*issue.User, error) {
+	users, unknown, noViewer := nc.MatchAssignees(r.opts.Assignees, config.Me)
+	if noViewer {
+		return nil, render.Network("GitHub did not return the authenticated user for --%s %s", assigneeFlag, config.Me).
+			WithFix(render.AuthFix)
+	}
+	if len(unknown) == 0 {
+		return users, nil
+	}
+	repo := r.repo
+	fix := fmt.Sprintf("check the login, or give %s access to %s", unknown[0], repo)
+	if len(unknown) > 1 {
+		fix = "check the logins, or give them access to " + repo.String()
+	}
+	e := render.Usage("--%s: %s cannot be assigned issues in %s", assigneeFlag, joinWords(unknown, "and"), repo).WithFix(fix)
+	if logins, err := assignableUsers(ctx, r.Client, repo); err == nil {
+		e = e.WithAllowed(logins...)
+	}
+	return nil, e
+}
+
+// newAssigneeLogins splits the --assignee values into the logins to look
+// up among the assignable users, in order, and whether config.Me is among
+// them (the viewer is read for it).
+func newAssigneeLogins(assignees []string) (logins []string, viewer bool) {
+	for _, a := range assignees {
+		if a == config.Me {
+			viewer = true
+		} else {
+			logins = append(logins, a)
+		}
+	}
+	return logins, viewer
+}
+
+// request is what the run asks for, for workflow.CheckNew and PlanNew, the
+// links related to found (nil for none).
+func (r *newRun) request(in newInput, found *issue.Created) workflow.NewRequest {
+	req := workflow.NewRequest{Repo: r.repo.String(), Labels: issue.LabelNames(in.labels), Assignees: loginsOf(in.assignees)}
+	if in.milestone != nil {
+		req.Milestone = in.milestone.Title
+	}
+	if in.initial != nil {
+		req.Initial = in.initial.Name
+	}
+	for _, l := range in.nc.Links {
+		req.Blockers = append(req.Blockers, r.link(l, found))
+	}
+	if p := in.nc.Parent; p != nil {
+		l := r.link(p, found)
+		if found != nil && found.ParentID != "" && !l.ParentOf {
+			// For the warning that the issue keeps its parent: gh issue
+			// edit takes the new parent's number in the issue's
+			// repository, else its URL.
+			l.EditArg = fmt.Sprintf("https://%s/%s/issues/%d", clientHost(), p.Ref.Repo, p.Ref.Number)
+			if p.Ref.Same(issue.Ref{Repo: r.repo, Number: p.Ref.Number}) {
+				l.EditArg = strconv.Itoa(p.Ref.Number)
+			}
+		}
+		req.Parent = &l
+	}
+	return req
+}
+
+// link is l for the plan, related to found (nil for none).
+func (r *newRun) link(l *issue.Linked, found *issue.Created) workflow.NewLink {
+	out := workflow.NewLink{Name: l.Ref.String(r.def), Arg: l.Ref.Arg(r.def),
+		SubIssues: l.SubIssues, Full: l.SubIssues >= issue.MaxSubIssues, Ref: l}
+	if found != nil {
+		out.Found = l.ID == found.ID
+		out.Blocks, out.BlockedBy = l.Blocks(found.ID), l.BlockedBy(found.ID)
+		out.ParentOf = found.ParentID != "" && found.ParentID == l.ID
+	}
+	return out
+}
+
+// foundState is found for the plan; nil for nil. rechecked: this run
+// created it, and found it again after the answer was lost.
+func (r *newRun) foundState(found *issue.Created, rechecked bool) *workflow.NewFound {
+	if found == nil {
+		return nil
+	}
+	ref := issue.Ref{Repo: r.repo, Number: found.Number}
+	out := &workflow.NewFound{Name: ref.String(r.def), Arg: ref.Arg(r.def), Number: found.Number,
+		Labels: found.Labels, Assignees: found.Assignees, AssigneesTotal: found.AssigneesTotal,
+		OnBoard: found.ItemID != "", Archived: found.Archived, Status: found.Status,
+		ParentHidden: found.ParentHidden, Rechecked: rechecked}
+	if found.Milestone != nil {
+		out.Milestone = found.Milestone.Title
+	}
+	if found.ParentID != "" {
+		out.Parent = r.parentName(found.Parent)
+	}
+	return out
+}
+
+// linksOf returns the issues the plan's links keep (workflow.NewLink.Ref).
+func linksOf(links []workflow.NewLink) []*issue.Linked {
+	var out []*issue.Linked
+	for _, l := range links {
+		out = append(out, l.Ref.(*issue.Linked))
+	}
+	return out
+}
+
+// usersOf returns the users of in with logins, in order.
+func usersOf(in newInput, logins []string) []*issue.User {
+	var out []*issue.User
+	for _, login := range logins {
+		if i := slices.IndexFunc(in.assignees, func(u *issue.User) bool { return u.Login == login }); i >= 0 {
+			out = append(out, in.assignees[i])
+		}
+	}
+	return out
+}
+
+// apply writes what plan has left once the issue exists (createIssue sets
+// its labels, milestone, assignees and parent): a resumed issue's labels
+// and milestone, one mutation each, then the board item, then the rest in
+// one mutation (see finish), recording each step as it takes effect.
+func (r *newRun) apply(ctx context.Context, s *board.Schema, statusField *board.Field, plan *workflow.NewPlan, in newInput) error {
+	if !plan.Create && len(plan.Labels) > 0 {
+		var ids []string
+		for _, n := range plan.Labels {
+			ids = append(ids, in.labels[slices.IndexFunc(in.labels, func(l issue.Label) bool { return l.Name == n })].ID)
+		}
+		vars := map[string]any{"issue": r.id, "labels": ids}
+		if err := r.Client.Mutate(ctx, effects.AddLabelsMutation, vars, nil); err != nil {
 			return &newStepError{step: "adding labels " + strings.Join(r.labels, ", ") + " failed", err: err}
 		}
 	}
-	if setMilestone {
-		vars := map[string]any{"issue": r.id, "milestone": milestone.ID}
-		if err := r.Client.Mutate(ctx, newSetMilestoneMutation, vars, nil); err != nil {
-			return &newStepError{step: "setting milestone " + singleLine(milestone.Title) + " failed", err: err}
+	if !plan.Create && plan.Milestone != "" {
+		vars := map[string]any{"issue": r.id, "milestone": in.milestone.ID}
+		if err := r.Client.Mutate(ctx, effects.SetMilestoneMutation, vars, nil); err != nil {
+			return &newStepError{step: "setting milestone " + singleLine(in.milestone.Title) + " failed", err: err}
 		}
-		r.milestone, r.milestoneSet = milestone, true
+		r.milestone, r.milestoneSet = in.milestone, true
 	}
-	if r.archived {
+	if plan.Unarchive {
 		vars := map[string]any{"project": s.ID, "item": r.itemID}
-		if err := r.Client.Mutate(ctx, newUnarchiveMutation, vars, nil); err != nil {
+		if err := r.Client.Mutate(ctx, effects.UnarchiveMutation, vars, nil); err != nil {
 			return &newStepError{step: "unarchiving it on board " + s.Ref().String() + " failed", err: err}
 		}
 		r.unarchived = true
 	}
-	if r.itemID == "" {
+	if plan.AddToBoard {
 		if err := r.addToBoard(ctx, s.ID, statusField.Name); err != nil {
 			return &newStepError{step: "adding it to board " + s.Ref().String() + " failed", err: err}
 		}
 	}
-	// A resumed issue keeps a status it already has: someone may have
-	// moved it on purpose.
-	if initial != nil && r.resumed && r.status != "" {
+	// A resumed issue keeps a status it already has, even one found only
+	// while adding it to the board: someone may have moved it on purpose.
+	initial := in.initial
+	if plan.Status == "" || plan.Resumed && r.status != "" {
 		initial = nil
 	}
-	var pending []*issue.Linked // links the issue lacks
-	for _, l := range nc.Links {
-		if l.Blocks(r.id) {
-			r.linkedFound = append(r.linkedFound, l)
-		} else {
-			pending = append(pending, l)
+	r.linkedFound = linksOf(plan.AlreadyLinked)
+	var assign []*issue.User
+	var parent *issue.Linked
+	if !plan.Create {
+		assign = usersOf(in, plan.Assign)
+		if plan.Parent {
+			parent = in.nc.Parent
 		}
 	}
-	if len(pending) > 0 || addParent != nil || len(assign) > 0 {
-		if err := r.finish(ctx, s.ID, statusField.ID, initial, assign, pending, addParent); err != nil {
+	if pending := linksOf(plan.Link); len(pending) > 0 || parent != nil || len(assign) > 0 {
+		if err := r.finish(ctx, s.ID, statusField.ID, initial, assign, pending, parent); err != nil {
 			return err
 		}
 	} else if initial != nil {
 		vars := map[string]any{"project": s.ID, "item": r.itemID, "field": statusField.ID, "option": initial.ID}
-		if err := r.Client.Mutate(ctx, newSetStatusMutation, vars, nil); err != nil {
+		if err := r.Client.Mutate(ctx, effects.SetStatusMutation, vars, nil); err != nil {
 			return &newStepError{step: "setting status " + initial.Name + " failed", err: err}
 		}
 		r.status, r.statusSet = initial.Name, true
 	}
 	if r.parentErr != nil {
 		// The rest is done; createIssue refused the parent for good.
-		return &newStepError{step: "making it a sub-issue of " + nc.Parent.Ref.String(def) + " failed", err: r.parentErr, parent: true}
+		return &newStepError{step: "making it a sub-issue of " + in.nc.Parent.Ref.String(r.def) + " failed", err: r.parentErr, parent: true}
 	}
 	return nil
 }
 
-// newFinishMutation sets the status (status), assigns $assignees
-// (assign), adds n blocked-by links of $issue, one aliased field each, and
-// makes $issue a sub-issue of $parent (parent) (see newRun.finish).
-func newFinishMutation(status, assign bool, n int, parent bool) string {
-	decls := []string{"$issue: ID!"}
-	var fields []string
-	if status {
-		decls = append(decls, "$project: ID!", "$item: ID!", "$field: ID!", "$option: String!")
-		fields = append(fields, "  status: updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, "+
-			"fieldId: $field, value: {singleSelectOptionId: $option}}) { projectV2Item { id } }")
-	}
-	if assign {
-		decls = append(decls, "$assignees: [ID!]!")
-		fields = append(fields, "  assign: addAssigneesToAssignable(input: {assignableId: $issue, assigneeIds: $assignees}) { clientMutationId }")
-	}
-	for i := range n {
-		decls = append(decls, "$"+linkAlias(i)+": ID!")
-		fields = append(fields, "  "+linkAlias(i)+": "+effects.BlockedByField(true, "issue", linkAlias(i)))
-	}
-	if parent {
-		decls = append(decls, "$parent: ID!")
-		fields = append(fields, "  parent: addSubIssue(input: {issueId: $parent, subIssueId: $issue}) { issue { id } }")
-	}
-	return "mutation NewFinish(" + strings.Join(decls, ", ") + ") {\n" + strings.Join(fields, "\n") + "\n}"
-}
-
 // finish sets the status initial (nil leaves it alone), assigns the users
 // assign, adds the blocked-by links and makes the issue a sub-issue of
-// parent (nil for none) in one mutation, the status first:
-//
-//	mutation NewFinish($issue: ID!, $project: ID!, $item: ID!, $field: ID!, $option: String!, $assignees: [ID!]!, $link0: ID!) {
-//	  status: updateProjectV2ItemFieldValue(...) { projectV2Item { id } }
-//	  assign: addAssigneesToAssignable(input: {assignableId: $issue, assigneeIds: $assignees}) { clientMutationId }
-//	  link0: addBlockedBy(input: {issueId: $issue, blockingIssueId: $link0}) { issue { id } }
-//	  parent: addSubIssue(input: {issueId: $parent, subIssueId: $issue}) { issue { id } }
-//	}
-//
-// What took effect is recorded (r.statusSet, r.assigned, r.linked,
-// r.parentSet) even when the rest failed; an error after everything took
-// effect is only a warning.
+// parent (nil for none) in one mutation (see effects.NewFinish). What took
+// effect is recorded (r.statusSet, r.assigned, r.linked, r.parentSet) even
+// when the rest failed; an error after everything took effect is only a
+// warning.
 func (r *newRun) finish(ctx context.Context, projectID, fieldID string, initial *board.Option, assign []*issue.User, links []*issue.Linked, parent *issue.Linked) error {
-	vars := map[string]any{"issue": r.id}
-	if parent != nil {
-		vars["parent"] = parent.ID
-	}
-	if len(assign) > 0 {
-		vars["assignees"] = userIDs(assign)
-	}
-	for i, l := range links {
-		vars[linkAlias(i)] = l.ID
-	}
+	f := effects.NewFinish{Status: initial != nil, Assignees: userIDs(assign)}
+	ids := effects.IDs{Project: projectID, Issue: r.id, Item: r.itemID, StatusField: fieldID}
 	if initial != nil {
-		vars["project"], vars["item"], vars["field"], vars["option"] = projectID, r.itemID, fieldID, initial.ID
+		ids.StatusOption = initial.ID
 	}
+	for _, l := range links {
+		f.Links = append(f.Links, l.ID)
+	}
+	if parent != nil {
+		f.Parent = parent.ID
+	}
+	m := f.Build(ids)
 	var data map[string]json.RawMessage
-	err := r.Client.Mutate(ctx, newFinishMutation(initial != nil, len(assign) > 0, len(links), parent != nil), vars, &data)
+	err := r.Client.Mutate(ctx, m.Query, m.Vars, &data)
 	var steps []string
 	if initial != nil {
-		if raw, ok := data["status"]; ok && !isJSONNull(raw) {
+		if effects.Answered(data, effects.AliasStatus) {
 			r.status, r.statusSet = initial.Name, true
 		} else {
 			steps = append(steps, "setting status "+initial.Name)
 		}
 	}
 	if len(assign) > 0 {
-		if raw, ok := data["assign"]; ok && !isJSONNull(raw) {
+		if effects.Answered(data, effects.AliasAssign) {
 			r.assigned = loginsOf(assign)
 		} else {
 			steps = append(steps, "assigning "+joinWords(loginsOf(assign), "and"))
@@ -1122,7 +979,7 @@ func (r *newRun) finish(ctx context.Context, projectID, fieldID string, initial 
 	}
 	var missed []*issue.Linked
 	for i, l := range links {
-		if raw, ok := data[linkAlias(i)]; ok && !isJSONNull(raw) {
+		if effects.Answered(data, effects.LinkAlias(i)) {
 			r.linked = append(r.linked, l)
 		} else {
 			missed = append(missed, l)
@@ -1133,14 +990,14 @@ func (r *newRun) finish(ctx context.Context, projectID, fieldID string, initial 
 	}
 	parentMissed := false
 	if parent != nil {
-		if raw, ok := data["parent"]; ok && !isJSONNull(raw) {
+		if effects.Answered(data, effects.AliasParent) {
 			r.parent, r.parentSet = &parent.Ref, true
 		} else {
 			steps = append(steps, "making it a sub-issue of "+parent.Ref.String(r.def))
 			parentMissed = true
 		}
 	}
-	if parentMissed && len(steps) == 1 && parentRefused(err, "parent", false) {
+	if parentMissed && len(steps) == 1 && parentRefused(err, effects.AliasParent, false) {
 		return &newStepError{step: steps[0] + " failed", err: err, parent: true}
 	}
 	switch {
@@ -1197,8 +1054,9 @@ func containsAnyFold(s string, words ...string) bool {
 
 // addToBoard puts the issue on the board projectID and sets r.itemID (and
 // r.status, when a re-read finds the item with one). A refusal that is not
-// a lost answer is followed by one re-read of the issue's board items: the
-// item may be there all the same, added by GitHub or the board's automation.
+// a lost answer is followed by one re-read of the issue's board items
+// (newRecheckDelay later): the item may be there all the same, added by
+// GitHub or the board's automation.
 func (r *newRun) addToBoard(ctx context.Context, projectID, statusField string) error {
 	var out struct {
 		Add *struct {
@@ -1208,7 +1066,7 @@ func (r *newRun) addToBoard(ctx context.Context, projectID, statusField string) 
 		} `json:"addProjectV2ItemById"`
 	}
 	vars := map[string]any{"project": projectID, "issue": r.id}
-	err := r.Client.Mutate(ctx, newAddToBoardMutation, vars, &out)
+	err := r.Client.Mutate(ctx, effects.AddToBoardMutation, vars, &out)
 	if err == nil {
 		if out.Add == nil || out.Add.Item == nil || out.Add.Item.ID == "" {
 			return render.Internal("addProjectV2ItemById returned no item")
@@ -1220,7 +1078,10 @@ func (r *newRun) addToBoard(ctx context.Context, projectID, statusField string) 
 		// A lost answer or an interrupted run: the re-run finds the item.
 		return err
 	}
-	it := r.recheckItem(ctx, projectID, statusField)
+	if !recheckPause(ctx) {
+		return err
+	}
+	it := issue.ReadBoardItem(ctx, r.Client, r.id, statusField, projectID)
 	if it == nil {
 		return err
 	}
@@ -1229,32 +1090,6 @@ func (r *newRun) addToBoard(ctx context.Context, projectID, statusField string) 
 		r.status = it.Status.Name
 	}
 	r.warnings = append(r.warnings, fmt.Sprintf("GitHub refused adding %s to the board, but a re-read found it there", r.name()))
-	return nil
-}
-
-// recheckItem re-reads the issue's board items after a refused
-// addProjectV2ItemById and returns its unarchived item on projectID, or nil
-// when there is none or the read fails.
-func (r *newRun) recheckItem(ctx context.Context, projectID, statusField string) *newItemJSON {
-	if !recheckPause(ctx) {
-		return nil
-	}
-	var out struct {
-		Node *struct {
-			ProjectItems struct {
-				Nodes []*newItemJSON `json:"nodes"`
-			} `json:"projectItems"`
-		} `json:"node"`
-	}
-	vars := map[string]any{"issue": r.id, "status": statusField}
-	if err := r.Client.Query(ctx, newBoardItemsQuery, vars, &out); err != nil || out.Node == nil {
-		return nil
-	}
-	for _, it := range out.Node.ProjectItems.Nodes {
-		if it != nil && !it.IsArchived && it.Project != nil && it.Project.ID == projectID && it.ID != "" {
-			return it
-		}
-	}
 	return nil
 }
 
@@ -1289,25 +1124,27 @@ func noIssueCreated() *render.Error {
 // recheck re-reads the newest issues after a lost createIssue answer and
 // returns the issue with marker, or nil when it is not there or the read
 // fails.
-func (r *newRun) recheck(ctx context.Context, repo issue.Repo, statusField, marker, projectID string) *foundIssue {
+func (r *newRun) recheck(ctx context.Context, repo issue.Repo, statusField, marker, projectID string) *issue.Created {
 	if !recheckPause(ctx) {
 		return nil
 	}
-	nc, err := readNewContext(ctx, r.Client, repo, statusField, nil, r.opts.Parent, r.opts.Assignees)
+	logins, viewer := newAssigneeLogins(r.opts.Assignees)
+	nc, err := issue.ReadNewContext(ctx, r.Client, issue.NewRequest{Repo: repo, StatusField: statusField,
+		Parent: r.opts.Parent, Logins: logins, Viewer: viewer})
 	if err != nil {
 		return nil
 	}
-	return nc.find(marker, projectID)
+	return nc.Find(marker, projectID)
 }
 
-// create sends createIssue, with milestone and parent unless nil, and the
-// assignees. On an
-// error with the issue in the payload (a part of the input GitHub refused)
-// the issue exists: r.number is set and the error is returned for a
-// partial result.
-func (r *newRun) create(ctx context.Context, repoID, body string, labels []newLabel, milestone *newMilestone, parent *issue.Linked, assignees []*issue.User) error {
-	ids := make([]string, len(labels))
-	for i, l := range labels {
+// create sends createIssue with what in resolved: the labels, the
+// milestone and the parent unless nil, and the assignees. On an error with
+// the issue in the payload (a part of the input GitHub refused) the issue
+// exists: r.number is set and the error is returned for a partial result.
+func (r *newRun) create(ctx context.Context, repoID, body string, in newInput) error {
+	milestone, parent, assignees := in.milestone, in.nc.Parent, in.assignees
+	ids := make([]string, len(in.labels))
+	for i, l := range in.labels {
 		ids[i] = l.ID
 	}
 	var out struct {
@@ -1330,7 +1167,7 @@ func (r *newRun) create(ctx context.Context, repoID, body string, labels []newLa
 	if len(assignees) > 0 {
 		vars["assignees"] = userIDs(assignees)
 	}
-	err := r.Client.Mutate(ctx, newCreateMutation, vars, &out)
+	err := r.Client.Mutate(ctx, effects.CreateIssueMutation, vars, &out)
 	if out.Create == nil || out.Create.Issue == nil || out.Create.Issue.Number == 0 {
 		if err == nil {
 			err = noIssueCreated()
@@ -1341,7 +1178,7 @@ func (r *newRun) create(ctx context.Context, repoID, body string, labels []newLa
 	r.number, r.id = is.Number, is.ID
 	if err != nil && parent != nil && parentRefused(err, "createIssue", true) {
 		// The issue exists with the rest: the run goes on, and ends with
-		// this refusal (see run).
+		// this refusal (see apply).
 		r.parentErr = err
 		r.milestone, r.milestoneSet = milestone, milestone != nil
 		r.assigned = loginsOf(assignees)
@@ -1368,14 +1205,6 @@ func (r *newRun) create(ctx context.Context, repoID, body string, labels []newLa
 		r.assigned = loginsOf(assignees)
 	}
 	return nil
-}
-
-// joinWords lists words as "a", "a or b", "a, b or c".
-func joinWords(words []string, conj string) string {
-	if len(words) <= 1 {
-		return strings.Join(words, "")
-	}
-	return strings.Join(words[:len(words)-1], ", ") + " " + conj + " " + words[len(words)-1]
 }
 
 // confirm is the confirmation line of a finished run:
@@ -1444,41 +1273,24 @@ func (r *newRun) confirm() string {
 	return render.Confirm(r.name(), title, effects...)
 }
 
-// planDry fills the run's fields as a run that writes would leave them,
-// for a dry run: the issue created with the labels, milestone, parent and
-// assignees, or the resumed one finished as run would finish it (assign:
-// the assignees it lacks); on the board,
-// unarchived, in the initial status unless a resumed issue has one, and
-// blocked by links, those it lacks (linked) apart from those it has
-// (linkedFound).
-func (r *newRun) planDry(milestone *newMilestone, setMilestone bool, initial *board.Option, links []*issue.Linked, parent, addParent *issue.Linked, assignees, assign []*issue.User) {
-	if !r.resumed {
-		r.assigned = loginsOf(assignees)
-		r.milestone, r.milestoneSet = milestone, milestone != nil
-		if parent != nil {
-			r.parent, r.parentSet = &parent.Ref, true
-		}
-		r.linked = links
-	} else {
-		r.assigned = loginsOf(assign)
-		if setMilestone {
-			r.milestone, r.milestoneSet = milestone, true
-		}
-		if addParent != nil {
-			r.parent, r.parentSet = &addParent.Ref, true
-		}
-		for _, l := range links {
-			if l.Blocks(r.id) {
-				r.linkedFound = append(r.linkedFound, l)
-			} else {
-				r.linked = append(r.linked, l)
-			}
-		}
+// planDry fills the run's fields as applying plan would leave them, for a
+// dry run: the issue created with the labels, milestone, parent and
+// assignees, or the resumed one finished; on the board, unarchived, in the
+// initial status unless a resumed issue has one, and blocked by the links
+// it lacks (linked) apart from those it has (linkedFound).
+func (r *newRun) planDry(plan *workflow.NewPlan, in newInput) {
+	r.assigned = slices.Clone(plan.Assign)
+	if plan.Milestone != "" {
+		r.milestone, r.milestoneSet = in.milestone, true
 	}
-	r.added = r.itemID == ""
-	r.unarchived = r.archived
-	if initial != nil && (!r.resumed || r.status == "") {
-		r.status, r.statusSet = initial.Name, true
+	if plan.Parent {
+		r.parent, r.parentSet = &in.nc.Parent.Ref, true
+	}
+	r.linked, r.linkedFound = linksOf(plan.Link), linksOf(plan.AlreadyLinked)
+	r.added = plan.AddToBoard
+	r.unarchived = plan.Unarchive
+	if plan.Status != "" {
+		r.status, r.statusSet = plan.Status, true
 	}
 }
 
@@ -1663,37 +1475,8 @@ func (r *newRun) partial(err error) error {
 	return render.Partial("%s %s, but %s\n%s", r.name(), what, step, why).WithFix(fix).WithCause(err)
 }
 
-// newContext is what newContextQuery read.
-type newContext struct {
-	RepoID    string
-	Labels    graph.Connection[newLabel]
-	Issues    []*newIssueJSON
-	allLabels []newLabel // all repo labels, once read past the first page
-	// Milestones are the repo's open milestones: the first page.
-	Milestones    graph.Connection[newMilestone]
-	allMilestones []newMilestone // all of them, once read past the first page
-	// Links are the --blocked-by issues, in order (see issue.Links).
-	Links []*issue.Linked
-	// Parent is the --parent issue, read as a link; nil without --parent.
-	Parent *issue.Linked
-	// Assignable are the assignable users read for each --assignee login
-	// but config.Me, in the order of newAssigneeLogins; Viewer is the
-	// authenticated user, read for config.Me.
-	Assignable [][]*issue.User
-	Viewer     *issue.User
-}
-
-type newLabel struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-}
-
-// newMilestone is a repo milestone: an open one (see issue.OpenMilestone),
-// or the milestone of a recent issue, whose ID is not read.
-type newMilestone = issue.OpenMilestone
-
 // milestoneJSON is the milestone in new's JSON result, nil for none.
-func milestoneJSON(m *newMilestone) *jsonMilestone {
+func milestoneJSON(m *issue.OpenMilestone) *jsonMilestone {
 	if m == nil {
 		return nil
 	}
@@ -1704,268 +1487,6 @@ func milestoneJSON(m *newMilestone) *jsonMilestone {
 		}
 	}
 	return out
-}
-
-type newItemJSON struct {
-	ID         string `json:"id"`
-	IsArchived bool   `json:"isArchived"`
-	Project    *struct {
-		ID string `json:"id"`
-	} `json:"project"`
-	Status *struct {
-		Name string `json:"name"`
-	} `json:"fieldValueByName"`
-}
-
-type newIssueJSON struct {
-	ID              string `json:"id"`
-	Number          int    `json:"number"`
-	Title           string `json:"title"`
-	Body            string `json:"body"`
-	ViewerDidAuthor bool   `json:"viewerDidAuthor"`
-	Labels          struct {
-		Nodes []*struct {
-			Name string `json:"name"`
-		} `json:"nodes"`
-	} `json:"labels"`
-	Milestone *newMilestone `json:"milestone"`
-	// Parent is read with --parent only (newIssueParent).
-	Parent *struct {
-		ID         string `json:"id"`
-		Number     int    `json:"number"`
-		Repository *struct {
-			NameWithOwner string `json:"nameWithOwner"`
-		} `json:"repository"`
-	} `json:"parent"`
-	// Assignees are read with --assignee only (newIssueAssignees).
-	Assignees *struct {
-		TotalCount int `json:"totalCount"`
-		Nodes      []*struct {
-			Login string `json:"login"`
-		} `json:"nodes"`
-	} `json:"assignees"`
-	ProjectItems struct {
-		Nodes []*newItemJSON `json:"nodes"`
-	} `json:"projectItems"`
-	parentHidden bool // GitHub withheld its parent (hiddenParents)
-}
-
-// readNewContext reads what new needs before writing, with the issues of
-// blockers (the --blocked-by ones) and parent (--parent, nil for none) as
-// links, and with parent each recent issue's parent: a missing link is
-// issue.Linked.Missing, not an error. With assignees (the --assignee
-// logins) it reads who of them can be assigned in repo, the viewer for
-// config.Me and each recent issue's assignees.
-func readNewContext(ctx context.Context, q graph.Querier, repo issue.Repo, statusField string, blockers []issue.Ref, parent *issue.Ref, assignees []string) (*newContext, error) {
-	links := issue.Links(slices.Clone(blockers))
-	if parent != nil {
-		links = append(links, *parent) // the last one
-	}
-	var r *struct {
-		ID         string                         `json:"id"`
-		Labels     graph.Connection[newLabel]     `json:"labels"`
-		Milestones graph.Connection[newMilestone] `json:"milestones"`
-		Issues     struct {
-			Nodes []*newIssueJSON `json:"nodes"`
-		} `json:"issues"`
-	}
-	vars := map[string]any{"owner": repo.Owner, "repo": repo.Name, "status": statusField, "window": newDedupWindow}
-	links.AddVars(vars)
-	logins, _ := newAssigneeLogins(assignees)
-	for i, login := range logins {
-		vars[assigneeAlias(i)] = login
-	}
-	var data map[string]json.RawMessage
-	err := q.Query(ctx, newContextQueryWith(links, parent != nil, assignees), vars, &data)
-	var assignable [][]*issue.User
-	if raw, ok := data["repository"]; ok {
-		if uerr := json.Unmarshal(raw, &r); uerr != nil {
-			return nil, render.Internal("cannot decode GitHub's answer").WithCause(uerr)
-		}
-		if r != nil && len(logins) > 0 {
-			var uerr error
-			if assignable, uerr = decodeAssignable(raw, len(logins)); uerr != nil {
-				return nil, render.Internal("cannot decode GitHub's answer").WithCause(uerr)
-			}
-		}
-	}
-	hidden, others := hiddenParents(err)
-	if err != nil && r != nil && (others == nil || issue.OnlyLinkErrors(others)) {
-		err = nil // a missing --blocked-by issue (LinksError names it), or a parent withheld
-	}
-	if r == nil && (err == nil || render.FromError(err).Code == render.ExitNotFound) {
-		return nil, render.NotFound("repository %s not found, or the token cannot see it", repo).
-			WithFix("gh repo view " + repo.String()).WithCause(err)
-	}
-	if err != nil {
-		return nil, err
-	}
-	nc := &newContext{RepoID: r.ID, Labels: r.Labels, Milestones: r.Milestones, Issues: r.Issues.Nodes}
-	for i, is := range nc.Issues {
-		if is != nil && hidden[i] {
-			is.parentHidden = true
-		}
-	}
-	if len(links) > 0 {
-		if nc.Links, err = links.Decode(data); err != nil {
-			return nil, render.Internal("cannot decode GitHub's answer").WithCause(err)
-		}
-	}
-	if parent != nil {
-		nc.Links, nc.Parent = nc.Links[:len(blockers)], nc.Links[len(blockers)]
-	}
-	nc.Assignable = assignable
-	if raw, ok := data["viewer"]; ok && !isJSONNull(raw) {
-		var v issue.User
-		if err := json.Unmarshal(raw, &v); err != nil {
-			return nil, render.Internal("cannot decode GitHub's answer").WithCause(err)
-		}
-		if v.ID != "" {
-			nc.Viewer = &v
-		}
-	}
-	return nc, nil
-}
-
-// decodeAssignable decodes the n assignable-user lookups of a context
-// read (assignee0, assignee1...) from the repository object raw; a lookup
-// GitHub left out is empty.
-func decodeAssignable(raw json.RawMessage, n int) ([][]*issue.User, error) {
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &fields); err != nil {
-		return nil, err
-	}
-	out := make([][]*issue.User, n)
-	for i := range n {
-		f, ok := fields[assigneeAlias(i)]
-		if !ok || isJSONNull(f) {
-			continue
-		}
-		var c struct {
-			Nodes []*issue.User `json:"nodes"`
-		}
-		if err := json.Unmarshal(f, &c); err != nil {
-			return nil, err
-		}
-		out[i] = c.Nodes
-	}
-	return out, nil
-}
-
-// assignees resolves the --assignee logins to users who can be assigned
-// issues in repo, in order and without duplicates (config.Me and the
-// viewer's own login are one user): config.Me is the viewer, a login is
-// matched among the assignable users read for it, ignoring case. Logins
-// that cannot be assigned are one usage error (exit code 1) naming them
-// all, with the repository's assignable users as the allowed values, which
-// takes one more read.
-func (nc *newContext) assignees(ctx context.Context, q graph.Querier, repo issue.Repo, assignees []string) ([]*issue.User, error) {
-	var out []*issue.User
-	var unknown []string
-	add := func(u *issue.User) {
-		if !slices.ContainsFunc(out, func(x *issue.User) bool { return x.ID == u.ID }) {
-			out = append(out, u)
-		}
-	}
-	i := 0 // index among the logins looked up
-	for _, login := range assignees {
-		if login == config.Me {
-			if nc.Viewer == nil {
-				return nil, render.Network("GitHub did not return the authenticated user for --%s %s", assigneeFlag, config.Me).
-					WithFix(render.AuthFix)
-			}
-			add(nc.Viewer)
-			continue
-		}
-		var found *issue.User
-		if i < len(nc.Assignable) {
-			for _, u := range nc.Assignable[i] {
-				if u != nil && u.ID != "" && strings.EqualFold(u.Login, login) {
-					found = u
-					break
-				}
-			}
-		}
-		i++
-		if found == nil {
-			unknown = append(unknown, login)
-			continue
-		}
-		add(found)
-	}
-	if len(unknown) == 0 {
-		return out, nil
-	}
-	fix := fmt.Sprintf("check the login, or give %s access to %s", unknown[0], repo)
-	if len(unknown) > 1 {
-		fix = "check the logins, or give them access to " + repo.String()
-	}
-	e := render.Usage("--%s: %s cannot be assigned issues in %s", assigneeFlag, joinWords(unknown, "and"), repo).WithFix(fix)
-	if logins, err := assignableUsers(ctx, q, repo); err == nil {
-		e = e.WithAllowed(logins...)
-	}
-	return nil, e
-}
-
-// hiddenParents returns the indexes of the recent issues whose parent
-// GitHub withheld from the token (NOT_FOUND or FORBIDDEN at
-// repository.issues.nodes.<i>.parent), and err without those errors: nil
-// when they were all of them, or when err is not a GraphQL error.
-func hiddenParents(err error) (map[int]bool, error) {
-	var gqlErr *api.GraphQLError
-	if !errors.As(err, &gqlErr) || gqlErr == nil {
-		return nil, err
-	}
-	hidden := map[int]bool{}
-	var rest []api.GraphQLErrorItem
-	for _, item := range gqlErr.Errors {
-		p := item.Path
-		if len(p) == 5 && p[0] == "repository" && p[1] == "issues" && p[2] == "nodes" && p[4] == "parent" &&
-			(item.Type == "NOT_FOUND" || item.Type == "FORBIDDEN") {
-			if i, ok := p[3].(float64); ok {
-				hidden[int(i)] = true
-				continue
-			}
-		}
-		rest = append(rest, item)
-	}
-	if len(rest) == 0 {
-		return hidden, nil
-	}
-	return hidden, &api.GraphQLError{Errors: rest}
-}
-
-// foundIssue is an issue an earlier run created, as find returns it.
-type foundIssue struct {
-	ID, itemID, status string
-	title              string
-	archived           bool
-	Number             int
-	labels             []string
-	milestone          *newMilestone // nil for none
-	// parentID is the node ID of its parent, "" for none, and parent names
-	// it; read with --parent only.
-	parentID string
-	parent   *issue.Ref
-	// parentHidden: it has a parent GitHub withheld from the token.
-	parentHidden bool
-	// assignees are the logins of its assignees, and assigneesTotal how
-	// many it has; read with --assignee only.
-	assignees      []string
-	assigneesTotal int
-}
-
-// missingAssignees splits users into those f lacks, to assign, and the
-// logins of those it has already.
-func (f *foundIssue) missingAssignees(users []*issue.User) (missing []*issue.User, have []string) {
-	for _, u := range users {
-		if slices.ContainsFunc(f.assignees, func(l string) bool { return strings.EqualFold(l, u.Login) }) {
-			have = append(have, u.Login)
-		} else {
-			missing = append(missing, u)
-		}
-	}
-	return missing, have
 }
 
 // loginsOf returns the logins of users, as GitHub spells them.
@@ -1984,235 +1505,4 @@ func userIDs(users []*issue.User) []string {
 		out[i] = u.ID
 	}
 	return out
-}
-
-// find returns the newest open issue the viewer wrote whose body ends with
-// marker, with its item on the board projectID, or nil.
-func (nc *newContext) find(marker, projectID string) *foundIssue {
-	for i := len(nc.Issues) - 1; i >= 0; i-- {
-		is := nc.Issues[i]
-		if is == nil || !is.ViewerDidAuthor || !strings.HasSuffix(strings.TrimSpace(is.Body), marker) {
-			continue
-		}
-		f := &foundIssue{ID: is.ID, Number: is.Number, title: is.Title, milestone: is.Milestone, parentHidden: is.parentHidden}
-		if p := is.Parent; p != nil && p.ID != "" && p.Repository != nil {
-			if repo, err := issue.ParseRepo(p.Repository.NameWithOwner); err == nil {
-				f.parentID, f.parent = p.ID, &issue.Ref{Repo: repo, Number: p.Number}
-			}
-		}
-		for _, l := range is.Labels.Nodes {
-			if l != nil {
-				f.labels = append(f.labels, l.Name)
-			}
-		}
-		if a := is.Assignees; a != nil {
-			for _, u := range a.Nodes {
-				if u != nil {
-					f.assignees = append(f.assignees, u.Login)
-				}
-			}
-			f.assigneesTotal = max(a.TotalCount, len(f.assignees))
-		}
-		for _, it := range is.ProjectItems.Nodes {
-			if it != nil && it.Project != nil && it.Project.ID == projectID {
-				f.itemID, f.archived = it.ID, it.IsArchived
-				if it.Status != nil {
-					f.status = it.Status.Name
-				}
-			}
-		}
-		return f
-	}
-	return nil
-}
-
-// labels returns the repo labels: the first page read with the context, or
-// all of them when there are more and more is asked.
-func (nc *newContext) labels(ctx context.Context, q graph.Querier, repo issue.Repo, all bool) ([]newLabel, error) {
-	if !all || !nc.Labels.PageInfo.HasNextPage {
-		return nc.Labels.Nodes, nil
-	}
-	if nc.allLabels == nil {
-		type resp struct {
-			Repository *struct {
-				Labels graph.Connection[newLabel] `json:"labels"`
-			} `json:"repository"`
-		}
-		vars := map[string]any{"owner": repo.Owner, "repo": repo.Name}
-		page, err := graph.Paginate(ctx, q, newLabelsQuery, vars, 0, func(r *resp) *graph.Connection[newLabel] {
-			if r.Repository == nil {
-				return nil
-			}
-			return &r.Repository.Labels
-		})
-		if err != nil {
-			return nil, err
-		}
-		nc.allLabels = page.Nodes
-	}
-	return nc.allLabels, nil
-}
-
-// resolve maps --type, --area and --label to repo labels, without
-// duplicates. An unknown one is a usage error with the allowed values.
-func (nc *newContext) resolve(ctx context.Context, q graph.Querier, cfg *config.Config, repo issue.Repo, o newOptions) ([]newLabel, error) {
-	prefix := cfg.Labels.AreaPrefix
-	type want struct {
-		flag, value, name string
-	}
-	var wants []want
-	if o.Type != "" {
-		name := o.Type
-		for _, t := range cfg.Labels.Types {
-			if strings.EqualFold(t, o.Type) {
-				name = t
-			}
-		}
-		wants = append(wants, want{"type", o.Type, name})
-	}
-	for _, a := range o.Areas {
-		wants = append(wants, want{"area", a, prefix + a})
-	}
-	for _, l := range o.Labels {
-		wants = append(wants, want{"label", l, l})
-	}
-
-	var out []newLabel
-	for _, w := range wants {
-		if strings.TrimSpace(w.value) == "" {
-			return nil, render.Usage("--%s is empty", w.flag).WithFix("gh dojo new --help")
-		}
-		l, err := nc.lookup(ctx, q, repo, w.name)
-		if err != nil {
-			return nil, err
-		}
-		if l == nil {
-			all, err := nc.labels(ctx, q, repo, true)
-			if err != nil {
-				return nil, err
-			}
-			return nil, unknownNewLabel(cfg, repo, w.flag, w.value, w.name, all)
-		}
-		if w.flag == "type" && len(cfg.Labels.Types) == 0 && prefix != "" && hasPrefixFold(l.Name, prefix) {
-			return nil, render.Usage("--type %q is an area label; pass --area %s instead", w.value, l.Name[len(prefix):]).
-				WithFix("gh dojo new --help")
-		}
-		if !slices.ContainsFunc(out, func(x newLabel) bool { return x.ID == l.ID }) {
-			out = append(out, *l)
-		}
-	}
-	return out, nil
-}
-
-// lookup finds a repo label by name, ignoring case as GitHub does.
-func (nc *newContext) lookup(ctx context.Context, q graph.Querier, repo issue.Repo, name string) (*newLabel, error) {
-	find := func(ls []newLabel) *newLabel {
-		for i := range ls {
-			if strings.EqualFold(ls[i].Name, name) {
-				return &ls[i]
-			}
-		}
-		return nil
-	}
-	if l := find(nc.Labels.Nodes); l != nil {
-		return l, nil
-	}
-	all, err := nc.labels(ctx, q, repo, true)
-	if err != nil {
-		return nil, err
-	}
-	return find(all), nil
-}
-
-// unknownNewLabel is the error for a --type, --area or --label value with
-// no matching repo label.
-func unknownNewLabel(cfg *config.Config, repo issue.Repo, flag, value, name string, all []newLabel) error {
-	prefix := cfg.Labels.AreaPrefix
-	var allowed []string
-	switch flag {
-	case "type":
-		if len(cfg.Labels.Types) > 0 {
-			// The type is in labels.types (checkNewType), so the repo lacks it.
-			return cfg.Errorf("labels.types has %q, but %s has no such label", name, repo).
-				WithFix(fmt.Sprintf("gh label create %q -R %s", name, repo))
-		}
-		for _, l := range all {
-			if prefix == "" || !hasPrefixFold(l.Name, prefix) {
-				allowed = append(allowed, l.Name)
-			}
-		}
-	case "area":
-		for _, l := range all {
-			if prefix != "" && hasPrefixFold(l.Name, prefix) {
-				allowed = append(allowed, l.Name[len(prefix):])
-			}
-		}
-		if len(allowed) == 0 {
-			return render.Usage("unknown area %q: %s has no labels starting with %q", value, repo, prefix).
-				WithFix("gh label list -R " + repo.String())
-		}
-	default:
-		for _, l := range all {
-			allowed = append(allowed, l.Name)
-		}
-	}
-	return render.Usage("unknown %s %q: no such label in %s", flag, value, repo).WithAllowed(allowed...).
-		WithFix("gh label list -R " + repo.String())
-}
-
-func hasPrefixFold(s, prefix string) bool {
-	return len(s) >= len(prefix) && strings.EqualFold(s[:len(prefix)], prefix)
-}
-
-// milestoneFix is the command that puts issue r.number of repo in the
-// milestone title: a verb that only sets the --milestone milestone (see
-// onlySetsMilestone) and starts from the issue's status (r.status, or
-// statuses.initial without one), else gh issue edit.
-func (r *newRun) milestoneFix(repo issue.Repo, title string) string {
-	status := r.status
-	if status == "" {
-		status = r.cfg.Statuses.Initial
-	}
-	for _, v := range r.cfg.Verbs {
-		if onlySetsMilestone(v) && (len(v.From) == 0 || slices.Contains(v.From, status)) {
-			def, err := r.App.Repo()
-			if err != nil {
-				def = issue.Repo{}
-			}
-			return fmt.Sprintf("gh dojo %s %s --%s %q", v.Name, issue.Ref{Repo: repo, Number: r.number}.Arg(def),
-				config.ArgMilestone, title)
-		}
-	}
-	return fmt.Sprintf("gh issue edit %d -R %s --milestone %q", r.number, repo, title)
-}
-
-// onlySetsMilestone reports whether v does nothing but set the
-// --milestone milestone: no status, comment, labels, assignees, close,
-// reopen, sprint or fields; it needs nothing besides --milestone, not the
-// user's go-ahead, and checks neither labels nor, to refuse, blockers or
-// sub-issues. Such a verb is a safe way to change an issue's milestone.
-func onlySetsMilestone(v config.Verb) bool {
-	return v.MilestoneArg && v.To == "" && v.Comment == "" && len(v.AddLabels)+len(v.RemoveLabels) == 0 &&
-		!v.Assigns() && v.Unassign == "" && v.Close == "" && !v.Reopen && v.Iteration == "" && len(v.Fields) == 0 &&
-		!v.Confirm && slices.Equal(v.Require, []string{config.ArgMilestone}) && len(v.RequireOneOf) == 0 &&
-		!v.ChecksLabels() && v.Blockers != config.BlockersDeny && v.SubIssues != config.BlockersDeny
-}
-
-// milestone returns the open milestone title names, matched as a verb's
-// milestone effect matches it (see issue.MatchMilestone): the title
-// regardless of case, else the only one it starts. An unknown or ambiguous
-// title is a usage error listing the open milestones or the candidates.
-func (nc *newContext) milestone(ctx context.Context, q graph.Querier, repo issue.Repo, title string) (*newMilestone, error) {
-	all := nc.Milestones.Nodes
-	if nc.Milestones.PageInfo.HasNextPage {
-		if nc.allMilestones == nil {
-			rest, err := issue.ReadMilestones(ctx, q, repo, nc.Milestones.PageInfo.EndCursor)
-			if err != nil {
-				return nil, err
-			}
-			nc.allMilestones = append(slices.Clone(nc.Milestones.Nodes), rest...)
-		}
-		all = nc.allMilestones
-	}
-	return issue.MatchMilestone(title, all, repo)
 }

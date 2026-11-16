@@ -59,3 +59,15 @@ func withMarker(text, marker string) string {
 	}
 	return fmt.Sprintf("%s\n\n%s", text, marker)
 }
+
+// joinWords lists words as "a", "a or b", "a, b or c".
+func joinWords(words []string, conj string) string {
+	if len(words) <= 1 {
+		return strings.Join(words, "")
+	}
+	return strings.Join(words[:len(words)-1], ", ") + " " + conj + " " + words[len(words)-1]
+}
+
+func hasPrefixFold(s, prefix string) bool {
+	return len(s) >= len(prefix) && strings.EqualFold(s[:len(prefix)], prefix)
+}
