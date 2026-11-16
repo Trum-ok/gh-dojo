@@ -117,9 +117,6 @@ fragment value on ProjectV2ItemFieldValue {
 
 fragment field on ProjectV2FieldCommon { id name dataType }`
 
-// historyWindow is the timelineItems(last: N) of cardQuery.
-const historyWindow = 20
-
 type cardResponse struct {
 	Repository *repoJSON
 	Viewer     *User // read for Lookup.Viewer only
