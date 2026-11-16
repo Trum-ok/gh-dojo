@@ -55,6 +55,17 @@ func ReadMilestones(ctx context.Context, q graph.Querier, repo Repo, after strin
 // errors.Is.
 var ErrAmbiguousMilestone = errors.New("ambiguous milestone")
 
+// MilestoneKeyError is err of MatchMilestone for a milestone of the
+// config, at key: it names the key, and its fix says to change it.
+func MilestoneKeyError(key string, err error) *render.Error {
+	e := render.FromError(err)
+	fix := fmt.Sprintf("%s, or fix %s", e.Fix, key)
+	if errors.Is(err, ErrAmbiguousMilestone) {
+		fix = "write more of the title in " + key
+	}
+	return render.Usage("%s: %s", key, e.What).WithAllowed(e.Allowed...).WithFix(fix).WithCause(err)
+}
+
 // SameMilestone reports whether title, as given to a verb or new, names
 // the milestone titled current exactly, regardless of case: an issue in
 // that milestone has it already, even once the milestone is closed and

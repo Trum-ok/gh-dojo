@@ -12,6 +12,7 @@ import (
 
 	"github.com/Trum-ok/gh-dojo/internal/agent"
 	"github.com/Trum-ok/gh-dojo/internal/config"
+	"github.com/Trum-ok/gh-dojo/internal/doctor"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/spf13/cobra"
 )
@@ -251,27 +252,27 @@ func prepareAgentFiles(cfg *config.Config, cmdRoot *cobra.Command, root *os.Root
 // from the one that wrote the file; --check in CI is the strict check. A
 // hand-written skill under [agent], or a file install cannot handle, is a
 // problem.
-func checkAgentFiles(r *doctorReport, cfg *config.Config, cmdRoot *cobra.Command) {
+func checkAgentFiles(r *doctor.Report, cfg *config.Config, cmdRoot *cobra.Command) {
 	if cfg.Path == "" || len(cfg.Agent.Targets) == 0 { // not read from a file: in tests
 		return
 	}
 	root, err := openRepoRoot(cfg)
 	if err != nil {
-		r.problem("agent", err)
+		r.AddProblem("agent", err)
 		return
 	}
 	defer root.Close()
 	targets := agent.Targets // without [agent]: any file agent install wrote
 	if cfg.Agent.Set {
 		if targets, err = agentTargets(cfg, nil); err != nil {
-			r.problem("agent", err)
+			r.AddProblem("agent", err)
 			return
 		}
 	}
 	files, err := prepareAgentFiles(cfg, cmdRoot, root, targets)
 	if err != nil {
 		if cfg.Agent.Set {
-			r.problem("agent", err)
+			r.AddProblem("agent", err)
 		}
 		return
 	}
@@ -287,7 +288,7 @@ func checkAgentFiles(r *doctorReport, cfg *config.Config, cmdRoot *cobra.Command
 		case agent.StateUpToDate:
 			ok = append(ok, f.Path)
 		case agent.StateHandWritten:
-			r.problem("agent", render.Usage("%s was not written by gh dojo agent install", f.Path).
+			r.AddProblem("agent", render.Usage("%s was not written by gh dojo agent install", f.Path).
 				WithFix(agent.HandWrittenFix(f.Target, config.FileName)))
 			return
 		default:
@@ -295,11 +296,11 @@ func checkAgentFiles(r *doctorReport, cfg *config.Config, cmdRoot *cobra.Command
 		}
 	}
 	if len(stale) > 0 {
-		r.warn("agent", "gh dojo agent install", "not up to date with %s or this gh-dojo version: %s",
+		r.AddWarn("agent", "gh dojo agent install", "not up to date with %s or this gh-dojo version: %s",
 			config.FileName, strings.Join(stale, ", "))
 		return
 	}
-	r.ok("agent", "%s: up to date", strings.Join(ok, ", "))
+	r.AddOK("agent", "%s: up to date", strings.Join(ok, ", "))
 }
 
 // readAgentNotes reads [agent] notes from root: "" without them, else the
