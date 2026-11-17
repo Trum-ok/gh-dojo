@@ -180,8 +180,8 @@ func TestConfirm(t *testing.T) {
 		Confirm("#12", long, strings.Repeat("effect, ", 18)+"last effect"),
 	}
 	for _, l := range lines[:len(lines)-1] {
-		if n := utf8.RuneCountInString(l); n > MaxConfirmRunes {
-			t.Errorf("confirmation is %d runes, want at most %d: %q", n, MaxConfirmRunes, l)
+		if n := utf8.RuneCountInString(l); n > maxConfirmRunes {
+			t.Errorf("confirmation is %d runes, want at most %d: %q", n, maxConfirmRunes, l)
 		}
 	}
 	// Effects are never cut, even past the limit; the title is dropped then.

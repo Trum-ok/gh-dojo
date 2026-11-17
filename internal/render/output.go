@@ -6,8 +6,8 @@ import (
 	"strings"
 )
 
-// MaxConfirmRunes is the length limit of a confirmation line.
-const MaxConfirmRunes = 160
+// maxConfirmRunes is the length limit of a confirmation line.
+const maxConfirmRunes = 160
 
 // minTitleRunes is the shortest cut title worth printing; below it the title
 // is left out.
@@ -21,7 +21,7 @@ const minTitleRunes = 8
 //	Confirm("#57", "Fix login redirect", "created", Transition("", "Backlog"))
 //	// #57 "Fix login redirect" created, no status → Backlog
 //
-// Only the title is shortened to keep the line within MaxConfirmRunes, and
+// Only the title is shortened to keep the line within maxConfirmRunes, and
 // left out if too little of it would fit. The subject and effects are never
 // cut: they say what was done, so a line without a title may be longer.
 func Confirm(subject, title string, effects ...string) string {
@@ -29,7 +29,7 @@ func Confirm(subject, title string, effects ...string) string {
 	tail := SingleLine(strings.Join(nonEmpty(effects), ", "))
 	if title = SingleLine(title); title != "" {
 		// room left for `"title"` between head and tail, with separators.
-		room := MaxConfirmRunes - RuneLen(head) - RuneLen(tail) - 2
+		room := maxConfirmRunes - RuneLen(head) - RuneLen(tail) - 2
 		if head != "" {
 			room--
 		}

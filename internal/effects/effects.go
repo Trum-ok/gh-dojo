@@ -33,29 +33,30 @@ import (
 const OperationName = "Verb"
 
 // Aliases of the mutation fields, one per kind of op. They key the response
-// data and the paths of GraphQL errors.
+// data and the paths of GraphQL errors. AliasStatus and AliasAssign are
+// NewFinish's too, whose caller reads its answer.
 const (
-	AliasBoard        = "board"
-	AliasUnarchive    = "unarchive"
-	AliasReopen       = "reopen"
+	aliasBoard        = "board"
+	aliasUnarchive    = "unarchive"
+	aliasReopen       = "reopen"
 	AliasStatus       = "status"
-	AliasAddLabels    = "addLabels"
-	AliasRemoveLabels = "removeLabels"
+	aliasAddLabels    = "addLabels"
+	aliasRemoveLabels = "removeLabels"
 	AliasAssign       = "assign"
-	AliasUnassign     = "unassign"
-	AliasComment      = "comment"
-	AliasClose        = "close"
-	AliasIteration    = "sprint"
-	AliasMilestone    = "milestone"
+	aliasUnassign     = "unassign"
+	aliasComment      = "comment"
+	aliasClose        = "close"
+	aliasIteration    = "sprint"
+	aliasMilestone    = "milestone"
 )
 
-// FieldAlias is the alias of the i-th field a SetFields op sets: field0,
+// fieldAlias is the alias of the i-th field a SetFields op sets: field0,
 // field1, ...
-func FieldAlias(i int) string { return fmt.Sprintf("field%d", i) }
+func fieldAlias(i int) string { return fmt.Sprintf("field%d", i) }
 
-// BlockedByAlias is the alias of the i-th AddBlockedBy op: blockedBy0,
+// blockedByAlias is the alias of the i-th AddBlockedBy op: blockedBy0,
 // blockedBy1, ...; its variable is blocker0, blocker1, ...
-func BlockedByAlias(i int) string { return fmt.Sprintf("blockedBy%d", i) }
+func blockedByAlias(i int) string { return fmt.Sprintf("blockedBy%d", i) }
 
 // IDs are the node IDs the ops need. Never print them.
 type IDs struct {
@@ -193,11 +194,11 @@ func Build(ops []workflow.Op, ids IDs) (*Mutation, error) {
 		}
 		switch op := op.(type) {
 		case workflow.AddToBoard:
-			alias = AliasBoard
+			alias = aliasBoard
 			err = firstErr(declare("project", "ID!", ids.Project), declare("issue", "ID!", ids.Issue))
 			field = addToBoardField
 		case workflow.Unarchive:
-			alias = AliasUnarchive
+			alias = aliasUnarchive
 			err = firstErr(declare("project", "ID!", ids.Project), declare("item", "ID!", ids.Item))
 			field = unarchiveField
 		case workflow.SetStatus:
@@ -206,11 +207,11 @@ func Build(ops []workflow.Op, ids IDs) (*Mutation, error) {
 				declare("field", "ID!", ids.StatusField), declare("option", "String!", ids.StatusOption))
 			field = setStatusInput + " { projectV2Item { id } }"
 		case workflow.Reopen:
-			alias = AliasReopen
+			alias = aliasReopen
 			err = declare("issue", "ID!", ids.Issue)
 			field = "reopenIssue(input: {issueId: $issue}) { issue { id } }"
 		case workflow.SetMilestone:
-			alias = AliasMilestone
+			alias = aliasMilestone
 			if op.To == "" { // out of its milestone
 				err = declare("issue", "ID!", ids.Issue)
 				field = "updateIssue(input: {id: $issue, milestoneId: null}) { issue { id } }"
@@ -219,13 +220,13 @@ func Build(ops []workflow.Op, ids IDs) (*Mutation, error) {
 			err = firstErr(declare("issue", "ID!", ids.Issue), declare("milestone", "ID!", ids.Milestone))
 			field = "updateIssue(input: {id: $issue, milestoneId: $milestone}) { issue { id } }"
 		case workflow.AddLabels:
-			alias = AliasAddLabels
+			alias = aliasAddLabels
 			var labels []string
 			labels, err = lookupAll("label", ids.Labels, op.Names)
 			err = firstErr(err, declare("issue", "ID!", ids.Issue), declare("addLabels", "[ID!]!", labels))
 			field = addLabelsField("addLabels")
 		case workflow.RemoveLabels:
-			alias = AliasRemoveLabels
+			alias = aliasRemoveLabels
 			var labels []string
 			labels, err = lookupAll("label", ids.Labels, op.Names)
 			err = firstErr(err, declare("issue", "ID!", ids.Issue), declare("removeLabels", "[ID!]!", labels))
@@ -237,13 +238,13 @@ func Build(ops []workflow.Op, ids IDs) (*Mutation, error) {
 			err = firstErr(err, declare("issue", "ID!", ids.Issue), declare("assignees", "[ID!]!", users))
 			field = assignField
 		case workflow.Unassign:
-			alias = AliasUnassign
+			alias = aliasUnassign
 			var users []string
 			users, err = lookupAll("user", ids.Users, op.Logins)
 			err = firstErr(err, declare("issue", "ID!", ids.Issue), declare("unassignees", "[ID!]!", users))
 			field = "removeAssigneesFromAssignable(input: {assignableId: $issue, assigneeIds: $unassignees}) { clientMutationId }"
 		case workflow.AddBlockedBy:
-			alias = BlockedByAlias(blockers)
+			alias = blockedByAlias(blockers)
 			v := fmt.Sprintf("blocker%d", blockers)
 			blockers++
 			id := ids.Blockers[op.Ref]
@@ -253,11 +254,11 @@ func Build(ops []workflow.Op, ids IDs) (*Mutation, error) {
 			err = firstErr(declare("issue", "ID!", ids.Issue), declare(v, "ID!", id))
 			field = BlockedByField(true, "issue", v)
 		case workflow.AddComment:
-			alias = AliasComment
+			alias = aliasComment
 			err = firstErr(declare("issue", "ID!", ids.Issue), declare("body", "String!", op.Text()))
 			field = "addComment(input: {subjectId: $issue, body: $body}) { commentEdge { node { id } } }"
 		case workflow.Close:
-			alias = AliasClose
+			alias = aliasClose
 			err = firstErr(declare("issue", "ID!", ids.Issue),
 				declare("reason", "IssueClosedStateReason!", strings.ToUpper(op.Reason)))
 			field = "closeIssue(input: {issueId: $issue, stateReason: $reason}) { issue { id } }"
@@ -269,7 +270,7 @@ func Build(ops []workflow.Op, ids IDs) (*Mutation, error) {
 				field = "closeIssue(input: {issueId: $issue, stateReason: $reason, duplicateIssueId: $original}) { issue { id } }"
 			}
 		case workflow.SetIteration:
-			alias = AliasIteration
+			alias = aliasIteration
 			err = firstErr(declare("project", "ID!", ids.Project), declare("item", "ID!", ids.Item),
 				declare("sprintField", "ID!", ids.SprintField))
 			if op.To == "" {
@@ -294,7 +295,7 @@ func Build(ops []workflow.Op, ids IDs) (*Mutation, error) {
 				if !ok || in.ID == "" || len(in.Value) == 0 {
 					return nil, fmt.Errorf("effects: no ID or value for field %q", c.Field)
 				}
-				alias := FieldAlias(i)
+				alias := fieldAlias(i)
 				if err := firstErr(declare(alias, "ID!", in.ID),
 					declare(alias+"Value", "ProjectV2FieldValue!", in.Value)); err != nil {
 					return nil, err
@@ -448,7 +449,7 @@ func (m *Mutation) Outcome(data map[string]json.RawMessage) (done, missed []work
 // ItemID returns the board item ID that addProjectV2ItemById returned in
 // data, or item when m has no AddToBoard or it did not succeed.
 func (m *Mutation) ItemID(data map[string]json.RawMessage, item string) string {
-	raw, ok := data[AliasBoard]
+	raw, ok := data[aliasBoard]
 	if !ok || graph.IsNull(raw) {
 		return item
 	}

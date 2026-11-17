@@ -57,7 +57,7 @@ func (it *Item) skip(cause error) {
 // Writes.Partial: when something was applied, the reason says what was
 // and what was not.
 func (it *Item) failRun(p *workflow.Plan, cause, err error) {
-	missed := Missing(p.Ops, it.Writes.Done)
+	missed := missing(p.Ops, it.Writes.Done)
 	it.Err = it.Writes.Partial(missed, cause, err)
 	it.Why = render.Reason(err)
 	if len(it.Writes.Done) > 0 {
@@ -135,18 +135,18 @@ func (w *Writes) ApplyFresh(ctx context.Context, be Backend, replan func() (*wor
 	case err == nil:
 		return nil
 	case !board.IsStale(err):
-		return w.Partial(Missing(plan.Ops, w.Done), err, err)
+		return w.Partial(missing(plan.Ops, w.Done), err, err)
 	}
 	if rerr := be.Reset(); rerr != nil {
-		return w.Partial(Missing(plan.Ops, w.Done), err, err)
+		return w.Partial(missing(plan.Ops, w.Done), err, err)
 	}
 	fresh, perr := replan()
 	if perr != nil {
-		return w.Partial(Missing(plan.Ops, w.Done), err, perr)
+		return w.Partial(missing(plan.Ops, w.Done), err, perr)
 	}
 	w.replanned(fresh)
 	if err := w.Apply(ctx, be, fresh); err != nil {
-		return w.Partial(Missing(fresh.Ops, w.Done), err, err)
+		return w.Partial(missing(fresh.Ops, w.Done), err, err)
 	}
 	return nil
 }
@@ -155,7 +155,7 @@ func (w *Writes) ApplyFresh(ctx context.Context, be Backend, replan func() (*wor
 // attempt confirmed: that is not sent again, even if the re-read does not
 // show it yet.
 func (w *Writes) replanned(fresh *workflow.Plan) {
-	fresh.Ops = Missing(fresh.Ops, w.Done)
+	fresh.Ops = missing(fresh.Ops, w.Done)
 	w.Fresh = fresh
 }
 
@@ -167,7 +167,7 @@ func (w *Writes) Apply(ctx context.Context, be Backend, p *workflow.Plan) error 
 	}
 	done, err := be.Apply(ctx, p)
 	w.Done = append(w.Done, done...)
-	if err != nil && len(Missing(p.Ops, done)) == 0 {
+	if err != nil && len(missing(p.Ops, done)) == 0 {
 		render.Warn(w.Stderr, "GitHub reported an error after applying every change: %s", render.Reason(err))
 		return nil
 	}
@@ -249,12 +249,12 @@ func missedText(missed []workflow.Op, cause error) string {
 	return "the rest is unconfirmed"
 }
 
-// Missing returns the ops of ops that are not among done, compared by
+// missing returns the ops of ops that are not among done, compared by
 // content: a re-plan may hold an op of a kind already done with other
 // values, such as a label to add that the first plan did not have, and
 // that one is still to send. SetFields compares field by field, since
 // GitHub may set some fields of one and not others (see effects.Outcome).
-func Missing(ops, done []workflow.Op) []workflow.Op {
+func missing(ops, done []workflow.Op) []workflow.Op {
 	var out []workflow.Op
 	for _, op := range ops {
 		if set, ok := op.(workflow.SetFields); ok {

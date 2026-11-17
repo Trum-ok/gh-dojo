@@ -410,10 +410,10 @@ func TestMissing(t *testing.T) {
 		workflow.AddComment{Body: "x", Marker: "m"},
 		workflow.SetStatus{From: "Ready", To: "Done"},
 	}
-	got := Missing(ops, done)
+	got := missing(ops, done)
 	want := []workflow.Op{workflow.AddLabels{Names: []string{"b"}}, workflow.SetStatus{From: "Ready", To: "Done"}}
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("Missing = %v, want %v", got, want)
+		t.Errorf("missing = %v, want %v", got, want)
 	}
 }
 

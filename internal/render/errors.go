@@ -294,17 +294,17 @@ func rateLimited(retryAfter string) *Error {
 	return Network("GitHub API rate limit exceeded; retry later")
 }
 
-// ContentLimitWait is how long to wait after GitHub's content creation
+// contentLimitWait is how long to wait after GitHub's content creation
 // limit when it does not say: it gives no Retry-After inside a GraphQL
 // answer, and reports of the limit clearing range from a minute to several.
-const ContentLimitWait = "a few minutes"
+const contentLimitWait = "a few minutes"
 
 // ContentLimited reports GitHub's secondary rate limit on creating content
 // (issues, comments, pull requests): exit code 4, with how long to wait
 // from retryAfter (seconds) when it is known. Mutations are never resent
 // (see internal/graph), so the fix is a later re-run.
 func ContentLimited(retryAfter string) *Error {
-	wait := ContentLimitWait
+	wait := contentLimitWait
 	if secs := RetryAfter(retryAfter); secs > 0 {
 		wait = strconv.Itoa(secs) + "s"
 	}
