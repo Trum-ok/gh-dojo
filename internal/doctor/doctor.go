@@ -150,13 +150,14 @@ func Run(ctx context.Context, env Env) *Report {
 	reach, viewer := checkToken(ctx, r, env.Client, repos)
 
 	var schema *board.Schema
+	sprintReported := false
 	switch {
 	case cfg == nil:
 		r.AddSkip("board", "needs a config that loads")
 	case !reach:
 		r.AddSkip("board", "needs GitHub access (see token)")
 	default:
-		schema = checkBoard(ctx, r, env.Boards, cfg)
+		schema, sprintReported = checkBoard(ctx, r, env.Boards, cfg)
 	}
 
 	switch {
@@ -178,7 +179,7 @@ func Run(ctx context.Context, env Env) *Report {
 		}
 	}
 
-	if cfg != nil && schema != nil {
+	if cfg != nil && schema != nil && !sprintReported {
 		CheckSprint(r, cfg, schema, env.Now(), func() (*board.Schema, error) {
 			ref := board.RefOf(cfg)
 			if err := env.Boards.Invalidate(ref); err != nil {
@@ -205,16 +206,19 @@ func configSummary(cfg *config.Config) string {
 // checkBoard checks the config against the board, from the cache when it
 // is fresh; a mismatch on a cached schema re-reads the board first. Each
 // mismatch is its own problem. It returns the schema, nil when the board
-// could not be read.
-func checkBoard(ctx context.Context, r *Report, boards Boards, cfg *config.Config) *board.Schema {
+// could not be read, and whether one of the problems is fields.sprint (a
+// field the board lacks or of another type), which leaves CheckSprint
+// nothing to add.
+func checkBoard(ctx context.Context, r *Report, boards Boards, cfg *config.Config) (s *board.Schema, sprintReported bool) {
 	s, err := boards.Resolve(ctx, board.RefOf(cfg), func(s *board.Schema) error { return board.Check(cfg, s) })
 	if s == nil {
 		r.AddProblem("board", err)
-		return nil
+		return nil, false
 	}
 	if problems := board.Problems(cfg, s); len(problems) > 0 {
 		for _, p := range problems {
 			r.AddProblem("board", p.Err)
+			sprintReported = sprintReported || p.Key == "fields.sprint"
 		}
 	} else if err != nil {
 		r.AddProblem("board", err)
@@ -234,7 +238,7 @@ func checkBoard(ctx context.Context, r *Report, boards Boards, cfg *config.Confi
 		r.AddProblem("board", render.Usage("board %s %q is closed", s.Ref(), s.Title).
 			WithFix(fmt.Sprintf("gh project close %d --owner %s --undo", s.Number, s.Owner)))
 	}
-	return s
+	return s, sprintReported
 }
 
 // CheckSprint checks that the sprint field has an iteration for today, the
@@ -253,8 +257,9 @@ func CheckSprint(r *Report, cfg *config.Config, s *board.Schema, now time.Time, 
 		return // board.Problems reported it
 	}
 	if f.Type != board.TypeIteration {
-		r.AddProblem("sprint", render.Usage("field %q on board %s is %s, not an iteration field", f.Name, s.Ref(), f.Type).
-			WithFix("edit fields.sprint in "+cfg.Display))
+		// Run reports it through board.Problems, with the allowed fields,
+		// and skips this check; called alone, it names the fix only.
+		r.AddProblem("sprint", s.WrongType(f, board.TypeIteration).WithAllowed().WithFix("edit fields.sprint in "+cfg.Display))
 		return
 	}
 	it := f.IterationAt(now)
