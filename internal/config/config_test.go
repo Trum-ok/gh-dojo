@@ -907,3 +907,24 @@ func TestErrorfAndKeyPath(t *testing.T) {
 	e := c.Errorf("%s: unknown status %q", c.KeyPath("verbs.wait.to"), "Waiting").WithAllowed("Backlog", "Done")
 	testutil.Golden(t, "errors/board_check_example", []byte(e.Text()+"\n"))
 }
+
+// TestMergeVerb: a repo verb's keys override the preset's one by one, the
+// preset's others stay with their origin recorded, and disabled comes
+// from the repo only.
+func TestMergeVerb(t *testing.T) {
+	to, done, comment, yes := "Doing", "Done", "Started.", true
+	base := &rawVerb{To: &to, Comment: &comment, Disabled: &yes}
+	over := &rawVerb{To: &done, Batch: &yes}
+	origin := map[string]string{}
+	got := mergeVerb(merger{preset: "kanban", origin: origin}, "start", base, over)
+	want := &rawVerb{To: &done, Comment: &comment, Batch: &yes}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("mergeVerb = %+v, want %+v", got, want)
+	}
+	if want := map[string]string{"verbs.start.comment": "kanban"}; !reflect.DeepEqual(origin, want) {
+		t.Errorf("origin = %v, want %v", origin, want)
+	}
+	if keys := got.setKeys(); !slices.Equal(keys, []string{"to", "comment", "batch"}) {
+		t.Errorf("setKeys = %v", keys)
+	}
+}
