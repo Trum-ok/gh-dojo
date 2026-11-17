@@ -26,6 +26,9 @@ const (
 
 var allConditions = []string{condGh, condDojo}
 
+// condNames are the conditions as the report and the chart name them.
+var condNames = map[string]string{condGh: "gh + CLAUDE.md", condDojo: "gh dojo + skill"}
+
 // workspace is an empty git repository whose origin is the sandbox, set up
 // for one condition: what an agent's working directory would hold.
 type workspace struct {

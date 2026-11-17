@@ -4,9 +4,10 @@ import { Board } from "./Board";
 import { ChatPanel } from "./Chat";
 import { mono, sans } from "./fonts";
 import { confirmation } from "./format";
-import { DURATION, FADE, msgs } from "./script";
+import { DURATION, msgs } from "./script";
 import { themes } from "./theme";
 import { Thread } from "./Thread";
+import { clamp, FADE } from "./timeline";
 
 export type DemoProps = { theme: "light" | "dark" };
 
@@ -17,10 +18,7 @@ export const Demo: React.FC<DemoProps> = ({ theme }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   // Fade in and out so the looping GIF does not jump back to the start.
-  const opacity = interpolate(frame / fps, [0, FADE, DURATION - FADE, DURATION], [0, 1, 1, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
+  const opacity = interpolate(frame / fps, [0, FADE, DURATION - FADE, DURATION], [0, 1, 1, 0], clamp);
 
   return (
     <AbsoluteFill style={{ backgroundColor: t.canvas, fontFamily: sans }}>

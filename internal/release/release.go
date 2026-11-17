@@ -1,8 +1,9 @@
-// Package release finds the issues a release includes (spec F11): the
-// commits of the release through the API, without a local git checkout,
-// and for each one the merged pull requests it belongs to with the issues
-// they close, plus the issues its message names after a keyword
-// ([release] keywords) or in a suffix ([release] suffix).
+// Package release finds the issues a release includes (see "release" in
+// docs/commands.md): the commits of the release through the API, without
+// a local git checkout, and for each one the merged pull requests it
+// belongs to with the issues they close, plus the issues its message
+// names after a keyword ([release] keywords) or in a suffix ([release]
+// suffix).
 //
 // Pull requests link a commit to its issues whatever the merge strategy:
 // GitHub associates a squash commit, a merge commit and each rebased

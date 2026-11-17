@@ -1,15 +1,16 @@
 import React from "react";
 import { Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { BLOCKER_RESOLVED, Card, cards, columns, WAIT_AT } from "./script";
+import { clamp } from "./timeline";
 import type { Theme } from "./theme";
 
-export const COL_W = 174;
+const COL_W = 174;
 const COL_GAP = 8;
 const CARD_H = 80;
 const CARD_GAP = 8;
 const HEADER_H = 40;
-export const BOARD_W = columns.length * COL_W + (columns.length - 1) * COL_GAP;
-export const BOARD_H = HEADER_H + 3 * (CARD_H + CARD_GAP) + 4;
+const BOARD_W = columns.length * COL_W + (columns.length - 1) * COL_GAP;
+const BOARD_H = HEADER_H + 3 * (CARD_H + CARD_GAP) + 4;
 
 const MOVE = 1.1; // seconds a card takes to cross columns
 const SHIFT = 0.5; // seconds a card takes to close a gap in its column
@@ -30,11 +31,7 @@ const place = (card: Card, sec: number) => {
   const cur = card.moves[i];
   const prev = card.moves[Math.max(0, i - 1)];
   const across = cur.col !== prev.col;
-  const p = interpolate(sec, [cur.at, cur.at + (across ? MOVE : SHIFT)], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: ease,
-  });
+  const p = interpolate(sec, [cur.at, cur.at + (across ? MOVE : SHIFT)], [0, 1], { ...clamp, easing: ease });
   const a = slotXY(prev.col, prev.slot);
   const b = slotXY(cur.col, cur.slot);
   // Lifted only while in flight: at p = 1, sin(p·π) is 1e-16, not 0.
@@ -84,10 +81,7 @@ const CardView: React.FC<{ card: Card; t: Theme; sec: number }> = ({ card, t, se
   const hero = card.id === "42";
   const blockedShown = hero && sec >= WAIT_AT;
   const resolved = sec >= BLOCKER_RESOLVED + MOVE;
-  const chipIn = interpolate(sec, [WAIT_AT, WAIT_AT + 0.3], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
+  const chipIn = interpolate(sec, [WAIT_AT, WAIT_AT + 0.3], [0, 1], clamp);
   return (
     <div
       style={{

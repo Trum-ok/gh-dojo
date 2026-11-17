@@ -26,8 +26,8 @@ const (
 // archived items left out) with what `list` prints, the viewer's login for
 // --mine and the status field's ID (to notice a cached schema that is out of
 // date), so a whole board takes ceil(items/100) requests. Windows: labels
-// 100 and assignees 10 per issue, each with its totalCount.
-const itemsQuery = `query BoardItems($owner: String!, $number: Int!, $status: String!, $cursor: String) {
+// and assignees per issue, each with its totalCount.
+var itemsQuery = `query BoardItems($owner: String!, $number: Int!, $status: String!, $cursor: String) {
   viewer { login }
   repositoryOwner(login: $owner) {
     ... on User { projectV2(number: $number) { ...items } }
@@ -51,13 +51,15 @@ fragment items on ProjectV2 {
           title
           state
           repository { nameWithOwner }
-          labels(first: 100) { totalCount nodes { name } }
-          assignees(first: 10) { totalCount nodes { login } }
-        }
+          labels(first: ` + strconv.Itoa(LabelsWindow) + `) { totalCount nodes { name } }
+` + assigneesLine + `        }
       }
     }
   }
 }`
+
+// assigneesLine is the line of itemsQuery that reads an issue's assignees.
+var assigneesLine = "          assignees(first: " + strconv.Itoa(AssigneesWindow) + ") { totalCount nodes { login } }\n"
 
 // Item content types, as GitHub names them. ContentHidden is an item whose
 // content the token cannot see.
@@ -83,13 +85,13 @@ var sprintItems = strings.NewReplacer(
 // one more connection per issue, so the request count stays
 // ceil(items/100).
 var blockerItems = strings.NewReplacer(
-	"          assignees(first: 10) { totalCount nodes { login } }\n",
-	"          assignees(first: 10) { totalCount nodes { login } }\n"+
+	assigneesLine,
+	assigneesLine+
 		"          blockedBy(first: "+strconv.Itoa(BlockersWindow)+") { totalCount nodes { number state repository { nameWithOwner } } }\n",
 )
 
-// ItemsOptions are what ReadItemsWith reads beyond ReadItems, in the same
-// requests.
+// ItemsOptions are what ReadItemsWith reads beyond the items' status,
+// labels and assignees, in the same requests; the zero value reads none.
 type ItemsOptions struct {
 	// Sprint is the name of the sprint field: each item's iteration of it
 	// is read (Item.SprintID, Item.Sprint); "" reads none.
@@ -141,7 +143,7 @@ type Blocker struct {
 	State  string // "OPEN" or "CLOSED"
 }
 
-// Items is the whole board, read by ReadItems.
+// Items is the whole board, read by ReadItemsWith.
 type Items struct {
 	// Viewer is the login of the token's user.
 	Viewer string
@@ -160,15 +162,10 @@ type Items struct {
 	Incomplete bool
 }
 
-// ReadItems reads every non-archived item of the board s in board order,
-// 100 per request, with statusField's value. A board that no longer exists
-// is exit code 3; network and auth problems keep graph's codes.
-func ReadItems(ctx context.Context, q graph.Querier, s *Schema, statusField string) (*Items, error) {
-	return ReadItemsWith(ctx, q, s, statusField, ItemsOptions{})
-}
-
-// ReadItemsWith is ReadItems that also reads what o asks for, in the same
-// requests.
+// ReadItemsWith reads every non-archived item of the board s in board
+// order, 100 per request, with statusField's value and what o asks for. A
+// board that no longer exists is exit code 3; network and auth problems
+// keep graph's codes.
 func ReadItemsWith(ctx context.Context, q graph.Querier, s *Schema, statusField string, o ItemsOptions) (*Items, error) {
 	out := &Items{}
 	tq := &tolerant{q: q}

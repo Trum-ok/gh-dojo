@@ -1,6 +1,6 @@
 // The story of the main demo. Command output and comments are the real text
 // gh-dojo prints and posts with the kanban preset (internal/config/presets/kanban.toml).
-import { Chat } from "./timeline";
+import { Chat, FADE } from "./timeline";
 
 const chat = new Chat()
   .wait(0.4)
@@ -27,7 +27,6 @@ const chat = new Chat()
   .wait(2.6);
 
 export const msgs = chat.msgs;
-export const FADE = 0.35;
 export const DURATION = chat.t + FADE;
 
 const { start, wait, resolved, ready } = chat.marks;

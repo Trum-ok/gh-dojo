@@ -3,6 +3,8 @@ package release
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/Trum-ok/gh-dojo/internal/graph"
@@ -70,16 +72,16 @@ type Pull struct {
 }
 
 // commitFragment is what a release reads of each commit.
-const commitFragment = `fragment releaseCommit on Commit {
+var commitFragment = `fragment releaseCommit on Commit {
   oid
   message
-  associatedPullRequests(first: 5) {
+  associatedPullRequests(first: ` + strconv.Itoa(PullWindow) + `) {
     totalCount
     nodes {
       number
       merged
       repository { nameWithOwner }
-      closingIssuesReferences(first: 25) {
+      closingIssuesReferences(first: ` + strconv.Itoa(ClosingWindow) + `) {
         totalCount
         nodes { number repository { nameWithOwner } }
       }
@@ -144,7 +146,7 @@ var compareQuery = `query ReleaseCompare($owner: String!, $repo: String!, $base:
         status
         aheadBy
         behindBy
-        commits(first: 100, after: $cursor) {
+        commits(first: ` + strconv.Itoa(PageSize) + `, after: $cursor) {
           totalCount
           pageInfo { hasNextPage endCursor }
           nodes { ...releaseCommit }
@@ -160,7 +162,7 @@ var historyQuery = `query ReleaseHistory($owner: String!, $repo: String!, $head:
   repository(owner: $owner, name: $repo) {
     object(oid: $head) {
       ... on Commit {
-        history(first: 100, after: $cursor) {
+        history(first: ` + strconv.Itoa(PageSize) + `, after: $cursor) {
           pageInfo { hasNextPage endCursor }
           nodes { ...releaseCommit }
         }
@@ -407,9 +409,7 @@ func (r *Range) walk(ctx context.Context, q graph.Querier) error {
 				continue
 			}
 			if c.OID == r.SinceCommit {
-				for i, j := 0, len(commits)-1; i < j; i, j = i+1, j-1 {
-					commits[i], commits[j] = commits[j], commits[i]
-				}
+				slices.Reverse(commits)
 				r.add(commits)
 				return nil
 			}
@@ -458,22 +458,16 @@ func (r *Range) add(nodes []*commitJSON) {
 				pull.Closes = append(pull.Closes, issue.Ref{Repo: ir, Number: i.Number})
 			}
 			if p.Closing.TotalCount > len(p.Closing.Nodes) {
-				r.Warnings = appendOnce(r.Warnings, fmt.Sprintf("pull request %s closes %d issues; read the first %d",
-					pull.Ref.String(r.Repo), p.Closing.TotalCount, len(p.Closing.Nodes)))
+				w := fmt.Sprintf("pull request %s closes %d issues; read the first %d",
+					pull.Ref.String(r.Repo), p.Closing.TotalCount, len(p.Closing.Nodes))
+				if !slices.Contains(r.Warnings, w) {
+					r.Warnings = append(r.Warnings, w)
+				}
 			}
 			c.Pulls = append(c.Pulls, pull)
 		}
 		r.Commits = append(r.Commits, c)
 	}
-}
-
-func appendOnce(list []string, s string) []string {
-	for _, o := range list {
-		if o == s {
-			return list
-		}
-	}
-	return append(list, s)
 }
 
 // Short is a commit's oid as output names it: its first 7 characters.
@@ -517,13 +511,13 @@ func refNotFound(ctx context.Context, q graph.Querier, repo issue.Repo, ref, fla
 	if err := q.Query(ctx, refQuery, vars, &resp); err != nil || resp.Repository == nil || resp.Repository.Object == nil {
 		return refMissing(repo, ref, flag)
 	}
-	return render.NotFound("%s%s: no tag, branch or commit of %s", flag, ref, repo).
+	return refMissing(repo, ref, flag).
 		WithFix(fmt.Sprintf("if %s is a git remote of your checkout, GitHub names it %s: pass %s%s", remote, name, flag, name))
 }
 
 // refMissing is the error for ref, named by flag ("--since "), that is no
 // tag, branch or commit of repo.
-func refMissing(repo issue.Repo, ref, flag string) error {
+func refMissing(repo issue.Repo, ref, flag string) *render.Error {
 	return render.NotFound("%s%s: no tag, branch or commit of %s", flag, ref, repo).
 		WithFix(fmt.Sprintf("pass a tag, a branch or a commit of %s (push it first)", repo))
 }

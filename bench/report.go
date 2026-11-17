@@ -69,7 +69,6 @@ func report(files []string) error {
 		return fmt.Sprintf("| %s | %d | %d/%d | %d | %s | %s | %s | %s | %s | %d | %d | %d |", label, len(rs), ok, len(rs), viol,
 			spread(cost, "%.3f"), spread(tok, "%.0f"), spread(turns, "%.0f"), spread(secs, "%.0f"), spread(calls, "%.0f"), errs, refusals, denied)
 	}
-	condName := map[string]string{condGh: "gh + CLAUDE.md", condDojo: "gh dojo + skill"}
 	if slices.ContainsFunc(all, func(r agentResult) bool { return !session[r.Task] }) {
 		fmt.Println("One-message tasks, all together:")
 		fmt.Println()
@@ -78,7 +77,7 @@ func report(files []string) error {
 		for _, m := range models {
 			for _, c := range allConditions {
 				if rs := groups[key{"", m, c}]; len(rs) > 0 {
-					fmt.Println(row(m+" | "+condName[c], rs))
+					fmt.Println(row(m+" | "+condNames[c], rs))
 				}
 			}
 		}
@@ -90,12 +89,12 @@ func report(files []string) error {
 		for _, m := range models {
 			for _, c := range allConditions {
 				if rs := groups[key{t, m, c}]; len(rs) > 0 {
-					fmt.Println(row(m+" | "+condName[c], rs))
+					fmt.Println(row(m+" | "+condNames[c], rs))
 				}
 			}
 		}
 		if session[t] {
-			sessionSteps(models, func(m, c string) []agentResult { return groups[key{t, m, c}] }, condName)
+			sessionSteps(models, func(m, c string) []agentResult { return groups[key{t, m, c}] })
 		}
 		var notes []string
 		for _, m := range models {
@@ -120,7 +119,7 @@ func report(files []string) error {
 // sessionSteps prints a session's running totals after each message: the
 // steps done right so far and the medians of cost, tokens, turns and time.
 // Where the conditions' lines cross is where gh dojo's skill pays off.
-func sessionSteps(models []string, runs func(model, cond string) []agentResult, condName map[string]string) {
+func sessionSteps(models []string, runs func(model, cond string) []agentResult) {
 	fmt.Println()
 	fmt.Println("Running totals after each message: steps done right of all runs, then medians.")
 	fmt.Println()
@@ -129,23 +128,13 @@ func sessionSteps(models []string, runs func(model, cond string) []agentResult, 
 	for _, m := range models {
 		for _, c := range allConditions {
 			rs := runs(m, c)
-			steps := 0
-			for _, r := range rs {
-				steps = max(steps, len(r.Steps))
-			}
-			for i := range steps {
+			for i := range stepCount(rs) {
 				ok, total, errs, refusals := 0, 0, 0, 0
-				var cost, tok, turns, secs []float64
 				for _, r := range rs {
 					if i >= len(r.Steps) {
 						continue
 					}
-					var sc, st, su, ss float64
 					for _, p := range r.Steps[:i+1] {
-						sc += p.CostUSD
-						st += float64(p.Tokens) / 1000
-						su += float64(p.Turns)
-						ss += float64(p.DurationMS) / 1000
 						errs += p.ToolErrors
 						refusals += p.Refusals
 						total++
@@ -153,14 +142,47 @@ func sessionSteps(models []string, runs func(model, cond string) []agentResult, 
 							ok++
 						}
 					}
-					cost, tok, turns, secs = append(cost, sc), append(tok, st), append(turns, su), append(secs, ss)
 				}
-				fmt.Printf("| %s | %s | %d | %d/%d | %s | %s | %s | %s | %d | %d |\n", m, condName[c], i+1, ok, total,
+				cost := runningTotals(rs, i, func(p stepResult) float64 { return p.CostUSD })
+				tok := runningTotals(rs, i, func(p stepResult) float64 { return float64(p.Tokens) / 1000 })
+				turns := runningTotals(rs, i, func(p stepResult) float64 { return float64(p.Turns) })
+				secs := runningTotals(rs, i, stepSeconds)
+				fmt.Printf("| %s | %s | %d | %d/%d | %s | %s | %s | %s | %d | %d |\n", m, condNames[c], i+1, ok, total,
 					spread(cost, "%.3f"), spread(tok, "%.0f"), spread(turns, "%.0f"), spread(secs, "%.0f"), errs, refusals)
 			}
 		}
 	}
 }
+
+// stepCount is how many messages the longest session of rs answered.
+func stepCount(rs []agentResult) int {
+	n := 0
+	for _, r := range rs {
+		n = max(n, len(r.Steps))
+	}
+	return n
+}
+
+// runningTotals is, for each run of rs that answered message i (from 0),
+// the total of value over its steps up to that one: the report prints
+// their median after each message, and the chart draws it.
+func runningTotals(rs []agentResult, i int, value func(stepResult) float64) []float64 {
+	var out []float64
+	for _, r := range rs {
+		if i >= len(r.Steps) {
+			continue
+		}
+		t := 0.0
+		for _, p := range r.Steps[:i+1] {
+			t += value(p)
+		}
+		out = append(out, t)
+	}
+	return out
+}
+
+// stepSeconds is how long a step took, in seconds.
+func stepSeconds(p stepResult) float64 { return float64(p.DurationMS) / 1000 }
 
 // load reads results.jsonl files, leaving out the runs the harness failed:
 // it returns how many.
@@ -207,17 +229,9 @@ func spread(vs []float64, format string) string {
 	if len(vs) == 0 {
 		return "–"
 	}
-	s := slices.Clone(vs)
-	slices.Sort(s)
-	var med float64
-	if n := len(s); n%2 == 1 {
-		med = s[n/2]
-	} else {
-		med = (s[n/2-1] + s[n/2]) / 2
-	}
-	m := fmt.Sprintf(format, med)
-	if len(s) == 1 {
+	m := fmt.Sprintf(format, median(vs))
+	if len(vs) == 1 {
 		return m
 	}
-	return fmt.Sprintf("%s [%s–%s]", m, strings.TrimSpace(fmt.Sprintf(format, s[0])), strings.TrimSpace(fmt.Sprintf(format, s[len(s)-1])))
+	return fmt.Sprintf("%s [%s–%s]", m, strings.TrimSpace(fmt.Sprintf(format, slices.Min(vs))), strings.TrimSpace(fmt.Sprintf(format, slices.Max(vs))))
 }

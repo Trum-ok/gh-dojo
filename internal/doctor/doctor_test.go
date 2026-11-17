@@ -197,6 +197,27 @@ func TestRun(t *testing.T) {
 	}
 }
 
+// TestRunSprintFieldType: a sprint field of another type is one problem,
+// the board's; the sprint check adds no second one.
+func TestRunSprintFieldType(t *testing.T) {
+	gh := &fakeGitHub{scopes: scopes("project, repo"), data: map[string]string{
+		"Doctor": `{"viewer": {"login": "octocat"},
+			"repo0": {"nameWithOwner": "acme/api", "hasIssuesEnabled": true}}`,
+		"DoctorLabels": `{"repo0": {"labels": {"totalCount": 1, "nodes": [{"name": "bug"}]}, "area": {"nodes": []}}}`,
+	}}
+	cfg := parse(t, kanbanConfig+"\n[fields]\nsprint = \"Status\"\n")
+	r := Run(context.Background(), env(cfg, gh, &fakeBoards{schema: kanbanBoard()}))
+	var problems []string
+	for _, c := range r.Checks {
+		if c.Result == "problem" && strings.Contains(c.Detail, "not an iteration field") {
+			problems = append(problems, line(c))
+		}
+	}
+	if len(problems) != 1 || !strings.HasPrefix(problems[0], "problem board: ") {
+		t.Errorf("problems about the sprint field:\n  %s\nwant one, the board's", strings.Join(problems, "\n  "))
+	}
+}
+
 // TestRunNoConfig: the token is still checked; the board and the
 // repositories need the config, and the Doctor query reads the viewer
 // alone.

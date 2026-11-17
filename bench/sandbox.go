@@ -237,31 +237,42 @@ func (s *sandbox) read(n int) (state, error) {
 // issues returns the state of every issue in the repository, open or closed,
 // whose title starts with prefix, newest first.
 func (s *sandbox) issues(prefix string) ([]state, []string, error) {
-	var out struct {
-		Repository struct {
-			Issues struct {
-				Nodes []struct {
-					ID string
-					stateNode
+	var states []state
+	var ids []string
+	vars := map[string]any{"o": s.owner, "r": s.name, "after": nil}
+	for {
+		var out struct {
+			Repository struct {
+				Issues struct {
+					Nodes []struct {
+						ID string
+						stateNode
+					}
+					PageInfo struct {
+						HasNextPage bool
+						EndCursor   string
+					}
 				}
 			}
 		}
-	}
-	err := s.do(`query($o: String!, $r: String!) { repository(owner: $o, name: $r) {
-  issues(first: 100, orderBy: {field: CREATED_AT, direction: DESC}) { nodes { id `+stateFields+` } } } }`,
-		map[string]any{"o": s.owner, "r": s.name}, &out)
-	if err != nil {
-		return nil, nil, fmt.Errorf("list issues: %w", err)
-	}
-	var states []state
-	var ids []string
-	for _, n := range out.Repository.Issues.Nodes {
-		if strings.HasPrefix(n.Title, prefix) {
-			states = append(states, s.toState(n.stateNode))
-			ids = append(ids, n.ID)
+		err := s.do(`query($o: String!, $r: String!, $after: String) { repository(owner: $o, name: $r) {
+  issues(first: 100, after: $after, orderBy: {field: CREATED_AT, direction: DESC}) {
+    nodes { id `+stateFields+` } pageInfo { hasNextPage endCursor } } } }`, vars, &out)
+		if err != nil {
+			return nil, nil, fmt.Errorf("list issues: %w", err)
 		}
+		page := out.Repository.Issues
+		for _, n := range page.Nodes {
+			if strings.HasPrefix(n.Title, prefix) {
+				states = append(states, s.toState(n.stateNode))
+				ids = append(ids, n.ID)
+			}
+		}
+		if !page.PageInfo.HasNextPage || page.PageInfo.EndCursor == "" {
+			return states, ids, nil
+		}
+		vars["after"] = page.PageInfo.EndCursor
 	}
-	return states, ids, nil
 }
 
 // sweep deletes every issue whose title starts with prefix. Deleting needs

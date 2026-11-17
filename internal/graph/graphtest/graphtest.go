@@ -28,8 +28,8 @@ const (
 	recordMutationsEnv = "GH_DOJO_RECORD_MUTATIONS"
 )
 
-// Recording reports whether tests run in record mode (GH_DOJO_RECORD=1).
-func Recording() bool { return os.Getenv(recordEnv) != "" }
+// recording reports whether tests run in record mode (GH_DOJO_RECORD=1).
+func recording() bool { return os.Getenv(recordEnv) != "" }
 
 // File is the on-disk fixture format.
 type File struct {
@@ -104,7 +104,7 @@ func New(t testing.TB, files ...string) *Server {
 	if len(files) == 0 {
 		t.Fatal("graphtest.New: no fixture files")
 	}
-	s := &Server{t: t, files: files, record: Recording()}
+	s := &Server{t: t, files: files, record: recording()}
 	for i, path := range files {
 		f, err := readFile(path)
 		if errors.Is(err, os.ErrNotExist) && s.record {

@@ -22,7 +22,7 @@ func chart(dir string, files []string) error {
 	var panels []panel
 	for _, m := range []string{"sonnet", "haiku"} {
 		p := panel{title: strings.ToUpper(m[:1]) + m[1:]}
-		for _, c := range []string{condDojo, condGh} {
+		for _, c := range chartConds {
 			var rs []agentResult
 			for _, r := range all {
 				if r.Task == task && r.Model == m && r.Cond == c {
@@ -33,18 +33,8 @@ func chart(dir string, files []string) error {
 				return fmt.Errorf("chart: no %s runs of %s with %s", task, m, c)
 			}
 			var line []float64
-			for i := range len(rs[0].Steps) {
-				var secs []float64
-				for _, r := range rs {
-					if i < len(r.Steps) {
-						s := 0.0
-						for _, st := range r.Steps[:i+1] {
-							s += float64(st.DurationMS) / 1000
-						}
-						secs = append(secs, s)
-					}
-				}
-				line = append(line, median(secs))
+			for i := range stepCount(rs) {
+				line = append(line, median(runningTotals(rs, i, stepSeconds)))
 			}
 			p.lines = append(p.lines, line)
 		}
@@ -63,13 +53,14 @@ func chart(dir string, files []string) error {
 	return nil
 }
 
-// panel is one model: a line per condition, in the order of chartSeries.
+// panel is one model: a line per condition, in the order of chartConds.
 type panel struct {
 	title string
 	lines [][]float64
 }
 
-var chartSeries = []string{"gh dojo + skill", "gh + CLAUDE.md"}
+// chartConds are the conditions of the chart's lines, in order.
+var chartConds = []string{condDojo, condGh}
 
 // theme is the ink of one GitHub theme. The series are the first two slots of
 // a categorical palette checked for colour blindness on both surfaces.
@@ -113,13 +104,14 @@ func drawChart(panels []panel, th theme) string {
 	var desc []string
 	for _, p := range panels {
 		desc = append(desc, fmt.Sprintf("%s: %.0f s with %s, %.0f s with %s", p.title,
-			p.lines[0][len(p.lines[0])-1], chartSeries[0], p.lines[1][len(p.lines[1])-1], chartSeries[1]))
+			p.lines[0][len(p.lines[0])-1], condNames[chartConds[0]], p.lines[1][len(p.lines[1])-1], condNames[chartConds[1]]))
 	}
 	f("<desc>%s. Medians of 5 sessions each.</desc>\n", html.EscapeString(strings.Join(desc, "; ")))
 
 	// The legend, then what the axes are.
 	x := float64(gutter)
-	for i, name := range chartSeries {
+	for i, c := range chartConds {
+		name := condNames[c]
 		f(`<line x1="%.0f" y1="22" x2="%.0f" y2="22" stroke="%s" stroke-width="2" stroke-linecap="round"/>`+"\n", x, x+18, th.series[i])
 		f(`<text x="%.0f" y="26" font-size="13" fill="%s">%s</text>`+"\n", x+24, th.primary, html.EscapeString(name))
 		x += 24 + float64(len(name))*6.8 + 28

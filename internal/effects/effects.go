@@ -15,6 +15,15 @@
 // GraphQL runs the fields of a mutation in order and fails them one by one:
 // a rejected status change leaves the comment after it posted. Outcome
 // tells which ops took effect from the fields that came back non-null.
+//
+// gh dojo new's mutations (new.go) take up to four requests instead:
+// GraphQL cannot feed one field's result into another field of the same
+// document, and each step needs the one before: createIssue the issue ID
+// that adding it to the board takes, addProjectV2ItemById the item ID
+// that setting its status takes. A resumed issue (one an earlier run
+// created) gets the labels, milestone and board item it lacks one
+// mutation each, so a partial report names the step that failed; the
+// status and the rest go into NewFinish.
 package effects
 
 import (
@@ -24,6 +33,7 @@ import (
 	"strings"
 
 	"github.com/Trum-ok/gh-dojo/internal/graph"
+	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/Trum-ok/gh-dojo/internal/workflow"
 )
 
@@ -32,29 +42,30 @@ import (
 const OperationName = "Verb"
 
 // Aliases of the mutation fields, one per kind of op. They key the response
-// data and the paths of GraphQL errors.
+// data and the paths of GraphQL errors. AliasStatus and AliasAssign are
+// NewFinish's too, whose caller reads its answer.
 const (
-	AliasBoard        = "board"
-	AliasUnarchive    = "unarchive"
-	AliasReopen       = "reopen"
+	aliasBoard        = "board"
+	aliasUnarchive    = "unarchive"
+	aliasReopen       = "reopen"
 	AliasStatus       = "status"
-	AliasAddLabels    = "addLabels"
-	AliasRemoveLabels = "removeLabels"
+	aliasAddLabels    = "addLabels"
+	aliasRemoveLabels = "removeLabels"
 	AliasAssign       = "assign"
-	AliasUnassign     = "unassign"
-	AliasComment      = "comment"
-	AliasClose        = "close"
-	AliasIteration    = "sprint"
-	AliasMilestone    = "milestone"
+	aliasUnassign     = "unassign"
+	aliasComment      = "comment"
+	aliasClose        = "close"
+	aliasIteration    = "sprint"
+	aliasMilestone    = "milestone"
 )
 
-// FieldAlias is the alias of the i-th field a SetFields op sets: field0,
+// fieldAlias is the alias of the i-th field a SetFields op sets: field0,
 // field1, ...
-func FieldAlias(i int) string { return fmt.Sprintf("field%d", i) }
+func fieldAlias(i int) string { return fmt.Sprintf("field%d", i) }
 
-// BlockedByAlias is the alias of the i-th AddBlockedBy op: blockedBy0,
+// blockedByAlias is the alias of the i-th AddBlockedBy op: blockedBy0,
 // blockedBy1, ...; its variable is blocker0, blocker1, ...
-func BlockedByAlias(i int) string { return fmt.Sprintf("blockedBy%d", i) }
+func blockedByAlias(i int) string { return fmt.Sprintf("blockedBy%d", i) }
 
 // IDs are the node IDs the ops need. Never print them.
 type IDs struct {
@@ -144,8 +155,10 @@ func Batches(ops []workflow.Op) [][]workflow.Op {
 }
 
 // Build makes one mutation document from ops: at most one op of each kind
-// (AddBlockedBy one per blocking issue), with the IDs it needs. A SetStatus without ids.Item is an error: add the
-// issue to the board first (see Batches).
+// (AddBlockedBy one per blocking issue), with the IDs it needs. An op that
+// sets a field of the board item (SetStatus, SetIteration, SetFields)
+// without ids.Item is an error: add the issue to the board first (see
+// Batches).
 //
 //	mutation Verb($project: ID!, $item: ID!, $field: ID!, $option: String!, $issue: ID!, $body: String!, $reason: IssueClosedStateReason!) {
 //	  status: updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field, value: {singleSelectOptionId: $option}}) { projectV2Item { id } }
@@ -192,25 +205,24 @@ func Build(ops []workflow.Op, ids IDs) (*Mutation, error) {
 		}
 		switch op := op.(type) {
 		case workflow.AddToBoard:
-			alias = AliasBoard
+			alias = aliasBoard
 			err = firstErr(declare("project", "ID!", ids.Project), declare("issue", "ID!", ids.Issue))
-			field = "addProjectV2ItemById(input: {projectId: $project, contentId: $issue}) { item { id } }"
+			field = addToBoardField
 		case workflow.Unarchive:
-			alias = AliasUnarchive
+			alias = aliasUnarchive
 			err = firstErr(declare("project", "ID!", ids.Project), declare("item", "ID!", ids.Item))
-			field = "unarchiveProjectV2Item(input: {projectId: $project, itemId: $item}) { item { id } }"
+			field = unarchiveField
 		case workflow.SetStatus:
 			alias = AliasStatus
 			err = firstErr(declare("project", "ID!", ids.Project), declare("item", "ID!", ids.Item),
 				declare("field", "ID!", ids.StatusField), declare("option", "String!", ids.StatusOption))
-			field = "updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field, " +
-				"value: {singleSelectOptionId: $option}}) { projectV2Item { id } }"
+			field = setStatusInput + " { projectV2Item { id } }"
 		case workflow.Reopen:
-			alias = AliasReopen
+			alias = aliasReopen
 			err = declare("issue", "ID!", ids.Issue)
 			field = "reopenIssue(input: {issueId: $issue}) { issue { id } }"
 		case workflow.SetMilestone:
-			alias = AliasMilestone
+			alias = aliasMilestone
 			if op.To == "" { // out of its milestone
 				err = declare("issue", "ID!", ids.Issue)
 				field = "updateIssue(input: {id: $issue, milestoneId: null}) { issue { id } }"
@@ -219,13 +231,13 @@ func Build(ops []workflow.Op, ids IDs) (*Mutation, error) {
 			err = firstErr(declare("issue", "ID!", ids.Issue), declare("milestone", "ID!", ids.Milestone))
 			field = "updateIssue(input: {id: $issue, milestoneId: $milestone}) { issue { id } }"
 		case workflow.AddLabels:
-			alias = AliasAddLabels
+			alias = aliasAddLabels
 			var labels []string
 			labels, err = lookupAll("label", ids.Labels, op.Names)
 			err = firstErr(err, declare("issue", "ID!", ids.Issue), declare("addLabels", "[ID!]!", labels))
-			field = "addLabelsToLabelable(input: {labelableId: $issue, labelIds: $addLabels}) { clientMutationId }"
+			field = addLabelsField("addLabels")
 		case workflow.RemoveLabels:
-			alias = AliasRemoveLabels
+			alias = aliasRemoveLabels
 			var labels []string
 			labels, err = lookupAll("label", ids.Labels, op.Names)
 			err = firstErr(err, declare("issue", "ID!", ids.Issue), declare("removeLabels", "[ID!]!", labels))
@@ -235,15 +247,15 @@ func Build(ops []workflow.Op, ids IDs) (*Mutation, error) {
 			var users []string
 			users, err = lookupAll("user", ids.Users, []string{op.Login})
 			err = firstErr(err, declare("issue", "ID!", ids.Issue), declare("assignees", "[ID!]!", users))
-			field = "addAssigneesToAssignable(input: {assignableId: $issue, assigneeIds: $assignees}) { clientMutationId }"
+			field = assignField
 		case workflow.Unassign:
-			alias = AliasUnassign
+			alias = aliasUnassign
 			var users []string
 			users, err = lookupAll("user", ids.Users, op.Logins)
 			err = firstErr(err, declare("issue", "ID!", ids.Issue), declare("unassignees", "[ID!]!", users))
 			field = "removeAssigneesFromAssignable(input: {assignableId: $issue, assigneeIds: $unassignees}) { clientMutationId }"
 		case workflow.AddBlockedBy:
-			alias = BlockedByAlias(blockers)
+			alias = blockedByAlias(blockers)
 			v := fmt.Sprintf("blocker%d", blockers)
 			blockers++
 			id := ids.Blockers[op.Ref]
@@ -253,11 +265,11 @@ func Build(ops []workflow.Op, ids IDs) (*Mutation, error) {
 			err = firstErr(declare("issue", "ID!", ids.Issue), declare(v, "ID!", id))
 			field = BlockedByField(true, "issue", v)
 		case workflow.AddComment:
-			alias = AliasComment
+			alias = aliasComment
 			err = firstErr(declare("issue", "ID!", ids.Issue), declare("body", "String!", op.Text()))
 			field = "addComment(input: {subjectId: $issue, body: $body}) { commentEdge { node { id } } }"
 		case workflow.Close:
-			alias = AliasClose
+			alias = aliasClose
 			err = firstErr(declare("issue", "ID!", ids.Issue),
 				declare("reason", "IssueClosedStateReason!", strings.ToUpper(op.Reason)))
 			field = "closeIssue(input: {issueId: $issue, stateReason: $reason}) { issue { id } }"
@@ -269,7 +281,7 @@ func Build(ops []workflow.Op, ids IDs) (*Mutation, error) {
 				field = "closeIssue(input: {issueId: $issue, stateReason: $reason, duplicateIssueId: $original}) { issue { id } }"
 			}
 		case workflow.SetIteration:
-			alias = AliasIteration
+			alias = aliasIteration
 			err = firstErr(declare("project", "ID!", ids.Project), declare("item", "ID!", ids.Item),
 				declare("sprintField", "ID!", ids.SprintField))
 			if op.To == "" {
@@ -294,7 +306,7 @@ func Build(ops []workflow.Op, ids IDs) (*Mutation, error) {
 				if !ok || in.ID == "" || len(in.Value) == 0 {
 					return nil, fmt.Errorf("effects: no ID or value for field %q", c.Field)
 				}
-				alias := FieldAlias(i)
+				alias := fieldAlias(i)
 				if err := firstErr(declare(alias, "ID!", in.ID),
 					declare(alias+"Value", "ProjectV2FieldValue!", in.Value)); err != nil {
 					return nil, err
@@ -346,6 +358,26 @@ func BlockedByField(add bool, issue, blocker string) string {
 	return name + "(input: {issueId: $" + issue + ", blockingIssueId: $" + blocker + "}) { issue { id } }"
 }
 
+// The mutation fields both a verb's document (Build) and new's mutations
+// use, with their variables: $project, $issue, $item, $field, $option,
+// $assignees.
+const (
+	addToBoardField = "addProjectV2ItemById(input: {projectId: $project, contentId: $issue}) { item { id } }"
+	unarchiveField  = "unarchiveProjectV2Item(input: {projectId: $project, itemId: $item}) { item { id } }"
+	assignField     = "addAssigneesToAssignable(input: {assignableId: $issue, assigneeIds: $assignees}) { clientMutationId }"
+	// setStatusInput sets the status option; a selection of
+	// projectV2Item { id } follows it.
+	setStatusInput = "updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field, " +
+		"value: {singleSelectOptionId: $option}})"
+	// addLabelsHead and addLabelsTail are addLabelsField around the name
+	// of its variable, apart so a constant can hold them too.
+	addLabelsHead = "addLabelsToLabelable(input: {labelableId: $issue, labelIds: $"
+	addLabelsTail = "}) { clientMutationId }"
+)
+
+// addLabelsField adds the labels in $<labels> to the issue in $issue.
+func addLabelsField(labels string) string { return addLabelsHead + labels + addLabelsTail }
+
 // lookupAll returns the IDs of names in ids, ignoring case.
 func lookupAll(kind string, ids map[string]string, names []string) ([]string, error) {
 	out := make([]string, 0, len(names))
@@ -383,10 +415,6 @@ func firstErr(errs ...error) error {
 // SetFields with the fields set is done, one with the rest missed, so a
 // partial report names each field.
 func (m *Mutation) Outcome(data map[string]json.RawMessage) (done, missed []workflow.Op) {
-	answered := func(alias string) bool {
-		v, found := data[alias]
-		return found && !graph.IsNull(v)
-	}
 	for i, s := range m.Steps {
 		if i > 0 && m.Steps[i-1].op == s.op {
 			continue // judged with the op's first step
@@ -397,7 +425,7 @@ func (m *Mutation) Outcome(data map[string]json.RawMessage) (done, missed []work
 				if t.op != s.op {
 					break
 				}
-				if answered(t.Alias) {
+				if Answered(data, t.Alias) {
 					got = append(got, set.Changes[k])
 				} else {
 					lost = append(lost, set.Changes[k])
@@ -416,7 +444,7 @@ func (m *Mutation) Outcome(data map[string]json.RawMessage) (done, missed []work
 			if t.op != s.op {
 				break
 			}
-			if !answered(t.Alias) {
+			if !Answered(data, t.Alias) {
 				ok = false
 			}
 		}
@@ -432,7 +460,7 @@ func (m *Mutation) Outcome(data map[string]json.RawMessage) (done, missed []work
 // ItemID returns the board item ID that addProjectV2ItemById returned in
 // data, or item when m has no AddToBoard or it did not succeed.
 func (m *Mutation) ItemID(data map[string]json.RawMessage, item string) string {
-	raw, ok := data[AliasBoard]
+	raw, ok := data[aliasBoard]
 	if !ok || graph.IsNull(raw) {
 		return item
 	}
@@ -492,10 +520,7 @@ func Missed(op workflow.Op) string {
 		for i, c := range op.Changes {
 			names[i] = c.Field
 		}
-		if n := len(names); n > 1 {
-			return strings.Join(names[:n-1], ", ") + " and " + names[n-1] + " not set"
-		}
-		return strings.Join(names, "") + " not set"
+		return render.JoinWords(names, "and") + " not set"
 	}
 	return op.Describe() + " not done"
 }

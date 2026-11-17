@@ -110,11 +110,11 @@ func Problems(c *config.Config, s *Schema) []Problem {
 				e.Fix = fmt.Sprintf("add an iteration field %q on the board (%s), or %s", c.Fields[name], s.URL, e.Fix)
 			}
 		case name == "status" && f.Type != TypeSingleSelect:
-			add(key, s.notSingleSelect(f))
+			add(key, s.WrongType(f, TypeSingleSelect))
 		case name == "status":
 			status = f
 		case name == "sprint" && f.Type != TypeIteration:
-			add(key, s.notIteration(f))
+			add(key, s.WrongType(f, TypeIteration))
 		}
 	}
 	if status != nil {
@@ -194,28 +194,20 @@ func tomlKey(name string) string {
 	return key[len("verbs.v.field."):]
 }
 
-// notIteration is the error for a sprint field of another type; the
-// allowed values are the board's iteration fields.
-func (s *Schema) notIteration(f *Field) error {
+// WrongType is the error for the config's status or sprint field when it
+// is not of type want, TypeSingleSelect or TypeIteration; the allowed
+// values are the board's fields of that type.
+func (s *Schema) WrongType(f *Field, want FieldType) *render.Error {
+	kind := "a single-select field"
+	if want == TypeIteration {
+		kind = "an iteration field"
+	}
 	var names []string
 	for _, g := range s.Fields {
-		if g.Type == TypeIteration {
+		if g.Type == want {
 			names = append(names, g.Name)
 		}
 	}
-	return render.Usage("field %q on board %s is %s, not an iteration field", f.Name, s.Ref(), f.Type).
-		WithAllowed(names...).WithCause(ErrFieldType)
-}
-
-// notSingleSelect is the error for a status field of another type; the
-// allowed values are the board's single-select fields.
-func (s *Schema) notSingleSelect(f *Field) error {
-	var names []string
-	for _, g := range s.Fields {
-		if g.Type == TypeSingleSelect {
-			names = append(names, g.Name)
-		}
-	}
-	return render.Usage("field %q on board %s is %s, not a single-select field", f.Name, s.Ref(), f.Type).
+	return render.Usage("field %q on board %s is %s, not %s", f.Name, s.Ref(), f.Type, kind).
 		WithAllowed(names...).WithCause(ErrFieldType)
 }

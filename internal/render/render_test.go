@@ -180,8 +180,8 @@ func TestConfirm(t *testing.T) {
 		Confirm("#12", long, strings.Repeat("effect, ", 18)+"last effect"),
 	}
 	for _, l := range lines[:len(lines)-1] {
-		if n := utf8.RuneCountInString(l); n > MaxConfirmRunes {
-			t.Errorf("confirmation is %d runes, want at most %d: %q", n, MaxConfirmRunes, l)
+		if n := utf8.RuneCountInString(l); n > maxConfirmRunes {
+			t.Errorf("confirmation is %d runes, want at most %d: %q", n, maxConfirmRunes, l)
 		}
 	}
 	// Effects are never cut, even past the limit; the title is dropped then.
@@ -216,25 +216,20 @@ func TestWarn(t *testing.T) {
 	testutil.Golden(t, "warn", buf.Bytes())
 }
 
-func TestTruncate(t *testing.T) {
-	items := make([]int, 73)
-	var out strings.Builder
-	show := func(label string, got []int, note string) {
-		fmt.Fprintf(&out, "%s: %d items, note=%q\n", label, len(got), note)
+func TestShown(t *testing.T) {
+	for _, tt := range []struct {
+		shown, total int
+		hint, want   string
+	}{
+		{50, 73, "", "showing 50 of 73"},
+		{50, 73, "use --comments all to see all", "showing 50 of 73, use --comments all to see all"},
+		{10, 10, "use --limit 10", ""},
+		{0, 0, "", ""},
+	} {
+		if got := Shown(tt.shown, tt.total, tt.hint); got != tt.want {
+			t.Errorf("Shown(%d, %d, %q) = %q, want %q", tt.shown, tt.total, tt.hint, got, tt.want)
+		}
 	}
-
-	got, note := Truncate(items, 50, 73, "")
-	show("cut", got, note)
-	got, note = Truncate(items[:50], 0, 73, "use --comments all to see all")
-	show("api total larger", got, note)
-	got, note = Truncate(items[:10], 50, 10, "")
-	show("fits", got, note)
-	got, note = Truncate(items, 0, 0, "")
-	show("no limit", got, note)
-	got, note = Truncate([]int(nil), 50, 0, "")
-	show("empty", got, note)
-
-	testutil.Golden(t, "truncate", []byte(out.String()))
 }
 
 func mustURL(s string) *url.URL {

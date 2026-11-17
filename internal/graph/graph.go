@@ -177,27 +177,14 @@ func retryDelay(err error, attempt int) (time.Duration, bool) {
 	if !errors.As(err, &httpErr) || httpErr == nil {
 		return 0, false
 	}
-	if httpErr.StatusCode < 500 && !isSecondaryRateLimit(httpErr) {
+	if httpErr.StatusCode < 500 && !render.IsSecondaryRateLimit(httpErr) {
 		return 0, false
 	}
 	delay := baseDelay << (attempt - 1)
-	if s := httpErr.Headers.Get("Retry-After"); s != "" {
-		if secs, perr := strconv.Atoi(strings.TrimSpace(s)); perr == nil && secs >= 0 {
-			delay = max(delay, time.Duration(secs)*time.Second)
-		}
+	if secs := render.RetryAfter(httpErr.Headers.Get("Retry-After")); secs > 0 {
+		delay = max(delay, time.Duration(secs)*time.Second)
 	}
 	return delay, true
-}
-
-func isSecondaryRateLimit(e *api.HTTPError) bool {
-	if e.StatusCode != http.StatusForbidden && e.StatusCode != http.StatusTooManyRequests {
-		return false
-	}
-	if e.Headers.Get("X-RateLimit-Remaining") == "0" {
-		return false // primary limit: resets in up to an hour, retrying is pointless
-	}
-	return e.Headers.Get("Retry-After") != "" ||
-		strings.Contains(strings.ToLower(e.Message), "secondary rate limit")
 }
 
 // mapError turns a go-gh or transport error into a short *render.Error,
@@ -275,40 +262,43 @@ func describeGraphQL(err *api.GraphQLError) *render.Error {
 			return render.Internal("GitHub rejected gh-dojo's GraphQL query")
 		}
 	}
-	has := func(t string) (api.GraphQLErrorItem, bool) {
-		for _, item := range err.Errors {
-			if item.Type == t {
-				return item, true
+	return render.MapGraphQL(err, render.GraphQLWords{
+		Scopes: func(item api.GraphQLErrorItem) *render.Error {
+			return render.Network("GitHub token is missing a required scope%s", scopesHint(item.Message)).WithFix(render.AuthFix)
+		},
+		Other: func(err *api.GraphQLError) *render.Error {
+			for _, item := range err.Errors {
+				if e := orgDenial(item); e != nil {
+					return e
+				}
 			}
-		}
-		return api.GraphQLErrorItem{}, false
+			if isCycle(err) {
+				return render.Usage("GitHub refused a blocked-by link: it would make a dependency cycle")
+			}
+			return nil
+		},
+		Forbidden: func(api.GraphQLErrorItem) *render.Error {
+			return render.Network("GitHub denied access; the token may lack the project scope or access to the owner").WithFix(render.AuthFix)
+		},
+		NotFound: func(api.GraphQLErrorItem) *render.Error {
+			return render.NotFound("GitHub API: not found")
+		},
+	})
+}
+
+// orgDenial returns the error for an organization's policy denying the
+// token, nil for none: its SAML single sign-on or its OAuth app access
+// restrictions.
+func orgDenial(item api.GraphQLErrorItem) *render.Error {
+	switch {
+	case samlFailure(item):
+		return render.Network("GitHub denied access: the organization enforces SAML single sign-on and the token is not authorized for it").
+			WithFix(SSOFix)
+	case strings.Contains(strings.ToLower(item.Message), "oauth app access restrictions"):
+		return render.Network("GitHub denied access: the organization restricts OAuth apps and has not approved GitHub CLI").
+			WithFix(OAuthRestrictedFix)
 	}
-	if e := render.GraphQLLimit(err); e != nil {
-		return e
-	}
-	if item, ok := has("INSUFFICIENT_SCOPES"); ok {
-		return render.Network("GitHub token is missing a required scope%s", scopesHint(item.Message)).WithFix(render.AuthFix)
-	}
-	for _, item := range err.Errors {
-		if samlFailure(item) {
-			return render.Network("GitHub denied access: the organization enforces SAML single sign-on and the token is not authorized for it").
-				WithFix(SSOFix)
-		}
-		if strings.Contains(strings.ToLower(item.Message), "oauth app access restrictions") {
-			return render.Network("GitHub denied access: the organization restricts OAuth apps and has not approved GitHub CLI").
-				WithFix(OAuthRestrictedFix)
-		}
-	}
-	if isCycle(err) {
-		return render.Usage("GitHub refused a blocked-by link: it would make a dependency cycle")
-	}
-	if _, ok := has("FORBIDDEN"); ok {
-		return render.Network("GitHub denied access; the token may lack the project scope or access to the owner").WithFix(render.AuthFix)
-	}
-	if _, ok := has("NOT_FOUND"); ok {
-		return render.NotFound("GitHub API: not found")
-	}
-	return render.New(render.ExitUsage, "GitHub API rejected the request")
+	return nil
 }
 
 // SSOFix is the fix when an organization's SAML single sign-on blocks gh's
@@ -369,10 +359,7 @@ func transportReason(err error) string {
 	if errors.As(err, &urlErr) && urlErr.Err != nil {
 		err = urlErr.Err
 	}
-	msg := strings.TrimSpace(err.Error())
-	if i := strings.IndexByte(msg, '\n'); i >= 0 {
-		msg = msg[:i]
-	}
+	msg := render.FirstLine(err.Error())
 	if msg == "" || strings.Contains(msg, "://") {
 		return "connection failed"
 	}
@@ -462,7 +449,7 @@ func AffectsAll(err error) bool {
 		for _, item := range gqlErr.Errors {
 			switch {
 			case item.Type == "INSUFFICIENT_SCOPES", item.Type == "FORBIDDEN",
-				samlFailure(item), strings.Contains(strings.ToLower(item.Message), "oauth app access restrictions"):
+				orgDenial(item) != nil:
 				return true
 			}
 		}

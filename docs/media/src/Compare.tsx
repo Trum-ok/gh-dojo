@@ -1,12 +1,11 @@
 import React from "react";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { ChatPanel } from "./Chat";
-import { dojoSide, DURATION, FADE, ghSide } from "./compareScript";
+import { dojoSide, DURATION, ghSide } from "./compareScript";
 import { mono, sans } from "./fonts";
 import { confirmation } from "./format";
 import { Theme, themes } from "./theme";
-
-const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
+import { clamp, FADE } from "./timeline";
 
 const Verdict: React.FC<{ t: Theme; sec: number; at: number; good: boolean; children: React.ReactNode }> = ({
   t,

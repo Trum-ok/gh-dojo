@@ -9,8 +9,6 @@ import (
 	"github.com/rivo/uniseg"
 )
 
-// Text helpers shared by every command's output.
-
 // JoinWords lists words as "a", "a or b", "a, b or c" with conj ("or",
 // "and") before the last.
 func JoinWords(words []string, conj string) string {
@@ -80,6 +78,15 @@ func SingleLine(s string) string {
 		return r
 	}, bidiControls.Replace(s))
 	return strings.Join(strings.Fields(s), " ")
+}
+
+// FirstLine is the first line of s, without surrounding spaces.
+func FirstLine(s string) string {
+	s = strings.TrimSpace(s)
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		s = strings.TrimSpace(s[:i])
+	}
+	return s
 }
 
 // HasPrefixFold reports whether s starts with prefix, ignoring case.

@@ -178,15 +178,6 @@ func (s *Schema) Field(name string) (*Field, error) {
 	return nil, unknown(ErrUnknownField, fmt.Sprintf("field %q on board %s", name, s.Ref()), name, writable)
 }
 
-// FieldNames lists all field names in board order, built-in ones included.
-func (s *Schema) FieldNames() []string {
-	names := make([]string, len(s.Fields))
-	for i, f := range s.Fields {
-		names[i] = f.Name
-	}
-	return names
-}
-
 // Option returns the single-select option with exactly this name.
 func (f *Field) Option(name string) (*Option, error) {
 	if f.Type != TypeSingleSelect {
