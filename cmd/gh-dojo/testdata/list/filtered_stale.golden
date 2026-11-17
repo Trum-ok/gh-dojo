@@ -1,0 +1,8 @@
+code: 0
+--- stdout
+Backlog (1)
+  #1 Fix login redirect
+Icebox (1)
+  #7 Someday
+hidden: 1 closed or Done, use --all
+--- stderr

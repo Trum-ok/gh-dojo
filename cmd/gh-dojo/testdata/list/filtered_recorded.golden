@@ -1,0 +1,120 @@
+$ gh dojo list
+code: 0
+--- stdout
+Backlog (9)
+  #54 list и next сразу после new не видят новую задачу: доска отстаёт на секунды [type: dogfood]
+  #58 Хуки pre/post для глаголов (F13): нужны ли и в каком виде [type: enhancement, question]
+  #59 Несколько агентов на одной доске: захват, аренда, передача [type: enhancement, question]
+  #63 Подсказывать похожий флаг при unknown flag [type: enhancement, question]
+  #65 Токен без scope project: отказывать до первой записи, а не после [type: enhancement, question]
+  #69 Docs site instead of plain Markdown on GitHub? [type: documentation, question]
+  #86 new: нельзя завести задачу на уже сделанную работу, не изображая start и ready [type: dogfood]
+  #87 README: гифки — из репозитория во вложения GitHub, сжатые [type: documentation]
+  #95 start --show не принимает --full и --comments: карточку целиком приходится читать вторым вызовом show [type: dogfood]
+Ready (2; titles: --status Ready): #92 #93
+In progress (1)
+  #94 next и list читают всю доску вместе с Done вместо фильтра items(query:) на стороне GitHub [type: dogfood] @Trum-ok
+hidden: 79 closed or Done, use --all
+--- stderr
+
+$ gh dojo list --json
+code: 0
+--- stdout
+{"schema_version":1,"error":null,"sprint_filter":null,"sprint":null,"issues":[{"repo":"Trum-ok/gh-dojo","number":54,"title":"list и next сразу после new не видят новую задачу: доска отстаёт на секунды","state":"open","status":"Backlog","labels":["type: dogfood"],"labels_total":1,"assignees":[],"assignees_total":0},{"repo":"Trum-ok/gh-dojo","number":58,"title":"Хуки pre/post для глаголов (F13): нужны ли и в каком виде","state":"open","status":"Backlog","labels":["type: enhancement","question"],"labels_total":2,"assignees":[],"assignees_total":0},{"repo":"Trum-ok/gh-dojo","number":59,"title":"Несколько агентов на одной доске: захват, аренда, передача","state":"open","status":"Backlog","labels":["type: enhancement","question"],"labels_total":2,"assignees":[],"assignees_total":0},{"repo":"Trum-ok/gh-dojo","number":63,"title":"Подсказывать похожий флаг при unknown flag","state":"open","status":"Backlog","labels":["type: enhancement","question"],"labels_total":2,"assignees":[],"assignees_total":0},{"repo":"Trum-ok/gh-dojo","number":65,"title":"Токен без scope project: отказывать до первой записи, а не после","state":"open","status":"Backlog","labels":["type: enhancement","question"],"labels_total":2,"assignees":[],"assignees_total":0},{"repo":"Trum-ok/gh-dojo","number":69,"title":"Docs site instead of plain Markdown on GitHub?","state":"open","status":"Backlog","labels":["type: documentation","question"],"labels_total":2,"assignees":[],"assignees_total":0},{"repo":"Trum-ok/gh-dojo","number":86,"title":"new: нельзя завести задачу на уже сделанную работу, не изображая start и ready","state":"open","status":"Backlog","labels":["type: dogfood"],"labels_total":1,"assignees":[],"assignees_total":0},{"repo":"Trum-ok/gh-dojo","number":87,"title":"README: гифки — из репозитория во вложения GitHub, сжатые","state":"open","status":"Backlog","labels":["type: documentation"],"labels_total":1,"assignees":[],"assignees_total":0},{"repo":"Trum-ok/gh-dojo","number":95,"title":"start --show не принимает --full и --comments: карточку целиком приходится читать вторым вызовом show","state":"open","status":"Backlog","labels":["type: dogfood"],"labels_total":1,"assignees":[],"assignees_total":0},{"repo":"Trum-ok/gh-dojo","number":92,"title":"release не говорит о задачах в Ready, которые не нашёл в релизе","state":"open","status":"Ready","labels":["type: dogfood"],"labels_total":1,"assignees":["Trum-ok"],"assignees_total":1},{"repo":"Trum-ok/gh-dojo","number":93,"title":"release молча пропускает задачи, названные в коммите только суффиксом (#N), когда suffix выключен","state":"open","status":"Ready","labels":["type: dogfood"],"labels_total":1,"assignees":["Trum-ok"],"assignees_total":1},{"repo":"Trum-ok/gh-dojo","number":94,"title":"next и list читают всю доску вместе с Done вместо фильтра items(query:) на стороне GitHub","state":"open","status":"In progress","labels":["type: dogfood"],"labels_total":1,"assignees":["Trum-ok"],"assignees_total":1}],"matched":12,"unchecked":0,"hidden":79,"filtered":0,"skipped":{"draft_issues":0,"pull_requests":0,"unseen":0},"incomplete":false,"warnings":[]}
+--- stderr
+
+$ gh dojo list --mine
+code: 0
+--- stdout
+Ready (2; titles: --status Ready): #92 #93
+In progress (1)
+  #94 next и list читают всю доску вместе с Done вместо фильтра items(query:) на стороне GitHub [type: dogfood] @Trum-ok
+hidden: 18 closed or Done, use --all
+filtered out: 70 issues not matching --mine
+--- stderr
+
+$ gh dojo list --label type: dogfood
+code: 0
+--- stdout
+Backlog (3)
+  #54 list и next сразу после new не видят новую задачу: доска отстаёт на секунды [type: dogfood]
+  #86 new: нельзя завести задачу на уже сделанную работу, не изображая start и ready [type: dogfood]
+  #95 start --show не принимает --full и --comments: карточку целиком приходится читать вторым вызовом show [type: dogfood]
+Ready (2; titles: --status Ready): #92 #93
+In progress (1)
+  #94 next и list читают всю доску вместе с Done вместо фильтра items(query:) на стороне GitHub [type: dogfood] @Trum-ok
+hidden: 26 closed or Done, use --all
+filtered out: 59 issues not matching --label
+--- stderr
+
+$ gh dojo list --label TYPE: ENHANCEMENT --label question --limit 2
+code: 0
+--- stdout
+Backlog (4)
+  #58 Хуки pre/post для глаголов (F13): нужны ли и в каком виде [type: enhancement, question]
+  #59 Несколько агентов на одной доске: захват, аренда, передача [type: enhancement, question]
+showing 2 of 4, use --limit 4; not shown: Backlog 2
+filtered out: 87 issues not matching --label
+--- stderr
+
+$ gh dojo list --status none --status Ready
+code: 0
+--- stdout
+Ready (2)
+  #92 release не говорит о задачах в Ready, которые не нашёл в релизе [type: dogfood] @Trum-ok
+  #93 release молча пропускает задачи, названные в коммите только суффиксом (#N), когда suffix выключен [type: dogfood] @Trum-ok
+filtered out: 89 issues not matching --status
+--- stderr
+
+$ gh dojo list --status Backlog --mine
+code: 0
+--- stdout
+no issues to show
+filtered out: 91 issues not matching --status --mine
+--- stderr
+
+$ gh dojo next
+code: 0
+--- stdout
+#54 list и next сразу после new не видят новую задачу: доска отстаёт на секунды [type: dogfood]
+#58 Хуки pre/post для глаголов (F13): нужны ли и в каком виде [type: enhancement, question]
+#59 Несколько агентов на одной доске: захват, аренда, передача [type: enhancement, question]
+#63 Подсказывать похожий флаг при unknown flag [type: enhancement, question]
+#65 Токен без scope project: отказывать до первой записи, а не после [type: enhancement, question]
+showing 5 of 9, use --limit 9
+--- stderr
+
+$ gh dojo next --all --json
+code: 0
+--- stdout
+{"schema_version":1,"error":null,"sprint_filter":null,"sprint":null,"issues":[{"repo":"Trum-ok/gh-dojo","number":54,"title":"list и next сразу после new не видят новую задачу: доска отстаёт на секунды","state":"open","status":"Backlog","labels":["type: dogfood"],"labels_total":1,"assignees":[],"assignees_total":0,"unresolved_blockers":[],"unread_blockers":0},{"repo":"Trum-ok/gh-dojo","number":58,"title":"Хуки pre/post для глаголов (F13): нужны ли и в каком виде","state":"open","status":"Backlog","labels":["type: enhancement","question"],"labels_total":2,"assignees":[],"assignees_total":0,"unresolved_blockers":[],"unread_blockers":0},{"repo":"Trum-ok/gh-dojo","number":59,"title":"Несколько агентов на одной доске: захват, аренда, передача","state":"open","status":"Backlog","labels":["type: enhancement","question"],"labels_total":2,"assignees":[],"assignees_total":0,"unresolved_blockers":[],"unread_blockers":0},{"repo":"Trum-ok/gh-dojo","number":63,"title":"Подсказывать похожий флаг при unknown flag","state":"open","status":"Backlog","labels":["type: enhancement","question"],"labels_total":2,"assignees":[],"assignees_total":0,"unresolved_blockers":[],"unread_blockers":0},{"repo":"Trum-ok/gh-dojo","number":65,"title":"Токен без scope project: отказывать до первой записи, а не после","state":"open","status":"Backlog","labels":["type: enhancement","question"],"labels_total":2,"assignees":[],"assignees_total":0,"unresolved_blockers":[],"unread_blockers":0}],"matched":9,"unchecked":0,"hidden":0,"filtered":0,"skipped":{"draft_issues":0,"pull_requests":0,"unseen":0},"incomplete":false,"warnings":[]}
+--- stderr
+
+$ gh dojo next --mine
+code: 0
+--- stdout
+no issues to take
+filtered out: 9 issues not matching --mine
+--- stderr
+
+$ gh dojo next --label question --limit 1
+code: 0
+--- stdout
+#58 Хуки pre/post для глаголов (F13): нужны ли и в каком виде [type: enhancement, question]
+showing 1 of 5, use --limit 5
+filtered out: 4 issues not matching --label
+--- stderr
+
+$ gh dojo next --label type: dogfood --label question
+code: 0
+--- stdout
+no issues to take
+filtered out: 9 issues not matching --label
+--- stderr
+
+$ gh dojo list --label type: dogfod
+code: 1
+--- stdout
+--- stderr
+error: no issue on the board has label "type: dogfod"; did you mean "type: dogfood"?
+

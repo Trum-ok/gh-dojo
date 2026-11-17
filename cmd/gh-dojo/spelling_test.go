@@ -49,6 +49,7 @@ func TestListDefaultSpelling(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			withConfig(t, spelledConfig)
+			everyItem(t)
 			withApp(t, tt.fixtures...)
 			code, out := runOut(tt.args...)
 			if code != render.ExitOK {

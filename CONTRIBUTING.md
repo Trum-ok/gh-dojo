@@ -247,6 +247,18 @@ into issues (verb `when` lines and comment templates) come from the config.
   ([#17](https://github.com/Trum-ok/gh-dojo/issues/17)).
 - The board schema is cached for an hour (see
   [Checked against the board](docs/configuration.md#checked-against-the-board)).
+- `list` and `next` read only the items they may show, with GitHub's filter
+  (`ProjectV2.items(query:)`, `board.Filter`), and count the rest with
+  `totalCount` of other filters in the same request (`cmd/gh-dojo/items_filter.go`):
+  one request after the schema, however much is done, where reading every
+  item took one per 100 items, Done included
+  ([#94](https://github.com/Trum-ok/gh-dojo/issues/94)). `next` reads each
+  blocker's place on the board with it (`projectItems`), so no blocker
+  needs to be among the items read. `list --all`, `--status` naming a final
+  status, a name or value the filter has no checked spelling for, and a
+  `--label` that no issue has (for `checkLabels`' suggestion) read every
+  item. GitHub's filter lags behind writes for a moment, so what is read is
+  checked again by the item's own fields.
 - Queries are retried on 5xx and secondary rate limits with exponential
   backoff, at most `MaxAttempts` sends (`internal/graph/graph.go`).
   Mutations are sent once: re-running the command re-reads the state and
@@ -291,6 +303,18 @@ into issues (verb `when` lines and comment templates) come from the config.
   longer checked offline and the skill names the prefix, not the types;
   `new`'s error lists them. An earlier `labels.types` list was dropped for
   this; do not bring it back, nor add a key per new label scheme.
+- **GitHub filters, gh-dojo counts the same**
+  ([#94](https://github.com/Trum-ok/gh-dojo/issues/94)). `list` and `next`
+  read only what they may show, but their counts (hidden, filtered out,
+  skipped) stay those of the whole board: each is a `totalCount` alias in
+  the same request, about 0.03 s each, less than reading the archive. The
+  filter's spelling was checked against GitHub, and `board.Filter` says
+  what was found (drafts match `is:issue`, field names are hyphenated,
+  values quoted, no OR of a value with no value); a name or value with
+  another spelling reads every item rather than guessing. Tests of how
+  `list` and `next` sort items out read every item (`everyItem`);
+  `TestFilteredSameAsEvery` records the board both ways at once and
+  compares.
 - **Every verb takes several issue numbers; how many is not config**
   ([#89](https://github.com/Trum-ok/gh-dojo/issues/89)). `internal/batch`
   checks and writes each issue on its own, so no verb is riskier on

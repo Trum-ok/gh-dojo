@@ -65,13 +65,17 @@ func runNext(cmd *cobra.Command, o *listOpts) error {
 			WithFix(`add initial = "<status>" under [statuses] in ` + cfg.Display)
 	}
 	a := newApp()
-	rb, err := readBoard(cmd, a, cfg, o, true)
+	rb, err := readBoard(cmd, a, cfg, o, true, nextFilter(cfg, o))
 	if err != nil {
 		return err
 	}
 	n := selectNext(cfg, rb.items, o)
-	// Blockers not among the items read are not on the board, or archived
-	// there: one more request reads their place, as show does.
+	if rb.filter != nil {
+		n.addRest(rb.filter, rb.items)
+	}
+	// Read without their place, blockers not among the items read are not
+	// on the board, or archived there: one more request reads their place,
+	// as show does.
 	var places map[board.IssueKey]board.Place
 	if keys := n.offBoard(); len(keys) > 0 {
 		if places, err = board.ReadPlaces(cmd.Context(), a.Client, rb.schema, cfg.StatusField(), rb.items.StatusFieldID, keys); err != nil {
@@ -159,14 +163,68 @@ func selectNext(cfg *config.Config, items *board.Items, o *listOpts) *next {
 	return n
 }
 
+// nextFilter is next's itemsFilter: the open issues in the initial status
+// or without one that pass the filters; counted, the items in the initial
+// status or without one by kind, and the open issues there before the
+// filters.
+func nextFilter(cfg *config.Config, o *listOpts) func(*board.Schema, *board.Field) *itemsFilter {
+	if readEveryItem {
+		return nil
+	}
+	return func(s *board.Schema, field *board.Field) *itemsFilter {
+		terms, labels, ok := o.userTerms(s, cfg)
+		if !ok {
+			return nil
+		}
+		var others []string
+		for _, st := range field.OptionNames() {
+			if st != cfg.Statuses.Initial {
+				others = append(others, st)
+			}
+		}
+		var scope board.Filter
+		if len(others) > 0 {
+			t, ok := board.FieldTerm(cfg.StatusField(), others, true)
+			if !ok {
+				return nil
+			}
+			scope = board.Filter{t}
+		}
+		open := scope.And(board.FilterIssues, board.FilterOpen)
+		q := newItemsFilter(scope, open.And(terms...))
+		if len(terms) > 0 {
+			q.count("open", open)
+		}
+		if len(labels) > 0 {
+			q.count("labeled", board.Filter{board.FilterIssues}.And(labels...))
+		}
+		return q
+	}
+}
+
+// addRest counts the items next's filter left out: the open issues in
+// the initial status or without one that were not read do not pass the
+// filters, and the draft issues, pull requests and unseen items there are
+// skipped. GitHub matched each --label against all of an issue's labels,
+// so none is unchecked.
+func (n *next) addRest(q *itemsFilter, items *board.Items) {
+	if open, ok := q.get(items, "open"); ok {
+		n.filtered += max(0, open-len(items.Items))
+	}
+	n.addSkipped(q, items)
+	for i := range n.candidates {
+		n.candidates[i].unsure = false
+	}
+}
+
 // offBoard lists the candidates' open blockers that are not among the
-// board's items read, each once.
+// board's items read and were read without their place, each once.
 func (n *next) offBoard() []board.IssueKey {
 	var keys []board.IssueKey
 	for _, c := range n.candidates {
 		for _, b := range c.BlockedBy.Nodes {
 			k := board.IssueKey{Repo: b.Repo, Number: b.Number}
-			if _, on := n.onBoard[k]; b.State != issue.StateClosed && !on && !slices.Contains(keys, k) {
+			if _, on := n.onBoard[k]; b.State != issue.StateClosed && b.Place == nil && !on && !slices.Contains(keys, k) {
 				keys = append(keys, k)
 			}
 		}
@@ -176,9 +234,9 @@ func (n *next) offBoard() []board.IssueKey {
 
 // resolve sorts out the blocked candidates, by the rule of show and the
 // blockers check: a blocker is resolved when it is closed or on the board
-// in a resolved status, archived or not. Its place is its item's among
-// the board's items, else the one ReadPlaces read; one that could not be
-// read is unresolved.
+// in a resolved status, archived or not. Its place is the one read with
+// it, else its item's among the board's items, else the one ReadPlaces
+// read; one that could not be read is unresolved.
 func (n *next) resolve(cfg *config.Config, o *listOpts, places map[board.IssueKey]board.Place) {
 	for _, c := range n.candidates {
 		c.unread = max(0, c.BlockedBy.TotalCount-len(c.BlockedBy.Nodes))
@@ -189,10 +247,13 @@ func (n *next) resolve(cfg *config.Config, o *listOpts, places map[board.IssueKe
 			}
 			k := board.IssueKey{Repo: b.Repo, Number: b.Number}
 			nb := nextBlocker{Blocker: b, link: issue.Link{State: b.State}}
-			if bi, on := n.onBoard[k]; on {
+			if bi, on := n.onBoard[k]; on && b.Place == nil {
 				nb.link.OnBoard, nb.link.Status = true, bi.Status
 			} else {
 				p, read := places[k]
+				if b.Place != nil {
+					p, read = *b.Place, true
+				}
 				if !read {
 					p = board.Place{Unknown: "not read"}
 				}

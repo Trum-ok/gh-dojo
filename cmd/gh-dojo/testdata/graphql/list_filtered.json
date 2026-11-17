@@ -1,0 +1,69 @@
+{
+  "comment": "Hand-crafted from the recorded filtered_dojo.json query (list --mine --label bug): of the board's 10 items, 6 issues (3 of them mine with bug: 2 open, read, and 1 closed), a draft issue, 2 pull requests and an item the token cannot see. #2 has 102 labels, 3 read, bug not among them: GitHub matched it.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "BoardItems",
+      "query": "query BoardItems($owner: String!, $number: Int!, $status: String!, $cursor: String, $count0: String!, $count1: String!, $count2: String!, $count3: String!, $count4: String!, $count5: String!, $filter: String!) {\n  viewer { login }\n  repositoryOwner(login: $owner) {\n    ... on User { projectV2(number: $number) { ...items } }\n    ... on Organization { projectV2(number: $number) { ...items } }\n  }\n}\n\nfragment items on ProjectV2 {\n  field(name: $status) { ... on ProjectV2SingleSelectField { id } }\n  count0: items(first: 0, query: $count0) { totalCount }\n  count1: items(first: 0, query: $count1) { totalCount }\n  count2: items(first: 0, query: $count2) { totalCount }\n  count3: items(first: 0, query: $count3) { totalCount }\n  count4: items(first: 0, query: $count4) { totalCount }\n  count5: items(first: 0, query: $count5) { totalCount }\n  items(first: 100, after: $cursor, query: $filter) {\n    totalCount\n    pageInfo { hasNextPage endCursor }\n    nodes {\n      status: fieldValueByName(name: $status) {\n        ... on ProjectV2ItemFieldSingleSelectValue { name }\n      }\n      content {\n        __typename\n        ... on Issue {\n          number\n          title\n          state\n          repository { nameWithOwner }\n          labels(first: 100) { totalCount nodes { name } }\n          assignees(first: 10) { totalCount nodes { login } }\n        }\n      }\n    }\n  }\n}",
+      "variables": {
+        "count0": "",
+        "count1": "is:issue -is:draft",
+        "count2": "is:issue is:draft",
+        "count3": "is:pr",
+        "count4": "is:issue -is:draft assignee:@me label:\"bug\"",
+        "count5": "is:issue -is:draft label:\"bug\"",
+        "cursor": null,
+        "filter": "is:issue -is:draft is:open -status:\"Done\" assignee:@me label:\"bug\"",
+        "number": 5,
+        "owner": "Trum-ok",
+        "status": "Status"
+      },
+      "response": {
+        "data": {
+          "viewer": { "login": "Trum-ok" },
+          "repositoryOwner": {
+            "projectV2": {
+              "field": { "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ" },
+              "count0": { "totalCount": 10 },
+              "count1": { "totalCount": 6 },
+              "count2": { "totalCount": 1 },
+              "count3": { "totalCount": 2 },
+              "count4": { "totalCount": 3 },
+              "count5": { "totalCount": 4 },
+              "items": {
+                "totalCount": 2,
+                "pageInfo": { "hasNextPage": false, "endCursor": "Mg" },
+                "nodes": [
+                  {
+                    "status": { "name": "Backlog" },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 1,
+                      "title": "Fix login redirect",
+                      "state": "OPEN",
+                      "repository": { "nameWithOwner": "Trum-ok/gh-dojo" },
+                      "labels": { "totalCount": 1, "nodes": [{ "name": "bug" }] },
+                      "assignees": { "totalCount": 1, "nodes": [{ "login": "Trum-ok" }] }
+                    }
+                  },
+                  {
+                    "status": { "name": "In progress" },
+                    "content": {
+                      "__typename": "Issue",
+                      "number": 2,
+                      "title": "Too many labels",
+                      "state": "OPEN",
+                      "repository": { "nameWithOwner": "Trum-ok/gh-dojo" },
+                      "labels": { "totalCount": 102, "nodes": [{ "name": "l1" }, { "name": "l2" }, { "name": "l3" }] },
+                      "assignees": { "totalCount": 1, "nodes": [{ "login": "Trum-ok" }] }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

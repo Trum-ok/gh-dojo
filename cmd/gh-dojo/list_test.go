@@ -80,6 +80,7 @@ func TestList(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			withConfig(t, dojoConfig)
+			everyItem(t)
 			var srv *graphtest.Server
 			if tt.fixtures != nil {
 				srv = withApp(t, tt.fixtures...)

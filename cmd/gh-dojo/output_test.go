@@ -132,6 +132,7 @@ func TestListJSON(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			withConfig(t, dojoConfig)
+			everyItem(t)
 			withApp(t, tt.fixtures...)
 			code, out := runJSON(t, append([]string{"list", "--json"}, tt.args...)...)
 			if code != render.ExitOK {
@@ -146,6 +147,7 @@ func TestListJSON(t *testing.T) {
 // stays on stderr, out of the filtered output.
 func TestListJQ(t *testing.T) {
 	withConfig(t, dojoConfig)
+	everyItem(t)
 	withApp(t, boardFixture, listChangedFixture)
 	var stdout, stderr bytes.Buffer
 	code := run(newRootCmd, []string{"list", "--jq", ".issues[].number"}, &stdout, &stderr)
@@ -600,6 +602,7 @@ func TestFilterAfterWrite(t *testing.T) {
 // empty, not cut in the middle.
 func TestTemplateBuffered(t *testing.T) {
 	withConfig(t, dojoConfig)
+	everyItem(t)
 	withApp(t, boardFixture, itemsTwoPagesFixture)
 	code, stdout, stderr := runStreams("list", "--template", `{{range .issues}}#{{.number}}{{end}}{{index .issues 999}}`)
 	if code != render.ExitUsage || stdout != "" || !strings.Contains(stderr, "error: --template: ") {
@@ -633,6 +636,7 @@ func TestVersionJSON(t *testing.T) {
 // sprint) from no --sprint at all; sprint is null for both.
 func TestListSprintFilterJSON(t *testing.T) {
 	withSprintApp(t, time.Time{}, verbFixture("sprint_items"))
+	everyItem(t)
 	for _, tt := range []struct {
 		args   []string
 		stdout string

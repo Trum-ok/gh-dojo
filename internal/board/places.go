@@ -18,9 +18,10 @@ type IssueKey struct {
 
 func (k IssueKey) String() string { return k.Repo + "#" + strconv.Itoa(k.Number) }
 
-// Place is an issue's place on a board, read by ReadPlaces: what show
-// reads of a linked issue, for one that is not among the board's items
-// (not on the board, or archived there).
+// Place is an issue's place on a board, read by ReadPlaces (or with a
+// blocker, ItemsOptions.Places): what show reads of a linked issue, for
+// one that is not among the board's items (not on the board, or archived
+// there).
 type Place struct {
 	State    string // "OPEN" or "CLOSED"; "" when Unknown
 	OnBoard  bool   // an item of the board, archived or not

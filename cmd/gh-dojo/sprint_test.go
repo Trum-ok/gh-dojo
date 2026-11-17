@@ -193,6 +193,7 @@ func TestSprintPlanStaleSchema(t *testing.T) {
 // items.
 func TestSprintListStaleSchema(t *testing.T) {
 	srv, before := withStaleSprintApp(t, verbFixture("sprint_items"))
+	everyItem(t)
 	code, out := runOut("list", "--sprint", "current")
 	if code != render.ExitOK {
 		t.Errorf("exit code = %d, want %d\n%s", code, render.ExitOK, out)
@@ -279,6 +280,7 @@ func TestSprintNotOnBoard(t *testing.T) {
 // title the board lacks is an error after one re-read of the board.
 func TestSprintList(t *testing.T) {
 	srv, before := withSprintApp(t, time.Time{}, verbFixture("sprint_items"), iterationBoardFixture)
+	everyItem(t)
 	for _, tt := range []struct {
 		args     []string
 		code     render.Code

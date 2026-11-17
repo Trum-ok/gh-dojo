@@ -71,6 +71,15 @@ func withApp(t *testing.T, fixtures ...string) *graphtest.Server {
 	return srv
 }
 
+// everyItem makes list and next read every item of the board for the rest
+// of the test, as list --all does: the hand-crafted boards check how they
+// sort the items out, whichever items GitHub's filter would send.
+func everyItem(t *testing.T) {
+	t.Helper()
+	readEveryItem = true
+	t.Cleanup(func() { readEveryItem = false })
+}
+
 // noApp is newApp outside withApp (TestMain installs it): commands must
 // not reach GitHub in tests. It records the call, so the test run fails
 // (strayAppFailures) even when the command's internal error is what a

@@ -115,6 +115,11 @@ status first.
   counted.
 - At most `--limit` issues are printed (default 50), with the total.
 
+`list` asks GitHub only for the issues it may show and for how many items
+it leaves out, so closed and final issues piling up do not slow it down;
+`--all`, and `--status` naming a final status, read every item. So does a
+`--label` that no issue has, to suggest the label meant.
+
 Issues in a status that is resolved but not final
 ([`statuses.resolved`](configuration.md#statuses), such as Ready: done and waiting for a
 release) pile up until a release, so their group is one line of numbers:
@@ -160,11 +165,11 @@ $ gh dojo next --all
   issues, pull requests and items the token cannot see in the initial status
   or without one are counted as skipped.
 
-Blockers are read with the board's items, so `next` usually takes as many
-requests as `list`; when a candidate's open blocker is not among the
-board's items (not on the board, or archived there), one more request reads
-where those blockers stand. It needs `statuses.initial`: without it, it is
-a config error (exit code 1).
+Each candidate's blockers are read with it, each with its place on the
+board, archived or not, so `next` takes one request (after the schema)
+however many issues are done; a `--label` that no issue has reads every
+item, as in `list`. It needs `statuses.initial`: without it, it is a
+config error (exit code 1).
 
 ## new
 

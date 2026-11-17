@@ -1,0 +1,13 @@
+code: 0
+--- stdout
+#10 Take me first
+#11 Waits for work in progress — blocked by #20 (In progress)
+#12 Blocker archived in Ready
+#13 Blocker on another board only — blocked by #22 (not on the board)
+#14 Blocker closed
+#15 Blocker's projects withheld — blocked by acme/api#3 (status not read: GitHub withheld its projects from the token)
+#16 Blocker's status field renamed — blocked by #24 (status not read: the board's status field was renamed since it was read)
+#17 Blocker on the board without a status — blocked by #25 (on the board, no status)
+skipped: 1 draft issue, 1 pull request, 1 item the token cannot see (next shows issues only)
+--- stderr
+warning: GitHub withheld parts of some board items from this token; their lines may be incomplete

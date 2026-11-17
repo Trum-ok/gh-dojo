@@ -72,6 +72,7 @@ func TestOrgCommands(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			srv, before := withOrgApp(t, orgConfig, tt.warm, tt.fixtures...)
+			everyItem(t)
 			code, out := runOut(tt.args...)
 			if code != render.ExitOK {
 				t.Errorf("exit code = %d, want 0\n%s", code, out)

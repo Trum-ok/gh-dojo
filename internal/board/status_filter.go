@@ -82,7 +82,7 @@ func ReadInStatus(ctx context.Context, q graph.Querier, s *Schema, statusField s
 	}
 	var out []Item
 	for _, n := range page.Nodes {
-		it := n.item()
+		it := n.item(false, "", "")
 		if it.Type != ContentIssue || !slices.Contains(statuses, it.Status) {
 			continue
 		}

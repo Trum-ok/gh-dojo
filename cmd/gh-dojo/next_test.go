@@ -73,6 +73,7 @@ func TestNext(t *testing.T) {
 				cfg = dojoConfig
 			}
 			withConfig(t, cfg)
+			everyItem(t)
 			var srv *graphtest.Server
 			if tt.fixtures != nil {
 				srv = withApp(t, tt.fixtures...)
@@ -94,6 +95,7 @@ func TestNext(t *testing.T) {
 // blocked by #42 in Ready, is hidden. One request with a warm schema.
 func TestNextSprint(t *testing.T) {
 	srv, before := withSprintApp(t, time.Time{}, verbFixture("next_sprint_items"))
+	everyItem(t)
 	code, out := runOut("next", "--sprint", "current")
 	if code != render.ExitOK {
 		t.Errorf("exit code = %d, want %d\n%s", code, render.ExitOK, out)
@@ -129,6 +131,7 @@ func TestNextJSON(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			withConfig(t, dojoConfig)
+			everyItem(t)
 			withApp(t, append([]string{boardFixture}, tt.items...)...)
 			code, out := runJSON(t, append([]string{"next", "--json"}, tt.args...)...)
 			if code != render.ExitOK {

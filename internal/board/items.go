@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -77,15 +79,37 @@ var sprintItems = strings.NewReplacer(
 		"      }\n      content {\n",
 )
 
-// blockerItems makes itemsQuery also read each issue's blockers
-// (ItemsOptions.Blockers): their number, state and repository, not their
-// board status, which the caller looks up among the board's items. It is
-// one more connection per issue, so the request count stays
-// ceil(items/100).
-var blockerItems = strings.NewReplacer(
-	assigneesLine,
-	assigneesLine+
-		"          blockedBy(first: "+strconv.Itoa(BlockersWindow)+") { totalCount nodes { number state repository { nameWithOwner } } }\n",
+// blockersLine reads an issue's blockers (ItemsOptions.Blockers): their
+// number, state and repository. It is one more connection per issue, so
+// the request count stays ceil(items/100).
+var blockersLine = "          blockedBy(first: " + strconv.Itoa(BlockersWindow) + ") { totalCount nodes { number state repository { nameWithOwner } } }\n"
+
+// blockerItems makes itemsQuery also read each issue's blockers, not their
+// board status, which the caller looks up among the board's items.
+var blockerItems = strings.NewReplacer(assigneesLine, assigneesLine+blockersLine)
+
+// placeItems makes itemsQuery also read each issue's blockers with their
+// place on the board (ItemsOptions.Places), as ReadPlaces does: the
+// caller needs no other items to resolve them.
+var placeItems = strings.NewReplacer(assigneesLine, assigneesLine+
+	strings.Replace(blockersLine, "repository { nameWithOwner } }", "repository { nameWithOwner }\n"+
+		"            projectItems(first: "+strconv.Itoa(projectsWindow)+") {\n"+
+		"              totalCount\n"+
+		"              nodes {\n"+
+		"                isArchived\n"+
+		"                project { id }\n"+
+		"                status: fieldValueByName(name: $status) {\n"+
+		"                  ... on ProjectV2ItemFieldSingleSelectValue { name field { ... on ProjectV2FieldCommon { id } } }\n"+
+		"                }\n"+
+		"              }\n"+
+		"            }\n"+
+		"          }", 1))
+
+// filterItems makes itemsQuery read only the items $filter matches
+// (ItemsOptions.Filter).
+var filterItems = strings.NewReplacer(
+	"$cursor: String)", "$cursor: String, $filter: String!)",
+	"items(first: 100, after: $cursor)", "items(first: 100, after: $cursor, query: $filter)",
 )
 
 // ItemsOptions are what ReadItemsWith reads beyond the items' status,
@@ -96,6 +120,16 @@ type ItemsOptions struct {
 	Sprint string
 	// Blockers reads each issue's blockers (Item.BlockedBy).
 	Blockers bool
+	// Places also reads each blocker's place on the board (Blocker.Place),
+	// so the items read need not include the blockers. Needs Blockers.
+	Places bool
+	// Filter reads only the items it matches (see Filter), in board
+	// order; "" reads every item.
+	Filter string
+	// Counts are filters whose item counts are read in the same requests
+	// (Items.Counts, in the same order), with no items: what Filter left
+	// out can still be counted (principle 7).
+	Counts []string
 }
 
 // query is itemsQuery with what o reads.
@@ -104,10 +138,39 @@ func (o ItemsOptions) query() string {
 	if o.Sprint != "" {
 		q = sprintItems.Replace(q)
 	}
-	if o.Blockers {
+	switch {
+	case o.Places:
+		q = placeItems.Replace(q)
+	case o.Blockers:
 		q = blockerItems.Replace(q)
 	}
+	if o.Filter != "" {
+		q = filterItems.Replace(q)
+	}
+	if len(o.Counts) > 0 {
+		var decls, fields strings.Builder
+		for i := range o.Counts {
+			fmt.Fprintf(&decls, ", $count%d: String!", i)
+			fmt.Fprintf(&fields, "  count%d: items(first: 0, query: $count%d) { totalCount }\n", i, i)
+		}
+		q = strings.Replace(q, "$cursor: String", "$cursor: String"+decls.String(), 1)
+		q = strings.Replace(q, "  items(first: 100", fields.String()+"  items(first: 100", 1)
+	}
 	return q
+}
+
+// vars are the variables of o's query beyond the board's and the status
+// field's.
+func (o ItemsOptions) vars(vars map[string]any) {
+	if o.Sprint != "" {
+		vars["sprint"] = o.Sprint
+	}
+	if o.Filter != "" {
+		vars["filter"] = o.Filter
+	}
+	for i, c := range o.Counts {
+		vars["count"+strconv.Itoa(i)] = c
+	}
 }
 
 // Item is a board item. Only issues have the issue fields set.
@@ -134,14 +197,19 @@ type Item struct {
 }
 
 // Blocker is an issue that blocks a board item's issue. Its board status
-// is not read: look it up among the board's items.
+// is read with ItemsOptions.Places only: else look it up among the
+// board's items.
 type Blocker struct {
 	Repo   string // "owner/name"
 	Number int
 	State  string // "OPEN" or "CLOSED"
+	// Place is its place on the board, as ReadPlaces reads it; nil
+	// without ItemsOptions.Places.
+	Place *Place
 }
 
-// Items is the whole board, read by ReadItemsWith.
+// Items is the board as ReadItemsWith read it: every item, or those
+// ItemsOptions.Filter matches.
 type Items struct {
 	// Viewer is the login of the token's user.
 	Viewer string
@@ -158,20 +226,21 @@ type Items struct {
 	// Incomplete is set when GitHub withheld part of a visible item, such as
 	// its labels; the item is listed with what could be read.
 	Incomplete bool
+	// Counts are the item counts of ItemsOptions.Counts, in the same
+	// order, as GitHub reported them on the first page.
+	Counts []int
 }
 
-// ReadItemsWith reads every non-archived item of the board s in board
-// order, 100 per request, with statusField's value and what o asks for. A
-// board that no longer exists is exit code 3; network and auth problems
-// keep graph's codes.
+// ReadItemsWith reads the non-archived items of the board s in board
+// order, 100 per request, with statusField's value and what o asks for:
+// every item, or those o.Filter matches. A board that no longer exists is
+// exit code 3; network and auth problems keep graph's codes.
 func ReadItemsWith(ctx context.Context, q graph.Querier, s *Schema, statusField string, o ItemsOptions) (*Items, error) {
 	out := &Items{}
 	tq := &tolerant{q: q}
 	vars := map[string]any{"owner": s.Owner, "number": s.Number, "status": statusField}
+	o.vars(vars)
 	query := o.query()
-	if o.Sprint != "" {
-		vars["sprint"] = o.Sprint
-	}
 	first := true
 	page, err := graph.Paginate(ctx, tq, query, vars, 0, func(r *itemsResponse) *graph.Connection[*itemNode] {
 		if r.Viewer != nil && out.Viewer == "" {
@@ -181,13 +250,23 @@ func ReadItemsWith(ctx context.Context, q graph.Querier, s *Schema, statusField 
 			return nil
 		}
 		p := r.RepositoryOwner.ProjectV2
-		if first && p.Field != nil {
-			out.StatusFieldID = p.Field.ID
+		if first {
+			if p.Field != nil {
+				out.StatusFieldID = p.Field.ID
+			}
+			for i := range o.Counts {
+				out.Counts = append(out.Counts, p.counts["count"+strconv.Itoa(i)])
+			}
 		}
 		first = false
 		for _, i := range tq.page {
 			if i < len(p.Items.Nodes) && p.Items.Nodes[i] != nil {
 				p.Items.Nodes[i].partial = true
+			}
+		}
+		for i, bs := range tq.places {
+			if i < len(p.Items.Nodes) && p.Items.Nodes[i] != nil {
+				p.Items.Nodes[i].withheldPlaces = bs
 			}
 		}
 		return &p.Items
@@ -203,7 +282,7 @@ func ReadItemsWith(ctx context.Context, q graph.Querier, s *Schema, statusField 
 	out.Items = make([]Item, 0, len(page.Nodes))
 	seen := map[string]bool{} // a board changed between pages repeats items
 	for _, n := range page.Nodes {
-		it := n.item()
+		it := n.item(o.Places, s.ID, out.StatusFieldID)
 		if it.Type == ContentIssue {
 			key := it.Repo + "#" + strconv.Itoa(it.Number)
 			if seen[key] {
@@ -226,17 +305,54 @@ type itemsResponse struct {
 		Login string `json:"login"`
 	} `json:"viewer"`
 	RepositoryOwner *struct {
-		ProjectV2 *struct {
-			Field *struct {
-				ID string `json:"id"`
-			} `json:"field"`
-			Items graph.Connection[*itemNode] `json:"items"`
-		} `json:"projectV2"`
+		ProjectV2 *itemsProject `json:"projectV2"`
 	} `json:"repositoryOwner"`
+}
+
+// itemsProject is the board in itemsQuery's response.
+type itemsProject struct {
+	Field *struct {
+		ID string `json:"id"`
+	} `json:"field"`
+	Items graph.Connection[*itemNode] `json:"items"`
+	// counts are the totalCount of each countN alias, by alias.
+	counts map[string]int
+}
+
+func (p *itemsProject) UnmarshalJSON(data []byte) error {
+	type plain itemsProject
+	if err := json.Unmarshal(data, (*plain)(p)); err != nil {
+		return err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	for k, v := range fields {
+		if !strings.HasPrefix(k, "count") {
+			continue
+		}
+		var c *struct {
+			TotalCount int `json:"totalCount"`
+		}
+		if err := json.Unmarshal(v, &c); err != nil {
+			return err
+		}
+		if c != nil {
+			if p.counts == nil {
+				p.counts = map[string]int{}
+			}
+			p.counts[k] = c.TotalCount
+		}
+	}
+	return nil
 }
 
 type itemNode struct {
 	partial bool // GitHub withheld part of it (tolerant)
+	// withheldPlaces are the indices of the blockers whose projects
+	// GitHub withheld in part (tolerant).
+	withheldPlaces []int
 
 	Status *struct {
 		Name string `json:"name"`
@@ -266,20 +382,26 @@ type itemNode struct {
 			} `json:"nodes"`
 		} `json:"assignees"`
 		BlockedBy struct {
-			TotalCount int `json:"totalCount"`
-			Nodes      []*struct {
-				Number     int    `json:"number"`
-				State      string `json:"state"`
-				Repository *struct {
-					NameWithOwner string `json:"nameWithOwner"`
-				} `json:"repository"`
-			} `json:"nodes"`
+			TotalCount int            `json:"totalCount"`
+			Nodes      []*blockerNode `json:"nodes"`
 		} `json:"blockedBy"`
 	} `json:"content"`
 }
 
-// item converts a node; a null node or content is ContentHidden.
-func (n *itemNode) item() Item {
+// blockerNode is a blocker; its state and projects are a placeNode, the
+// projects read with ItemsOptions.Places only.
+type blockerNode struct {
+	Number     int `json:"number"`
+	Repository *struct {
+		NameWithOwner string `json:"nameWithOwner"`
+	} `json:"repository"`
+	placeNode
+}
+
+// item converts a node; a null node or content is ContentHidden. places
+// says the blockers' places were read, on the board boardID whose status
+// field is statusFieldID.
+func (n *itemNode) item(places bool, boardID, statusFieldID string) Item {
 	var it Item
 	if n == nil {
 		return it
@@ -316,11 +438,16 @@ func (n *itemNode) item() Item {
 		}
 	}
 	it.BlockedBy.TotalCount = c.BlockedBy.TotalCount
-	for _, b := range c.BlockedBy.Nodes {
+	for j, b := range c.BlockedBy.Nodes {
 		if b == nil || b.Repository == nil {
 			continue // withheld from the token: counted, not read
 		}
-		it.BlockedBy.Nodes = append(it.BlockedBy.Nodes, Blocker{Repo: b.Repository.NameWithOwner, Number: b.Number, State: b.State})
+		bl := Blocker{Repo: b.Repository.NameWithOwner, Number: b.Number, State: b.State}
+		if places {
+			p := b.place(boardID, statusFieldID, slices.Contains(n.withheldPlaces, j))
+			bl.Place = &p
+		}
+		it.BlockedBy.Nodes = append(it.BlockedBy.Nodes, bl)
 	}
 	return it
 }
@@ -331,15 +458,18 @@ func (n *itemNode) item() Item {
 // as ContentHidden; anything withheld below the content sets partial.
 //
 // page holds the indices of the nodes of the last page read with parts
-// withheld, for Item.Incomplete.
+// withheld, for Item.Incomplete; places, by node index, the indices of
+// the blockers whose projects were withheld in part, for Blocker.Place.
 type tolerant struct {
 	q       graph.Querier
 	partial bool
 	page    []int
+	places  map[int][]int
 }
 
 func (t *tolerant) Query(ctx context.Context, query string, vars map[string]any, out any) error {
 	t.page = t.page[:0]
+	t.places = nil
 	err := t.q.Query(ctx, query, vars, out)
 	if err == nil {
 		return nil
@@ -350,6 +480,7 @@ func (t *tolerant) Query(ctx context.Context, query string, vars map[string]any,
 	}
 	partial := false
 	var page []int
+	places := map[int][]int{}
 	for _, e := range items {
 		p := e.Path
 		if len(p) < 5 || p[0] != "repositoryOwner" || p[1] != "projectV2" || p[2] != "items" || p[3] != "nodes" {
@@ -363,11 +494,18 @@ func (t *tolerant) Query(ctx context.Context, query string, vars map[string]any,
 			partial = true
 			if i, ok := pathIndex(p[4]); ok {
 				page = append(page, i)
+				// nodes.<i>.content.blockedBy.nodes.<j>.projectItems...
+				if len(p) > 9 && p[6] == "blockedBy" && p[9] == "projectItems" {
+					if j, ok := pathIndex(p[8]); ok && !slices.Contains(places[i], j) {
+						places[i] = append(places[i], j)
+					}
+				}
 			}
 		}
 	}
 	t.partial = t.partial || partial
 	t.page = page
+	t.places = places
 	return nil
 }
 

@@ -141,7 +141,7 @@ func runList(cmd *cobra.Command, o *listOpts) error {
 		return err
 	}
 	a := newApp()
-	rb, err := readBoard(cmd, a, cfg, o, false)
+	rb, err := readBoard(cmd, a, cfg, o, false, listFilter(cfg, o))
 	if err != nil {
 		return err
 	}
@@ -149,21 +149,31 @@ func runList(cmd *cobra.Command, o *listOpts) error {
 	warnings := readWarnings(cmd, items, items.Incomplete)
 	repo := refRepo(a)
 	l := buildList(cfg, field.OptionNames(), items, o)
+	if rb.filter != nil {
+		l.addRest(rb.filter, items)
+	}
 	res := l.result(o, items)
 	res.Warnings = render.OrEmpty(warnings)
 	return emit(cmd, res, func(w io.Writer) { l.write(w, repo, cfg, o) })
 }
 
 // readBoard reads the board's items for list and next: the schema, the
-// --status and --sprint of o checked against it, every item in board order
-// (with its sprint for --sprint, and its blockers when blockers is set),
-// then --label checked against the items. See readWarnings for the
+// --status and --sprint of o checked against it, the items in board order
+// (with their sprint for --sprint, and their blockers when blockers is
+// set), then --label checked against the items. See readWarnings for the
 // warnings about the read.
+//
+// filterFor builds, from the schema and its status field, the filter of
+// the items to read and the counts of the rest (see itemsFilter); nil, or
+// a nil itemsFilter, reads every item. With a filter, the blockers are
+// read with their place on the board. When no issue has every --label,
+// the board is read again unfiltered, for checkLabels.
 //
 // A cached schema may be out of date: a status added or renamed since, or
 // the status field renamed. It is re-read once, which also surfaces the
-// config error when the config no longer matches the board.
-func readBoard(cmd *cobra.Command, a *App, cfg *config.Config, o *listOpts, blockers bool) (*boardRead, error) {
+// config error when the config no longer matches the board; a filter
+// built from it is built anew and the items read again.
+func readBoard(cmd *cobra.Command, a *App, cfg *config.Config, o *listOpts, blockers bool, filterFor func(*board.Schema, *board.Field) *itemsFilter) (*boardRead, error) {
 	ctx := cmd.Context()
 	s, err := a.Schema(ctx)
 	if err != nil {
@@ -187,26 +197,45 @@ func readBoard(cmd *cobra.Command, a *App, cfg *config.Config, o *listOpts, bloc
 	if err != nil {
 		return nil, err
 	}
-	opts := board.ItemsOptions{Blockers: blockers}
-	if o.sprint != "" {
-		opts.Sprint = cfg.SprintField()
-	}
-	items, err := board.ReadItemsWith(ctx, a.Client, s, cfg.StatusField(), opts)
-	if err != nil {
-		return nil, err
-	}
-	if !refreshed && s.Cached && staleStatus(field, items) {
-		if field, err = refresh(); err != nil {
+	for {
+		var flt *itemsFilter
+		if filterFor != nil {
+			flt = filterFor(s, field)
+		}
+		opts := board.ItemsOptions{Blockers: blockers}
+		if o.sprint != "" {
+			opts.Sprint = cfg.SprintField()
+		}
+		if flt != nil {
+			flt.options(&opts)
+			opts.Places = blockers
+		}
+		items, err := board.ReadItemsWith(ctx, a.Client, s, cfg.StatusField(), opts)
+		if err != nil {
 			return nil, err
 		}
+		if !refreshed && s.Cached && staleStatus(field, items) {
+			if field, err = refresh(); err != nil {
+				return nil, err
+			}
+			if flt != nil {
+				continue
+			}
+		}
+		if flt != nil && flt.unknownLabel(items) {
+			filterFor = nil
+			continue
+		}
+		if flt == nil {
+			if err := checkLabels(items, o.labels); err != nil {
+				return nil, err
+			}
+		}
+		if def := refRepo(a); def != "" {
+			spellDefault(items, def)
+		}
+		return &boardRead{schema: s, field: field, items: items, filter: flt}, nil
 	}
-	if err := checkLabels(items, o.labels); err != nil {
-		return nil, err
-	}
-	if def := refRepo(a); def != "" {
-		spellDefault(items, def)
-	}
-	return &boardRead{schema: s, field: field, items: items}, nil
 }
 
 // spellDefault names the default repository def as the config spells it
@@ -231,6 +260,65 @@ type boardRead struct {
 	schema *board.Schema
 	field  *board.Field // the status field
 	items  *board.Items
+	// filter is what the items were read with; nil: every item.
+	filter *itemsFilter
+}
+
+// listFilter is list's itemsFilter: the open issues not in a final status
+// (or in the --status asked for) that pass the filters; counted, every
+// item of the board by kind and the issues that pass the filters. --all,
+// and --status naming a final status, read every item.
+func listFilter(cfg *config.Config, o *listOpts) func(*board.Schema, *board.Field) *itemsFilter {
+	final := cfg.Statuses.Final
+	if o.all || readEveryItem {
+		return nil
+	}
+	return func(s *board.Schema, field *board.Field) *itemsFilter {
+		if slices.ContainsFunc(o.want, func(st string) bool { return st != "" && slices.Contains(final, st) }) {
+			return nil
+		}
+		terms, labels, ok := o.userTerms(s, cfg)
+		if !ok {
+			return nil
+		}
+		read := board.Filter{board.FilterIssues, board.FilterOpen}
+		switch {
+		case len(o.want) > 0:
+			t, ok := statusTerm(cfg.StatusField(), field.OptionNames(), o.want)
+			if !ok {
+				return nil
+			}
+			if t != "" {
+				terms = append(board.Filter{t}, terms...)
+			}
+		case len(final) > 0:
+			t, ok := board.FieldTerm(cfg.StatusField(), final, true)
+			if !ok {
+				return nil
+			}
+			read = read.And(t)
+		}
+		q := newItemsFilter(nil, read.And(terms...))
+		q.count("matching", board.Filter{board.FilterIssues}.And(terms...))
+		if len(labels) > 0 {
+			q.count("labeled", board.Filter{board.FilterIssues}.And(labels...))
+		}
+		return q
+	}
+}
+
+// addRest counts the items list's filter left out: the issues that pass
+// the filters but were not read are closed or in a final status (hidden),
+// the other issues do not pass them, and the draft issues, pull requests
+// and unseen items are skipped. GitHub matched each --label against all
+// of an issue's labels, so none is unchecked.
+func (l *list) addRest(q *itemsFilter, items *board.Items) {
+	issues, _ := q.get(items, "issues")
+	matching, _ := q.get(items, "matching")
+	l.hidden += max(0, matching-len(items.Items))
+	l.filtered += max(0, issues-matching)
+	l.addSkipped(q, items)
+	l.unchecked = 0
 }
 
 // readWarnings prints on stderr, and returns for the JSON, the warnings

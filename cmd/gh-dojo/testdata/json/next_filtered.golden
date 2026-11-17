@@ -1,0 +1,111 @@
+code: 0
+--- stdout
+{
+  "schema_version": 1,
+  "error": null,
+  "sprint_filter": null,
+  "sprint": null,
+  "issues": [
+    {
+      "repo": "Trum-ok/gh-dojo",
+      "number": 10,
+      "title": "Take me first",
+      "state": "open",
+      "status": "Backlog",
+      "labels": [],
+      "labels_total": 0,
+      "assignees": [],
+      "assignees_total": 0,
+      "unresolved_blockers": [],
+      "unread_blockers": 0
+    },
+    {
+      "repo": "Trum-ok/gh-dojo",
+      "number": 11,
+      "title": "Waits for work in progress",
+      "state": "open",
+      "status": null,
+      "labels": [],
+      "labels_total": 0,
+      "assignees": [],
+      "assignees_total": 0,
+      "unresolved_blockers": [
+        {
+          "ref": "Trum-ok/gh-dojo#20",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 20,
+          "on_board": true,
+          "status": "In progress",
+          "archived": false,
+          "status_unknown_reason": null
+        }
+      ],
+      "unread_blockers": 0
+    },
+    {
+      "repo": "Trum-ok/gh-dojo",
+      "number": 12,
+      "title": "Blocker archived in Ready",
+      "state": "open",
+      "status": "Backlog",
+      "labels": [],
+      "labels_total": 0,
+      "assignees": [],
+      "assignees_total": 0,
+      "unresolved_blockers": [],
+      "unread_blockers": 0
+    },
+    {
+      "repo": "Trum-ok/gh-dojo",
+      "number": 13,
+      "title": "Blocker on another board only",
+      "state": "open",
+      "status": "Backlog",
+      "labels": [],
+      "labels_total": 0,
+      "assignees": [],
+      "assignees_total": 0,
+      "unresolved_blockers": [
+        {
+          "ref": "Trum-ok/gh-dojo#22",
+          "repo": "Trum-ok/gh-dojo",
+          "number": 22,
+          "on_board": false,
+          "status": null,
+          "archived": false,
+          "status_unknown_reason": null
+        }
+      ],
+      "unread_blockers": 0
+    },
+    {
+      "repo": "Trum-ok/gh-dojo",
+      "number": 14,
+      "title": "Blocker closed",
+      "state": "open",
+      "status": "Backlog",
+      "labels": [],
+      "labels_total": 0,
+      "assignees": [],
+      "assignees_total": 0,
+      "unresolved_blockers": [],
+      "unread_blockers": 0
+    }
+  ],
+  "matched": 8,
+  "unchecked": 0,
+  "hidden": 0,
+  "filtered": 0,
+  "skipped": {
+    "draft_issues": 1,
+    "pull_requests": 1,
+    "unseen": 1
+  },
+  "incomplete": true,
+  "warnings": [
+    "GitHub withheld parts of some board items from this token; their lines may be incomplete"
+  ]
+}
+
+--- stderr
+warning: GitHub withheld parts of some board items from this token; their lines may be incomplete

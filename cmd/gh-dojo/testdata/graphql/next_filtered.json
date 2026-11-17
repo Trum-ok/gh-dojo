@@ -1,0 +1,170 @@
+{
+  "comment": "Hand-crafted from the recorded filtered_dojo.json query (next): the open issues in Backlog or without a status, each blocker read with its place on the board (projectItems), none of them among the items read: in progress on the board, archived there in Ready (resolved), on another board only, closed, its projects withheld from the token (FORBIDDEN, as in items_two_pages.json), in a status field renamed since, on the board without a status. Also counted: 2 closed issues, a draft, a pull request and an item the token cannot see. Answers next, next --all and next --all --json alike (repeat).",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "BoardItems",
+      "query": "query BoardItems($owner: String!, $number: Int!, $status: String!, $cursor: String, $count0: String!, $count1: String!, $count2: String!, $count3: String!, $filter: String!) {\n  viewer { login }\n  repositoryOwner(login: $owner) {\n    ... on User { projectV2(number: $number) { ...items } }\n    ... on Organization { projectV2(number: $number) { ...items } }\n  }\n}\n\nfragment items on ProjectV2 {\n  field(name: $status) { ... on ProjectV2SingleSelectField { id } }\n  count0: items(first: 0, query: $count0) { totalCount }\n  count1: items(first: 0, query: $count1) { totalCount }\n  count2: items(first: 0, query: $count2) { totalCount }\n  count3: items(first: 0, query: $count3) { totalCount }\n  items(first: 100, after: $cursor, query: $filter) {\n    totalCount\n    pageInfo { hasNextPage endCursor }\n    nodes {\n      status: fieldValueByName(name: $status) {\n        ... on ProjectV2ItemFieldSingleSelectValue { name }\n      }\n      content {\n        __typename\n        ... on Issue {\n          number\n          title\n          state\n          repository { nameWithOwner }\n          labels(first: 100) { totalCount nodes { name } }\n          assignees(first: 10) { totalCount nodes { login } }\n          blockedBy(first: 50) { totalCount nodes { number state repository { nameWithOwner }\n            projectItems(first: 10) {\n              totalCount\n              nodes {\n                isArchived\n                project { id }\n                status: fieldValueByName(name: $status) {\n                  ... on ProjectV2ItemFieldSingleSelectValue { name field { ... on ProjectV2FieldCommon { id } } }\n                }\n              }\n            }\n          } }\n        }\n      }\n    }\n  }\n}",
+      "variables": {
+        "count0": "-status:\"Ready\",\"In progress\",\"In review\",\"Waiting\",\"Done\"",
+        "count1": "-status:\"Ready\",\"In progress\",\"In review\",\"Waiting\",\"Done\" is:issue -is:draft",
+        "count2": "-status:\"Ready\",\"In progress\",\"In review\",\"Waiting\",\"Done\" is:issue is:draft",
+        "count3": "-status:\"Ready\",\"In progress\",\"In review\",\"Waiting\",\"Done\" is:pr",
+        "cursor": null,
+        "filter": "-status:\"Ready\",\"In progress\",\"In review\",\"Waiting\",\"Done\" is:issue -is:draft is:open",
+        "number": 5,
+        "owner": "Trum-ok",
+        "status": "Status"
+      },
+      "repeat": true,
+      "response": {
+        "data": {
+          "viewer": { "login": "Trum-ok" },
+          "repositoryOwner": {
+            "projectV2": {
+              "field": { "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ" },
+              "count0": { "totalCount": 13 },
+              "count1": { "totalCount": 10 },
+              "count2": { "totalCount": 1 },
+              "count3": { "totalCount": 1 },
+              "items": {
+                "totalCount": 8,
+                "pageInfo": { "hasNextPage": false, "endCursor": "OA" },
+                "nodes": [
+                  {
+                    "status": { "name": "Backlog" },
+                    "content": {
+                      "__typename": "Issue", "number": 10, "title": "Take me first", "state": "OPEN",
+                      "repository": { "nameWithOwner": "Trum-ok/gh-dojo" },
+                      "labels": { "totalCount": 0, "nodes": [] },
+                      "assignees": { "totalCount": 0, "nodes": [] },
+                      "blockedBy": { "totalCount": 0, "nodes": [] }
+                    }
+                  },
+                  {
+                    "status": null,
+                    "content": {
+                      "__typename": "Issue", "number": 11, "title": "Waits for work in progress", "state": "OPEN",
+                      "repository": { "nameWithOwner": "Trum-ok/gh-dojo" },
+                      "labels": { "totalCount": 0, "nodes": [] },
+                      "assignees": { "totalCount": 0, "nodes": [] },
+                      "blockedBy": { "totalCount": 1, "nodes": [
+                        { "number": 20, "state": "OPEN", "repository": { "nameWithOwner": "Trum-ok/gh-dojo" },
+                          "projectItems": { "totalCount": 1, "nodes": [
+                            { "isArchived": false, "project": { "id": "PVT_kwHOBFGd5c4BrMYF" },
+                              "status": { "name": "In progress", "field": { "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ" } } }
+                          ] } }
+                      ] }
+                    }
+                  },
+                  {
+                    "status": { "name": "Backlog" },
+                    "content": {
+                      "__typename": "Issue", "number": 12, "title": "Blocker archived in Ready", "state": "OPEN",
+                      "repository": { "nameWithOwner": "Trum-ok/gh-dojo" },
+                      "labels": { "totalCount": 0, "nodes": [] },
+                      "assignees": { "totalCount": 0, "nodes": [] },
+                      "blockedBy": { "totalCount": 1, "nodes": [
+                        { "number": 21, "state": "OPEN", "repository": { "nameWithOwner": "Trum-ok/gh-dojo" },
+                          "projectItems": { "totalCount": 2, "nodes": [
+                            { "isArchived": false, "project": { "id": "PVT_other" },
+                              "status": { "name": "In progress", "field": { "id": "PVTSSF_other" } } },
+                            { "isArchived": true, "project": { "id": "PVT_kwHOBFGd5c4BrMYF" },
+                              "status": { "name": "Ready", "field": { "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ" } } }
+                          ] } }
+                      ] }
+                    }
+                  },
+                  {
+                    "status": { "name": "Backlog" },
+                    "content": {
+                      "__typename": "Issue", "number": 13, "title": "Blocker on another board only", "state": "OPEN",
+                      "repository": { "nameWithOwner": "Trum-ok/gh-dojo" },
+                      "labels": { "totalCount": 0, "nodes": [] },
+                      "assignees": { "totalCount": 0, "nodes": [] },
+                      "blockedBy": { "totalCount": 1, "nodes": [
+                        { "number": 22, "state": "OPEN", "repository": { "nameWithOwner": "Trum-ok/gh-dojo" },
+                          "projectItems": { "totalCount": 1, "nodes": [
+                            { "isArchived": false, "project": { "id": "PVT_other" },
+                              "status": { "name": "Ready", "field": { "id": "PVTSSF_other" } } }
+                          ] } }
+                      ] }
+                    }
+                  },
+                  {
+                    "status": { "name": "Backlog" },
+                    "content": {
+                      "__typename": "Issue", "number": 14, "title": "Blocker closed", "state": "OPEN",
+                      "repository": { "nameWithOwner": "Trum-ok/gh-dojo" },
+                      "labels": { "totalCount": 0, "nodes": [] },
+                      "assignees": { "totalCount": 0, "nodes": [] },
+                      "blockedBy": { "totalCount": 1, "nodes": [
+                        { "number": 23, "state": "CLOSED", "repository": { "nameWithOwner": "Trum-ok/gh-dojo" },
+                          "projectItems": { "totalCount": 1, "nodes": [
+                            { "isArchived": false, "project": { "id": "PVT_kwHOBFGd5c4BrMYF" },
+                              "status": { "name": "In progress", "field": { "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ" } } }
+                          ] } }
+                      ] }
+                    }
+                  },
+                  {
+                    "status": { "name": "Backlog" },
+                    "content": {
+                      "__typename": "Issue", "number": 15, "title": "Blocker's projects withheld", "state": "OPEN",
+                      "repository": { "nameWithOwner": "Trum-ok/gh-dojo" },
+                      "labels": { "totalCount": 0, "nodes": [] },
+                      "assignees": { "totalCount": 0, "nodes": [] },
+                      "blockedBy": { "totalCount": 1, "nodes": [
+                        { "number": 3, "state": "OPEN", "repository": { "nameWithOwner": "acme/api" },
+                          "projectItems": { "totalCount": 1, "nodes": [null] } }
+                      ] }
+                    }
+                  },
+                  {
+                    "status": { "name": "Backlog" },
+                    "content": {
+                      "__typename": "Issue", "number": 16, "title": "Blocker's status field renamed", "state": "OPEN",
+                      "repository": { "nameWithOwner": "Trum-ok/gh-dojo" },
+                      "labels": { "totalCount": 0, "nodes": [] },
+                      "assignees": { "totalCount": 0, "nodes": [] },
+                      "blockedBy": { "totalCount": 1, "nodes": [
+                        { "number": 24, "state": "OPEN", "repository": { "nameWithOwner": "Trum-ok/gh-dojo" },
+                          "projectItems": { "totalCount": 1, "nodes": [
+                            { "isArchived": false, "project": { "id": "PVT_kwHOBFGd5c4BrMYF" },
+                              "status": { "name": "Doing", "field": { "id": "PVTSSF_old" } } }
+                          ] } }
+                      ] }
+                    }
+                  },
+                  {
+                    "status": { "name": "Backlog" },
+                    "content": {
+                      "__typename": "Issue", "number": 17, "title": "Blocker on the board without a status", "state": "OPEN",
+                      "repository": { "nameWithOwner": "Trum-ok/gh-dojo" },
+                      "labels": { "totalCount": 0, "nodes": [] },
+                      "assignees": { "totalCount": 0, "nodes": [] },
+                      "blockedBy": { "totalCount": 1, "nodes": [
+                        { "number": 25, "state": "OPEN", "repository": { "nameWithOwner": "Trum-ok/gh-dojo" },
+                          "projectItems": { "totalCount": 1, "nodes": [
+                            { "isArchived": false, "project": { "id": "PVT_kwHOBFGd5c4BrMYF" }, "status": null }
+                          ] } }
+                      ] }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "errors": [
+          {
+            "type": "FORBIDDEN",
+            "path": ["repositoryOwner", "projectV2", "items", "nodes", 5, "content", "blockedBy", "nodes", 0, "projectItems", "nodes", 0],
+            "locations": [{ "line": 33, "column": 15 }],
+            "message": "Resource not accessible by integration"
+          }
+        ]
+      }
+    }
+  ]
+}
