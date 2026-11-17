@@ -171,13 +171,10 @@ func (v cardView) brief(c *issue.Card) string {
 	resolved := len(c.BlockedBy.Nodes) - len(unresolved)
 	switch {
 	case len(unresolved) > 0:
-		refs := make([]string, 0, maxBriefRefs)
-		for _, l := range unresolved[:min(len(unresolved), maxBriefRefs)] {
-			refs = append(refs, linkRef(c, l, v.def))
-		}
+		refs, more := v.briefRefs(c, unresolved)
 		blocked = fmt.Sprintf("blocked by %d unresolved (%s", len(unresolved), strings.Join(refs, ", "))
-		if n := len(unresolved) - len(refs); n > 0 {
-			blocked += fmt.Sprintf(" and %d more", n)
+		if more > 0 {
+			blocked += fmt.Sprintf(" and %d more", more)
 		}
 		blocked += ")"
 		if resolved > 0 {
@@ -237,12 +234,9 @@ func (v cardView) briefHierarchy(c *issue.Card) string {
 	unresolved := c.UnresolvedSubIssues(v.resolved)
 	parts := subIssueCounts(c, len(unresolved))
 	if len(unresolved) > 0 {
-		refs := make([]string, 0, maxBriefRefs)
-		for _, l := range unresolved[:min(len(unresolved), maxBriefRefs)] {
-			refs = append(refs, linkRef(c, l, v.def))
-		}
-		if n := len(unresolved) - len(refs); n > 0 {
-			refs = append(refs, fmt.Sprintf("%d more", n))
+		refs, more := v.briefRefs(c, unresolved)
+		if more > 0 {
+			refs = append(refs, fmt.Sprintf("%d more", more))
 		}
 		parts[len(parts)-1] += " (" + strings.Join(refs, ", ") + ")"
 	}
@@ -250,6 +244,16 @@ func (v cardView) briefHierarchy(c *issue.Card) string {
 		parts = append(parts, note)
 	}
 	return s + " · sub-issues: " + strings.Join(parts, ", ")
+}
+
+// briefRefs names the first maxBriefRefs of c's linked issues links for
+// --brief and counts the rest.
+func (v cardView) briefRefs(c *issue.Card, links []issue.Link) (refs []string, more int) {
+	refs = make([]string, 0, maxBriefRefs)
+	for _, l := range links[:min(len(links), maxBriefRefs)] {
+		refs = append(refs, linkRef(c, l, v.def))
+	}
+	return refs, len(links) - len(refs)
 }
 
 // board describes the issue's place on the board: status, other field
@@ -333,12 +337,31 @@ func cardMilestone(m *issue.Milestone) string {
 	return s
 }
 
-// writeBlockers writes the issues blocking this one, one per line:
-// unresolved first, then resolved ones still open (their board status is
-// in statuses.resolved), then closed ones. Only unresolved ones block.
+// writeBlockers writes the issues blocking this one, as writeResolvable
+// does. Only unresolved ones block.
 func (v cardView) writeBlockers(b *strings.Builder, c *issue.Card) {
+	v.writeResolvable(b, c, "blocked by", c.BlockedBy, func(unresolved, resolved int) []string {
+		switch {
+		case unresolved > 0 && resolved > 0:
+			return []string{fmt.Sprintf("%d unresolved, %d resolved", unresolved, resolved)}
+		case unresolved > 0:
+			return []string{fmt.Sprintf("%d unresolved", unresolved)}
+		case resolved > 0:
+			return []string{fmt.Sprintf("none unresolved (%d resolved)", resolved)}
+		}
+		return nil
+	})
+}
+
+// writeResolvable writes c's linked issues p, blockers or sub-issues, one
+// per line under the header writeLinks writes with label and what counts
+// makes of how many are unresolved and resolved: unresolved first, then
+// resolved ones still open (their board status is in statuses.resolved),
+// then closed ones.
+func (v cardView) writeResolvable(b *strings.Builder, c *issue.Card, label string, p graph.Page[issue.Link],
+	counts func(unresolved, resolved int) []string) {
 	var unresolved, done, closed []issue.Link
-	for _, l := range c.BlockedBy.Nodes {
+	for _, l := range p.Nodes {
 		switch {
 		case l.Closed():
 			closed = append(closed, l)
@@ -348,16 +371,7 @@ func (v cardView) writeBlockers(b *strings.Builder, c *issue.Card) {
 			unresolved = append(unresolved, l)
 		}
 	}
-	var counts []string
-	switch n := len(done) + len(closed); {
-	case len(unresolved) > 0 && n > 0:
-		counts = append(counts, fmt.Sprintf("%d unresolved, %d resolved", len(unresolved), n))
-	case len(unresolved) > 0:
-		counts = append(counts, fmt.Sprintf("%d unresolved", len(unresolved)))
-	case n > 0:
-		counts = append(counts, fmt.Sprintf("none unresolved (%d resolved)", n))
-	}
-	writeLinks(b, "blocked by", c.BlockedBy, counts)
+	writeLinks(b, label, p, counts(len(unresolved), len(done)+len(closed)))
 	for _, l := range unresolved {
 		writeLink(b, l, linkRef(c, l, v.def), linkPlace(l))
 	}
@@ -413,32 +427,13 @@ func (v cardView) parent(c *issue.Card) string {
 	return linkRef(c, *l, v.def) + " " + render.Clip(render.SingleLine(l.Title), maxLinkTitleRunes) + " (" + render.SingleLine(about) + ")"
 }
 
-// writeSubIssues writes the issue's sub-issues, one per line, as
-// writeBlockers writes blockers: unresolved first, then resolved ones
-// still open, then closed ones. The header counts the closed ones and the
-// unresolved ones, which a verb with sub_issues = "warn" or "deny" checks.
+// writeSubIssues writes the issue's sub-issues, as writeResolvable does.
+// The header counts the closed ones and the unresolved ones, which a verb
+// with sub_issues = "warn" or "deny" checks.
 func (v cardView) writeSubIssues(b *strings.Builder, c *issue.Card) {
-	var unresolved, done, closed []issue.Link
-	for _, l := range c.SubIssues.Nodes {
-		switch {
-		case l.Closed():
-			closed = append(closed, l)
-		case l.Resolved(v.resolved):
-			done = append(done, l)
-		default:
-			unresolved = append(unresolved, l)
-		}
-	}
-	writeLinks(b, "sub-issues", c.SubIssues, subIssueCounts(c, len(unresolved)))
-	for _, l := range unresolved {
-		writeLink(b, l, linkRef(c, l, v.def), linkPlace(l))
-	}
-	for _, l := range done {
-		writeLink(b, l, linkRef(c, l, v.def), linkPlace(l)+", resolved")
-	}
-	for _, l := range closed {
-		writeLink(b, l, linkRef(c, l, v.def), "closed")
-	}
+	v.writeResolvable(b, c, "sub-issues", c.SubIssues, func(unresolved, _ int) []string {
+		return subIssueCounts(c, unresolved)
+	})
 }
 
 // subIssueCounts says how many sub-issues are closed, of all of them
@@ -687,7 +682,7 @@ func indent(s string) string {
 	return strings.Join(lines, "\n")
 }
 
-// login names an account; a deleted one is "ghost", as on GitHub.
+// cardLogin names an account; a deleted one is "ghost", as on GitHub.
 func cardLogin(s string) string {
 	if s == "" {
 		return "ghost"
