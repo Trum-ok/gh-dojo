@@ -237,7 +237,7 @@ func runLinks(cmd *cobra.Command, add bool, ref issue.Ref, bys []string, dryRun 
 	case len(missed) == 0:
 	case graph.IsCycle(err):
 		// A cycle through other issues: re-running cannot help.
-		what := "GitHub refused to mark " + name + " blocked by " + joinRefs(missed, repo) + ": it would make a dependency cycle"
+		what := "GitHub refused to mark " + name + " blocked by " + issue.JoinLinked(missed, repo) + ": it would make a dependency cycle"
 		e := render.Usage("%s", what).WithFix("gh dojo show " + ref.Arg(repo)).WithCause(err)
 		if len(done) == 0 {
 			return nil, e
@@ -260,7 +260,7 @@ func runLinks(cmd *cobra.Command, add bool, ref issue.Ref, bys []string, dryRun 
 		if fix != "" {
 			next = fix + ", then " + next
 		}
-		e := render.Partial("%s; %s%s: %s; %s", line(done), what, joinRefs(missed, repo), why, next).
+		e := render.Partial("%s; %s%s: %s; %s", line(done), what, issue.JoinLinked(missed, repo), why, next).
 			WithFix(fix).WithCause(err)
 		return result(done, missed, e), e
 	}
@@ -336,15 +336,15 @@ func linksConfirm(add bool, name string, repo issue.Repo, done, same []*issue.Li
 	var parts []string
 	switch {
 	case len(done) > 0 && add:
-		parts = append(parts, "blocked by "+joinRefs(done, repo))
+		parts = append(parts, "blocked by "+issue.JoinLinked(done, repo))
 	case len(done) > 0:
-		parts = append(parts, "no longer blocked by "+joinRefs(done, repo))
+		parts = append(parts, "no longer blocked by "+issue.JoinLinked(done, repo))
 	}
 	switch {
 	case len(same) > 0 && add:
-		parts = append(parts, "already blocked by "+joinRefs(same, repo))
+		parts = append(parts, "already blocked by "+issue.JoinLinked(same, repo))
 	case len(same) > 0:
-		parts = append(parts, "already not blocked by "+joinRefs(same, repo))
+		parts = append(parts, "already not blocked by "+issue.JoinLinked(same, repo))
 	}
 	return render.Confirm(name, "", parts...)
 }
@@ -367,19 +367,10 @@ func linksDryRun(add bool, name, title string, repo issue.Repo, change, same []*
 	var b strings.Builder
 	b.WriteString(render.Confirm("dry run: "+verb+" "+name, title))
 	if len(change) > 0 {
-		b.WriteString("\n  " + do + joinRefs(change, repo))
+		b.WriteString("\n  " + do + issue.JoinLinked(change, repo))
 	}
 	if len(same) > 0 {
-		b.WriteString("\n  blocked by: " + joinRefs(same, repo) + done)
+		b.WriteString("\n  blocked by: " + issue.JoinLinked(same, repo) + done)
 	}
 	return b.String()
-}
-
-// joinRefs lists linked issues as "#12", "#12 and #13", "#12, #13 and #14".
-func joinRefs(links []*issue.Linked, repo issue.Repo) string {
-	refs := make([]string, len(links))
-	for i, l := range links {
-		refs[i] = l.Ref.String(repo)
-	}
-	return render.JoinWords(refs, "and")
 }

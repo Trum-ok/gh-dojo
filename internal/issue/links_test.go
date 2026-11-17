@@ -224,3 +224,16 @@ func TestRefNames(t *testing.T) {
 		t.Errorf("RefNames = %q, want 10 named and 3 more", got)
 	}
 }
+
+func TestJoinLinked(t *testing.T) {
+	def := issue.Repo{Owner: "acme", Name: "shop"}
+	links := []*issue.Linked{{Ref: issue.Ref{Repo: def, Number: 12}}}
+	if got := issue.JoinLinked(links, def); got != "#12" {
+		t.Errorf("JoinLinked = %q", got)
+	}
+	links = append(links, &issue.Linked{Ref: issue.Ref{Repo: issue.Repo{Owner: "acme", Name: "api"}, Number: 3}},
+		&issue.Linked{Ref: issue.Ref{Repo: def, Number: 14}})
+	if got := issue.JoinLinked(links, def); got != "#12, acme/api#3 and #14" {
+		t.Errorf("JoinLinked = %q", got)
+	}
+}

@@ -173,6 +173,7 @@ gh extension install .
 | `internal/workflow`        | Verb checks and the effect plan; `new`'s checks and plan                              |
 | `internal/effects`         | Effects → one GraphQL mutation; `new`'s mutations                                     |
 | `internal/batch`           | Running a verb on its issues: one by one, retries, the summary                        |
+| `internal/newissue`        | Running `new`: its plan applied, re-reads, resuming, the partial result               |
 | `internal/issue`           | Reading issues (cards) and batches of them; what `new` reads                          |
 | `internal/graph`           | GraphQL client over go-gh: retries, pagination, errors, partial answers               |
 | `internal/graph/graphtest` | Replaying recorded GraphQL responses in tests ([above](#graphql-fixtures))            |

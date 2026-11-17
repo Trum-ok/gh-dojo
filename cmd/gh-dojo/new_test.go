@@ -8,6 +8,7 @@ import (
 
 	"github.com/Trum-ok/gh-dojo/internal/graph/graphtest"
 	"github.com/Trum-ok/gh-dojo/internal/issue"
+	"github.com/Trum-ok/gh-dojo/internal/newissue"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/Trum-ok/gh-dojo/internal/testutil"
 	"github.com/spf13/cobra"
@@ -273,9 +274,9 @@ func TestNewBoardFails(t *testing.T) {
 // noRecheckDelay makes re-reads after a lost or refused write immediate.
 func noRecheckDelay(t *testing.T) {
 	t.Helper()
-	saved := newRecheckDelay
-	t.Cleanup(func() { newRecheckDelay = saved })
-	newRecheckDelay = 0
+	saved := newissue.RecheckDelay
+	t.Cleanup(func() { newissue.RecheckDelay = saved })
+	newissue.RecheckDelay = 0
 }
 
 // TestNewPartialKeepsFix: exit 5 keeps the fix of a cause a re-run alone

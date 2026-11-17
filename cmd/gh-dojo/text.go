@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -50,12 +49,4 @@ func readBodyFile(cmd *cobra.Command, path string) (string, error) {
 		return "", render.Usage("--%s: %s is longer than %d KiB", bodyFileFlag, what, maxTextBytes>>10).WithFix(help)
 	}
 	return strings.TrimSpace(string(data)), nil
-}
-
-// withMarker appends a hidden marker to text as its last paragraph.
-func withMarker(text, marker string) string {
-	if text == "" {
-		return marker
-	}
-	return fmt.Sprintf("%s\n\n%s", text, marker)
 }

@@ -160,6 +160,16 @@ func RefNames(refs []Ref, def Repo) string {
 	return s
 }
 
+// JoinLinked lists linked issues as "#12", "#12 and #13", "#12, #13 and
+// #14", relative to def.
+func JoinLinked(links []*Linked, def Repo) string {
+	refs := make([]string, len(links))
+	for i, l := range links {
+		refs[i] = l.Ref.String(def)
+	}
+	return render.JoinWords(refs, "and")
+}
+
 // blockingWindow is how many of an issue's links are read each way for
 // a link: the issues a linked issue blocks (Linked.Blocks) and those that
 // block it (Linked.BlockedBy), and the blockers of the issue gh dojo block
