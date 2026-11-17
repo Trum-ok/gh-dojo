@@ -349,18 +349,31 @@ The actions in the workflows are pinned to commit SHAs, with the version in
 a comment: a tag or branch can be moved to other code, a SHA cannot.
 Dependabot updates the SHA and the comment together.
 
-Once the tag is pushed, its issues move to Done with the installed
-`gh dojo` through [`release`](docs/commands.md#release), which explains how
-it finds a release's issues and what its output means. This project's rules:
+A release is one command, `make release TAG=vX.Y.Z`
+([`script/release.sh`](script/release.sh)), which stops at the first
+failure. It checks that `main` is checked out with nothing uncommitted, is
+the same as `origin/main` and that the tag is newer than every `v*` tag;
+tags `HEAD` and pushes the tag; waits for that tag's `release.yml` run and
+checks the release's assets; runs `make install` and checks that
+`gh dojo --version` prints the tag; and moves the release's issues to Done
+with `gh dojo release vX.Y.Z --verb done --comment "vX.Y.Z"`. After a
+failure, run it again with the same tag: a tag already at `HEAD` is not
+created again, and the later steps are safe to repeat.
+
+The last step moves issues with the installed `gh dojo` through
+[`release`](docs/commands.md#release), which explains how it finds a
+release's issues and what its output means. This project's rules:
 
 - `done` starts only from Ready here, and `[release]` in
   `.github/dojo.toml` adds `Refs #N` to the closing keywords. Before
   tagging, `gh dojo release main --verb done --dry-run` shows what the next
   release holds.
-- An agent moves a release's issues only on the user's word: it runs
-  `gh dojo release vX.Y.Z --verb done --dry-run`, shows the list to the
-  user, and once they agree runs the same without `--dry-run`, with
-  `--comment "vX.Y.Z"`.
+- An agent releases only on the user's word, since the release moves
+  issues to Done: it runs `gh dojo release main --verb done --dry-run`,
+  shows the list to the user and asks for the tag, and once they agree runs
+  `make release TAG=vX.Y.Z`. On its own, the same is
+  `gh dojo release vX.Y.Z --verb done --dry-run`, then without `--dry-run`,
+  with `--comment "vX.Y.Z"`.
 - `not ready (done starts only from Ready): #41 (In progress)` exits 0: a
   `Refs #41` commit of an issue still in progress. Don't move it by hand for
   the release; a later release picks it up only if its commits name it

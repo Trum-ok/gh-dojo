@@ -10,7 +10,7 @@ LDFLAGS := -X main.version=$(VERSION)
 INSTALL_DIR ?= $(HOME)/.local/share/gh-dojo/$(BIN)
 
 .PHONY: build test vet lint vuln tools golden agent dist install demo \
-	check fmt tidy e2e
+	check fmt tidy e2e release
 
 build:
 	go build -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/gh-dojo
@@ -101,6 +101,13 @@ agent:
 # does (script/build-release.sh), stamped with VERSION.
 dist:
 	script/build-release.sh $(VERSION)
+
+# Release TAG from main: tag, push, wait for release.yml, make install, then
+# move the release's issues to Done (script/release.sh; CONTRIBUTING.md,
+# Releases). Only on the user's word for the tag and the issues.
+release:
+	@test -n "$(TAG)" || { echo "usage: make release TAG=vX.Y.Z" >&2; exit 1; }
+	script/release.sh $(TAG)
 
 # Render the README media (docs/media/*.gif) from its Remotion project; needs
 # Node and ffmpeg. See docs/media/README.md.
