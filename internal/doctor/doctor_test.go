@@ -574,10 +574,10 @@ milestone = "v1"
 func TestCheckSprint(t *testing.T) {
 	cfg := parse(t, kanbanConfig+"\n[fields]\nsprint = \"Sprint\"\n")
 	r := &Report{}
-	CheckSprint(r, cfg, kanbanBoard(), today, nil)
-	CheckSprint(r, cfg, kanbanBoard(), today.AddDate(0, 1, 0), nil)
+	checkSprint(r, cfg, kanbanBoard(), today, nil)
+	checkSprint(r, cfg, kanbanBoard(), today.AddDate(0, 1, 0), nil)
 	cfg.Fields["sprint"] = "Status"
-	CheckSprint(r, cfg, kanbanBoard(), today, nil)
+	checkSprint(r, cfg, kanbanBoard(), today, nil)
 	wantLines(t, r,
 		"ok sprint: Sprint: today (2026-11-11, UTC) is in Sprint 1",
 		"problem sprint: Sprint has no iteration for today (2026-12-11, UTC) [fix: add one in the Sprint field settings: https://github.com/orgs/acme/projects/3/settings]",
@@ -589,11 +589,47 @@ func TestCheckSprint(t *testing.T) {
 	stale.Cached, stale.Fields[1].Iterations = true, nil
 	boards := &fakeBoards{schema: kanbanBoard()}
 	r = &Report{}
-	CheckSprint(r, cfg, stale, today, func() (*board.Schema, error) { return boards.Fetch(context.Background(), board.Ref{}) })
+	checkSprint(r, cfg, stale, today, func() (*board.Schema, error) { return boards.Fetch(context.Background(), board.Ref{}) })
 	wantLines(t, r, "ok sprint: Sprint: today (2026-11-11, UTC) is in Sprint 1")
 	if boards.fetches != 1 {
 		t.Errorf("%d re-reads, want 1", boards.fetches)
 	}
+
+	// A fresh schema is not re-read.
+	fresh := kanbanBoard()
+	fresh.Fields[1].Iterations = nil
+	r = &Report{}
+	checkSprint(r, cfg, fresh, today, func() (*board.Schema, error) {
+		t.Error("a fresh schema was re-read")
+		return nil, nil
+	})
+	wantLines(t, r, "problem sprint: Sprint has no iteration for today (2026-11-11, UTC) [fix: add one in the Sprint field settings: https://github.com/orgs/acme/projects/3/settings]")
+
+	// No line without fields.sprint, nor for a field the board lacks:
+	// board.Problems reports that.
+	r = &Report{}
+	checkSprint(r, parse(t, kanbanConfig), kanbanBoard(), today, nil)
+	cfg.Fields["sprint"] = "Nope"
+	checkSprint(r, cfg, kanbanBoard(), today, nil)
+	wantLines(t, r)
+
+	// A completed iteration still covers its days, as verbs see it.
+	cfg.Fields["sprint"] = "Sprint"
+	done := kanbanBoard()
+	done.Fields[1].Iterations = append([]board.Iteration{
+		{ID: "I0", Title: "Sprint 0", StartDate: "2026-10-26", Duration: 14, Completed: true},
+	}, done.Fields[1].Iterations...)
+	r = &Report{}
+	checkSprint(r, cfg, done, time.Date(2026, 11, 1, 9, 0, 0, 0, time.UTC), nil)
+	wantLines(t, r, "ok sprint: Sprint: today (2026-11-01, UTC) is in Sprint 0")
+
+	// board.timezone: 22:30 UTC on Nov 22 is Nov 23 in Moscow, after
+	// Sprint 1.
+	tz := parse(t, strings.Replace(kanbanConfig, "project = 3\n", "project = 3\ntimezone = \"Europe/Moscow\"\n", 1)+
+		"\n[fields]\nsprint = \"Sprint\"\n")
+	r = &Report{}
+	checkSprint(r, tz, kanbanBoard(), time.Date(2026, 11, 22, 22, 30, 0, 0, time.UTC), nil)
+	wantLines(t, r, "problem sprint: Sprint has no iteration for today (2026-11-23, Europe/Moscow) [fix: add one in the Sprint field settings: https://github.com/orgs/acme/projects/3/settings]")
 }
 
 // TestErr: a problem about auth or the network makes the exit code 4,

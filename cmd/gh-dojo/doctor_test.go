@@ -7,14 +7,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/Trum-ok/gh-dojo/internal/board"
-	"github.com/Trum-ok/gh-dojo/internal/config"
-	"github.com/Trum-ok/gh-dojo/internal/doctor"
 	"github.com/Trum-ok/gh-dojo/internal/graph"
 	"github.com/Trum-ok/gh-dojo/internal/graph/graphtest"
 	"github.com/Trum-ok/gh-dojo/internal/render"
@@ -313,89 +310,6 @@ func TestDoctorArgs(t *testing.T) {
 		t.Errorf("exit code = %d, want %d", code, render.ExitUsage)
 	}
 	testutil.Golden(t, "doctor/args", out)
-}
-
-// TestDoctorSprint calls the sprint check directly, with sprint fields the
-// config would reject against the board.
-func TestDoctorSprint(t *testing.T) {
-	srv := graphtest.New(t, boardFixtures+"iteration_board.json")
-	l := board.NewLoader(srv.Client())
-	l.Dir, l.Host = t.TempDir(), "github.com"
-	s, err := l.Load(context.Background(), board.Ref{Owner: "acme", Number: 3})
-	if err != nil {
-		t.Fatal(err)
-	}
-	cfg, err := config.Parse([]byte(`
-version = 1
-[board]
-owner = "acme"
-project = 3
-[fields]
-status = "Status"
-`), ".github/dojo.toml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	r := &doctor.Report{}
-	doctor.CheckSprint(r, cfg, s, testNow, nil) // no fields.sprint: no line
-	sprints, err := config.Parse([]byte(sprintsPresetConfig), ".github/dojo.toml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	doctor.CheckSprint(r, sprints, s, testNow, nil) // the sprints preset's Sprint field
-	for _, tt := range []struct {
-		field string
-		now   time.Time
-	}{
-		{"Sprint", testNow},
-		{"Sprint", time.Date(2026, 12, 20, 9, 0, 0, 0, time.UTC)}, // after the last iteration
-		{"Sprint", time.Date(2026, 11, 1, 9, 0, 0, 0, time.UTC)},  // in Sprint 11, completed: verbs take it
-		{"Status", testNow},
-		{"Nope", testNow}, // board.Problems reports a missing field
-	} {
-		cfg.Fields["sprint"] = tt.field
-		doctor.CheckSprint(r, cfg, s, tt.now, nil)
-	}
-
-	// A cached schema without today's iteration is re-read once: Sprint
-	// 12 was added since. A fresh schema is not.
-	cfg.Fields["sprint"] = "Sprint"
-	stale := *s
-	stale.Cached = true
-	stale.Fields = slices.Clone(s.Fields)
-	for i, f := range stale.Fields {
-		if f.Name == "Sprint" {
-			stale.Fields[i].Iterations = slices.DeleteFunc(slices.Clone(f.Iterations),
-				func(it board.Iteration) bool { return it.Title == "Sprint 12" })
-		}
-	}
-	refetches := 0
-	refetch := func() (*board.Schema, error) { refetches++; return s, nil }
-	doctor.CheckSprint(r, cfg, &stale, testNow, refetch)
-	stale.Cached = false
-	doctor.CheckSprint(r, cfg, &stale, testNow, refetch)
-	if refetches != 1 {
-		t.Errorf("%d re-reads of the board, want 1 (for the cached schema only)", refetches)
-	}
-
-	// board.timezone: 22:30 UTC on Nov 22 is Nov 23 in Moscow, Sprint 13.
-	tz, err := config.Parse([]byte(`
-version = 1
-[board]
-owner = "acme"
-project = 3
-timezone = "Europe/Moscow"
-[fields]
-status = "Status"
-sprint = "Sprint"
-`), ".github/dojo.toml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	doctor.CheckSprint(r, tz, s, time.Date(2026, 11, 22, 22, 30, 0, 0, time.UTC), nil)
-	var b strings.Builder
-	writeDoctor(&b, r)
-	testutil.Golden(t, "doctor/sprint", []byte(b.String()))
 }
 
 // withClient makes newApp use c and a private schema cache.

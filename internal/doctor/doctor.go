@@ -180,7 +180,7 @@ func Run(ctx context.Context, env Env) *Report {
 	}
 
 	if cfg != nil && schema != nil && !sprintReported {
-		CheckSprint(r, cfg, schema, env.Now(), func() (*board.Schema, error) {
+		checkSprint(r, cfg, schema, env.Now(), func() (*board.Schema, error) {
 			ref := board.RefOf(cfg)
 			if err := env.Boards.Invalidate(ref); err != nil {
 				return nil, err
@@ -207,7 +207,7 @@ func configSummary(cfg *config.Config) string {
 // is fresh; a mismatch on a cached schema re-reads the board first. Each
 // mismatch is its own problem. It returns the schema, nil when the board
 // could not be read, and whether one of the problems is fields.sprint (a
-// field the board lacks or of another type), which leaves CheckSprint
+// field the board lacks or of another type), which leaves checkSprint
 // nothing to add.
 func checkBoard(ctx context.Context, r *Report, boards Boards, cfg *config.Config) (s *board.Schema, sprintReported bool) {
 	s, err := boards.Resolve(ctx, board.RefOf(cfg), func(s *board.Schema) error { return board.Check(cfg, s) })
@@ -241,12 +241,12 @@ func checkBoard(ctx context.Context, r *Report, boards Boards, cfg *config.Confi
 	return s, sprintReported
 }
 
-// CheckSprint checks that the sprint field has an iteration for today, the
+// checkSprint checks that the sprint field has an iteration for today, the
 // date in board.timezone verbs use (iteration = "current"), as verbs see
 // it: a completed iteration still covers its days. Without one on a
 // cached schema it re-reads the board once with refetch before reporting
 // a problem. It adds no line when fields.sprint is not set.
-func CheckSprint(r *Report, cfg *config.Config, s *board.Schema, now time.Time, refetch func() (*board.Schema, error)) {
+func checkSprint(r *Report, cfg *config.Config, s *board.Schema, now time.Time, refetch func() (*board.Schema, error)) {
 	now = now.In(cfg.Board.Loc())
 	name := cfg.SprintField()
 	if name == "" {
