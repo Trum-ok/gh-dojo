@@ -280,6 +280,18 @@ into issues (verb `when` lines and comment templates) come from the config.
   longer checked offline and the skill names the prefix, not the types;
   `new`'s error lists them. An earlier `labels.types` list was dropped for
   this; do not bring it back, nor add a key per new label scheme.
+- **Every verb takes several issue numbers; how many is not config**
+  ([#89](https://github.com/Trum-ok/gh-dojo/issues/89)). `internal/batch`
+  checks and writes each issue on its own, so no verb is riskier on
+  several issues than on one; how many numbers a command takes is CLI
+  mechanics, not a process rule. `release --verb` runs any verb but one
+  that needs `--assignee`, `--milestone` or `--of`: the user names the
+  verb, so a separate permission would guard nothing. The verb key
+  `batch`, which once allowed both, is deprecated rather than removed,
+  since configs of released versions must keep loading: a deprecated key
+  loads, does nothing, is left out of the allowed keys of errors, and
+  `gh dojo doctor` warns about it with the fix to remove it
+  (`Config.Deprecated`).
 
 ## Working on gh-dojo with gh-dojo
 

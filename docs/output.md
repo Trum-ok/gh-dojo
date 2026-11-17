@@ -47,11 +47,11 @@ fix: wait a few minutes, then re-run the same command
 
 ## Several issues at once
 
-A verb with `batch = true` takes several issue numbers, and
-[`release`](commands.md#release) can run it; other verbs take exactly one
-and say which verbs take several. An issue given twice counts once (`12` and
-`acme/shop#12` too, in the default repository acme/shop). The cards are read
-together, in a few requests, from any repositories
+Every verb takes several issue numbers, and [`release`](commands.md#release)
+runs a verb on a release's issues the same way. An issue given twice counts
+once (`12` and `acme/shop#12` too, in the default repository acme/shop); a
+single issue prints no summary. The cards are read together, in a few
+requests, from any repositories
 (`gh dojo done 12 acme/api#3`); then each issue is checked, planned and
 written on its own, with its own mutation, so a lost answer or a
 refusal touches that issue alone. An issue that fails is skipped and the
@@ -252,8 +252,9 @@ The schemas, by command, after `schema_version` and `error`:
   links it would change), `changed`, `unchanged`, `missed`.
 - `describe`: `config`, `preset`, `board`, `repos`, `verbs`: `[{name, when,
   from, to, requires, requires_one_of, optional, batch, checks,
-  effects}]`, `statuses`: `{initial, final, resolved}`, `exit_codes`:
-  `[{code, meaning, next}]`.
+  effects}]` (`batch`, the verb takes several numbers, is always `true`
+  now that every verb does), `statuses`: `{initial, final, resolved}`,
+  `exit_codes`: `[{code, meaning, next}]`.
 - `doctor`: `ok` (no check is a problem), `checks`: `[{name, result,
   detail, allowed, fix}]`, `result` one of `ok`, `problem`, `warn`,
   `skip`.

@@ -86,7 +86,6 @@ reopen = true
 when = "The change is released"
 to = "Done"
 iteration = "by_status_date:Ready"  # the sprint in which it became Ready
-batch = true                 # gh dojo ship 12 13 14
 from_labels = ["approved"]   # labels the issue must all have
 refuse_labels = ["on-hold"]  # labels of which it may have none
 sub_issues = "deny"          # refuse while a sub-issue is unresolved; or "warn"
@@ -102,7 +101,6 @@ Estimate = 3                 # number; a text field takes a string, a date field
 [verbs.schedule]
 when = "The issue moves to another release"
 milestone = "{milestone}"    # an open milestone from --milestone; or a title such as "v1.2"
-batch = true
 
 [verbs.done]
 close = false                # keep the issue open: false turns off the preset's close
@@ -249,7 +247,7 @@ command (`show`, `list`, `new`, `comment`, `describe`, `init`, `doctor`,
 | `blockers`       | check or effect | `"warn"` or `"deny"`: check the issue's unresolved blockers; `"link"`: `--by N` also marks it blocked by #N |
 | `sub_issues`     | check  | `"warn"` or `"deny"`: check the issue's unresolved [sub-issues](commands.md#show) |
 | `confirm`        | check  | `"user"`: the verb is the user's decision and runs only with `--yes` |
-| `batch`          | —      | `true`: the verb takes several issue numbers at once and is one [`release --verb`](commands.md#release) can run (one without it is exit code 1 there, as is one that needs `--assignee`, `--milestone` or `--of`) |
+| `batch`          | —      | Deprecated: does nothing, since every verb takes several issue numbers. A config with it still loads; [`gh dojo doctor`](commands.md#doctor) warns: remove it |
 | `to`             | effect | Target status |
 | `iteration`      | effect | Set the sprint field: `"current"`, `"by_status_date:<status>"` or `"clear"`; needs `fields.sprint` |
 | `field`          | effect | A table of other board fields to set: `[verbs.<name>.field]` with `Priority = "P1"`, `Estimate = 3` |
@@ -494,7 +492,6 @@ off a key the preset sets:
 | `unassign` | `unassign = false` |
 | `milestone` | `milestone = false` |
 | `reopen` | `reopen = false` |
-| `batch` | `batch = false` |
 | `iteration` | `iteration = ""` |
 | `to` | `to = ""` (the status stays) |
 | `comment` | `comment = ""` (no comment) |
@@ -591,7 +588,7 @@ The board's status field must have these options (other options are fine):
 | `start` | In progress | Backlog, Waiting, Ready |                       | warns about unresolved blockers        | session link, `--comment`    |
 | `wait`  | Waiting     | In progress             | `--by` or `--comment` | `--by 17` marks it blocked by #17      | "Waiting for …", `--comment` |
 | `ready` | Ready       | In progress, Waiting    |                       |                                        | `--comment`                  |
-| `done`  | Done        | Ready, In progress      |                       | closes as completed; several issues    | `--comment`                  |
+| `done`  | Done        | Ready, In progress      |                       | closes as completed                    | `--comment`                  |
 
 `start` only warns (`blockers = "deny"` refuses, `false` skips the check);
 `wait --by "the API team"` only comments. `done` closes the issue, since
@@ -679,7 +676,7 @@ to decide.
 | `request-changes` | Changes requested | In review                           | needs `--comment`; labels; back to the author alone: the reviewer is unassigned |
 | `approve`         | Approved          | In review                           | refused on hold; the user's decision (`--yes`); back to the author alone |
 | `reject`          | status unchanged  | In progress, In review, Changes requested, Approved | the user's decision; closes as not planned, on hold or not |
-| `merged`          | Merged            | Approved                            | refused on hold; closes as completed; several issues at once |
+| `merged`          | Merged            | Approved                            | refused on hold; closes as completed |
 
 On hold is the label `blocked`, not a status, so a held issue keeps its
 status and `resume` leaves it there: `refuse_labels = ["blocked"]` keeps

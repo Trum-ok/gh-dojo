@@ -371,7 +371,7 @@ ok       verbs    octocat/shop: 2 labels exist, 1 assignee can be assigned
 | Check | What it checks |
 |-------|----------------|
 | `version` | The installed gh-dojo version |
-| `config` | `.github/dojo.toml` loads |
+| `config` | `.github/dojo.toml` loads; a key that still loads but does nothing (a verb's `batch`) is `warn`, with the fix to remove it |
 | `token` | gh is logged in, and the token has the `project` scope (from `GH_TOKEN`: "set GH_TOKEN to …") |
 | `board` | The board exists, is open, and has every field and status the config names, each mismatch on its own line |
 | `repo` | Each repository of [`board.repos`](configuration.md#board), or the current one, is visible with issues enabled; a warning when `board.repos` spells one otherwise than GitHub does |
@@ -459,8 +459,7 @@ gh-dojo may be a different version than the one in CI.
 ## Process verbs
 
 ```sh
-gh dojo <verb> <N> [--comment TEXT] [--by N|TEXT] [--assignee LOGIN] [--milestone TITLE] [--of N] [--yes] [--dry-run] [--show]
-gh dojo <verb> <N>... [flags]     # a verb with batch = true, such as done
+gh dojo <verb> <N>... [--comment TEXT] [--by N|TEXT] [--assignee LOGIN] [--milestone TITLE] [--of N] [--yes] [--dry-run] [--show]
 ```
 
 Verbs come from [`[verbs]`](configuration.md#verbs) in the config, so each project has its
@@ -470,10 +469,9 @@ their `when` line and the lifecycle; `gh dojo <verb> --help` shows the
 allowed starting statuses, the target status, the required arguments, the
 other effects and the comment template.
 
-A verb takes one issue number (several with
-[`batch = true`](configuration.md#verbs), see
-[Several issues at once](output.md#several-issues-at-once)) and, in one
-command:
+A verb takes one issue number or several (see
+[Several issues at once](output.md#several-issues-at-once)) and, for each
+issue, in one command:
 
 1. checks, in this order, that the required arguments are given, that the
    issue is open (a verb that moves it to a final status, closes it or
@@ -538,8 +536,8 @@ read before start:`, and the confirmation line says what changed. A verb
 that refuses the issue (exit code 2), needs `--yes` or writes it in part
 prints the card alone, its error on stderr, as long as the issue was read.
 
-`--show` takes one issue: a batch verb given several numbers refuses it,
-and `gh dojo show 12 13` reads them. In `--json` the issue's `card` is the
+`--show` takes one issue: a verb given several numbers refuses it, and
+`gh dojo show 12 13` reads them. In `--json` the issue's `card` is the
 card of [`show --json`](output.md#json-output), `null` without `--show`.
 
 ```console
@@ -558,11 +556,11 @@ it set: "Item closed" moves an issue a verb closed (to Done by default),
 "Item reopened" moves one it reopened. Turn them off in the board's workflow
 settings, or point them at the statuses your verbs set.
 
-A verb with [`batch = true`](configuration.md#verbs) (the presets' `done`)
-takes several numbers: `gh dojo done 12 13 14`. Each issue is checked and
-written on its own; see [Several issues at once](output.md#several-issues-at-once)
-for the summary and the exit code. [`release`](#release) runs it on the
-issues of a release.
+Every verb takes several numbers: `gh dojo done 12 13 14`. Each issue is
+checked and written on its own; see
+[Several issues at once](output.md#several-issues-at-once) for the summary
+and the exit code. [`release`](#release) runs a verb on the issues of a
+release.
 
 ## release
 
@@ -570,9 +568,8 @@ issues of a release.
 gh dojo release <ref> --verb <verb> [--since <ref>] [--exclude N]... [--dry-run] [--yes] [--comment TEXT] [--by TEXT]
 ```
 
-Once a release is tagged, runs a verb with [`batch = true`](configuration.md#verbs)
-on the issues it includes, as `gh dojo done 12 13 14` would: same checks,
-summary and exit codes ([Several issues at once](output.md#several-issues-at-once)).
+Once a release is tagged, runs a verb on the issues it includes, as
+`gh dojo done 12 13 14` would: same checks, summary and exit codes ([Several issues at once](output.md#several-issues-at-once)).
 Before the tag, `gh dojo release main --verb done --dry-run` shows what the
 next release holds.
 
@@ -593,10 +590,10 @@ dry run: done #3 "Read the config"
   `suffix of commit <sha>`) and its plan.
 - No issues is a line saying where release looked, exit code 0.
 - `--comment`, `--by` and `--yes` go to the verb, for every issue.
-- A verb without `batch = true` is exit code 1. So is one that needs
-  `--assignee`, `--milestone` or `--of` (`assign = "{assignee}"`,
-  `milestone = "{milestone}"`, `close = "duplicate"`), which release does
-  not take: run it on the issues themselves.
+- Any verb runs but one that needs `--assignee`, `--milestone` or `--of`
+  (`assign = "{assignee}"`, `milestone = "{milestone}"`,
+  `close = "duplicate"`), which release does not take: that is exit code 1;
+  run it on the issues themselves.
 - `--exclude N` (`#N`, `owner/repo#N` or a URL; repeatable, or
   comma-separated) leaves out any issue found, by a pull request or a
   message, before it is read: the line `excluded: acme/api#3 (commit
