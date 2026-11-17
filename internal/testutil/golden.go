@@ -7,6 +7,40 @@ import (
 	"testing"
 )
 
+// usedEnv names a file that Golden appends the absolute path of every
+// golden file it reads to, one per line; script/unused-golden.sh lists the
+// golden files no test read.
+const usedEnv = "GOLDEN_USED"
+
+// recordUse appends path to the file usedEnv names, if set. One short
+// O_APPEND write per line keeps the lines whole when the packages' test
+// binaries run in parallel.
+func recordUse(t testing.TB, path string) {
+	t.Helper()
+	log := os.Getenv(usedEnv)
+	if log == "" {
+		return
+	}
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if real, err := filepath.EvalSymlinks(abs); err == nil { // as pwd -P in the script
+		abs = real
+	}
+	f, err := os.OpenFile(log, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = f.WriteString(filepath.ToSlash(abs) + "\n")
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 // updateEnv names the environment variable that rewrites golden files. An
 // environment variable, unlike a test flag, works with `go test ./...`
 // across packages that do not all define the flag.
@@ -21,6 +55,7 @@ const updateEnv = "UPDATE_GOLDEN"
 func Golden(t testing.TB, name string, got []byte) {
 	t.Helper()
 	path := filepath.Join("testdata", filepath.FromSlash(name)+".golden")
+	recordUse(t, path)
 	if os.Getenv(updateEnv) != "" {
 		if os.Getenv("CI") != "" {
 			t.Fatalf("%s is set together with CI; golden files are never rewritten in CI", updateEnv)

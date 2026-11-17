@@ -55,10 +55,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # On Ubuntu also with -race, failing on golden files no test reads.
           - os: ubuntu-latest
-            race: -race
+            test: script/unused-golden.sh -race
           - os: macos-latest
+            test: go test ./...
           - os: windows-latest
+            test: go test ./...
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -69,6 +72,6 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Test
-        run: go test ${{ matrix.race }} ./...
+        run: ${{ matrix.test }}
       - name: Build
         run: go build ./...

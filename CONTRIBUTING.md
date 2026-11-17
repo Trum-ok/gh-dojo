@@ -27,7 +27,9 @@ CI (`.github/workflows/ci.yml`, on pushes to `main` and pull requests)
 checks once, on Linux, `gofmt -l .`, `go mod tidy -diff` (`tools/` too),
 `go vet` (also for Windows, macOS and `-tags e2e`), `make lint`, the release
 build and its `agent install --check` (see below); then runs `go test ./...`
-(`-race` on Ubuntu) and `go build ./...` on Ubuntu, macOS and Windows.
+and `go build ./...` on Ubuntu, macOS and Windows, on Ubuntu with `-race`
+through `script/unused-golden.sh`, which also fails on golden files no test
+reads.
 `make check` runs all of it on your machine, the release build checked with
 your own system's binary and the tests on that system only; run it before
 sending a change. It leaves out `make vuln`, which needs the network and
@@ -284,7 +286,8 @@ make golden   # UPDATE_GOLDEN=1 go test ./...
 ```
 
 Rewriting is refused when `CI` is set, so CI can never pass by accepting its
-own output. `internal/config`'s `TestReadmeExamples` loads every `toml` block
+own output. A golden file no test reads any more fails
+`script/unused-golden.sh` (in `make check` and CI): delete it with its test. `internal/config`'s `TestReadmeExamples` loads every `toml` block
 in `README.md` and `docs/*.md`, and `TestExampleConfigs` every `examples/*.toml`, so README
 examples and example configs must stay valid configs. `cmd/gh-dojo`'s
 `TestExampleReview` runs `describe`, a dry run of every verb and

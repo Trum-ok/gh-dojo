@@ -41,9 +41,10 @@ tidy:
 
 # The checks of CI (.github/workflows/ci.yml) on this machine: format, tidy,
 # vet, staticcheck, the release build and its agent install --check, then
-# go test -race and go build. Not vuln, which needs the network, nor e2e,
-# which needs a token and the sandbox boards. The tests run on this system
-# only; CI runs them on Linux, macOS and Windows.
+# go test -race (failing on golden files no test reads) and go build. Not
+# vuln, which needs the network, nor e2e, which needs a token and the
+# sandbox boards. The tests run on this system only; CI runs them on Linux,
+# macOS and Windows.
 check: fmt tidy vet lint dist
 	@bin="dist/$(BIN)_$(VERSION)_$$(go env GOOS)-$$(go env GOARCH)"; \
 	sums="$(BIN)_$(VERSION)_checksums.txt"; set -ex; \
@@ -51,7 +52,7 @@ check: fmt tidy vet lint dist
 	(cd dist && shasum -a 256 -c --strict "$$sums"); \
 	test "$$(wc -l <"dist/$$sums")" -eq 6; \
 	"$$bin" agent install --check
-	go test -race ./...
+	script/unused-golden.sh -race
 	go build ./...
 
 # The linters, at the versions pinned in tools/go.mod, built for this machine
