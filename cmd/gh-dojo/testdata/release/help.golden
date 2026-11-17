@@ -37,6 +37,11 @@ whose commits name it again picks it up. A closed one is refused (exit code 2),
 unless it is in a final status (statuses.final): then it is done with, listed as
 already closed and left out, and the verb does not touch it.
 
+For a verb that finishes issues (done), a warning names the issues in a status
+where finished work waits for a release (statuses.resolved but not final, that
+the verb starts from: Ready) that the release does not include, with the
+command for those it includes after all: work committed without a link.
+
 --dry-run lists each issue with how it was found and its plan.
 
 Usage:

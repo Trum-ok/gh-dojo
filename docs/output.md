@@ -238,6 +238,12 @@ The schemas, by command, after `schema_version` and `error`:
     one the verb's `from` does not allow; for `closed` and `not_ready`,
     `on_board` and `status` say where the issue stands, `status` `null` for
     no status, else both are `null`),
+  - `not_in_release`: `[{number, repo, ref, title, state, status}]`, the
+    board's issues in Ready the release does not include, for a verb that
+    finishes issues ([Ready, not in the
+    release](commands.md#ready-not-in-the-release); `state` `open` or
+    `closed`; `[]` when none, not read or the read failed, which
+    `warnings` then says),
   - and `warnings`;
 
   `issues` and `summary` count only the issues the verb ran on, the default

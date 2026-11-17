@@ -1,0 +1,7 @@
+viewer: 
+status field: 
+total: 3
+incomplete: false
+- Trum-ok/gh-dojo#88 OPEN status="Ready" "Several issues per verb" labels=[]/0 assignees=[]/0
+- Trum-ok/gh-dojo-docs#3 CLOSED status="In review" "Docs for the API" labels=[]/0 assignees=[]/0
+- Trum-ok/gh-dojo#89 OPEN status="Ready" "Every verb takes several issues" labels=[]/0 assignees=[]/0

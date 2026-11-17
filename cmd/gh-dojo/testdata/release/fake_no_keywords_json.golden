@@ -1,4 +1,5 @@
 code: 0
 --- stdout
-{"schema_version":1,"error":null,"verb":"done","default_repo":"acme/shop","dry_run":false,"release":{"ref":"HEAD","commit":"a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1","since":"abc1234","since_picked":false,"since_commit":"abababababababababababababababababababab","compared":false,"commits":4},"issues":[],"skipped":[],"summary":{"total":0,"done":0,"written":0,"failed":0,"not_attempted":0},"warnings":[]}
+{"schema_version":1,"error":null,"verb":"done","default_repo":"acme/shop","dry_run":false,"release":{"ref":"HEAD","commit":"a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1","since":"abc1234","since_picked":false,"since_commit":"abababababababababababababababababababab","compared":false,"commits":4},"issues":[],"skipped":[],"not_in_release":[{"number":42,"repo":"acme/shop","ref":"acme/shop#42","title":"Fix login redirect","state":"open","status":"Ready"}],"summary":{"total":0,"done":0,"written":0,"failed":0,"not_attempted":0},"warnings":["in Ready but not found in the release: #42; for any it includes: gh dojo done 42"]}
 --- stderr
+warning: in Ready but not found in the release: #42; for any it includes: gh dojo done 42

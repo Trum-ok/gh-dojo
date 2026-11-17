@@ -1,15 +1,18 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/Trum-ok/gh-dojo/internal/batch"
+	"github.com/Trum-ok/gh-dojo/internal/board"
 	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/graph"
 	"github.com/Trum-ok/gh-dojo/internal/issue"
@@ -25,7 +28,9 @@ import (
 //
 // Requests: one for the tags and the head (one per 100 tags), one per
 // release.PageSize commits with their pull requests, then the batch's
-// (one read per issue.MaxBatch issues, a mutation per issue to write).
+// (one read per issue.MaxBatch issues, a mutation per issue to write),
+// then for a verb that finishes issues one for the board's issues in
+// Ready the release does not include (releaseRun.readPending).
 
 func init() { register(newReleaseCmd) }
 
@@ -72,6 +77,10 @@ func newReleaseCmd() (*cobra.Command, error) {
 			"whose commits name it again picks it up. A closed one is refused (exit code 2),\n" +
 			"unless it is in a final status (statuses.final): then it is done with, listed as\n" +
 			"already closed and left out, and the verb does not touch it.\n\n" +
+			"For a verb that finishes issues (done), a warning names the issues in a status\n" +
+			"where finished work waits for a release (statuses.resolved but not final, that\n" +
+			"the verb starts from: Ready) that the release does not include, with the\n" +
+			"command for those it includes after all: work committed without a link.\n\n" +
 			"--dry-run lists each issue with how it was found and its plan.",
 		Example: `  gh dojo release main --verb done --dry-run
   gh dojo release v0.2.0 --verb done --dry-run
@@ -171,7 +180,7 @@ func runRelease(cmd *cobra.Command, ref string, o *releaseOpts) error {
 	}
 
 	res := &releaseRun{rng: rng, def: def, found: found, keywords: cfg.Release.Keywords, suffix: cfg.Release.Suffix,
-		repos: []issue.Repo{def}, final: cfg.Statuses.Final}
+		repos: []issue.Repo{def}, final: cfg.Statuses.Final, waiting: releaseWaiting(cfg, v)}
 	for _, f := range reverted {
 		res.skipped = append(res.skipped, releaseSkipped{found: f, reason: skipReverted})
 	}
@@ -186,6 +195,10 @@ func runRelease(cmd *cobra.Command, ref string, o *releaseOpts) error {
 		render.Warn(cmd.ErrOrStderr(), "%s", w)
 	}
 	if len(refs) == 0 {
+		if w := res.readPending(ctx, be, v, o.args); w != "" {
+			render.Warn(cmd.ErrOrStderr(), "%s", w)
+			warnings = append(warnings, w)
+		}
 		return emit(cmd, res.json(v.Name, backendRepo(be), o.dryRun, nil, warnings), func(w io.Writer) {
 			fmt.Fprintln(w, res.head(0))
 			for _, line := range []string{res.revertedLine(), res.excludedLine()} {
@@ -220,6 +233,10 @@ func runRelease(cmd *cobra.Command, ref string, o *releaseOpts) error {
 	items, err := b.Do(ctx, refs, o.dryRun)
 	if err != nil {
 		return err
+	}
+	if w := res.readPending(ctx, be, v, o.args); w != "" {
+		render.Warn(cmd.ErrOrStderr(), "%s", w)
+		res.skipWarnings = append(res.skipWarnings, w)
 	}
 	var summary error
 	if len(items) > 0 { // none: the head line said why
@@ -284,6 +301,124 @@ func releaseFinishes(cfg *config.Config, v config.Verb) bool {
 	return releaseLacks(v) == "" && (v.Close == config.CloseCompleted || slices.Contains(cfg.Statuses.Final, v.To))
 }
 
+// releaseWaiting are the statuses where finished work waits for a release
+// that verb v finishes: statuses.resolved (the work is complete) but not
+// final nor v's own to, among those v starts from; kanban's Ready for
+// done. None for a verb that finishes no issue (releaseFinishes): its
+// release has nothing to say about the board.
+func releaseWaiting(cfg *config.Config, v config.Verb) []string {
+	if !releaseFinishes(cfg, v) {
+		return nil
+	}
+	var out []string
+	for _, s := range cfg.Statuses.Resolved {
+		if s != v.To && !slices.Contains(cfg.Statuses.Final, s) && v.StartsFrom(s, cfg.Statuses.Initial) {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// statusReader is a Backend that reads the board's issues in some
+// statuses, for the issues in Ready a release does not include
+// (releaseRun.readPending): githubBackend, the tests' fake.
+type statusReader interface {
+	// ReadInStatus returns the board's issues in statuses, open and
+	// closed, in board order: one request as a rule (board.ReadInStatus).
+	ReadInStatus(ctx context.Context, statuses []string) ([]board.Item, error)
+}
+
+func (b *githubBackend) ReadInStatus(ctx context.Context, statuses []string) ([]board.Item, error) {
+	cfg, err := b.app.Config()
+	if err != nil {
+		return nil, err
+	}
+	s, err := b.app.Schema(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return board.ReadInStatus(ctx, b.app.Client, s, cfg.StatusField(), statuses)
+}
+
+// releasePending is an issue in a status where finished work waits for a
+// release (releaseRun.waiting) that the release does not include.
+type releasePending struct {
+	ref    issue.Ref
+	title  string
+	closed bool
+	status string
+}
+
+// readPending reads the board's issues in r.waiting that the release does
+// not include, found or left out (an issue release found is named on its
+// own lines), into r.pending, and returns the warning naming them, with
+// the command that runs v on them, the release's --comment and --by
+// given; "" for none. Such an issue is most likely work that went into
+// the release with no link in its commits: release cannot know, so the
+// user decides.
+//
+//	in Ready but not found in the release: #88, #89; for any it includes: gh dojo done 88 89 --comment "v0.7.0"
+//
+// It costs one request (board.ReadInStatus), GitHub filtering the board,
+// since what the batch read is only the issues found. A release without
+// commits, or whose verb finishes no issue, reads nothing. A read that
+// fails is a warning too: the release itself is done.
+func (r *releaseRun) readPending(ctx context.Context, be Backend, v config.Verb, a workflow.Args) string {
+	sr, ok := be.(statusReader)
+	if !ok || len(r.waiting) == 0 || len(r.rng.Commits) == 0 {
+		return ""
+	}
+	in := render.JoinWords(r.waiting, "or")
+	items, err := sr.ReadInStatus(ctx, r.waiting)
+	if err != nil {
+		what, _, _ := strings.Cut(render.FromError(err).What, "\n")
+		return "not checked for issues in " + in + " the release does not include: " + what
+	}
+	for _, it := range items {
+		repo, err := issue.ParseRepo(it.Repo)
+		if err != nil {
+			continue
+		}
+		if repo.Same(r.def) {
+			repo = r.def // as the config spells it
+		}
+		ref := issue.Ref{Repo: repo, Number: it.Number}
+		if r.includes(ref) {
+			continue
+		}
+		r.pending = append(r.pending, releasePending{ref: ref, title: it.Title, closed: it.State == "CLOSED", status: it.Status})
+	}
+	if len(r.pending) == 0 {
+		return ""
+	}
+	slices.SortStableFunc(r.pending, func(x, y releasePending) int { return issue.CompareRefs(r.def)(x.ref, y.ref) })
+	refs := make([]issue.Ref, len(r.pending))
+	args := []string{"gh dojo", v.Name}
+	for i, p := range r.pending {
+		refs[i] = p.ref
+		if p.ref.Repo.Same(r.def) {
+			args = append(args, strconv.Itoa(p.ref.Number))
+		} else {
+			args = append(args, p.ref.String(r.def))
+		}
+	}
+	if a.HasComment {
+		args = append(args, "--"+config.ArgComment, strconv.Quote(a.Comment))
+	}
+	if a.HasBy {
+		args = append(args, "--"+config.ArgBy, strconv.Quote(a.By))
+	}
+	return "in " + in + " but not found in the release: " + issue.RefNames(refs, r.def) +
+		"; for any it includes: " + strings.Join(args, " ")
+}
+
+// includes reports whether the release found ref, whether it runs the
+// verb on it or left it out, or found it only through reverted commits.
+func (r *releaseRun) includes(ref issue.Ref) bool {
+	return slices.ContainsFunc(r.found, func(f release.Found) bool { return f.Ref.Same(ref) }) ||
+		slices.ContainsFunc(r.skipped, func(s releaseSkipped) bool { return s.found.Ref.Same(ref) })
+}
+
 // releaseRun is what release found, for its output.
 type releaseRun struct {
 	rng      *release.Range
@@ -301,6 +436,11 @@ type releaseRun struct {
 	// in a final status.
 	skipped      []releaseSkipped
 	skipWarnings []string
+	// waiting are the statuses where finished work waits for this
+	// release (releaseWaiting), pending the issues in them it does not
+	// include (readPending).
+	waiting []string
+	pending []releasePending
 }
 
 // Why release leaves out an issue it found.
@@ -619,9 +759,22 @@ type releaseResult struct {
 	// name that are no issue (a pull request, a missing issue or
 	// repository), issues closed in a final status and issues not ready
 	// for the verb.
-	Skipped  []releaseSkipJSON `json:"skipped"`
-	Summary  verbSummaryJSON   `json:"summary"`
-	Warnings []string          `json:"warnings"`
+	Skipped []releaseSkipJSON `json:"skipped"`
+	// NotInRelease are the board's issues in a status where finished work
+	// waits for a release (Ready for done) that the release does not
+	// include (see releaseRun.readPending), the warning's issues.
+	NotInRelease []releasePendingJSON `json:"not_in_release"`
+	Summary      verbSummaryJSON      `json:"summary"`
+	Warnings     []string             `json:"warnings"`
+}
+
+type releasePendingJSON struct {
+	Number int    `json:"number"`
+	Repo   string `json:"repo"`
+	Ref    string `json:"ref"`
+	Title  string `json:"title"`
+	State  string `json:"state"` // open or closed
+	Status string `json:"status"`
 }
 
 type releaseRangeJSON struct {
@@ -677,7 +830,16 @@ func (r *releaseRun) json(verb, repo string, dry bool, items []*batch.Item, warn
 			Ref: r.rng.Head, Commit: r.rng.HeadCommit, Since: r.rng.Since, SincePicked: r.rng.Picked,
 			SinceCommit: r.rng.SinceCommit, Compared: r.rng.Compared, Commits: len(r.rng.Commits),
 		},
-		Issues: []releaseIssueJSON{}, Skipped: []releaseSkipJSON{}, Summary: v.Summary, Warnings: render.OrEmpty(warnings),
+		Issues: []releaseIssueJSON{}, Skipped: []releaseSkipJSON{}, NotInRelease: []releasePendingJSON{},
+		Summary: v.Summary, Warnings: render.OrEmpty(warnings),
+	}
+	for _, p := range r.pending {
+		state := "open"
+		if p.closed {
+			state = "closed"
+		}
+		out.NotInRelease = append(out.NotInRelease, releasePendingJSON{Number: p.ref.Number, Repo: p.ref.Repo.String(),
+			Ref: fullRef(p.ref), Title: p.title, State: state, Status: p.status})
 	}
 	for i, it := range items {
 		out.Issues = append(out.Issues, releaseIssueJSON{verbIssueJSON: v.Issues[i], FoundBy: toReleaseSourcesJSON(r.foundOf(it.Ref))})

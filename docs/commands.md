@@ -608,11 +608,15 @@ dry run: done #3 "Read the config"
   message, before it is read: the line `excluded: acme/api#3 (commit
   de25f45)` and the JSON's `skipped` (`excluded`) name it, and an
   `--exclude` the release does not include is a warning.
+- For a verb that finishes issues, a warning names the board's issues in
+  Ready the release does not include ([Ready, not in the
+  release](#ready-not-in-the-release)).
 - A `<ref>` or `--since` GitHub does not know is exit code 3; for one with
   a `/`, such as `origin/main`, one more request checks the name after it,
   and if GitHub has it the `fix:` names it (`pass main`).
 - Requests: one for `<ref>` and the start (one per 100 tags), one per 100
-  commits with their pull requests, then the batch's.
+  commits with their pull requests, then the batch's, then for a verb that
+  finishes issues one for the board's issues in Ready.
 
 ### The range
 
@@ -758,3 +762,29 @@ sprint by a repeat of `done` when they have none. One the board's own
 workflows moved there ("Item closed" after a `Fixes #12` commit; the status
 history marks the change automated) did not go through the process: the
 verb gets it as any issue.
+
+### Ready, not in the release
+
+Work committed with no link to its issue (no keyword, no suffix, no pull
+request) goes into the tag while its issue stays in Ready, unnoticed. So
+for a verb that finishes issues (closes them as completed or moves them to
+a final status, as `done` does), release then reads the board's issues in
+the statuses where finished work waits for a release: those of
+[`statuses.resolved`](configuration.md#statuses) that are not final and
+that the verb starts from, Ready in the presets. Those it did not find, by
+any way and whatever it did with them, are named in a warning with the
+command that runs the verb on them, the release's `--comment` and `--by`
+included, and in the JSON's `not_in_release`:
+
+```console
+$ gh dojo release v0.7.0 --verb done --comment "v0.7.0"
+...
+warning: in Ready but not found in the release: #67, #88, #89; for any it includes: gh dojo done 67 88 89 --comment "v0.7.0"
+```
+
+Release cannot tell whether such an issue shipped: run the command on those
+that did, leave out the rest. The warning keeps the exit code. It costs one
+request, which GitHub filters by status (`items(query: …)`), so it does not
+grow with the board; a range with no commits, or a verb that finishes no
+issue, reads nothing. A read that fails is a warning too (`not checked for
+issues in Ready …`), the release itself done.

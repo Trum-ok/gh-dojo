@@ -25,15 +25,18 @@ keywords = ["closes", "fixes", "resolves", "refs"]
 // are written. #9, closed in Done, is done with: listed as already closed
 // and left out. #17, in Backlog, is not ready for done: listed, not
 // failed (exit 0). The dry run lists how each issue was found, then the
-// plans.
+// plans. Last, the board's issues in Ready (one request, filtered by
+// GitHub): #3 and #7 are in the release; #88, #67 and
+// Trum-ok/gh-dojo-docs#4 are not, so a warning names them with the
+// command for those the release includes after all.
 func TestReleaseNotReady(t *testing.T) {
 	srv, before := withWarmVerbApp(t, verbFixture("release_dojo"), verbFixture("batch_done_refused"))
 	withConfig(t, verbDojoConfig+releaseKeywords)
 	checkRuns(t, srv, before,
-		// tags (2 pages), commits, cards
-		runs{[]string{"release", "v0.2.0", "--verb", "done", "--dry-run"}, render.ExitOK, 4, "release_dry_run"},
-		// the same, then a mutation each for #3 and #7
-		runs{[]string{"release", "v0.2.0", "--verb", "done"}, render.ExitOK, 6, "release"},
+		// tags (2 pages), commits, cards, the board's issues in Ready
+		runs{[]string{"release", "v0.2.0", "--verb", "done", "--dry-run"}, render.ExitOK, 5, "release_dry_run"},
+		// the same, with a mutation each for #3 and #7
+		runs{[]string{"release", "v0.2.0", "--verb", "done"}, render.ExitOK, 7, "release"},
 	)
 }
 
@@ -41,14 +44,15 @@ func TestReleaseNotReady(t *testing.T) {
 // through the closing references of merged pull request #50, #3 through
 // its message, and both are read in one request (TestBatchOtherRepo).
 // cli/cli#2 is closed but not on the board: not "not ready", since no
-// later release would move it, but refused (exit code 2).
+// later release would move it, but refused (exit code 2). The board's
+// only issue in Ready is #3: no warning.
 func TestReleaseOtherRepo(t *testing.T) {
 	srv, before := withWarmVerbApp(t, verbFixture("release_repos"), verbFixture("batch_done_repos"))
 	withConfig(t, verbDojoConfig+releaseKeywords)
 	args := []string{"release", "v0.2.0", "--since", "v0.1.0", "--verb", "done", "--dry-run"}
 	checkRuns(t, srv, before,
-		runs{args, render.ExitDenied, 3, "release_other_repo"},
-		runs{append(args, "--json"), render.ExitDenied, 3, "release_other_repo_json"},
+		runs{args, render.ExitDenied, 4, "release_other_repo"},
+		runs{append(args, "--json"), render.ExitDenied, 4, "release_other_repo_json"},
 	)
 }
 
@@ -131,11 +135,70 @@ func TestReleaseFake(t *testing.T) {
 		f := shop()
 		withBackend(t, f)
 		code, out := runOut("release", "v1.0.0", "--since", "v0.9.0", "--verb", "done")
-		if code != render.ExitOK || f.reads != 0 {
-			t.Errorf("exit code = %d, reads = %d\n%s", code, f.reads, out)
+		if code != render.ExitOK || f.reads != 0 || f.statusReads != 0 {
+			t.Errorf("exit code = %d, reads = %d, status reads = %d\n%s", code, f.reads, f.statusReads, out)
 		}
 		testutil.Golden(t, "release/no_commits", out)
 	})
+}
+
+// TestReleasePending: the board's issues in Ready (statuses.resolved but
+// not final, that done starts from) the release does not include are
+// named in a warning, with the command that runs the verb on them and the
+// release's --comment: #44, #45 (closed) and acme/api#3, not #42, which
+// the release includes, nor #46 in Done. In the JSON they are
+// not_in_release. A verb that finishes no issue (ready) reads nothing;
+// a read that fails is a warning, the release's outcome unchanged.
+func TestReleasePending(t *testing.T) {
+	pending := func() *fakeBackend {
+		return &fakeBackend{
+			issues: map[int]workflow.Issue{
+				42: {Number: 42, Title: "Fix login redirect", OnBoard: true, Status: "Ready"},
+				43: {Number: 43, Title: "Speed up checkout", OnBoard: true, Status: "Done", Closed: true},
+				44: {Number: 44, Title: "Cache the catalog", OnBoard: true, Status: "Ready"},
+				45: {Number: 45, Title: "Typo on the cart page", OnBoard: true, Status: "Ready", Closed: true},
+				46: {Number: 46, Title: "Shipped before", OnBoard: true, Status: "Done", Closed: true},
+			},
+			others: map[string]workflow.Issue{
+				"acme/api#3": {Number: 3, Title: "Rate limit the API", OnBoard: true, Status: "Ready"},
+			},
+			pulls: map[int]bool{5: true},
+		}
+	}
+	tests := []struct {
+		name    string
+		config  string
+		args    []string
+		code    render.Code
+		applied int
+		reads   int // ReadInStatus calls
+		fail    bool
+	}{
+		{"pending", verbsConfig, []string{"--comment", "v1.0.0"}, render.ExitOK, 1, 1, false},
+		{"pending_dry_run", verbsConfig, []string{"--dry-run"}, render.ExitOK, 0, 1, false},
+		{"pending_json", verbsConfig, []string{"--dry-run", "--json"}, render.ExitOK, 0, 1, false},
+		// No keywords: the release finds nothing, so #42 is named too.
+		{"pending_no_issues", verbsConfig + "[release]\nkeywords = []\n", []string{"--comment", "v1.0.0"}, render.ExitOK, 0, 1, false},
+		{"pending_other_verb", verbsConfig, []string{"--verb", "ready"}, render.ExitOK, 0, 0, false},
+		{"pending_unread", verbsConfig, []string{"--comment", "v1.0.0"}, render.ExitOK, 1, 1, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			withConfig(t, tt.config)
+			withApp(t, verbFixture("release_shop"))
+			f := pending()
+			if tt.fail {
+				f.statusErr = render.Network("cannot reach GitHub (connection reset)").WithFix("retry later")
+			}
+			withBackend(t, f)
+			code, out := runOut(append([]string{"release", "HEAD", "--since", "abc1234", "--verb", "done"}, tt.args...)...)
+			if code != tt.code || len(f.applied) != tt.applied || f.statusReads != tt.reads {
+				t.Errorf("exit code = %d, applied %d, status reads %d; want %d, %d, %d\n%s",
+					code, len(f.applied), f.statusReads, tt.code, tt.applied, tt.reads, out)
+			}
+			testutil.Golden(t, "release/"+tt.name, out)
+		})
+	}
 }
 
 // closedByAutomation makes #43 of acme/shop closed in Done by the board's

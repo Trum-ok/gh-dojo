@@ -1,5 +1,5 @@
 {
-  "comment": "Hand-crafted in the shape of internal/release/testdata/graphql/compare_cli.json: gh dojo release v0.2.0 picks v0.1.0 and finds #3 (Refs), #7 and #9 (Fixes, a list), #17 through merged pull request #50, and #7 again; #12 (see, no keyword), #20 (a pull request not merged) and #21 (a fork's) are not found. The issues of batch_done_refused.json, in its order.",
+  "comment": "Hand-crafted in the shape of internal/release/testdata/graphql/compare_cli.json: gh dojo release v0.2.0 picks v0.1.0 and finds #3 (Refs), #7 and #9 (Fixes, a list), #17 through merged pull request #50, and #7 again; #12 (see, no keyword), #20 (a pull request not merged) and #21 (a fork's) are not found. The issues of batch_done_refused.json, in its order. The board's issues in Ready (BoardItemsInStatus): #3 and #7, which the release includes, and #88, #67 (closed, its repository spelled in another case) and Trum-ok/gh-dojo-docs#4, which it does not: the warning names those.",
   "handcrafted": true,
   "interactions": [
     {
@@ -227,6 +227,37 @@
                     }
                   ]
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "BoardItemsInStatus",
+      "query": "query BoardItemsInStatus($owner: String!, $number: Int!, $status: String!, $filter: String!, $cursor: String) {\n  repositoryOwner(login: $owner) {\n    ... on User { projectV2(number: $number) { ...inStatus } }\n    ... on Organization { projectV2(number: $number) { ...inStatus } }\n  }\n}\n\nfragment inStatus on ProjectV2 {\n  items(first: 100, after: $cursor, query: $filter) {\n    totalCount\n    pageInfo { hasNextPage endCursor }\n    nodes {\n      status: fieldValueByName(name: $status) {\n        ... on ProjectV2ItemFieldSingleSelectValue { name }\n      }\n      content {\n        __typename\n        ... on Issue {\n          number\n          title\n          state\n          repository { nameWithOwner }\n        }\n      }\n    }\n  }\n}",
+      "variables": {
+        "owner": "Trum-ok",
+        "number": 5,
+        "status": "Status",
+        "filter": "is:issue status:Ready",
+        "cursor": null
+      },
+      "repeat": true,
+      "response": {
+        "data": {
+          "repositoryOwner": {
+            "projectV2": {
+              "items": {
+                "totalCount": 5,
+                "pageInfo": { "hasNextPage": false, "endCursor": "NQ" },
+                "nodes": [
+                  { "status": { "name": "Ready" }, "content": { "__typename": "Issue", "number": 88, "title": "Several issues per verb", "state": "OPEN", "repository": { "nameWithOwner": "Trum-ok/gh-dojo" } } },
+                  { "status": { "name": "Ready" }, "content": { "__typename": "Issue", "number": 3, "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)", "state": "OPEN", "repository": { "nameWithOwner": "Trum-ok/gh-dojo" } } },
+                  { "status": { "name": "Ready" }, "content": { "__typename": "Issue", "number": 4, "title": "Docs for release", "state": "OPEN", "repository": { "nameWithOwner": "Trum-ok/gh-dojo-docs" } } },
+                  { "status": { "name": "Ready" }, "content": { "__typename": "Issue", "number": 67, "title": "Content limit on createIssue", "state": "CLOSED", "repository": { "nameWithOwner": "trum-ok/GH-dojo" } } },
+                  { "status": { "name": "Ready" }, "content": { "__typename": "Issue", "number": 7, "title": "Batch reads", "state": "OPEN", "repository": { "nameWithOwner": "Trum-ok/gh-dojo" } } }
+                ]
               }
             }
           }

@@ -145,7 +145,7 @@ own name with the [`field`](#effects) effect. Logical names are lowercase:
 |------------|---------|
 | `initial`  | Set by `new`; issues without a status or not on the board count as this one for `from`. `next` shows the issues in it, or without a status |
 | `final`    | Statuses of finished work. `list` hides them, with a counter; a verb whose `to` is one also runs on a closed issue, and does not unarchive the item; `release` leaves out a closed issue in one ([already closed](commands.md#already-closed)) |
-| `resolved` | Statuses in which an open blocker no longer blocks: its work is done though the issue stays open (kanban: Ready, Done). `list` folds a group resolved but not final into one line of numbers |
+| `resolved` | Statuses in which an open blocker no longer blocks: its work is done though the issue stays open (kanban: Ready, Done). `list` folds a group resolved but not final into one line of numbers, and `release` warns about the issues in one it does not include ([Ready, not in the release](commands.md#ready-not-in-the-release)) |
 
 A blocker is resolved when it is closed, or on the board in a `resolved`
 status, archived or not. An open one not on the board, one whose board

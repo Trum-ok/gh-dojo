@@ -1,5 +1,5 @@
 {
-  "comment": "Hand-crafted like release_dojo.json: gh dojo release v0.2.0 --since v0.1.0 finds #3 (Refs) and cli/cli#2, which merged pull request #50 closes: the issues of batch_done_repos.json.",
+  "comment": "Hand-crafted like release_dojo.json: gh dojo release v0.2.0 --since v0.1.0 finds #3 (Refs) and cli/cli#2, which merged pull request #50 closes: the issues of batch_done_repos.json. The board's only issue in Ready is #3, which the release includes: no warning.",
   "handcrafted": true,
   "interactions": [
     {
@@ -87,6 +87,33 @@
                     }
                   ]
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "BoardItemsInStatus",
+      "query": "query BoardItemsInStatus($owner: String!, $number: Int!, $status: String!, $filter: String!, $cursor: String) {\n  repositoryOwner(login: $owner) {\n    ... on User { projectV2(number: $number) { ...inStatus } }\n    ... on Organization { projectV2(number: $number) { ...inStatus } }\n  }\n}\n\nfragment inStatus on ProjectV2 {\n  items(first: 100, after: $cursor, query: $filter) {\n    totalCount\n    pageInfo { hasNextPage endCursor }\n    nodes {\n      status: fieldValueByName(name: $status) {\n        ... on ProjectV2ItemFieldSingleSelectValue { name }\n      }\n      content {\n        __typename\n        ... on Issue {\n          number\n          title\n          state\n          repository { nameWithOwner }\n        }\n      }\n    }\n  }\n}",
+      "variables": {
+        "owner": "Trum-ok",
+        "number": 5,
+        "status": "Status",
+        "filter": "is:issue status:Ready",
+        "cursor": null
+      },
+      "repeat": true,
+      "response": {
+        "data": {
+          "repositoryOwner": {
+            "projectV2": {
+              "items": {
+                "totalCount": 1,
+                "pageInfo": { "hasNextPage": false, "endCursor": "MQ" },
+                "nodes": [
+                  { "status": { "name": "Ready" }, "content": { "__typename": "Issue", "number": 3, "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)", "state": "OPEN", "repository": { "nameWithOwner": "Trum-ok/gh-dojo" } } }
+                ]
               }
             }
           }

@@ -7,3 +7,4 @@ not ready (done starts only from Ready or In progress): #17 (Backlog)
 #7 In progress → Done, closed as completed
 2 of 2 done
 --- stderr
+warning: in Ready but not found in the release: #67, #88, Trum-ok/gh-dojo-docs#4; for any it includes: gh dojo done 67 88 Trum-ok/gh-dojo-docs#4

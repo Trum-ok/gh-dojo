@@ -6,3 +6,4 @@ dry run: done #43 "Speed up checkout"
   status: Ready → Done
   close: as completed
 --- stderr
+warning: in Ready but not found in the release: #42; for any it includes: gh dojo done 42

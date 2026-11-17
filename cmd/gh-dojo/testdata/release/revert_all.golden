@@ -3,3 +3,4 @@ code: 0
 release HEAD: 6 commits since abc1234, no issues
 reverted: #44 (PR #60)
 --- stderr
+warning: in Ready but not found in the release: #41, #42, #43; for any it includes: gh dojo done 41 42 43

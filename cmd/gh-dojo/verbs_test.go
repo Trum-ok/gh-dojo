@@ -4,13 +4,16 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/Trum-ok/gh-dojo/internal/batch"
+	"github.com/Trum-ok/gh-dojo/internal/board"
 	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/issue"
 	"github.com/Trum-ok/gh-dojo/internal/render"
@@ -97,6 +100,9 @@ type fakeBackend struct {
 	reads     int           // ReadIssue and ReadIssues calls
 	attempts  int           // Apply calls, failed ones included
 	applied   []*workflow.Plan
+
+	statusErr   error // the error of ReadInStatus
+	statusReads int   // ReadInStatus calls
 }
 
 // fakeRepo is the default repository of fakeBackend.
@@ -158,6 +164,34 @@ func (f *fakeBackend) Apply(_ context.Context, p *workflow.Plan) ([]workflow.Op,
 }
 
 func (f *fakeBackend) Reset() error { return nil }
+
+// ReadInStatus returns the issues on the board in statuses, of acme/shop
+// first, as release reads them (statusReader); statusErr fails it.
+func (f *fakeBackend) ReadInStatus(_ context.Context, statuses []string) ([]board.Item, error) {
+	f.statusReads++
+	if f.statusErr != nil {
+		return nil, f.statusErr
+	}
+	var out []board.Item
+	add := func(repo string, is workflow.Issue) {
+		if !is.OnBoard || !slices.Contains(statuses, is.Status) {
+			return
+		}
+		state := "OPEN"
+		if is.Closed {
+			state = "CLOSED"
+		}
+		out = append(out, board.Item{Type: board.ContentIssue, Status: is.Status, Repo: repo, Number: is.Number, Title: is.Title, State: state})
+	}
+	for _, n := range slices.Sorted(maps.Keys(f.issues)) {
+		add(fakeRepo.String(), f.issues[n])
+	}
+	for _, key := range slices.Sorted(maps.Keys(f.others)) {
+		repo, _, _ := strings.Cut(key, "#")
+		add(repo, f.others[key])
+	}
+	return out, nil
+}
 
 func (f *fakeBackend) Repo() (issue.Repo, error) { return fakeRepo, nil }
 

@@ -380,6 +380,11 @@ release's issues and what its output means. This project's rules:
   the release; a later release picks it up only if its commits name it
   again, so once it is Ready and released, run
   `gh dojo done 41 --comment "vX.Y.Z"`, on the user's word like any `done`.
+- `warning: in Ready but not found in the release: #88, #89; for any it
+  includes: gh dojo done 88 89 --comment "vX.Y.Z"` exits 0: issues in Ready
+  no commit of the release names, most likely work committed without
+  `Refs #N`. Find their commits in the release (`git log vA..vB`) and show
+  the user; on their word, run the command for those that shipped.
 - Exit code 2 is a refusal, not "not ready": say, an issue closed by
   `Fixes #12` but not in Ready. Release won't move it now or later; ask the
   user.

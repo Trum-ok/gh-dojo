@@ -2,3 +2,4 @@ code: 0
 --- stdout
 release HEAD: 4 commits since abc1234, no issues: no merged pull request closes one ([release] keywords is empty)
 --- stderr
+warning: in Ready but not found in the release: #42; for any it includes: gh dojo done 42

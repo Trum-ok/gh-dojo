@@ -12,3 +12,4 @@ dry run: done #7 "Issue 7"
   status: In progress → Done
   close: as completed
 --- stderr
+warning: in Ready but not found in the release: #67, #88, Trum-ok/gh-dojo-docs#4; for any it includes: gh dojo done 67 88 Trum-ok/gh-dojo-docs#4

@@ -1,0 +1,66 @@
+{
+  "comment": "Hand-crafted: the gh-dojo board (user Trum-ok, project 5) filtered by status:Ready,\"In review\" (release's issues in Ready not in the release), two pages: issues in Ready and In review, open and closed, of two repositories; an issue in Done the filter matched anyway, a pull request, an item whose content the token cannot see, and an issue repeated on page 2 (the board changed between pages). Error shapes follow GitHub's partial-data errors.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "BoardItemsInStatus",
+      "query": "query BoardItemsInStatus($owner: String!, $number: Int!, $status: String!, $filter: String!, $cursor: String) {\n  repositoryOwner(login: $owner) {\n    ... on User { projectV2(number: $number) { ...inStatus } }\n    ... on Organization { projectV2(number: $number) { ...inStatus } }\n  }\n}\n\nfragment inStatus on ProjectV2 {\n  items(first: 100, after: $cursor, query: $filter) {\n    totalCount\n    pageInfo { hasNextPage endCursor }\n    nodes {\n      status: fieldValueByName(name: $status) {\n        ... on ProjectV2ItemFieldSingleSelectValue { name }\n      }\n      content {\n        __typename\n        ... on Issue {\n          number\n          title\n          state\n          repository { nameWithOwner }\n        }\n      }\n    }\n  }\n}",
+      "variables": {
+        "owner": "Trum-ok",
+        "number": 5,
+        "status": "Status",
+        "filter": "is:issue status:Ready,\"In review\"",
+        "cursor": null
+      },
+      "response": {
+        "data": {
+          "repositoryOwner": {
+            "projectV2": {
+              "items": {
+                "totalCount": 7,
+                "pageInfo": { "hasNextPage": true, "endCursor": "NQ" },
+                "nodes": [
+                  { "status": { "name": "Ready" }, "content": { "__typename": "Issue", "number": 88, "title": "Several issues per verb", "state": "OPEN", "repository": { "nameWithOwner": "Trum-ok/gh-dojo" } } },
+                  { "status": { "name": "In review" }, "content": { "__typename": "Issue", "number": 3, "title": "Docs for the API", "state": "CLOSED", "repository": { "nameWithOwner": "Trum-ok/gh-dojo-docs" } } },
+                  { "status": { "name": "Done" }, "content": { "__typename": "Issue", "number": 50, "title": "Shipped long ago", "state": "CLOSED", "repository": { "nameWithOwner": "Trum-ok/gh-dojo" } } },
+                  { "status": { "name": "Ready" }, "content": { "__typename": "PullRequest" } },
+                  { "status": { "name": "Ready" }, "content": null }
+                ]
+              }
+            }
+          }
+        },
+        "errors": [
+          { "type": "NOT_FOUND", "path": ["repositoryOwner", "projectV2", "items", "nodes", 4, "content"], "message": "Could not resolve to an Issue." }
+        ]
+      }
+    },
+    {
+      "operation": "BoardItemsInStatus",
+      "query": "query BoardItemsInStatus($owner: String!, $number: Int!, $status: String!, $filter: String!, $cursor: String) {\n  repositoryOwner(login: $owner) {\n    ... on User { projectV2(number: $number) { ...inStatus } }\n    ... on Organization { projectV2(number: $number) { ...inStatus } }\n  }\n}\n\nfragment inStatus on ProjectV2 {\n  items(first: 100, after: $cursor, query: $filter) {\n    totalCount\n    pageInfo { hasNextPage endCursor }\n    nodes {\n      status: fieldValueByName(name: $status) {\n        ... on ProjectV2ItemFieldSingleSelectValue { name }\n      }\n      content {\n        __typename\n        ... on Issue {\n          number\n          title\n          state\n          repository { nameWithOwner }\n        }\n      }\n    }\n  }\n}",
+      "variables": {
+        "owner": "Trum-ok",
+        "number": 5,
+        "status": "Status",
+        "filter": "is:issue status:Ready,\"In review\"",
+        "cursor": "NQ"
+      },
+      "response": {
+        "data": {
+          "repositoryOwner": {
+            "projectV2": {
+              "items": {
+                "totalCount": 7,
+                "pageInfo": { "hasNextPage": false, "endCursor": "Nw" },
+                "nodes": [
+                  { "status": { "name": "Ready" }, "content": { "__typename": "Issue", "number": 88, "title": "Several issues per verb", "state": "OPEN", "repository": { "nameWithOwner": "Trum-ok/gh-dojo" } } },
+                  { "status": { "name": "Ready" }, "content": { "__typename": "Issue", "number": 89, "title": "Every verb takes several issues", "state": "OPEN", "repository": { "nameWithOwner": "Trum-ok/gh-dojo" } } }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
