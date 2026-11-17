@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/Trum-ok/gh-dojo/internal/graph"
@@ -71,16 +72,16 @@ type Pull struct {
 }
 
 // commitFragment is what a release reads of each commit.
-const commitFragment = `fragment releaseCommit on Commit {
+var commitFragment = `fragment releaseCommit on Commit {
   oid
   message
-  associatedPullRequests(first: 5) {
+  associatedPullRequests(first: ` + strconv.Itoa(PullWindow) + `) {
     totalCount
     nodes {
       number
       merged
       repository { nameWithOwner }
-      closingIssuesReferences(first: 25) {
+      closingIssuesReferences(first: ` + strconv.Itoa(ClosingWindow) + `) {
         totalCount
         nodes { number repository { nameWithOwner } }
       }
@@ -145,7 +146,7 @@ var compareQuery = `query ReleaseCompare($owner: String!, $repo: String!, $base:
         status
         aheadBy
         behindBy
-        commits(first: 100, after: $cursor) {
+        commits(first: ` + strconv.Itoa(PageSize) + `, after: $cursor) {
           totalCount
           pageInfo { hasNextPage endCursor }
           nodes { ...releaseCommit }
@@ -161,7 +162,7 @@ var historyQuery = `query ReleaseHistory($owner: String!, $repo: String!, $head:
   repository(owner: $owner, name: $repo) {
     object(oid: $head) {
       ... on Commit {
-        history(first: 100, after: $cursor) {
+        history(first: ` + strconv.Itoa(PageSize) + `, after: $cursor) {
           pageInfo { hasNextPage endCursor }
           nodes { ...releaseCommit }
         }

@@ -19,7 +19,7 @@ var dojoItemsBoard = &board.Schema{Owner: "Trum-ok", OwnerType: board.OwnerUser,
 func readItems(t *testing.T, s *board.Schema, files ...string) (*board.Items, *graphtest.Server, error) {
 	t.Helper()
 	srv := graphtest.New(t, files...)
-	items, err := board.ReadItems(context.Background(), srv.Client(), s, "Status")
+	items, err := board.ReadItemsWith(context.Background(), srv.Client(), s, "Status", board.ItemsOptions{})
 	return items, srv, err
 }
 

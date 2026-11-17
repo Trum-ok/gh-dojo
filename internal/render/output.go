@@ -78,17 +78,6 @@ func Shown(shown, total int, hint string) string {
 	return note
 }
 
-// Truncate keeps at most limit items (limit <= 0 keeps all) and returns the
-// note from Shown. total is the full count, e.g. a GraphQL totalCount; it is
-// raised to len(items) if smaller.
-func Truncate[T any](items []T, limit, total int, hint string) ([]T, string) {
-	total = max(total, len(items))
-	if limit > 0 && len(items) > limit {
-		items = items[:limit]
-	}
-	return items, Shown(len(items), total, hint)
-}
-
 // OrEmpty returns s, or an empty slice for nil: JSON lists are [], never
 // null.
 func OrEmpty[T any](s []T) []T {
