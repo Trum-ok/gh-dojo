@@ -16,6 +16,13 @@
 // What the card cannot know it says so: BoardUnknown (the issue may be on
 // the board), StatusUnknown, HistoryTruncated and HistoryUntracked are not
 // "no" answers.
+//
+// Besides Read: ReadRefs and ReadAll read the cards of several issues,
+// batched in few requests; ReadLinks reads the issue gh dojo block and
+// unblock change with the issues they link; ReadNewContext reads what gh
+// dojo new needs before it writes; ReadMilestones reads a repository's
+// open milestones past the first page, and MatchMilestone finds the one a
+// title names among them.
 package issue
 
 import (
@@ -231,13 +238,7 @@ func (c *Card) Ref() Ref { return Ref{Repo: c.Repo, Number: c.Number} }
 // checks use this, never State alone: an open blocker in a resolved status
 // does not block. When BlockedBy.Truncated(), more may exist.
 func (c *Card) UnresolvedBlockers(resolved []string) []Link {
-	var out []Link
-	for _, l := range c.BlockedBy.Nodes {
-		if !l.Resolved(resolved) {
-			out = append(out, l)
-		}
-	}
-	return out
+	return unresolved(c.BlockedBy.Nodes, resolved)
 }
 
 // UnresolvedSubIssues returns the sub-issues whose work is not done, by
@@ -245,8 +246,13 @@ func (c *Card) UnresolvedBlockers(resolved []string) []Link {
 // status, or with a status that could not be read. The sub-issues check
 // of a verb uses this. When SubIssues.Truncated(), more may exist.
 func (c *Card) UnresolvedSubIssues(resolved []string) []Link {
+	return unresolved(c.SubIssues.Nodes, resolved)
+}
+
+// unresolved returns the links that are not Resolved.
+func unresolved(links []Link, resolved []string) []Link {
 	var out []Link
-	for _, l := range c.SubIssues.Nodes {
+	for _, l := range links {
 		if !l.Resolved(resolved) {
 			out = append(out, l)
 		}
@@ -378,19 +384,14 @@ type StatusChange struct {
 // auth problems keep graph's codes.
 func Read(ctx context.Context, q graph.Querier, req Request) (*Card, error) {
 	if req.Number <= 0 {
-		return nil, render.Usage("invalid issue number %d: want 1 or greater", req.Number)
+		return nil, invalidNumber(req.Number)
 	}
 	if req.Repo.Owner == "" || req.Repo.Name == "" {
 		return nil, render.Internal("issue.Read: no repository")
 	}
-	n := req.Comments
-	if n <= 0 {
-		n = DefaultComments
-	}
-	n = min(n, MaxComments)
 	vars := map[string]any{
 		"owner": req.Repo.Owner, "repo": req.Repo.Name, "number": req.Number,
-		"comments": n, "status": req.StatusField,
+		"comments": commentsWindow(req.Comments), "status": req.StatusField,
 	}
 	query, extra := lookupQuery(req.Lookup)
 	for k, v := range extra {
@@ -409,16 +410,15 @@ func Read(ctx context.Context, q graph.Querier, req Request) (*Card, error) {
 	case node != nil && node.ID != "" && onlyNested(err):
 		hidden = nestedPaths(err) // e.g. a project or blocker the token can't see
 	case render.FromError(err).Code == render.ExitNotFound && resp.Repository == nil:
-		return nil, render.NotFound("repository %s not found, or the token cannot see it", req.Repo).
-			WithFix("gh repo view " + req.Repo.String()).WithCause(err)
+		return nil, repoNotFound(req.Repo, err)
 	case render.FromError(err).Code == render.ExitNotFound:
-		return nil, notFound(req).WithCause(err)
+		return nil, notFound(req, err)
 	default:
 		return nil, err
 	}
 	switch {
 	case node == nil:
-		return nil, notFound(req)
+		return nil, notFound(req, nil)
 	case node.Typename != "Issue":
 		return nil, pullRequest(req)
 	}
@@ -437,14 +437,21 @@ func Read(ctx context.Context, q graph.Querier, req Request) (*Card, error) {
 // leads to the right number without leaving gh dojo.
 const ListFix = "gh dojo list"
 
-func notFound(req Request) *render.Error {
+// notFound is the error for a missing issue; cause, which may be nil, is
+// kept for errors.Is and As next to errIssueMissing.
+func notFound(req Request, cause error) *render.Error {
 	return render.NotFound("issue #%d not found in %s", req.Number, req.Repo).
-		WithFix(ListFix)
+		WithFix(ListFix).WithCause(errors.Join(errIssueMissing, cause))
+}
+
+// invalidNumber is the error for an issue number below 1.
+func invalidNumber(n int) *render.Error {
+	return render.Usage("invalid issue number %d: want 1 or greater", n)
 }
 
 // onlyNested reports whether every GraphQL error points below the issue
 // (repository.issueOrPullRequest.<field>...), so the issue itself was read,
-// or at a link of the Lookup (see OnlyLinkErrors), which only that link
+// or at a link of the Lookup (see onlyLinkErrors), which only that link
 // misses.
 func onlyNested(err error) bool {
 	var gqlErr *api.GraphQLError
@@ -479,16 +486,22 @@ func nestedPaths(err error) [][]any {
 		if len(item.Path) < 3 || item.Path[0] != "repository" || item.Path[1] != "issueOrPullRequest" {
 			continue
 		}
-		path := make([]any, 0, len(item.Path)-2)
-		for _, p := range item.Path[2:] {
-			if f, ok := p.(float64); ok {
-				p = int(f)
-			}
-			path = append(path, p)
-		}
-		paths = append(paths, path)
+		paths = append(paths, intIndexes(item.Path[2:]))
 	}
 	return paths
+}
+
+// intIndexes returns a copy of an error path with its list indexes, JSON
+// numbers, as ints.
+func intIndexes(path []any) []any {
+	out := make([]any, 0, len(path))
+	for _, p := range path {
+		if f, ok := p.(float64); ok {
+			p = int(f)
+		}
+		out = append(out, p)
+	}
+	return out
 }
 
 // below returns the paths of hidden at or below prefix, without prefix.
@@ -594,7 +607,7 @@ func (n *issueJSON) card(req Request, hidden [][]any) *Card {
 	if req.Board == nil {
 		return c
 	}
-	if req.StatusField != builtinStatus {
+	if req.StatusField != config.BuiltinStatus {
 		c.HistoryUntracked = true
 		return c
 	}
@@ -613,10 +626,6 @@ func (n *issueJSON) card(req Request, hidden [][]any) *Card {
 	c.HistoryTruncated = n.historyTruncated(c.Item)
 	return c
 }
-
-// builtinStatus is the name of a board's built-in status field, the only
-// one GitHub records ProjectV2ItemStatusChangedEvent for.
-const builtinStatus = "Status"
 
 // historyTruncated reports whether status changes of the board may precede
 // the timeline window: older events exist (of any board) and the oldest

@@ -9,6 +9,7 @@
 package config
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -29,7 +30,7 @@ const FileName = ".github/dojo.toml"
 // DocsURL is the page that documents the config format.
 const DocsURL = "https://github.com/Trum-ok/gh-dojo/blob/main/docs/configuration.md"
 
-// ErrNoConfig is the cause of the error Find and Load return when there is
+// ErrNoConfig is the cause of the error find and Load return when there is
 // no config file to load; test for it with errors.Is. Any other error means
 // a config exists but cannot be read or is invalid.
 var ErrNoConfig = errors.New("no " + FileName + " found")
@@ -55,7 +56,8 @@ const (
 )
 
 var (
-	args     = []string{ArgComment, ArgBy, ArgAssignee, ArgMilestone, ArgOf}
+	args = []string{ArgComment, ArgBy, ArgAssignee, ArgMilestone, ArgOf}
+	// builtins are the command names verbs cannot take.
 	builtins = []string{
 		"agent", "block", "comment", "describe", "doctor", "help", "init",
 		"list", "new", "next", "release", "show", "unblock",
@@ -64,10 +66,6 @@ var (
 
 // Args lists the verb arguments in the order they are documented.
 func Args() []string { return slices.Clone(args) }
-
-// Builtins lists the command names verbs cannot take: commands that exist
-// now or are planned.
-func Builtins() []string { return slices.Clone(builtins) }
 
 // Config is a loaded and validated .github/dojo.toml with its preset applied.
 type Config struct {
@@ -97,11 +95,10 @@ type Board struct {
 	// Assignee is who a verb with assign = true assigns: Me or a login;
 	// "" when not set.
 	Assignee string
-	// Timezone is board.timezone, an IANA time zone name such as
-	// "Europe/Moscow"; "" when not set. Location is that zone, UTC when
-	// not set: the sprint effect's "today" and the days issues entered a
+	// Location is the zone of board.timezone, an IANA time zone name such
+	// as "Europe/Moscow" (its String); nil when not set, which is UTC (see
+	// Loc): the sprint effect's "today" and the days issues entered a
 	// status are dates in it.
-	Timezone string
 	Location *time.Location
 }
 
@@ -197,9 +194,6 @@ var blockersValues = []string{BlockersWarn, BlockersDeny, BlockersLink}
 var subIssuesValues = []string{BlockersWarn, BlockersDeny}
 
 var closeReasons = []string{CloseCompleted, CloseNotPlanned, CloseDuplicate}
-
-// CloseReasons lists the reasons close accepts.
-func CloseReasons() []string { return slices.Clone(closeReasons) }
 
 // Statuses gives meaning to some board statuses. All are optional: without a
 // preset they are empty unless the config sets them.
@@ -391,6 +385,44 @@ func (v Verb) OnlyClearsSprint() bool {
 	return v.Iteration == IterationClear && v.To == "" && len(v.Fields) == 0
 }
 
+// StartsFrom reports whether the verb runs on an issue in status: its from
+// is empty or lists the status. An issue with no status, or not on the
+// board (status ""), is in initial, statuses.initial.
+func (v Verb) StartsFrom(status, initial string) bool {
+	return len(v.From) == 0 || slices.Contains(v.From, cmp.Or(status, initial))
+}
+
+// verbEffects are a verb's effects by key, in documentation order, each
+// with whether a verb has it.
+var verbEffects = []struct {
+	key string
+	set func(Verb) bool
+}{
+	{"to", func(v Verb) bool { return v.To != "" }},
+	{"comment", func(v Verb) bool { return v.Comment != "" }},
+	{"labels", func(v Verb) bool { return len(v.AddLabels)+len(v.RemoveLabels) > 0 }},
+	{"assign", Verb.Assigns},
+	{"unassign", func(v Verb) bool { return v.Unassign != "" }},
+	{"milestone", Verb.SetsMilestone},
+	{"close", func(v Verb) bool { return v.Close != "" }},
+	{"reopen", func(v Verb) bool { return v.Reopen }},
+	{"iteration", func(v Verb) bool { return v.Iteration != "" }},
+	{"field", func(v Verb) bool { return len(v.Fields) > 0 }},
+}
+
+// Effects returns the keys of the verb's effects, in documentation order:
+// to, comment, labels, assign, unassign, milestone, close, reopen,
+// iteration and field, each when the verb has it. A verb has at least one.
+func (v Verb) Effects() []string {
+	var keys []string
+	for _, e := range verbEffects {
+		if e.set(v) {
+			keys = append(keys, e.key)
+		}
+	}
+	return keys
+}
+
 // IterationRule is the verb's iteration key as written in the config:
 // "current", "clear" or "by_status_date:Ready"; "" when not set.
 func (v Verb) IterationRule() string {
@@ -441,10 +473,10 @@ type StatusRef struct {
 	Key    string
 }
 
-// Load finds the config by walking up from dir (see Find), parses it and
+// Load finds the config by walking up from dir (see find), parses it and
 // applies its preset.
 func Load(dir string) (*Config, error) {
-	path, err := Find(dir)
+	path, err := find(dir)
 	if err != nil {
 		return nil, err
 	}
@@ -467,11 +499,11 @@ func Load(dir string) (*Config, error) {
 	return c, nil
 }
 
-// Find returns the absolute path of the nearest .github/dojo.toml in dir or
+// find returns the absolute path of the nearest .github/dojo.toml in dir or
 // one of its parents. The search stops after the repository root, the first
 // directory that contains .git (a directory, or a file in worktrees and
 // submodules), or at the filesystem root outside a repository.
-func Find(dir string) (string, error) {
+func find(dir string) (string, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return "", render.Usage("cannot resolve directory %s: %v", dir, err).WithCause(err)

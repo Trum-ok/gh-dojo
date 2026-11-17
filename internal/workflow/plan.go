@@ -29,14 +29,14 @@ type Plan struct {
 
 	StatusUnchanged bool // the issue is already in Target; no SetStatus
 	CommentPresent  bool // the same comment is the latest gh-dojo comment already; no AddComment
-	// InPlace are the verb's effects found already in place, as the ops
-	// that would have applied them: Reopen, SetIteration (From = To),
-	// SetFields (the fields already set), SetMilestone (From = To),
-	// AddLabels, RemoveLabels,
-	// Assign, Unassign (the users not assigned, none for "all" with nobody
-	// to remove; or Kept, the user the verb assigns), AddBlockedBy, and Close with the reason the issue was
-	// closed with ("" when unknown). They are never applied; they give the "already" wording of
-	// the dry run and the confirmation line.
+	// InPlace are the verb's effects found already in place, as the ops that
+	// would have applied them: Reopen, SetIteration (From = To), SetFields
+	// (the fields already set), SetMilestone (From = To), AddLabels,
+	// RemoveLabels, Assign, Unassign (the users not assigned, none for "all"
+	// with nobody to remove; or Kept, the user the verb assigns),
+	// AddBlockedBy, and Close with the reason the issue was closed with (""
+	// when unknown). They are never applied; they give the "already" wording
+	// of the dry run and the confirmation line.
 	InPlace []Op
 
 	// NeedsYes is set for a verb with confirm = "user" run without --yes
@@ -225,15 +225,9 @@ func (f SetFields) each(word func(FieldChange) string) []string {
 func (c FieldChange) describe() string { return "field: " + c.effect() }
 func (c FieldChange) effect() string   { return c.Field + " " + valueTransition(c.From, c.To) }
 
-// valueTransition is like render.Transition for a field value: an empty
-// value reads "none".
-func valueTransition(from, to string) string {
-	from, to = orNone(from), orNone(to)
-	if from == to {
-		return to + " (unchanged)"
-	}
-	return from + " → " + to
-}
+// valueTransition is render.Transition for a field value: an empty value
+// reads "none", not "no status" (render.Transition takes no word for it).
+func valueTransition(from, to string) string { return render.Transition(orNone(from), orNone(to)) }
 
 // orNone is a field value as output says it: "none" when empty.
 func orNone(value string) string {
@@ -273,7 +267,7 @@ func (c AddComment) Text() string { return c.Body + "\n\n" + c.Marker }
 // Wording shared by the dry run, the confirmation line and the from check.
 const (
 	noChanges  = "no changes"       // an empty list of effects
-	noStatus   = "no status"        // as render.Transition says it
+	noStatus   = "no status"        // as render.Transition says it; render exports no constant for it
 	notOnBoard = "not on the board" // the "status" of an issue not on the board
 )
 
@@ -304,15 +298,15 @@ func (p *Plan) Unconfirmed() error {
 }
 
 // lines returns one entry per effect, in a fixed order: board, reopen,
-// status, sprint, fields (one entry per field), milestone, labels, assignees (who is
-// removed, then who is assigned, as the mutation does), blocked-by link,
-// comment, close. dry picks the dry-run wording
-// (Describe), otherwise the confirmation wording (Effect). Effects already
-// in place are included. The status change of an issue not on the board
-// reads "not on the board → In progress"; in the confirmation that line
-// alone stands for adding the issue to the board. Unarchiving is a board
-// effect too, but always has its own line. Labels added and removed share
-// one line; so do the blocked-by links added, and those already in place.
+// status, sprint, fields (one entry per field), milestone, labels, assignees
+// (who is removed, then who is assigned, as the mutation does), blocked-by
+// link, comment, close. dry picks the dry-run wording (Describe), otherwise
+// the confirmation wording (Effect). Effects already in place are included.
+// The status change of an issue not on the board reads "not on the board → In
+// progress"; in the confirmation that line alone stands for adding the issue
+// to the board. Unarchiving is a board effect too, but always has its own
+// line. Labels added and removed share one line; so do the blocked-by links
+// added, and those already in place.
 func (p *Plan) lines(dry bool) []string {
 	pick := Op.Effect
 	if dry {
@@ -496,10 +490,10 @@ func Marker(verb, body string) string {
 	return fmt.Sprintf("<!-- gh-dojo:%s:%s -->", verb, hex.EncodeToString(sum[:4]))
 }
 
-// LastMarker returns the marker of the most recent gh-dojo comment, of any
+// lastMarker returns the marker of the most recent gh-dojo comment, of any
 // verb; comments are oldest first. Only comments the viewer wrote count, and
 // only a marker that ends the comment (see markerRE).
-func LastMarker(comments []Comment) (string, bool) {
+func lastMarker(comments []Comment) (string, bool) {
 	for i := len(comments) - 1; i >= 0; i-- {
 		if !comments[i].ViewerDidAuthor {
 			continue
@@ -517,6 +511,6 @@ func LastMarker(comments []Comment) (string, bool) {
 // comments: after start, wait and start again, the second start's comment is
 // posted even if it equals the first.
 func AlreadyPosted(comments []Comment, marker string) bool {
-	last, ok := LastMarker(comments)
+	last, ok := lastMarker(comments)
 	return ok && last == marker
 }

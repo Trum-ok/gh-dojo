@@ -9,7 +9,7 @@ import (
 )
 
 // presetFS holds the presets: same format as .github/dojo.toml, without
-// preset and [board].
+// preset, [board], [agent] and [release] (see presetKeys).
 //
 //go:embed presets/*.toml
 var presetFS embed.FS

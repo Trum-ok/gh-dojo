@@ -10,10 +10,10 @@ import (
 	"github.com/Trum-ok/gh-dojo/internal/testutil"
 )
 
-// sprintConfig is kanban with a sprint field: the spec's done (the sprint
-// of the day the issue entered Ready), ready setting the same rule (it
-// enters Ready itself), and verbs for the other iteration rules and the
-// field effect.
+// sprintConfig is kanban with a sprint field: done puts the issue in the
+// sprint of the day it entered Ready, ready sets the same rule (it enters
+// Ready itself), and verbs for the other iteration rules and the field
+// effect.
 const sprintConfig = `
 version = 1
 preset = "kanban"

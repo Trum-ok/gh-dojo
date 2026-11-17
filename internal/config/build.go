@@ -100,7 +100,7 @@ func (c *Config) buildBoard(r rawBoard) error {
 		if err != nil {
 			return err
 		}
-		b.Timezone, b.Location = *r.Timezone, loc
+		b.Location = loc
 	}
 	c.Board = b
 	return nil
@@ -346,9 +346,12 @@ func (c *Config) buildVerb(name string, r *rawVerb) (Verb, error) {
 	if err := c.buildLabelChecks(name, r, &v); err != nil {
 		return Verb{}, err
 	}
-	if v.To == "" && v.Comment == "" && len(v.AddLabels)+len(v.RemoveLabels) == 0 && !v.Assigns() && v.Unassign == "" &&
-		!v.SetsMilestone() && v.Close == "" && !v.Reopen && v.Iteration == "" && len(v.Fields) == 0 {
-		return Verb{}, c.Errorf("verbs.%s has no effect: set to, comment, labels, assign, unassign, milestone, close, reopen, iteration or field", name)
+	if len(v.Effects()) == 0 {
+		keys := make([]string, len(verbEffects))
+		for i, e := range verbEffects {
+			keys[i] = e.key
+		}
+		return Verb{}, c.Errorf("verbs.%s has no effect: set %s", name, render.JoinWords(keys, "or"))
 	}
 	for _, list := range []struct {
 		key  string
@@ -420,8 +423,8 @@ func requires(r *rawVerb, arg string) bool {
 	return false
 }
 
-// buildEffects validates labels, assign, unassign, milestone, close, reopen, confirm, blockers,
-// sub_issues, iteration and field.
+// buildEffects validates labels, assign, unassign, milestone, close,
+// reopen, confirm, blockers, sub_issues, iteration and field.
 func (c *Config) buildEffects(name string, r *rawVerb, v *Verb) error {
 	p := "verbs." + name + "."
 	if r.Labels != nil {
@@ -456,17 +459,14 @@ func (c *Config) buildEffects(name string, r *rawVerb, v *Verb) error {
 	if err := c.buildMilestone(name, r.Milestone, v); err != nil {
 		return err
 	}
-	if o := r.Close; o != nil {
-		key := c.KeyPath(p + "close")
-		switch {
-		case o.Bool != nil && *o.Bool:
-			return c.Errorf("%s = true: want a reason, or false to leave the issue open", key).
-				WithAllowed(append(slices.Clone(closeReasons), "false")...)
-		case o.Str != nil && !slices.Contains(closeReasons, *o.Str):
-			return c.Errorf("%s: unknown reason %q", key, *o.Str).WithAllowed(closeReasons...)
-		case o.Str != nil:
-			v.Close = *o.Str
-		}
+	key := c.KeyPath(p + "close")
+	switch reason, set, err := c.offString(key, r.Close, "a reason", "leave the issue open", closeReasons...); {
+	case err != nil:
+		return err
+	case set && !slices.Contains(closeReasons, reason):
+		return c.Errorf("%s: unknown reason %q", key, reason).WithAllowed(closeReasons...)
+	case set:
+		v.Close = reason
 	}
 	v.Reopen = deref(r.Reopen)
 	v.Batch = deref(r.Batch)
@@ -479,22 +479,19 @@ func (c *Config) buildEffects(name string, r *rawVerb, v *Verb) error {
 			WithFix(fmt.Sprintf(`set close = %q to close the issue as a duplicate of the one --%s names, or drop {%s}`,
 				CloseDuplicate, ArgOf, VarOf))
 	}
-	if o := r.Confirm; o != nil {
-		key := c.KeyPath(p + "confirm")
-		switch {
-		case o.Bool != nil && *o.Bool:
-			return c.Errorf("%s = true: want %q, or false to turn it off", key, ConfirmUser).
-				WithAllowed(strconv.Quote(ConfirmUser), "false")
-		case o.Str != nil && *o.Str != ConfirmUser:
-			return c.Errorf("%s: unknown value %q", key, *o.Str).WithAllowed(ConfirmUser)
-		case o.Str != nil:
-			v.Confirm = true
-		}
+	key = c.KeyPath(p + "confirm")
+	switch who, set, err := c.offString(key, r.Confirm, strconv.Quote(ConfirmUser), offTurnsOff, strconv.Quote(ConfirmUser)); {
+	case err != nil:
+		return err
+	case set && who != ConfirmUser:
+		return c.Errorf("%s: unknown value %q", key, who).WithAllowed(ConfirmUser)
+	case set:
+		v.Confirm = true
 	}
-	if err := c.buildBlockers(name, r.Blockers, v); err != nil {
+	if err := c.buildChecks(name, "blockers", r.Blockers, v); err != nil {
 		return err
 	}
-	if err := c.buildSubIssues(name, r.SubIssues, v); err != nil {
+	if err := c.buildChecks(name, "sub_issues", r.SubIssues, v); err != nil {
 		return err
 	}
 	if err := c.buildIteration(name, r.Iteration, v); err != nil {
@@ -650,17 +647,16 @@ func (c *Config) buildAssign(name string, r *rawVerb, v *Verb) error {
 // without placeholders; {milestone} only stands alone.
 func (c *Config) buildMilestone(name string, o *rawOff, v *Verb) error {
 	p := "verbs." + name + "."
-	if o != nil {
-		key := c.KeyPath(p + "milestone")
+	key := c.KeyPath(p + "milestone")
+	m, set, err := c.offString(key, o, fmt.Sprintf("a milestone title, %q for the --%s one", MilestoneFromArg, ArgMilestone),
+		offTurnsOff, "a milestone title", strconv.Quote(MilestoneFromArg))
+	if err != nil {
+		return err
+	}
+	if set {
 		fix := fmt.Sprintf(`write the title of an open milestone, like milestone = "v1.2", or milestone = %q to take it from --%s`,
 			MilestoneFromArg, ArgMilestone)
-		switch m := deref(o.Str); {
-		case o.Bool != nil && *o.Bool:
-			return c.Errorf("%s = true: want a milestone title, %q for the --%s one, or false to turn it off",
-				key, MilestoneFromArg, ArgMilestone).
-				WithAllowed("a milestone title", strconv.Quote(MilestoneFromArg), "false")
-		case o.Bool != nil:
-			// false: no milestone, turning off a preset's.
+		switch {
 		case m == MilestoneFromArg:
 			v.MilestoneArg = true
 		case strings.TrimSpace(m) == "":
@@ -682,63 +678,69 @@ func (c *Config) buildMilestone(name string, o *rawOff, v *Verb) error {
 	}
 	if !v.MilestoneArg && v.Uses(VarMilestone) {
 		return c.Errorf("%s uses {%s}, the --%s milestone, but %s is not %q",
-			c.KeyPath(p+"comment"), VarMilestone, ArgMilestone, c.KeyPath(p+"milestone"), MilestoneFromArg).
+			c.KeyPath(p+"comment"), VarMilestone, ArgMilestone, key, MilestoneFromArg).
 			WithFix(fmt.Sprintf(`set milestone = %q to set the milestone --%s names, or drop {%s}`,
 				MilestoneFromArg, ArgMilestone, VarMilestone))
 	}
 	return nil
 }
 
-// buildBlockers validates the blockers key: "warn" or "deny" (checks),
-// "link" (the effect, which needs {by} in the comment template), or false
-// to turn off a preset's.
-func (c *Config) buildBlockers(name string, o *rawOff, v *Verb) error {
+// buildChecks validates the blockers or the sub_issues key (k): "warn" or
+// "deny" (checks of the issue's unresolved blockers or sub-issues), for
+// blockers also "link" (the effect, which needs {by} in the comment
+// template), or false to turn off a preset's.
+func (c *Config) buildChecks(name, k string, o *rawOff, v *Verb) error {
 	p := "verbs." + name + "."
-	if o != nil {
-		key := c.KeyPath(p + "blockers")
-		switch b := deref(o.Str); {
-		case o.Bool != nil && *o.Bool:
-			return c.Errorf("%s = true: want %q, %q or %q, or false to turn it off",
-				key, BlockersWarn, BlockersDeny, BlockersLink).
-				WithAllowed(strconv.Quote(BlockersWarn), strconv.Quote(BlockersDeny), strconv.Quote(BlockersLink), "false")
-		case o.Bool != nil:
-			// false: no check and no link, turning off a preset's.
-		case !slices.Contains(blockersValues, b):
-			return c.Errorf("%s: unknown value %q: %q and %q check the issue's unresolved blockers, "+
-				"%q marks the issue blocked by the --by issue", key, b, BlockersWarn, BlockersDeny, BlockersLink).
-				WithAllowed(blockersValues...)
-		case b == BlockersLink && !v.Uses(ArgBy):
-			return c.Errorf("%s = %q takes the blocking issue from --by, but %s does not use {%s}",
-				key, b, c.KeyPath(p+"comment"), ArgBy).
-				WithFix(fmt.Sprintf(`add {%s} to %s, e.g. "Waiting for {%s}.", or set %s = false to drop the link`,
-					ArgBy, c.KeyPath(p+"comment"), ArgBy, p+"blockers"))
-		default:
-			v.Blockers = b
+	key := c.KeyPath(p + k)
+	values, dest, what := blockersValues, &v.Blockers, "blockers"
+	if k == "sub_issues" {
+		values, dest, what = subIssuesValues, &v.SubIssues, "sub-issues"
+	}
+	quoted := make([]string, len(values))
+	for i, val := range values {
+		quoted[i] = strconv.Quote(val)
+	}
+	b, set, err := c.offString(key, o, render.JoinWords(quoted, "or"), offTurnsOff, quoted...)
+	switch {
+	case err != nil:
+		return err
+	case !set:
+		// Unset, or false: no check and no link, turning off a preset's.
+	case !slices.Contains(values, b):
+		check := fmt.Sprintf("%q and %q check the issue's unresolved %s", BlockersWarn, BlockersDeny, what)
+		if k == "blockers" {
+			check += fmt.Sprintf(", %q marks the issue blocked by the --by issue", BlockersLink)
 		}
+		return c.Errorf("%s: unknown value %q: %s", key, b, check).WithAllowed(values...)
+	case b == BlockersLink && !v.Uses(ArgBy):
+		return c.Errorf("%s = %q takes the blocking issue from --by, but %s does not use {%s}",
+			key, b, c.KeyPath(p+"comment"), ArgBy).
+			WithFix(fmt.Sprintf(`add {%s} to %s, e.g. "Waiting for {%s}.", or set %s = false to drop the link`,
+				ArgBy, c.KeyPath(p+"comment"), ArgBy, p+k))
+	default:
+		*dest = b
 	}
 	return nil
 }
 
-// buildSubIssues validates the sub_issues key: "warn" or "deny" (checks
-// of the issue's unresolved sub-issues), or false to turn off a preset's.
-func (c *Config) buildSubIssues(name string, o *rawOff, v *Verb) error {
-	if o == nil {
-		return nil
-	}
-	key := c.KeyPath("verbs." + name + ".sub_issues")
+// offTurnsOff is what false does to a key that takes a string or false,
+// but close (see offString).
+const offTurnsOff = "turn it off"
+
+// offString reads key, a verb's key that takes a string or false (rawOff):
+// it returns the string and true when one is set, and false when the key
+// is unset or false, which turns off a preset's value. true is an error:
+// "<key> = true: want <want>, or false to <off>", allowing allowed and
+// false.
+func (c *Config) offString(key string, o *rawOff, want, off string, allowed ...string) (string, bool, error) {
 	switch {
-	case o.Bool != nil && *o.Bool:
-		return c.Errorf("%s = true: want %q or %q, or false to turn it off", key, BlockersWarn, BlockersDeny).
-			WithAllowed(strconv.Quote(BlockersWarn), strconv.Quote(BlockersDeny), "false")
+	case o == nil || o.Bool != nil && !*o.Bool:
+		return "", false, nil
 	case o.Bool != nil:
-		// false: no check, turning off a preset's.
-	case !slices.Contains(subIssuesValues, *o.Str):
-		return c.Errorf("%s: unknown value %q: %q and %q check the issue's unresolved sub-issues",
-			key, *o.Str, BlockersWarn, BlockersDeny).WithAllowed(subIssuesValues...)
-	default:
-		v.SubIssues = *o.Str
+		return "", false, c.Errorf("%s = true: want %s, or false to %s", key, want, off).
+			WithAllowed(slices.Concat(allowed, []string{"false"})...)
 	}
-	return nil
+	return *o.Str, true, nil
 }
 
 // buildIteration validates the iteration key: "current", "clear" or

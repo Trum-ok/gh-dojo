@@ -81,13 +81,13 @@ func ReadRefs(ctx context.Context, q graph.Querier, req Request, refs []Ref) ([]
 	refs = slices.Clone(refs)
 	for i, r := range refs {
 		if r.Number <= 0 {
-			return nil, render.Usage("invalid issue number %d: want 1 or greater", r.Number)
+			return nil, invalidNumber(r.Number)
 		}
 		if r.Repo == (Repo{}) {
 			refs[i].Repo = req.Repo
 		}
 		if refs[i].Repo.Owner == "" || refs[i].Repo.Name == "" {
-			return nil, render.Internal("issue.ReadAll: no repository")
+			return nil, render.Internal("issue.ReadRefs: no repository")
 		}
 	}
 	if len(refs) == 1 {
@@ -123,34 +123,37 @@ func readEach(ctx context.Context, q graph.Querier, req Request, refs []Ref) ([]
 		if card != nil {
 			res.Repo = card.Repo // as GitHub spells it
 		}
-		if err != nil {
-			switch render.FromError(err).What {
-			case notFound(r).What:
-				res.Cause = CauseMissing
-			case pullRequest(r).What:
-				res.Cause = CausePullRequest
-			case repoNotFound(r.Repo).What:
-				if sameRepo(r.Repo, req.Repo) {
-					return out, err
-				}
-				res.Cause = CauseNoRepo
-			default:
-				return out, err
-			}
+		switch {
+		case err == nil:
+		case errors.Is(err, errIssueMissing):
+			res.Cause = CauseMissing
+		case errors.Is(err, errPullRequest):
+			res.Cause = CausePullRequest
+		case errors.Is(err, errRepoMissing) && !sameRepo(r.Repo, req.Repo):
+			res.Cause = CauseNoRepo
+		default:
+			return out, err
 		}
 		out = append(out, res)
 	}
 	return out, nil
 }
 
-// errRepoMissing is the cause of the error for a missing repository.
-var errRepoMissing = errors.New("repository not found")
+// The causes of the errors for a missing repository (repoNotFound), a
+// missing issue (notFound) and a pull request number (pullRequest): what
+// readEach and ReadRefs tell them apart by, never by their wording.
+var (
+	errRepoMissing  = errors.New("repository not found")
+	errIssueMissing = errors.New("issue not found")
+	errPullRequest  = errors.New("a pull request")
+)
 
 // repoNotFound is the error for a repository that does not exist or that
-// the token cannot see.
-func repoNotFound(repo Repo) *render.Error {
+// the token cannot see; cause, which may be nil, is kept for errors.Is and
+// As next to errRepoMissing.
+func repoNotFound(repo Repo, cause error) *render.Error {
 	return render.NotFound("repository %s not found, or the token cannot see it", repo).
-		WithFix("gh repo view " + repo.String())
+		WithFix("gh repo view " + repo.String()).WithCause(errors.Join(errRepoMissing, cause))
 }
 
 // batchRepos groups refs by repository, in the order each repository
@@ -192,7 +195,7 @@ func readBatch(ctx context.Context, q graph.Querier, req Request, refs []Ref) ([
 		switch {
 		case ok && (len(repos) > 1 || first != nil || !sameRepo(repos[0], req.Repo)):
 		case render.FromError(err).Code == render.ExitNotFound && len(repos) == 1 && first == nil:
-			return nil, repoNotFound(repos[0]).WithCause(errors.Join(errRepoMissing, err))
+			return nil, repoNotFound(repos[0], err)
 		default:
 			return nil, err
 		}
@@ -217,9 +220,9 @@ func readBatch(ctx context.Context, q graph.Querier, req Request, refs []Ref) ([
 			}
 			switch {
 			case block == nil:
-				out[i].Err, out[i].Cause = repoNotFound(r.Repo), CauseNoRepo
+				out[i].Err, out[i].Cause = repoNotFound(r.Repo, nil), CauseNoRepo
 			case node == nil || errs.missing[alias]:
-				out[i].Err, out[i].Cause = notFound(r), CauseMissing
+				out[i].Err, out[i].Cause = notFound(r, nil), CauseMissing
 			case node.Typename != "Issue":
 				out[i].Err, out[i].Cause = pullRequest(r), CausePullRequest
 			default:
@@ -233,9 +236,10 @@ func readBatch(ctx context.Context, q graph.Querier, req Request, refs []Ref) ([
 	return out, nil
 }
 
+// pullRequest is the error for a number that is a pull request.
 func pullRequest(req Request) *render.Error {
 	return render.NotFound("#%d in %s is a pull request; gh dojo works with issues only", req.Number, req.Repo).
-		WithFix(ListFix)
+		WithFix(ListFix).WithCause(errPullRequest)
 }
 
 // batchResponse is the answer of batchQuery: the repository fields by
@@ -342,14 +346,7 @@ func perIssueErrors(err error) (errs batchErrors, ok bool) {
 		case len(item.Path) == 2 && item.Type == "NOT_FOUND":
 			errs.missing[alias] = true
 		case len(item.Path) > 2 && (item.Type == "NOT_FOUND" || item.Type == "FORBIDDEN"):
-			path := make([]any, 0, len(item.Path)-2)
-			for _, p := range item.Path[2:] {
-				if f, isNum := p.(float64); isNum {
-					p = int(f)
-				}
-				path = append(path, p)
-			}
-			errs.hidden[alias] = append(errs.hidden[alias], path)
+			errs.hidden[alias] = append(errs.hidden[alias], intIndexes(item.Path[2:]))
 		default:
 			return batchErrors{}, false
 		}
@@ -357,6 +354,8 @@ func perIssueErrors(err error) (errs batchErrors, ok bool) {
 	return errs, true
 }
 
+// commentsWindow is how many comments Request.Comments n reads: 0 means
+// DefaultComments, at most MaxComments.
 func commentsWindow(n int) int {
 	if n <= 0 {
 		n = DefaultComments

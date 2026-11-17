@@ -236,8 +236,8 @@ func TestPlanNewResume(t *testing.T) {
 	switch {
 	case p.Create || !p.Resumed:
 		t.Errorf("Create %v, Resumed %v", p.Create, p.Resumed)
-	case !slices.Equal(p.Labels, []string{"area:cli"}) || !slices.Equal(p.LabelsInPlace, []string{"bug"}):
-		t.Errorf("labels %q, in place %q", p.Labels, p.LabelsInPlace)
+	case !slices.Equal(p.Labels, []string{"area:cli"}):
+		t.Errorf("labels %q", p.Labels)
 	case !slices.Equal(p.Assign, []string{"octocat"}) || !slices.Equal(p.AlreadyAssigned, []string{"monalisa"}):
 		t.Errorf("assign %q, already %q", p.Assign, p.AlreadyAssigned)
 	case p.Milestone != "" || p.MilestoneKept != "" || p.Parent || p.ParentKept:
@@ -334,7 +334,7 @@ confirm = "user"
 	}
 	f := newFound()
 	f.Status = "Backlog" // move starts only from In progress
-	if fix := MilestoneFix(c, f, "acme/api", "v2"); fix != `gh issue edit 57 -R acme/api --milestone "v2"` {
-		t.Errorf("MilestoneFix = %q", fix)
+	if fix := milestoneFix(c, f, "acme/api", "v2"); fix != `gh issue edit 57 -R acme/api --milestone "v2"` {
+		t.Errorf("milestoneFix = %q", fix)
 	}
 }

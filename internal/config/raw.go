@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -65,6 +66,9 @@ type rawRelease struct {
 	Suffix   *bool     `toml:"suffix"`
 }
 
+// rawVerb is a verb's table. Every field is a pointer, nil when the key is
+// unset, tagged with its key, in documentation order: verbKeys, setKeys
+// and mergeVerb go by the fields, so a new key is one field here.
 type rawVerb struct {
 	When         *string    `toml:"when"`
 	To           *string    `toml:"to"`
@@ -151,21 +155,24 @@ func (o *rawOff) UnmarshalTOML(v any) error {
 // setKeys lists the keys of v that are set, other than disabled.
 func (v *rawVerb) setKeys() []string {
 	var keys []string
-	for _, k := range []struct {
-		name string
-		set  bool
-	}{
-		{"when", v.When != nil}, {"to", v.To != nil}, {"from", v.From != nil},
-		{"from_labels", v.FromLabels != nil}, {"refuse_labels", v.RefuseLabels != nil},
-		{"require", v.Require != nil}, {"require_one_of", v.RequireOneOf != nil},
-		{"comment", v.Comment != nil}, {"labels", v.Labels != nil}, {"assign", v.Assign != nil},
-		{"unassign", v.Unassign != nil}, {"milestone", v.Milestone != nil}, {"close", v.Close != nil}, {"reopen", v.Reopen != nil}, {"confirm", v.Confirm != nil},
-		{"iteration", v.Iteration != nil}, {"field", v.Field != nil},
-		{"blockers", v.Blockers != nil}, {"sub_issues", v.SubIssues != nil}, {"batch", v.Batch != nil},
-	} {
-		if k.set {
-			keys = append(keys, k.name)
+	fields := reflect.ValueOf(v).Elem()
+	for i, k := range verbKeys {
+		if k != disabledKey && !fields.Field(i).IsNil() {
+			keys = append(keys, k)
 		}
+	}
+	return keys
+}
+
+// disabledKey is the verb key that drops the verb.
+const disabledKey = "disabled"
+
+// tomlKeys returns the toml tags of T's fields, in order.
+func tomlKeys[T any]() []string {
+	t := reflect.TypeFor[T]()
+	keys := make([]string, t.NumField())
+	for i := range keys {
+		keys[i] = t.Field(i).Tag.Get("toml")
 	}
 	return keys
 }
@@ -180,19 +187,11 @@ var (
 	sessionKeys  = []string{"env", "link"}
 	agentKeys    = []string{"targets", "notes", "description"}
 	releaseKeys  = []string{"keywords", "suffix"}
-	verbKeys     = []string{
-		"when", "to", "from", "from_labels", "refuse_labels", "require", "require_one_of", "comment",
-		"labels", "assign", "unassign", "milestone", "close", "reopen", "confirm", "iteration", "field", "blockers", "sub_issues", "batch",
-		"disabled",
-	}
+	verbKeys     = tomlKeys[rawVerb]()
 
-	// unsupportedVerbKeys are verb keys from the spec that this version
-	// recognizes but does not implement yet.
+	// unsupportedVerbKeys are verb keys reserved for hooks, which this
+	// version does not implement (an open question, issue #58).
 	unsupportedVerbKeys = []string{"pre", "post"}
-
-	// unsupportedKeys are other keys from the spec that this version
-	// recognizes but does not implement yet, with what they are for.
-	unsupportedKeys = map[string]string{}
 )
 
 // The [fields] entries this version uses: status (required) and sprint.
@@ -225,10 +224,10 @@ func fieldError(display, name string) error {
 }
 
 // fieldsKeyError returns the fieldError of the first [fields] entry that is
-// not status or sprint, in file order, nil when there is none or data does not parse.
-// It reads [fields] values of any type, so an unsupported field written as
-// a table ([fields.sprint]) is reported as unsupported rather than as a
-// type mismatch.
+// not status or sprint, in file order, nil when there is none or data does
+// not parse. It reads [fields] values of any type, so an unsupported field
+// written as a table ([fields.sprint]) is reported as unsupported rather
+// than as a type mismatch.
 func fieldsKeyError(data []byte, display string) error {
 	var probe struct {
 		Fields map[string]any `toml:"fields"`
@@ -378,9 +377,6 @@ func undecodedError(display string, key toml.Key) error {
 		allowed = verbKeys
 	case len(key) >= 2:
 		path = strings.Join(key[:2], ".")
-		if note, ok := unsupportedKeys[path]; ok {
-			return unsupported(display, path, note)
-		}
 		switch key[0] {
 		case "board":
 			allowed = boardKeys
@@ -402,13 +398,13 @@ func undecodedError(display string, key toml.Key) error {
 	default:
 		path, allowed = key.String(), topKeys
 	}
-	return render.Usage("%s: unknown key %s", display, path).WithAllowed(allowed...).WithFix(NewerFix)
+	return render.Usage("%s: unknown key %s", display, path).WithAllowed(allowed...).WithFix(newerFix)
 }
 
-// NewerFix is the fix of an unknown config key: a typo, or a key of a
+// newerFix is the fix of an unknown config key: a typo, or a key of a
 // newer gh-dojo than the one running, which an old installed build cannot
 // know.
-const NewerFix = "fix the key; if it is right, the config needs a newer gh-dojo: " +
+const newerFix = "fix the key; if it is right, the config needs a newer gh-dojo: " +
 	"gh extension upgrade dojo (from source: make install)"
 
 // merge applies repo over preset: scalar and list keys override one by one,
@@ -458,30 +454,19 @@ func mergeVerb(m merger, name string, base, over *rawVerb) *rawVerb {
 	if over == nil {
 		over = &rawVerb{}
 	}
-	p := "verbs." + name + "."
-	return &rawVerb{
-		When:         pick(m, p+"when", base.When, over.When),
-		To:           pick(m, p+"to", base.To, over.To),
-		From:         pick(m, p+"from", base.From, over.From),
-		FromLabels:   pick(m, p+"from_labels", base.FromLabels, over.FromLabels),
-		RefuseLabels: pick(m, p+"refuse_labels", base.RefuseLabels, over.RefuseLabels),
-		Require:      pick(m, p+"require", base.Require, over.Require),
-		RequireOneOf: pick(m, p+"require_one_of", base.RequireOneOf, over.RequireOneOf),
-		Comment:      pick(m, p+"comment", base.Comment, over.Comment),
-		Labels:       pick(m, p+"labels", base.Labels, over.Labels),
-		Assign:       pick(m, p+"assign", base.Assign, over.Assign),
-		Unassign:     pick(m, p+"unassign", base.Unassign, over.Unassign),
-		Milestone:    pick(m, p+"milestone", base.Milestone, over.Milestone),
-		Close:        pick(m, p+"close", base.Close, over.Close),
-		Reopen:       pick(m, p+"reopen", base.Reopen, over.Reopen),
-		Confirm:      pick(m, p+"confirm", base.Confirm, over.Confirm),
-		Iteration:    pick(m, p+"iteration", base.Iteration, over.Iteration),
-		Field:        pick(m, p+"field", base.Field, over.Field),
-		Blockers:     pick(m, p+"blockers", base.Blockers, over.Blockers),
-		SubIssues:    pick(m, p+"sub_issues", base.SubIssues, over.SubIssues),
-		Batch:        pick(m, p+"batch", base.Batch, over.Batch),
-		Disabled:     over.Disabled,
+	out := &rawVerb{Disabled: over.Disabled}
+	b, o, r := reflect.ValueOf(base).Elem(), reflect.ValueOf(over).Elem(), reflect.ValueOf(out).Elem()
+	for i, k := range verbKeys {
+		switch {
+		case k == disabledKey:
+		case !o.Field(i).IsNil():
+			r.Field(i).Set(o.Field(i))
+		case !b.Field(i).IsNil():
+			r.Field(i).Set(b.Field(i))
+			m.origin["verbs."+name+"."+k] = m.preset
+		}
 	}
+	return out
 }
 
 // pick returns over if set, else base, recording base's origin.

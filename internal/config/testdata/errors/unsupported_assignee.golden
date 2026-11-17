@@ -1,2 +1,0 @@
-error: .github/dojo.toml: board.assignee is not supported in this version (the assign effect comes in v0.1)
-fix: remove board.assignee from .github/dojo.toml
