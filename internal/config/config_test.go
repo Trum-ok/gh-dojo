@@ -14,9 +14,9 @@ import (
 	"github.com/Trum-ok/gh-dojo/internal/testutil"
 )
 
-// specExample is the example from docs/spec.md. Its drop verb is the
-// spec's, as is: no comment template, so --comment is posted as is.
-const specExample = `
+// fullExample overrides kanban with most keys. Its drop verb has no
+// comment template, so --comment is posted as is.
+const fullExample = `
 version = 1
 preset = "kanban"            # base, overrides follow
 
@@ -113,8 +113,8 @@ func dump(c *Config) string {
 	w("version: %d", c.Version)
 	w("preset: %q", c.Preset)
 	w("board: owner=%s project=%d repos=%v assignee=%q", c.Board.Owner, c.Board.Project, c.Board.Repos, c.Board.Assignee)
-	if c.Board.Timezone != "" {
-		w("board.timezone: %s (location %s, zone %q)", c.Board.Timezone, c.Board.Loc(), c.Board.Zone())
+	if c.Board.Location != nil {
+		w("board.timezone: %s (location %s, zone %q)", c.Board.Location, c.Board.Loc(), c.Board.Zone())
 	}
 	for _, name := range c.FieldNames() {
 		w("fields.%s: %q", name, c.Fields[name])
@@ -177,7 +177,7 @@ func TestLoad(t *testing.T) {
 		name    string
 		content string
 	}{
-		{"spec_example", specExample},
+		{"full_example", fullExample},
 		{"preset_only", presetOnly},
 		{"sprints_only", sprintsOnly},
 		// Overrides on top of sprints: another iteration field, start
@@ -627,8 +627,8 @@ func TestFindWalksUp(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(sub, ".github", "dojo.toml"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if path, err := Find(sub); err != nil || path != c.Path {
-		t.Errorf("Find = %q, %v; want %q", path, err, c.Path)
+	if path, err := find(sub); err != nil || path != c.Path {
+		t.Errorf("find = %q, %v; want %q", path, err, c.Path)
 	}
 }
 
@@ -783,7 +783,7 @@ func TestSessionResolve(t *testing.T) {
 			t.Errorf("%+v: got %q, %v; want %q, %v", tt.s, got, ok, tt.want, tt.wantOK)
 		}
 	}
-	c := mustLoad(t, specExample)
+	c := mustLoad(t, fullExample)
 	t.Setenv("CLAUDE_CODE_HOST_SESSION_ID", "s1")
 	if got, ok := c.Session.Resolve(nil); !ok || got != "claude://claude.ai/epitaxy/s1" {
 		t.Errorf("Resolve(nil) = %q, %v", got, ok)
@@ -794,7 +794,7 @@ func TestSessionResolve(t *testing.T) {
 // preset (kanban's done) and turned off with false; other verbs take one
 // number.
 func TestBatch(t *testing.T) {
-	c := mustLoad(t, specExample)
+	c := mustLoad(t, fullExample)
 	for _, v := range c.Verbs {
 		if v.Batch != (v.Name == "done") {
 			t.Errorf("%s: Batch = %v", v.Name, v.Batch)
@@ -926,5 +926,22 @@ func TestMergeVerb(t *testing.T) {
 	}
 	if keys := got.setKeys(); !slices.Equal(keys, []string{"to", "comment", "batch"}) {
 		t.Errorf("setKeys = %v", keys)
+	}
+}
+
+// TestBoardReposPattern: board.repos takes an owner with underscores (an
+// enterprise managed user) and refuses one starting with a dash, as
+// issue.ParseRepo does.
+func TestBoardReposPattern(t *testing.T) {
+	withRepos := func(repo string) string {
+		return strings.Replace(presetOnly, "project = 1\n", "project = 1\nrepos = [\""+repo+"\"]\n", 1)
+	}
+	c := mustLoad(t, withRepos("a_b/c"))
+	if !slices.Equal(c.Board.Repos, []string{"a_b/c"}) {
+		t.Errorf("repos = %v, want [a_b/c]", c.Board.Repos)
+	}
+	_, err := Load(writeConfig(t, withRepos("-x/y")))
+	if err == nil || !strings.Contains(err.Error(), `board.repos: "-x/y" is not owner/name`) {
+		t.Errorf(`repos = ["-x/y"]: err = %v, want not owner/name`, err)
 	}
 }

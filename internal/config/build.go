@@ -100,7 +100,7 @@ func (c *Config) buildBoard(r rawBoard) error {
 		if err != nil {
 			return err
 		}
-		b.Timezone, b.Location = *r.Timezone, loc
+		b.Location = loc
 	}
 	c.Board = b
 	return nil

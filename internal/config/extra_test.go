@@ -26,7 +26,7 @@ func TestFindStopsAtRepoRoot(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if path, err := Find(sub); err == nil {
+		if path, err := find(sub); err == nil {
 			t.Errorf(".git file=%v: found %s outside the repository", dotGitIsFile, path)
 		}
 		// The repository root itself is still searched.
@@ -36,7 +36,7 @@ func TestFindStopsAtRepoRoot(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(repo, ".github", "dojo.toml"), []byte(presetOnly), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := Find(sub); err != nil {
+		if _, err := find(sub); err != nil {
 			t.Errorf(".git file=%v: %v", dotGitIsFile, err)
 		}
 	}
@@ -51,7 +51,7 @@ func TestFindSkipsGithubFile(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(sub, ".github"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Find(sub); err != nil {
+	if _, err := find(sub); err != nil {
 		t.Errorf("a .github file must not stop the search: %v", err)
 	}
 }
@@ -95,10 +95,9 @@ func TestSessionConfigured(t *testing.T) {
 	}
 }
 
-func TestListsAreCopies(t *testing.T) {
+func TestArgsIsACopy(t *testing.T) {
 	Args()[0] = "x"
-	Builtins()[0] = "x"
-	if Args()[0] != ArgComment || Builtins()[0] != "agent" {
-		t.Error("Args and Builtins must return copies")
+	if Args()[0] != ArgComment {
+		t.Error("Args must return a copy")
 	}
 }
