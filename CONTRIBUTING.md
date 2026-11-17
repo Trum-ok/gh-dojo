@@ -19,14 +19,12 @@ make demo     # render the README animations (needs Node and ffmpeg)
 The animations in the README are [Remotion](https://www.remotion.dev/)
 videos in [`docs/media/`](docs/media).
 
-CI (`.github/workflows/ci.yml`) runs on pushes to `main` and on pull
-requests. Once, on Linux: `gofmt -l .` must print nothing, then
-`go mod tidy -diff` (for `tools/` too), `go vet ./...` (also with
-`GOOS=windows` and `GOOS=darwin`), `go vet -tags e2e ./e2e`, `make lint`,
-the release build, and `agent install --check` with that build (see below).
-On Ubuntu, macOS and Windows: `go test ./...` (with `-race` on Ubuntu) and
-`go build ./...`. Run the checks, `make lint` and `go test -race ./...`
-before sending a change.
+CI (`.github/workflows/ci.yml`, on pushes to `main` and pull requests)
+checks once, on Linux, `gofmt -l .`, `go mod tidy -diff` (`tools/` too),
+`go vet` (also for Windows, macOS and `-tags e2e`), `make lint`, the release
+build and its `agent install --check` (see below); then runs `go test ./...`
+(`-race` on Ubuntu) and `go build ./...` on Ubuntu, macOS and Windows. Run
+the checks, `make lint` and `go test -race ./...` before sending a change.
 
 The linters are pinned in `tools/go.mod`, a module of their own, so they add
 nothing to gh-dojo's dependencies; dependabot updates them with the rest.
@@ -34,11 +32,9 @@ nothing to gh-dojo's dependencies; dependabot updates them with the rest.
 is fixed, not silenced; if one is wrong, a `//lint:ignore <check> <reason>`
 on that line says why.
 
-`.github/workflows/vuln.yml` runs `make vuln` on pushes to `main`, on pull
-requests and daily, with the latest patch release of Go, since vulnerabilities
-are published while the code stays the same. It fails only on a
-vulnerability the code can reach; a vulnerable module whose affected code is
-never called is listed in the log, and dependabot updates it.
+`.github/workflows/vuln.yml` runs `make vuln` on pushes, pull requests and
+daily, with Go's latest patch release, and fails only on a vulnerability the
+code can reach.
 
 Code and tests must work on all three: build paths with `path/filepath`,
 show them to users with `filepath.ToSlash`, and keep OS error texts out of
@@ -47,8 +43,7 @@ Windows included.
 
 ## Install from source
 
-To run the latest `main`, install from source; this needs Go
-(the version in `go.mod`) and `gh`:
+To run the latest `main`, install from source:
 
 ```sh
 git clone https://github.com/Trum-ok/gh-dojo
@@ -90,7 +85,7 @@ with gh's token:
 
 ```sh
 GH_DOJO_E2E_REPO=Trum-ok/gh-dojo-sandbox GH_DOJO_E2E_KANBAN=6 GH_DOJO_E2E_SPRINTS=7 \
-  go test -tags e2e -count=1 -v ./e2e
+  go test -tags e2e -count=1 -v -timeout 15m ./e2e
 ```
 
 The sprints board's Sprint field has iterations up to November 2027: add
@@ -121,48 +116,33 @@ a comment: a tag or branch can be moved to other code, a SHA cannot.
 Dependabot updates the SHA and the comment together.
 
 Once the tag is pushed, its issues move to Done with the installed
-`gh dojo`: `gh dojo release vX.Y.Z --verb done --dry-run` lists them (found
-through `Refs #N` and closing keywords in the commits since the previous
-version tag, see `[release]` in `.github/dojo.toml`), then the same without
-`--dry-run`. The first release has no version tag before it:
-`--since c720ec9`, the first commit. `done` starts only from Ready here, so
-an open issue still in progress with a `Refs` commit in the release is
-listed as not ready and left alone; a later release picks it up only if its
-commits name it again, else `gh dojo done N` once it is Ready and released.
-Before tagging, `gh dojo release main --verb done --dry-run` shows what the
-next release holds (`main` as GitHub names it, not `origin/main`).
+`gh dojo` through [`release`](docs/commands.md#release), which explains how
+it finds a release's issues and what its output means. This project's rules:
 
-So in a commit message, an issue reference that is not a link, such as an
-example of the syntax, goes in backticks: `` `Fixes #12` ``,
-`` `refs: #12, acme/api#3` ``. Release does not count code; without the
-backticks it takes those numbers as the release's issues. One a message
-names that is no issue is left out with a warning (exit code 0); any other
-mistaken match is left out with `--exclude N`.
-
-An agent moves a release's issues to Done only on the user's word: it runs
-the `--dry-run`, shows the list to the user, and once they agree runs the
-same without `--dry-run`, optionally with `--comment "vX.Y.Z"`. What the
-output means:
-
-- `not ready (done starts only from Ready): #41 (In progress)` is normal and
-  exits 0: a partial commit (`Refs #41`) of an issue still in progress.
-  Don't move it by hand for the release; once it is Ready and released, run
+- `done` starts only from Ready here, and `[release]` in
+  `.github/dojo.toml` adds `Refs #N` to the closing keywords. Before
+  tagging, `gh dojo release main --verb done --dry-run` shows what the next
+  release holds.
+- An agent moves a release's issues only on the user's word: it runs
+  `gh dojo release vX.Y.Z --verb done --dry-run`, shows the list to the
+  user, and once they agree runs the same without `--dry-run`, with
+  `--comment "vX.Y.Z"`.
+- `not ready (done starts only from Ready): #41 (In progress)` exits 0: a
+  `Refs #41` commit of an issue still in progress. Don't move it by hand for
+  the release; a later release picks it up only if its commits name it
+  again, so once it is Ready and released, run
   `gh dojo done 41 --comment "vX.Y.Z"`, on the user's word like any `done`.
-- `already closed: #200 (Done)` is normal and exits 0: an issue that went
-  to Done without a release (docs, CI). Release leaves it as it is.
-- Exit code 2 is a refusal, not "not ready": say, the issue is closed
-  (`Fixes #12` in a commit) but not in Ready. Release won't move it now or
-  later; ask the user.
-- A warning like `acme/api#3: repository acme/api not found, or the token
-  cannot see it: left out` or `#99 not found: left out` means a number only
-  in a commit's text that is no issue the token can see (exit code 0). A
-  false match needs nothing (or `--exclude acme/api#3`); a real issue the
-  token can't see goes to the user. Our own repository "not found" fails
-  the batch (exit code 3), almost surely a token without access: tell the
+- Exit code 2 is a refusal, not "not ready": say, an issue closed by
+  `Fixes #12` but not in Ready. Release won't move it now or later; ask the
   user.
-
-The interface, help text and documentation are in English. Texts that go
-into issues (verb `when` lines and comment templates) come from the config.
+- A number only a commit message names that is no issue the token can see
+  is left out with a warning (exit code 0): a false match needs nothing (or
+  `--exclude`), a real issue the token can't see goes to the user. Our own
+  repository "not found" fails the batch (exit code 3), almost surely a
+  token without access: tell the user.
+- In a commit message, an issue reference that is not a link, such as an
+  example of the syntax, goes in backticks (`` `Fixes #12` ``), or release
+  takes it for one of the release's issues.
 
 ## Design principles
 
@@ -188,6 +168,9 @@ Every command is checked against these rules.
 8. **Self-describing.** `--help` and `describe` show this project's verbs and
    when to use each: the agent needs no outside documentation.
 
+The interface, help text and documentation are in English. Texts that go
+into issues (verb `when` lines and comment templates) come from the config.
+
 ### Requests and retries
 
 - Reading a card is one GraphQL request; a verb on an issue already on the
@@ -197,7 +180,8 @@ Every command is checked against these rules.
   mutation field's result into another in the same document, and setting a
   status needs the item ID only `addProjectV2ItemById` returns.
   `createIssue` with `projectV2Ids` is not used: GitHub adds the item
-  asynchronously and does not return its ID (#17).
+  asynchronously and does not return its ID
+  ([#17](https://github.com/Trum-ok/gh-dojo/issues/17)).
 - The board schema is cached for an hour (see
   [Checked against the board](docs/configuration.md#checked-against-the-board)).
 - Queries are retried on 5xx and secondary rate limits with exponential
@@ -210,8 +194,10 @@ Every command is checked against these rules.
   (exit 5) keeps that wait. GitHub gives it no type of its own: in a 200
   GraphQL answer it is `UNPROCESSABLE` "was submitted too quickly", over
   HTTP a 403 "…blocked from content creation", and `createIssue` may answer
-  with no issue and no error at all (#67). So `render.IsContentLimit`
-  matches GitHub's wording; add a phrase there when GitHub words it anew.
+  with no issue and no error at all
+  ([#67](https://github.com/Trum-ok/gh-dojo/issues/67)). So
+  `render.IsContentLimit` matches GitHub's wording; add a phrase there when
+  GitHub words it anew.
 - Auth comes only from gh's token (or `GH_TOKEN`); gh-dojo stores no secrets,
   never prints the token and sends no telemetry.
 
@@ -222,9 +208,10 @@ Every command is checked against these rules.
   without a shell; revisit if one asks.
 - **Every command that writes to GitHub takes `--dry-run`** (verbs,
   `release`, `new`, `comment`, `block`, `unblock`; `init` for its file):
-  agents carry the flag from one command to the next (#60). It reads and
-  checks what the run does and prints the plan; its JSON has `dry_run`.
-  A new command that writes gets it too.
+  agents carry the flag from one command to the next
+  ([#60](https://github.com/Trum-ok/gh-dojo/issues/60)). It reads and
+  checks what the run does and prints the plan; its JSON has `dry_run`
+  (`init`'s has `written`). A new command that writes gets it too.
 - **`release` goes through pull requests**, so it works with any merge
   strategy (squash, merge, rebase); commit keywords are the fallback.
 - **The generated skill is loaded into every session, so it repeats
@@ -233,45 +220,47 @@ Every command is checked against these rules.
   error's `fix:` line covers the rest); other repositories get detail only
   with several `board.repos`, and `release` one line pointing to its
   `--help`. Keep it that way when changing `internal/agent`.
-- **Label groups are a prefix, not a list** (#75). `labels.type_prefix` and
-  `labels.area_prefix` work alike: the values are the repository's labels
-  with the prefix, so the config cannot drift from them, and a new type is
-  `gh label create`. The price: `--type` is no longer checked offline and
-  the skill names the prefix, not the types; `new`'s error lists them. An
-  earlier `labels.types` list was dropped for this; do not bring it back,
-  nor add a key per new label scheme.
+- **Label groups are a prefix, not a list**
+  ([#75](https://github.com/Trum-ok/gh-dojo/issues/75)).
+  `labels.type_prefix` and `labels.area_prefix` work alike: the values are
+  the repository's labels with the prefix, so the config cannot drift from
+  them, and a new type is `gh label create`. The price: `--type` is no
+  longer checked offline and the skill names the prefix, not the types;
+  `new`'s error lists them. An earlier `labels.types` list was dropped for
+  this; do not bring it back, nor add a key per new label scheme.
 
 ## Layout
 
-| Package             | Responsible for                                                    |
-|---------------------|--------------------------------------------------------------------|
-| `cmd/gh-dojo`       | Entry point; cobra commands, verbs built from the config           |
-| `internal/config`   | Loading and validating `.github/dojo.toml`; embedded presets        |
-| `internal/board`    | Board schema for user and org projects, its cache, config checks   |
-| `internal/workflow` | Verb checks and the effect plan; `new`'s checks and plan           |
-| `internal/effects`  | Effects → one GraphQL mutation; `new`'s mutations                  |
-| `internal/batch`    | Running a verb on its issues: one by one, retries, the summary     |
-| `internal/issue`    | Reading issues (cards) and batches of them; what `new` reads       |
-| `internal/graph`    | GraphQL client over go-gh: retries, pagination, error mapping      |
-| `internal/render`   | Errors, exit codes, confirmations, folding with counts             |
-| `internal/agent`    | `agent install`'s files: targets, markers, writing, diffs          |
-| `internal/doctor`   | `doctor`'s checks of the setup and its report                      |
-| `internal/release`  | `release`: a release's commits, their pull requests and keywords   |
-| `internal/testutil` | Test helpers shared across packages: golden files                  |
+| Package                    | Responsible for                                                                       |
+|----------------------------|---------------------------------------------------------------------------------------|
+| `cmd/gh-dojo`              | Entry point; cobra commands, verbs built from the config                              |
+| `internal/config`          | Loading and validating `.github/dojo.toml`; embedded presets                          |
+| `internal/board`           | Board schema, its cache, config checks; items for `list`, `next`; projects for `init` |
+| `internal/workflow`        | Verb checks and the effect plan; `new`'s checks and plan                              |
+| `internal/effects`         | Effects → one GraphQL mutation; `new`'s mutations                                     |
+| `internal/batch`           | Running a verb on its issues: one by one, retries, the summary                        |
+| `internal/issue`           | Reading issues (cards) and batches of them; what `new` reads                          |
+| `internal/graph`           | GraphQL client over go-gh: retries, pagination, errors, partial answers               |
+| `internal/graph/graphtest` | Replaying recorded GraphQL responses in tests ([below](#graphql-fixtures))            |
+| `internal/render`          | Errors, exit codes, confirmations, folding with counts, text helpers                  |
+| `internal/agent`           | `agent install`'s files: targets, markers, writing, diffs                             |
+| `internal/doctor`          | `doctor`'s checks of the setup and its report                                         |
+| `internal/release`         | `release`: a release's commits, their pull requests and keywords                      |
+| `internal/testutil`        | Test helpers shared across packages: golden files                                     |
+| `bench`                    | The benchmark against plain gh ([docs/bench.md](docs/bench.md))                       |
+| `e2e`                      | Tests against real boards ([above](#end-to-end-tests))                                |
 
 The plan is separate from its execution: the workflow engine returns the
 operations without touching the network, which is what `--dry-run`, the
 tests and finishing a partially applied command rely on.
 
-A command prints its result through `emit` (`cmd/gh-dojo/output.go`): it
-builds one typed result and passes the function that prints it as text, so
-the text and `--json` come from the same data (`emitWrite` for a command
-that writes). JSON fields are snake_case and always present: lists are `[]`,
-an absent value is `null`, never `""`; no node IDs. A command returns its
-error as usual: `run` prints it as JSON too. A new field is fine, a renamed or
-removed one needs a new `schema_version` ([docs/output.md](docs/output.md#json-output) lists the
-schemas).
-Each command has JSON golden files under `cmd/gh-dojo/testdata/json/`.
+A command prints its result through `emit` (`cmd/gh-dojo/output.go`;
+`emitWrite` for a command that writes): it builds one typed result and
+passes the function that prints it as text, so the text and `--json` come
+from the same data. A command returns its error as usual: `run` prints it as
+JSON too. The JSON keeps the rules and schemas of
+[docs/output.md](docs/output.md#json-output) ("Stability"); each command has
+JSON golden files under `cmd/gh-dojo/testdata/json/`.
 
 ## Golden files
 
@@ -334,20 +323,18 @@ is, so review the log before sharing it. Any other `GH_DEBUG` value except
 
 gh-dojo tracks its own development on its board with the repository's
 [`.github/dojo.toml`](.github/dojo.toml): issues are created and moved only
-through `gh dojo` (`new`, `start`, `wait`, `ready`, `done`, `plan`,
-`release`, `comment`, `block`, `unblock`).
-`Ready` means committed to `main`; `Done` means released. Agents load the
-rules from [`.claude/skills/gh-dojo/SKILL.md`](.claude/skills/gh-dojo/SKILL.md),
-which `gh dojo agent install` generates from the config and the notes
-in [`.github/dojo-notes.md`](.github/dojo-notes.md). Never edit the skill:
-change the config or the notes and run `make agent`, which uses the build of
-your branch. So does CI's `agent install --check`, so a change to the
-generated text, the notes or the config needs `make agent` too.
+through `gh dojo`. `Ready` means committed to `main`; `Done` means released.
+Agents load the rules from
+[`.claude/skills/gh-dojo/SKILL.md`](.claude/skills/gh-dojo/SKILL.md), which
+`gh dojo agent install` generates from the config and the notes in
+[`.github/dojo-notes.md`](.github/dojo-notes.md), such as filing every
+inconvenience as a `dogfood` issue right away. Never edit the skill: change
+the config or the notes and run `make agent`, which uses the build of your
+branch. So does CI's `agent install --check`, so a change to the generated
+text, the notes or the config needs `make agent` too.
 
-- Use the installed `gh dojo`, the last `make install` from `main`, not a
-  build of your branch: a broken branch must not break issue tracking.
-  After a change is merged, run `make install` on `main` again. Unknown
-  config keys are errors, so a change that adds a key to `.github/dojo.toml`
-  (as `[agent]` did) breaks the installed `gh dojo` until that reinstall.
-- Any inconvenience noticed while using gh-dojo becomes an issue right away:
-  `gh dojo new "<title>" --type dogfood --body "..."`.
+Issue tracking uses the installed `gh dojo`, the last `make install` from
+`main`, not a build of your branch: a broken branch must not break it.
+After a change is merged, run `make install` on `main` again. Unknown config
+keys are errors, so a change that adds a key to `.github/dojo.toml` (as
+`[agent]` did) breaks the installed `gh dojo` until that reinstall.

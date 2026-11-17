@@ -1,6 +1,6 @@
 // The linters CI runs, pinned here and not in the main go.mod, so they add
-// nothing to gh-dojo's own dependencies; dependabot updates them. Run them
-// from the repository root with make lint (go tool -modfile=tools/go.mod).
+// nothing to gh-dojo's own dependencies; dependabot updates them. make lint
+// and make vuln build them into .tools/ (go build -modfile=tools/go.mod).
 module github.com/Trum-ok/gh-dojo/tools
 
 go 1.27
