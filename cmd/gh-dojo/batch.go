@@ -58,7 +58,7 @@ func newBatchRun(cmd *cobra.Command, be Backend, cfg *config.Config, v config.Ve
 }
 
 // batchHelp is the Batch section of the help of a verb with batch = true.
-func batchHelp(v config.Verb, line func(label, format string, a ...any)) {
+func batchHelp(v config.Verb, line helpLine) {
 	if !v.Batch {
 		return
 	}

@@ -67,7 +67,7 @@ func describeFields(_ *config.Config, v config.Verb) string {
 }
 
 // sprintHelp adds the verb help lines of the iteration and field effects.
-func sprintHelp(cfg *config.Config, v config.Verb, line func(label, format string, a ...any)) {
+func sprintHelp(cfg *config.Config, v config.Verb, line helpLine) {
 	zone := "UTC"
 	if z := cfg.Board.Zone(); z != "" {
 		zone = z

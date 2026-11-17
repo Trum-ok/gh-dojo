@@ -318,11 +318,14 @@ func batchVerbsNote(cfg *config.Config) string {
 	return "\nverbs that take several: " + strings.Join(names, ", ")
 }
 
+// helpLine adds a line to a verb's help: label (without its colon, "" to
+// continue the one above) in a column, then the text.
+type helpLine func(label, format string, a ...any)
+
 // labelVerbsHelp adds a help line per checked label that names the verbs
 // adding it (remove false, for from_labels) or removing it (for
 // refuse_labels): "resume removes it", "hold adds on-hold".
-func labelVerbsHelp(cfg *config.Config, v config.Verb, labels []string, remove bool,
-	line func(label, format string, a ...any)) {
+func labelVerbsHelp(cfg *config.Config, v config.Verb, labels []string, remove bool, line helpLine) {
 	does := "adds"
 	if remove {
 		does = "removes"
@@ -349,7 +352,27 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 		fmt.Fprintf(&b, "\n  %-10s %s", label, fmt.Sprintf(format, a...))
 	}
 	b.WriteString(v.When + "\n")
+	statusHelp(cfg, v, line)
+	argsHelp(v, line)
+	effectsHelp(cfg, v, line)
+	if v.Comment != "" {
+		line("Comment", "posted unless it renders empty or is already the latest gh-dojo comment:")
+		// The template as it will read in the issue, indented below the
+		// label; blank lines stay blank, without trailing spaces.
+		for _, l := range strings.Split(strings.Trim(v.Comment, "\r\n"), "\n") {
+			if l = strings.TrimRight(l, " \t\r"); l == "" {
+				b.WriteString("\n")
+			} else {
+				line("", "  %s", l)
+			}
+		}
+	}
+	return b.String()
+}
 
+// statusHelp adds the verb help lines of the statuses it moves an issue
+// from and to, and of the labels it needs or refuses.
+func statusHelp(cfg *config.Config, v config.Verb, line helpLine) {
 	from := "any status"
 	if len(v.From) > 0 {
 		from = strings.Join(v.From, ", ")
@@ -376,23 +399,13 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 		line("Refused", "while the issue has %s (exit code 2): ask the user", labelNames(v.RefuseLabels, "or", nil))
 		labelVerbsHelp(cfg, v, v.RefuseLabels, true, line)
 	}
+}
 
-	var required, optional []string
-	for _, arg := range config.Args() {
-		switch {
-		case slices.Contains(v.Require, arg):
-			required = append(required, "--"+arg)
-		case slices.Contains(v.RequireOneOf, arg):
-		case v.Takes(arg):
-			optional = append(optional, "--"+arg)
-		}
-	}
-	if len(v.RequireOneOf) > 0 {
-		names := make([]string, len(v.RequireOneOf))
-		for i, arg := range v.RequireOneOf {
-			names[i] = "--" + arg
-		}
-		required = append(required, "at least one of "+strings.Join(names, ", "))
+// argsHelp adds the verb help lines of its arguments, batch and confirm.
+func argsHelp(v config.Verb, line helpLine) {
+	required, oneOf, optional := verbArgs(v)
+	if len(oneOf) > 0 {
+		required = append(required, "at least one of "+strings.Join(oneOf, ", "))
 	}
 	if len(required) > 0 {
 		line("Requires", "%s", strings.Join(required, "; "))
@@ -408,7 +421,11 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 	if v.Confirm {
 		line("Confirm", "the user's decision: ask the user first; runs only with --yes")
 	}
+}
 
+// effectsHelp adds the verb help lines of what it does along the way,
+// except its comment.
+func effectsHelp(cfg *config.Config, v config.Verb, line helpLine) {
 	if v.OnlyClearsSprint() {
 		line("Board", "leaves an issue that is not there off the board")
 	} else {
@@ -428,42 +445,10 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 		line("Milestone", "%s (an open milestone, by title or a start only its title has);", v.Milestone)
 		line("", "an issue in it already keeps it, so a repeat is safe")
 	}
-	if len(v.AddLabels)+len(v.RemoveLabels) > 0 {
-		var signs []string
-		for _, l := range v.AddLabels {
-			signs = append(signs, "+"+l)
-		}
-		for _, l := range v.RemoveLabels {
-			signs = append(signs, "-"+l)
-		}
-		line("Labels", "%s (+ adds, - removes)", strings.Join(signs, " "))
+	if signs := labelSigns(v); signs != "" {
+		line("Labels", "%s (+ adds, - removes)", signs)
 	}
-	stay := "; other assignees stay"
-	if v.Unassign != "" {
-		stay = "" // see the Unassign line
-	}
-	switch {
-	case v.AssignArg:
-		line("Assign", "the --%s user (a login, or @me for you)%s", config.ArgAssignee, stay)
-		line("", "one who cannot be assigned issues in the repository is exit code 1, with who can")
-	case v.Assign == config.Me:
-		line("Assign", "you (the authenticated user)%s", stay)
-	case v.Assign != "":
-		line("Assign", "%s%s", v.Assign, stay)
-	}
-	switch v.Unassign {
-	case "":
-	case config.UnassignAll:
-		if v.Assigns() {
-			line("Unassign", "everyone else: the user it assigns stays the only assignee")
-		} else {
-			line("Unassign", "everyone: the issue is left with no assignees")
-		}
-	case config.Me:
-		line("Unassign", "you (the authenticated user); other assignees stay")
-	default:
-		line("Unassign", "%s; other assignees stay", v.Unassign)
-	}
+	assigneesHelp(v, line)
 	switch v.Blockers {
 	case config.BlockersWarn:
 		line("Blockers", "warns about unresolved blockers (%s), then runs", unresolvedMeaning(cfg))
@@ -488,19 +473,96 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 	case v.Close != "":
 		line("Close", "closes the issue as %s; an issue already closed stays as it is", workflow.ReasonText(v.Close))
 	}
-	if v.Comment != "" {
-		line("Comment", "posted unless it renders empty or is already the latest gh-dojo comment:")
-		// The template as it will read in the issue, indented below the
-		// label; blank lines stay blank, without trailing spaces.
-		for _, l := range strings.Split(strings.Trim(v.Comment, "\r\n"), "\n") {
-			if l = strings.TrimRight(l, " \t\r"); l == "" {
-				b.WriteString("\n")
-			} else {
-				line("", "  %s", l)
-			}
+}
+
+// assigneesHelp adds the verb help lines of whom it assigns and unassigns.
+func assigneesHelp(v config.Verb, line helpLine) {
+	stay := "; other assignees stay"
+	if v.Unassign != "" {
+		stay = "" // see the Unassign line
+	}
+	if who := assignWho(v); who != "" {
+		switch {
+		case v.AssignArg:
+			who += " (a login, or @me for you)"
+		case v.Assign == config.Me:
+			who += " (the authenticated user)"
+		}
+		line("Assign", "%s%s", who, stay)
+		if v.AssignArg {
+			line("", "one who cannot be assigned issues in the repository is exit code 1, with who can")
 		}
 	}
-	return b.String()
+	switch who := unassignWho(v); {
+	case who == "":
+	case v.Unassign == config.UnassignAll && v.Assigns():
+		line("Unassign", "%s: the user it assigns stays the only assignee", who)
+	case v.Unassign == config.UnassignAll:
+		line("Unassign", "%s: the issue is left with no assignees", who)
+	case v.Unassign == config.Me:
+		line("Unassign", "%s (the authenticated user); other assignees stay", who)
+	default:
+		line("Unassign", "%s; other assignees stay", who)
+	}
+}
+
+// verbArgs are the flags of the arguments v requires, needs at least one
+// of, and takes optionally, as "--comment". The required and optional
+// ones are in config.Args order, the one-of ones in config order.
+func verbArgs(v config.Verb) (required, oneOf, optional []string) {
+	for _, arg := range config.Args() {
+		switch {
+		case slices.Contains(v.Require, arg):
+			required = append(required, "--"+arg)
+		case slices.Contains(v.RequireOneOf, arg):
+		case v.Takes(arg):
+			optional = append(optional, "--"+arg)
+		}
+	}
+	for _, arg := range v.RequireOneOf {
+		oneOf = append(oneOf, "--"+arg)
+	}
+	return required, oneOf, optional
+}
+
+// labelSigns lists the labels v adds and removes: "+doing -blocked"; ""
+// for none.
+func labelSigns(v config.Verb) string {
+	var signs []string
+	for _, l := range v.AddLabels {
+		signs = append(signs, "+"+l)
+	}
+	for _, l := range v.RemoveLabels {
+		signs = append(signs, "-"+l)
+	}
+	return strings.Join(signs, " ")
+}
+
+// assignWho names whom v assigns: "the --assignee user", "you", a login;
+// "" for no one.
+func assignWho(v config.Verb) string {
+	switch {
+	case v.AssignArg:
+		return "the --" + config.ArgAssignee + " user"
+	case v.Assign == config.Me:
+		return "you"
+	}
+	return v.Assign
+}
+
+// unassignWho names whom v unassigns: "everyone else" (all but whom it
+// assigns), "everyone", "you", a login; "" for no one.
+func unassignWho(v config.Verb) string {
+	switch v.Unassign {
+	case config.UnassignAll:
+		if v.Assigns() {
+			return "everyone else"
+		}
+		return "everyone"
+	case config.Me:
+		return "you"
+	}
+	return v.Unassign
 }
 
 // unresolvedMeaning says when a blocker is unresolved under cfg's
@@ -526,6 +588,11 @@ func configNote() string {
 	return "\n\nNo process verbs: " + config.FileName + " could not be loaded:\n  " + text
 }
 
+// minNameWidth is the least width of the verb name column in the root
+// help's lifecycle and in describe: cobra's minimum, so the names line up
+// with the command list.
+const minNameWidth = 11
+
 // processHelp is the lifecycle section of the root help: the statuses each
 // verb moves an issue from and to, in config order, then the initial,
 // final and resolved statuses. A verb that closes or reopens the issue, or
@@ -543,7 +610,7 @@ func processHelp() string {
 	if err != nil {
 		return ""
 	}
-	width := 11 // cobra's minimum, so the names line up with the command list
+	width := minNameWidth
 	for _, v := range cfg.Verbs {
 		width = max(width, len(v.Name))
 	}

@@ -86,7 +86,8 @@ type processExitCode struct {
 // verbChecks and verbEffects say, in order, what a verb checks and does
 // beyond its from → to and its arguments, as short phrases joined into its
 // describe line. Each returns "" when the verb does not have the key. A new
-// verb key (blockers, batch) gets an entry in one of them.
+// verb key that checks or does something (blockers, close) gets an entry
+// in one of them; batch and the arguments are processVerb.facts'.
 var (
 	verbChecks = []func(cfg *config.Config, v config.Verb) string{
 		func(cfg *config.Config, v config.Verb) string {
@@ -157,42 +158,22 @@ var (
 			return ""
 		},
 		func(_ *config.Config, v config.Verb) string {
-			var signs []string
-			for _, l := range v.AddLabels {
-				signs = append(signs, "+"+l)
+			if signs := labelSigns(v); signs != "" {
+				return "labels " + signs
 			}
-			for _, l := range v.RemoveLabels {
-				signs = append(signs, "-"+l)
-			}
-			if len(signs) == 0 {
-				return ""
-			}
-			return "labels " + strings.Join(signs, " ")
+			return ""
 		},
 		func(_ *config.Config, v config.Verb) string {
-			switch {
-			case v.AssignArg:
-				return "assigns the --" + config.ArgAssignee + " user"
-			case v.Assign == "":
-				return ""
-			case v.Assign == config.Me:
-				return "assigns you"
+			if who := assignWho(v); who != "" {
+				return "assigns " + who
 			}
-			return "assigns " + v.Assign
+			return ""
 		},
 		func(_ *config.Config, v config.Verb) string {
-			switch v.Unassign {
-			case "":
-				return ""
-			case config.UnassignAll:
-				if v.Assigns() {
-					return "unassigns everyone else"
-				}
-				return "unassigns everyone"
-			case config.Me:
-				return "unassigns you"
+			if who := unassignWho(v); who != "" {
+				return "unassigns " + who
 			}
-			return "unassigns " + v.Unassign
+			return ""
 		},
 		func(_ *config.Config, v config.Verb) string {
 			if v.Blockers == config.BlockersLink {
@@ -291,21 +272,12 @@ func describeProcess(cfg *config.Config) *process {
 		},
 	}
 	for _, v := range cfg.Verbs {
+		required, oneOf, optional := verbArgs(v)
 		pv := processVerb{
 			Name: v.Name, When: v.When, From: render.OrEmpty(v.From), To: render.OrNull(v.To), Batch: v.Batch,
 			release:  v.Batch && releaseLacks(v) == "",
-			Requires: []string{}, RequiresOneOf: []string{}, Optional: []string{}, Checks: []string{}, Effects: []string{},
-		}
-		for _, arg := range config.Args() {
-			switch {
-			case slices.Contains(v.Require, arg):
-				pv.Requires = append(pv.Requires, "--"+arg)
-			case !slices.Contains(v.RequireOneOf, arg) && v.Takes(arg):
-				pv.Optional = append(pv.Optional, "--"+arg)
-			}
-		}
-		for _, arg := range v.RequireOneOf { // in config order, as in the verb's help
-			pv.RequiresOneOf = append(pv.RequiresOneOf, "--"+arg)
+			Requires: render.OrEmpty(required), RequiresOneOf: render.OrEmpty(oneOf), Optional: render.OrEmpty(optional),
+			Checks: []string{}, Effects: []string{},
 		}
 		for _, f := range verbChecks {
 			if s := f(cfg, v); s != "" {
@@ -369,7 +341,7 @@ func (p *process) text() string {
 	if len(p.Verbs) == 0 {
 		sections = append(sections, "No verbs: add them under [verbs] in "+p.Config+".")
 	} else {
-		width := 11 // as in the root help
+		width := minNameWidth
 		for _, v := range p.Verbs {
 			width = max(width, len(v.Name))
 		}
