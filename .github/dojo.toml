@@ -19,6 +19,7 @@ link = "claude://claude.ai/epitaxy/{id}"
 
 [verbs.start]
 when = "you take an issue to work on"
+assign = "@me"               # whoever runs start, not a fixed login
 comment = """
 Taken. Session: {session}
 
