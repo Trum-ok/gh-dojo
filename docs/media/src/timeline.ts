@@ -14,6 +14,13 @@ const SEND = 0.3; // from the last character to the bubble
 
 export const shownAt = (m: Msg) => (m.kind === "user" ? m.sent : m.at);
 
+// How long a video fades in and out, so the looping GIF does not jump back
+// to the start.
+export const FADE = 0.35;
+
+// interpolate's options that hold the output at its ends.
+export const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
+
 // Builds a chat: wait() moves the clock, user()/agent()/tool() add a message
 // at the current time and move the clock to its end, mark() names a moment.
 export class Chat {

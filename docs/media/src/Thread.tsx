@@ -3,13 +3,13 @@ import { Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { Avatar } from "./Avatar";
 import { statusAt } from "./Board";
 import { columns, Entry, thread } from "./script";
+import { clamp } from "./timeline";
 import type { Theme } from "./theme";
 
 // Issue #42 as on GitHub: its title and state, and a timeline of what each
 // verb did to it: the status change, the blocked-by link, the comment.
 // New entries grow in at the bottom and push the older ones up.
 
-const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 const RAIL = 15; // x of the timeline's line, the middle of the icons and avatars
 
 const Grow: React.FC<{ p: number; children: React.ReactNode }> = ({ p, children }) => (

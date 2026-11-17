@@ -1,14 +1,12 @@
 import React from "react";
 import { Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
-import { AGENT, Msg, shownAt, USER } from "./timeline";
+import { AGENT, clamp, Msg, shownAt, USER } from "./timeline";
 import { Avatar } from "./Avatar";
 import type { Theme } from "./theme";
 
 // A chat with an agent: the user types into the input and sends a bubble; the
 // agent answers in text and runs commands, shown as tool blocks with their
 // output. New messages grow in at the bottom and push the older ones up.
-
-const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
 // Grows its children from nothing to their full height: a one-row grid whose
 // track is p × the content's height (p fr, with p ≤ 1).

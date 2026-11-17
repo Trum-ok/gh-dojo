@@ -2,7 +2,7 @@
 // gh dojo. With plain gh the agent writes GraphQL and carries node IDs between
 // calls, and nothing reminds it to say why the issue waits. The mutations are
 // the ones gh-dojo itself sends; the gh dojo line is its real output.
-import { Chat } from "./timeline";
+import { Chat, FADE } from "./timeline";
 
 const REQUEST = "#42 is stuck until #12 lands.";
 
@@ -53,5 +53,4 @@ const dojo = new Chat()
 export const ghSide = { msgs: gh.msgs, verdict: gh.marks.verdict };
 export const dojoSide = { msgs: dojo.msgs, verdict: dojo.marks.verdict };
 
-export const FADE = 0.35;
 export const DURATION = Math.max(gh.t, dojo.t) + 3.5 + FADE;
