@@ -142,14 +142,14 @@ func HandWrittenFix(t Target, configFile string) string {
 // (exit code 1): gh-dojo cannot tell which text is its own.
 func Prepare(root *os.Root, t Target, body, configFile string) (*File, error) {
 	f := &File{Target: t}
-	data, err := root.ReadFile(filepath.FromSlash(t.Path))
+	data, err := ReadFile(root, t.Path)
 	switch {
 	case err == nil:
 		f.Exists = true
 		f.Have = string(data)
 	case errors.Is(err, fs.ErrNotExist):
 	default:
-		return nil, readError(t.Path, err)
+		return nil, err
 	}
 	eol := "\n"
 	if strings.Contains(f.Have, "\r\n") {
@@ -173,7 +173,7 @@ func Prepare(root *os.Root, t Target, body, configFile string) (*File, error) {
 	return f, nil
 }
 
-// ReadError is the error of a file that exists but cannot be read, such
+// readError is the error of a file that exists but cannot be read, such
 // as a symbolic link out of the repository.
 func readError(name string, err error) error {
 	var pe *fs.PathError

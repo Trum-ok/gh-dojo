@@ -253,5 +253,5 @@ const codeByte = 0
 // maskLine is l with every byte but its line break codeByte.
 func maskLine(l string) string {
 	body := strings.TrimRight(l, "\r\n")
-	return strings.Repeat("\x00", len(body)) + l[len(body):]
+	return strings.Repeat(string(rune(codeByte)), len(body)) + l[len(body):]
 }
