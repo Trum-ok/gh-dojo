@@ -62,6 +62,7 @@ type rawAgent struct {
 
 type rawRelease struct {
 	Keywords *[]string `toml:"keywords"`
+	Suffix   *bool     `toml:"suffix"`
 }
 
 type rawVerb struct {
@@ -178,7 +179,7 @@ var (
 	labelsKeys   = []string{"type_prefix", "area_prefix"}
 	sessionKeys  = []string{"env", "link"}
 	agentKeys    = []string{"targets", "notes", "description"}
-	releaseKeys  = []string{"keywords"}
+	releaseKeys  = []string{"keywords", "suffix"}
 	verbKeys     = []string{
 		"when", "to", "from", "from_labels", "refuse_labels", "require", "require_one_of", "comment",
 		"labels", "assign", "unassign", "milestone", "close", "reopen", "confirm", "iteration", "field", "blockers", "sub_issues", "batch",

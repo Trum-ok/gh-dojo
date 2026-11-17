@@ -265,7 +265,7 @@ var keywordRE = regexp.MustCompile(`^\pL+(?:[ -]\pL+)*$`)
 
 // buildRelease validates [release].
 func (c *Config) buildRelease(r rawRelease) error {
-	c.Release = Release{Keywords: DefaultKeywords()}
+	c.Release = Release{Keywords: DefaultKeywords(), Suffix: r.Suffix != nil && *r.Suffix}
 	if r.Keywords == nil {
 		return nil
 	}

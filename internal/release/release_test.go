@@ -78,7 +78,7 @@ func TestPrevious(t *testing.T) {
 }
 
 func TestMatcher(t *testing.T) {
-	m := NewMatcher([]string{"closes", "fixes", "refs", "part of"})
+	m := NewMatcher([]string{"closes", "fixes", "refs", "part of"}, false)
 	tests := []struct {
 		msg  string
 		want string
@@ -129,10 +129,10 @@ func TestMatcher(t *testing.T) {
 			t.Errorf("Refs(%q) = %q, want %q", tt.msg, s, tt.want)
 		}
 	}
-	if got := NewMatcher(nil).Refs("Fixes #1", dojo); got != nil {
+	if got := NewMatcher(nil, false).Refs("Fixes #1", dojo); got != nil {
 		t.Errorf("no keywords: %v", got)
 	}
-	if got := NewMatcher([]string{"closes"}).Refs("Fixes #1", dojo); got != nil {
+	if got := NewMatcher([]string{"closes"}, false).Refs("Fixes #1", dojo); got != nil {
 		t.Errorf("only closes: %v", got)
 	}
 }
@@ -151,7 +151,7 @@ func TestCollect(t *testing.T) {
 		{OID: "ddddddd4", Message: "Direct\n\nFixes #9, https://ghe.example.com/a/b/issues/1"},
 		{OID: "eeeeeee5", Message: "No issue"},
 	}}
-	found, warnings := Collect(r, NewMatcher([]string{"fixes", "refs"}), "github.com")
+	found, warnings := Collect(r, NewMatcher([]string{"fixes", "refs"}, false), "github.com")
 	var b strings.Builder
 	for _, f := range found {
 		fmt.Fprintf(&b, "%s:", f.Ref.String(dojo))
@@ -165,6 +165,85 @@ func TestCollect(t *testing.T) {
 		b.WriteString("\n")
 	}
 	want := "#3: PR #50@aaaaaaa commit aaaaaaa\ncli/cli#2: PR #50@aaaaaaa\n#7: PR #51@bbbbbbb commit ccccccc\n#9: commit ddddddd\n"
+	if b.String() != want {
+		t.Errorf("found:\n%s\nwant:\n%s", b.String(), want)
+	}
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "ghe.example.com") {
+		t.Errorf("warnings = %q", warnings)
+	}
+}
+
+func TestSuffix(t *testing.T) {
+	m := NewMatcher(nil, true)
+	tests := []struct {
+		msg  string
+		want string
+	}{
+		{"fix: login limit (#161)", "#161"},
+		{"fix: login limit (#164, #181)", "#164 #181"},
+		{"fix (#164,#181)", "#164 #181"},
+		{"fix ( #12 , acme/api#3 )  \t", "#12 acme/api#3"}, // spaces inside and after
+		{"fix (https://github.com/acme/api/issues/9)", "acme/api#9"},
+		{"fix (#161) (#200)", "#161 #200"},  // a title's issue, then a squash merge's PR
+		{"fix (#161)(#200)", "#161 #200"},   // groups need no space between
+		{"fix (#12) (#13, #12)", "#12 #13"}, // each once
+		{"(#5)", "#5"},                      // the whole line
+		{"fix (#12)\r\n\nbody", "#12"},
+		// Not a suffix.
+		{"fix (#12).", ""},
+		{"fix (see #12)", ""},
+		{"fix (#12, wip)", ""},
+		{"fix (#12 #13)", ""}, // commas only
+		{"fix (#12 and #13)", ""},
+		{"fix (12)", ""},
+		{"fix ()", ""},
+		{"fix f(#12)", ""},             // a call
+		{"(#12) fix", ""},              // the middle of the line
+		{"fix\n\nbody (#12)", ""},      // the body
+		{`Revert "fix (#12)"`, ""},     // a revert ends with a quote
+		{"fix (#12) wip (#13)", "#13"}, // groups read up to one that is not
+		{"fix (#12) (wip) (#13)", "#13"},
+		{"fix `(#12)`", ""}, // code
+		{"fix (`#12`)", ""},
+		{"fix (acme/api/pull/3)", ""}, // not a reference
+		{"fix (https://github.com/acme/api/pull/3)", ""},
+	}
+	for _, tt := range tests {
+		var got []string
+		for _, r := range m.Suffix(tt.msg, dojo) {
+			got = append(got, r.String(dojo))
+		}
+		if s := strings.Join(got, " "); s != tt.want {
+			t.Errorf("Suffix(%q) = %q, want %q", tt.msg, s, tt.want)
+		}
+	}
+	if got := NewMatcher([]string{"refs"}, false).Suffix("fix (#1)", dojo); got != nil {
+		t.Errorf("suffix off: %v", got)
+	}
+}
+
+// TestCollectSuffix: a suffix links a commit as a keyword does; the
+// commit's own pull request is left out with no warning, another one is
+// the caller's to tell; a keyword and the suffix of one commit are one
+// source, by keyword.
+func TestCollectSuffix(t *testing.T) {
+	squash := Pull{Ref: issue.Ref{Repo: dojo, Number: 200}}
+	r := &Range{Repo: dojo, Commits: []Commit{
+		{OID: "aaaaaaa1", Message: "fix: login limit (#161) (#200)", Pulls: []Pull{squash}},
+		{OID: "bbbbbbb2", Message: "fix: retry (#164, #181)\n\nRefs #164"},
+		{OID: "ccccccc3", Message: "chore (#150)"}, // a pull request of another commit, or no issue: read later
+		{OID: "ddddddd4", Message: "docs (https://ghe.example.com/a/b/issues/1)"},
+	}}
+	found, warnings := Collect(r, NewMatcher([]string{"refs"}, true), "github.com")
+	var b strings.Builder
+	for _, f := range found {
+		fmt.Fprintf(&b, "%s:", f.Ref.String(dojo))
+		for _, s := range f.Sources {
+			fmt.Fprintf(&b, " %s %s", s.By, Short(s.Commit))
+		}
+		b.WriteString("\n")
+	}
+	want := "#161: suffix aaaaaaa\n#164: keyword bbbbbbb\n#181: suffix bbbbbbb\n#150: suffix ccccccc\n"
 	if b.String() != want {
 		t.Errorf("found:\n%s\nwant:\n%s", b.String(), want)
 	}
@@ -193,7 +272,7 @@ func dumpRange(r *Range, keywords []string) []byte {
 	for _, w := range r.Warnings {
 		fmt.Fprintf(&b, "warning: %s\n", w)
 	}
-	found, warnings := Collect(r, NewMatcher(keywords), "github.com")
+	found, warnings := Collect(r, NewMatcher(keywords, false), "github.com")
 	for _, f := range found {
 		var src []string
 		for _, s := range f.Sources {

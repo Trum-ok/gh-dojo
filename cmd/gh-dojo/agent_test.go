@@ -160,10 +160,11 @@ func TestAgentInstall(t *testing.T) {
 
 // TestAgentConfigs is the skill of other configs with no [agent]: the
 // default target, no notes. kanban is this repository's preset; custom
-// overrides it; no_preset has no statuses, so no lifecycle path.
+// overrides it; no_preset has no statuses, so no lifecycle path; suffix
+// tells how a commit names its issue.
 func TestAgentConfigs(t *testing.T) {
 	for name, cfg := range map[string]string{"kanban": dojoConfig, "custom": customConfig, "no_preset": noPresetConfig,
-		"milestone": milestoneDojoConfig} {
+		"milestone": milestoneDojoConfig, "suffix": dojoConfig + "\n[release]\nsuffix = true\n"} {
 		t.Run(name, func(t *testing.T) {
 			dir := withRepo(t, cfg, nil)
 			if code, out := runOut("agent", "install"); code != render.ExitOK {

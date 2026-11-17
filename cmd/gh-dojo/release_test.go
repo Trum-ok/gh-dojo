@@ -123,6 +123,43 @@ func TestReleaseFake(t *testing.T) {
 	})
 }
 
+// TestReleaseSuffix: with [release] suffix = true, #42 is found in the
+// suffix of the squash commit of pull request #60, whose "(#60)" is left
+// out with no warning; "(#5)", another pull request, is left out with
+// one; #43, named by keyword and suffix in one commit, is found once, by
+// keyword. Off, the default, only the keyword counts. With no keywords
+// and no suffix in the messages, the head says where release looked.
+func TestReleaseSuffix(t *testing.T) {
+	suffix := verbsConfig + "[release]\nsuffix = true\n"
+	tests := []struct {
+		name, config, fixture string
+		args                  []string
+	}{
+		{"suffix_dry_run", suffix, "release_shop_suffix", []string{"--dry-run"}},
+		{"suffix_json", suffix, "release_shop_suffix", []string{"--dry-run", "--json"}},
+		{"suffix_off", verbsConfig, "release_shop_suffix", []string{"--dry-run"}},
+		{"suffix_none", verbsConfig + "[release]\nkeywords = []\nsuffix = true\n", "release_shop", nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			withConfig(t, tt.config)
+			withApp(t, verbFixture(tt.fixture))
+			withBackend(t, &fakeBackend{
+				issues: map[int]workflow.Issue{
+					42: {Number: 42, Title: "Fix login redirect", OnBoard: true, Status: "Ready"},
+					43: {Number: 43, Title: "Speed up checkout", OnBoard: true, Status: "Ready"},
+				},
+				pulls: map[int]bool{5: true, 60: true},
+			})
+			code, out := runOut(append([]string{"release", "HEAD", "--since", "abc1234", "--verb", "done"}, tt.args...)...)
+			if code != render.ExitOK {
+				t.Errorf("exit code = %d, want 0\n%s", code, out)
+			}
+			testutil.Golden(t, "release/"+tt.name, out)
+		})
+	}
+}
+
 // TestReleaseGuesses: a commit message's numbers that are no issue, #99
 // (no such issue) and acme/api#3 (no such repository), are left out with
 // a warning, not failed; #44 in a code span does not count. acme/api#7

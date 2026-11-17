@@ -46,6 +46,7 @@ description = "Also load it before a release."  # added to the skill's descripti
 
 [release]                    # gh dojo release
 keywords = ["closes", "fixes", "resolves", "refs"]   # words before #12 in a commit message; default: GitHub's closing keywords
+suffix = true                # "fix: login limit (#12)" names #12 too; default: false
 
 [verbs.start]                # overrides the preset's start key by key
 when = "You begin working on the issue"   # one line; first line of --help
@@ -193,6 +194,7 @@ requests it belongs to. A preset cannot set it.
 | Key        | Meaning |
 |------------|---------|
 | `keywords` | Words that, followed by issues on the same line of a commit message (`Fixes #12`, `refs: #12, acme/api#3`), put those issues in the release; whole words, in any case, letters with single spaces or dashes (`"part of"`). Default: GitHub's closing keywords, `close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves`, `resolved`; a list replaces them. `[]`: only pull requests count. With `refs`, keep the verb's `from` to Ready (the presets' `done` also starts from In progress): a `Refs` commit may be partial work, which is then [not ready](commands.md#release) rather than released |
+| `suffix`   | `true`: the parentheses that end the first line of a commit message put the issues in them in the release, `fix: login limit (#12)`, `(#12, acme/api#3)`, `fix (#161) (#200)`: [details](commands.md#release). The number of a pull request the commit belongs to, as a squash merge appends, is left out. Default `false`: where pull requests are squash-merged, the parentheses name a pull request, not an issue. With `true`, [`agent install`](commands.md#agent-install) tells the agent to name the issue so |
 
 ## verbs
 

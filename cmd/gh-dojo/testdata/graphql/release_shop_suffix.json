@@ -1,0 +1,121 @@
+{
+  "comment": "Hand-crafted from release_shop.json, for [release] suffix = true: #42 in the suffix of the squash commit of merged pull request #60, whose (#60) is left out; (#5), a pull request; #43 by keyword and suffix in one commit; one commit names nothing.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "ReleaseSince",
+      "query": "query ReleaseSince($owner: String!, $repo: String!, $head: String!, $since: String!, $sinceRef: String!) {\n  repository(owner: $owner, name: $repo) {\n    head: object(expression: $head) { oid ... on Commit { committedDate } }\n    since: object(expression: $since) { oid ... on Commit { committedDate } }\n    sinceRef: ref(qualifiedName: $sinceRef) { prefix name }\n  }\n}",
+      "variables": {
+        "head": "HEAD^{commit}",
+        "owner": "acme",
+        "repo": "shop",
+        "since": "abc1234^{commit}",
+        "sinceRef": "abc1234"
+      },
+      "repeat": true,
+      "response": {
+        "data": {
+          "repository": {
+            "head": {
+              "oid": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "committedDate": "2026-11-10T12:00:00Z"
+            },
+            "since": {
+              "oid": "abababababababababababababababababababab",
+              "committedDate": "2026-11-01T12:00:00Z"
+            },
+            "sinceRef": null
+          }
+        }
+      }
+    },
+    {
+      "operation": "ReleaseHistory",
+      "query": "query ReleaseHistory($owner: String!, $repo: String!, $head: GitObjectID!, $cursor: String) {\n  repository(owner: $owner, name: $repo) {\n    object(oid: $head) {\n      ... on Commit {\n        history(first: 100, after: $cursor) {\n          pageInfo { hasNextPage endCursor }\n          nodes { ...releaseCommit }\n        }\n      }\n    }\n  }\n}\n\n\n\nfragment releaseCommit on Commit {\n  oid\n  message\n  associatedPullRequests(first: 5) {\n    totalCount\n    nodes {\n      number\n      merged\n      repository { nameWithOwner }\n      closingIssuesReferences(first: 25) {\n        totalCount\n        nodes { number repository { nameWithOwner } }\n      }\n    }\n  }\n}",
+      "variables": {
+        "cursor": null,
+        "head": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+        "owner": "acme",
+        "repo": "shop"
+      },
+      "repeat": true,
+      "response": {
+        "data": {
+          "repository": {
+            "object": {
+              "history": {
+                "totalCount": 6,
+                "pageInfo": {
+                  "hasNextPage": false,
+                  "endCursor": "end"
+                },
+                "nodes": [
+                  {
+                    "oid": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+                    "message": "Fix the login redirect (#42) (#60)",
+                    "associatedPullRequests": {
+                      "totalCount": 1,
+                      "nodes": [
+                        {
+                          "number": 60,
+                          "merged": true,
+                          "repository": {
+                            "nameWithOwner": "acme/shop"
+                          },
+                          "closingIssuesReferences": {
+                            "totalCount": 0,
+                            "nodes": []
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "oid": "1212121212121212121212121212121212121212",
+                    "message": "Revert the cache (#5)",
+                    "associatedPullRequests": {
+                      "totalCount": 0,
+                      "nodes": []
+                    }
+                  },
+                  {
+                    "oid": "1313131313131313131313131313131313131313",
+                    "message": "Speed up checkout (#43)\n\nFixes #43",
+                    "associatedPullRequests": {
+                      "totalCount": 0,
+                      "nodes": []
+                    }
+                  },
+                  {
+                    "oid": "1414141414141414141414141414141414141414",
+                    "message": "Bump dependencies",
+                    "associatedPullRequests": {
+                      "totalCount": 0,
+                      "nodes": []
+                    }
+                  },
+                  {
+                    "oid": "abababababababababababababababababababab",
+                    "message": "Release v0.9.0",
+                    "associatedPullRequests": {
+                      "totalCount": 0,
+                      "nodes": []
+                    }
+                  },
+                  {
+                    "oid": "9999999999999999999999999999999999999999",
+                    "message": "Older",
+                    "associatedPullRequests": {
+                      "totalCount": 0,
+                      "nodes": []
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

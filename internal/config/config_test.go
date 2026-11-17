@@ -128,6 +128,9 @@ func dump(c *Config) string {
 	if !slices.Equal(c.Release.Keywords, DefaultKeywords()) { // left out for the default
 		w("release: keywords=%q", c.Release.Keywords)
 	}
+	if c.Release.Suffix { // left out when off, the default
+		w("release: suffix=true")
+	}
 	for _, v := range c.Verbs {
 		w("verb %s", v.Name)
 		w("  when: %s", v.When)
@@ -202,6 +205,7 @@ iteration = "current"
 		{"agent_no_targets", presetOnly + "[agent]\ntargets = []\n"},
 		{"release_keywords", presetOnly + "[release]\nkeywords = [\"Closes\", \"fixes\", \"refs\", \"part of\"]\n"},
 		{"release_no_keywords", presetOnly + "[release]\nkeywords = []\n"},
+		{"release_suffix", presetOnly + "[release]\nsuffix = true\n"},
 		{"agent_description", presetOnly + "[agent]\ndescription = \" Also when gh-dojo itself gets in the way. \"\n"},
 		{"blockers_off", presetOnly + "[verbs.wait]\nblockers = false\n"},
 		{"blockers_deny", presetOnly + "[verbs.start]\nblockers = \"deny\"\n[verbs.wait]\nblockers = \"warn\"\n"},
@@ -562,6 +566,7 @@ func TestLoadErrors(t *testing.T) {
 		{"release_keyword_empty", presetOnly + "[release]\nkeywords = [\"refs\", \"\"]\n"},
 		{"release_keyword_not_word", presetOnly + "[release]\nkeywords = [\"refs:\"]\n"},
 		{"release_keyword_duplicate", presetOnly + "[release]\nkeywords = [\"refs\", \"Fixes\", \"fixes\"]\n"},
+		{"release_suffix_not_bool", presetOnly + "[release]\nsuffix = \"yes\"\n"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -1,0 +1,4 @@
+code: 0
+--- stdout
+release HEAD: 4 commits since abc1234, no issues: no merged pull request closes one, no commit message names one in a suffix ([release] keywords is empty)
+--- stderr

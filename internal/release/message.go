@@ -2,6 +2,7 @@ package release
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/Trum-ok/gh-dojo/internal/issue"
@@ -23,17 +24,21 @@ var refRE = regexp.MustCompile(refPattern)
 // first issue of "Fixes #12, #13"; a list is taken whole here, as a
 // person reading it would.
 //
+// With suffix ([release] suffix), it also finds the issues in parentheses
+// at the end of the first line: "fix: login limit (#12)" (see Suffix).
+//
 // Code does not count, as Markdown does not link it: a reference in a code
 // span ("`Refs #12`") or a fenced block (```) is an example of the syntax,
 // not a link (see stripCode).
 type Matcher struct {
-	re *regexp.Regexp // nil: no keywords, nothing matches
+	re     *regexp.Regexp // nil: no keywords, nothing matches
+	suffix bool
 }
 
-// NewMatcher returns the matcher of keywords.
-func NewMatcher(keywords []string) *Matcher {
+// NewMatcher returns the matcher of keywords, and of the suffix if suffix.
+func NewMatcher(keywords []string, suffix bool) *Matcher {
 	if len(keywords) == 0 {
-		return &Matcher{}
+		return &Matcher{suffix: suffix}
 	}
 	alts := make([]string, len(keywords))
 	for i, k := range keywords {
@@ -42,7 +47,55 @@ func NewMatcher(keywords []string) *Matcher {
 	// Spaces and tabs only: a keyword and its list stay on one line, so
 	// "Refs #3" does not take the "#4" that starts the next one.
 	list := refPattern + `(?:(?:[ \t]*,[ \t]*|[ \t]+)(?:and[ \t]+)?` + refPattern + `)*`
-	return &Matcher{re: regexp.MustCompile(`(?i)(?:^|[^\pL\pN_])(?:` + strings.Join(alts, "|") + `)(?:[ \t]*:[ \t]*|[ \t]+)(` + list + `)`)}
+	return &Matcher{
+		re:     regexp.MustCompile(`(?i)(?:^|[^\pL\pN_])(?:` + strings.Join(alts, "|") + `)(?:[ \t]*:[ \t]*|[ \t]+)(` + list + `)`),
+		suffix: suffix,
+	}
+}
+
+// suffixRE is what the parentheses of a suffix hold: issue references
+// separated by commas, spaces around them allowed.
+var suffixRE = regexp.MustCompile(`^[ \t]*` + refPattern + `(?:[ \t]*,[ \t]*` + refPattern + `)*[ \t]*$`)
+
+// Suffix returns the issues the suffix of message names, in order, each
+// once, a bare #12 in repo; nil without [release] suffix. The suffix is
+// the groups of parentheses that end the first line, spaces after them
+// allowed: "fix: login limit (#12)", "(#12, acme/api#3)", and both of
+// "fix (#161) (#200)", a squash merge's "(#PR)" after a title that names
+// its issue. A group holds only references separated by commas, and
+// follows a space, another group or nothing; the groups are read from the
+// end, up to one that is not such ("(#12, wip)", "()", "(12)"). So
+// parentheses in the middle of the line ("(see #12) fix"), in the body,
+// or followed by anything ("(#12).", the quote of `Revert "fix (#12)"`)
+// do not count. Code does not count either.
+func (m *Matcher) Suffix(message string, repo issue.Repo) []issue.Ref {
+	if m == nil || !m.suffix {
+		return nil
+	}
+	line, _, _ := strings.Cut(stripCode(message), "\n")
+	var groups []string // from the end
+	for {
+		line = strings.TrimRight(line, " \t\r")
+		open := strings.LastIndexByte(line, '(')
+		if !strings.HasSuffix(line, ")") || open < 0 || !suffixRE.MatchString(line[open+1:len(line)-1]) {
+			break
+		}
+		if open > 0 && !strings.ContainsRune(" \t)", rune(line[open-1])) {
+			break // "f(#12)": a call, not a suffix
+		}
+		groups = append(groups, line[open+1:len(line)-1])
+		line = line[:open]
+	}
+	var out []issue.Ref
+	for _, g := range slices.Backward(groups) {
+		for _, tok := range refRE.FindAllString(g, -1) {
+			r, ok := issue.ParseRef(tok, repo)
+			if ok && !r.Pull && !containsRef(out, r) {
+				out = append(out, r)
+			}
+		}
+	}
+	return out
 }
 
 // Refs returns the issues message links, in order, each once, a bare #12

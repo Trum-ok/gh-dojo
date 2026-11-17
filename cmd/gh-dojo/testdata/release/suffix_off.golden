@@ -1,0 +1,8 @@
+code: 0
+--- stdout
+release HEAD: 4 commits since abc1234, 1 issue
+  #43: commit 1313131
+dry run: done #43 "Speed up checkout"
+  status: Ready → Done
+  close: as completed
+--- stderr

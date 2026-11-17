@@ -53,7 +53,9 @@ func newReleaseCmd() (*cobra.Command, error) {
 			"(its closing keywords or linked issues; squash, merge and rebase alike), or\n" +
 			"when a commit message names it after a keyword of [release] keywords, by\n" +
 			"default GitHub's closing ones (closes, fixes, resolves); owner/repo#N names\n" +
-			"an issue of another repository. Code in a message (`Refs #12`, a ``` block)\n" +
+			"an issue of another repository. With [release] suffix = true, so do the\n" +
+			"parentheses that end a message's first line: \"fix: login limit (#12)\",\n" +
+			"\"(#12, #13)\". Code in a message (`Refs #12`, a ``` block)\n" +
 			"does not count: put examples of the syntax in backticks.\n\n" +
 			"A message names issues as text, so a number only messages name that is no\n" +
 			"issue (a pull request, a missing issue, or one of a repository outside\n" +
@@ -151,14 +153,14 @@ func runRelease(cmd *cobra.Command, ref string, o *releaseOpts) error {
 	if err != nil {
 		return err
 	}
-	found, warnings := release.Collect(rng, release.NewMatcher(cfg.Release.Keywords), clientHost())
+	found, warnings := release.Collect(rng, release.NewMatcher(cfg.Release.Keywords, cfg.Release.Suffix), clientHost())
 	warnings = append(slices.Clone(rng.Warnings), warnings...)
 	for i := range found {
 		found[i].Ref = found[i].Ref.In(def) // the default repository as the config spells it
 	}
 	slices.SortStableFunc(found, func(a, b release.Found) int { return compareRefs(def)(a.Ref, b.Ref) })
 
-	res := &releaseRun{rng: rng, def: def, found: found, keywords: cfg.Release.Keywords, repos: []issue.Repo{def}}
+	res := &releaseRun{rng: rng, def: def, found: found, keywords: cfg.Release.Keywords, suffix: cfg.Release.Suffix, repos: []issue.Repo{def}}
 	for _, s := range cfg.Board.Repos {
 		if r, err := issue.ParseRepo(s); err == nil { // the config checked it
 			res.repos = append(res.repos, r)
@@ -264,6 +266,7 @@ type releaseRun struct {
 	def      issue.Repo
 	found    []release.Found
 	keywords []string
+	suffix   bool // [release] suffix
 	// repos are the project's own: the default repository and
 	// board.repos.
 	repos []issue.Repo
@@ -490,14 +493,21 @@ func (r *releaseRun) head(n int) string {
 
 // noIssues says where release looked.
 func (r *releaseRun) noIssues() string {
+	suffix := ""
+	if r.suffix {
+		suffix = " or in a suffix"
+	}
 	if len(r.keywords) == 0 {
+		if r.suffix {
+			return "no merged pull request closes one, no commit message names one in a suffix ([release] keywords is empty)"
+		}
 		return "no merged pull request closes one ([release] keywords is empty)"
 	}
 	kw := strings.Join(r.keywords[:min(len(r.keywords), 4)], ", ")
 	if len(r.keywords) > 4 {
 		kw += ", …"
 	}
-	return "no merged pull request closes one, no commit message names one after " + kw
+	return "no merged pull request closes one, no commit message names one after " + kw + suffix
 }
 
 // list prints the issues planned with how each was found, for a dry run:
@@ -513,13 +523,17 @@ func (r *releaseRun) list(w io.Writer, items []*batch.Item) {
 // maxSources is how many ways an issue was found the text names.
 const maxSources = 3
 
-// sources says how f was found: "PR #12, commit 1a2b3c4 and 2 more".
+// sources says how f was found: "PR #12, commit 1a2b3c4 and 2 more"; a
+// commit whose suffix names it is "suffix of commit 1a2b3c4".
 func (r *releaseRun) sources(f release.Found) string {
 	var parts []string
 	for _, s := range f.Sources[:min(len(f.Sources), maxSources)] {
-		if s.Pull != nil {
+		switch {
+		case s.Pull != nil:
 			parts = append(parts, "PR "+s.Pull.String(r.def))
-		} else {
+		case s.By == release.BySuffix:
+			parts = append(parts, "suffix of commit "+release.Short(s.Commit))
+		default:
 			parts = append(parts, "commit "+release.Short(s.Commit))
 		}
 	}
@@ -570,8 +584,10 @@ type releaseIssue struct {
 
 // releaseSource is one way an issue was found: a merged pull request
 // ("owner/name#12") that closes it, with its first commit in the release,
-// or a commit whose message names it (pull_request null).
+// or a commit whose message names it (pull_request null). By says which:
+// pull_request, keyword or suffix.
 type releaseSource struct {
+	By          string  `json:"by"`
 	PullRequest *string `json:"pull_request"`
 	Commit      string  `json:"commit"`
 }
@@ -612,7 +628,7 @@ func (r *releaseRun) json(verb, repo string, dry bool, items []*batch.Item, warn
 func sourcesJSON(f release.Found) []releaseSource {
 	out := []releaseSource{}
 	for _, s := range f.Sources {
-		src := releaseSource{Commit: s.Commit}
+		src := releaseSource{By: string(s.By), Commit: s.Commit}
 		if s.Pull != nil {
 			src.PullRequest = orNull(fullRef(*s.Pull))
 		}

@@ -625,14 +625,20 @@ func (d *agentDoc) writing(w *mdWriter) {
 		status = " in " + code(cfg.Statuses.Initial)
 	}
 	w.heading(1, "Creating and linking issues")
-	w.list([]string{
+	items := []string{
 		"`gh dojo new \"<title>\" --type " + typ + " --body \"…\"`: the issue, its labels, the board" + status +
 			", in one command; a long body: `--body-file <file>`, or `--body-file -` for stdin. More labels, assignees, a " +
 			"milestone, blockers or a parent: `gh dojo new --help`." + types,
 		"`gh dojo comment N \"text\"`: a comment without changing the status.",
 		"`gh dojo block N --by M` / `gh dojo unblock N --by M`: add or remove a blocked-by link without changing " +
 			"the status. An existing issue becomes a sub-issue with `gh issue edit N --parent M`.",
-	})
+	}
+	if cfg.Release.Suffix && d.hasCommand("release") {
+		items = append(items, "A commit for an issue names it in parentheses at the end of its first line, "+
+			"`fix: login limit (#12)`, several as `(#12, #13)`: that is how `gh dojo release` finds the issues "+
+			"a release includes.")
+	}
+	w.list(items)
 }
 
 func (d *agentDoc) repeats(w *mdWriter) {

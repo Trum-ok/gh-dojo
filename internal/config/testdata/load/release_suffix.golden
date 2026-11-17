@@ -1,0 +1,53 @@
+file: .github/dojo.toml
+version: 1
+preset: "kanban"
+board: owner=Trum-ok project=1 repos=[] assignee=""
+fields.status: "Status"
+statuses: initial="Backlog" final=["Done"] resolved=["Ready" "Done"]
+labels: type_prefix="" area_prefix="area:"
+session: env=[] link="{id}"
+release: suffix=true
+verb start
+  when: You begin working on the issue
+  to: "In progress"
+  from: ["Backlog" "Waiting" "Ready"]
+  require: [] require_one_of: []
+  comment: "Started. Session: {session}\n\n{comment}"
+  blockers: "warn"
+verb wait
+  when: Work is stuck: waiting for another issue or an outside decision
+  to: "Waiting"
+  from: ["In progress"]
+  require: [] require_one_of: ["by" "comment"]
+  comment: "Waiting for {by}.\n\n{comment}"
+  blockers: "link"
+verb ready
+  when: The work is done, verified and committed, but not released yet
+  to: "Ready"
+  from: ["In progress" "Waiting"]
+  require: [] require_one_of: []
+  comment: "{comment}"
+verb done
+  when: The change is released
+  to: "Done"
+  from: ["Ready" "In progress"]
+  require: [] require_one_of: []
+  comment: "{comment}"
+  labels: add=[] remove=[] assign: "" close: "completed" reopen: false confirm: false
+status refs:
+  "Backlog"    statuses.initial (from preset kanban)
+  "Done"       statuses.final (from preset kanban)
+  "Ready"      statuses.resolved (from preset kanban)
+  "Done"       statuses.resolved (from preset kanban)
+  "In progress" verbs.start.to (from preset kanban)
+  "Backlog"    verbs.start.from (from preset kanban)
+  "Waiting"    verbs.start.from (from preset kanban)
+  "Ready"      verbs.start.from (from preset kanban)
+  "Waiting"    verbs.wait.to (from preset kanban)
+  "In progress" verbs.wait.from (from preset kanban)
+  "Ready"      verbs.ready.to (from preset kanban)
+  "In progress" verbs.ready.from (from preset kanban)
+  "Waiting"    verbs.ready.from (from preset kanban)
+  "Done"       verbs.done.to (from preset kanban)
+  "Ready"      verbs.done.from (from preset kanban)
+  "In progress" verbs.done.from (from preset kanban)

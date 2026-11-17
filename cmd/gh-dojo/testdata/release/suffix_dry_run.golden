@@ -1,0 +1,13 @@
+code: 0
+--- stdout
+release HEAD: 4 commits since abc1234, 2 issues
+  #42: suffix of commit a1a1a1a
+  #43: commit 1313131
+dry run: done #42 "Fix login redirect"
+  status: Ready → Done
+  close: as completed
+dry run: done #43 "Speed up checkout"
+  status: Ready → Done
+  close: as completed
+--- stderr
+warning: #5 is a pull request, not an issue: left out (suffix of commit 1212121)

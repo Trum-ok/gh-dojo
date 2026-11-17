@@ -265,6 +265,11 @@ type Release struct {
 	// DefaultKeywords when not set; empty when set to [], which leaves
 	// only the pull requests' closing references.
 	Keywords []string
+	// Suffix: the issues in parentheses at the end of a commit message's
+	// first line ("fix: login limit (#12)", "(#12, #13)") link the commit
+	// to them too. Off by default: a squash merge appends "(#PR)", where
+	// the parentheses name a pull request, not an issue.
+	Suffix bool
 }
 
 // DefaultKeywords are GitHub's closing keywords: a commit message that says

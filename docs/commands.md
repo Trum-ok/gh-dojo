@@ -586,6 +586,21 @@ case; a list after a keyword counts whole up to the end of its line (`Fixes
 #12, #13 and #14`), a mention without one (`see #12`) does not. `Refs #12` says a commit is about
 an issue, which may be done only in part, so `refs` is not a default; a
 project that commits without pull requests adds it, as this one does.
+
+With [`[release] suffix = true`](configuration.md#release-keywords), the
+parentheses that end a message's first line name issues too: `fix: login
+limit (#12)`, `(#12, acme/api#3)`. A project whose commits go without pull
+requests often marks them so. Each group holds only references separated
+by commas, and several groups in a row all count: `fix (#161) (#200)`, a
+squash merge's `(#PR)` after a title that names its issue. Nothing may
+follow but spaces, so `(#12).` and the quote of `Revert "fix (#12)"` end
+no suffix: a revert does not put the issue in the release. Parentheses in
+the middle of the line (`(see #12) fix`) or in the body do not count. The
+number of a pull request the commit belongs to, the `(#PR)` a squash merge
+appends, is left out without a word; that pull request's issues are found
+through it. The suffix is off by default because there the parentheses
+name a pull request, not an issue.
+
 Code in a message does not count, as Markdown does not link it: a code span
 (`` `Refs #12` ``) or a fenced block (```` ``` ````) is an example of the
 syntax, not a link, so put such examples in backticks.
@@ -634,7 +649,8 @@ dry run: done #3 "Read the config"
 ...
 ```
 
-`--dry-run` lists how each issue was found (`PR #N`, `commit <sha>`) and its
+`--dry-run` lists how each issue was found (`PR #N`, `commit <sha>`,
+`suffix of commit <sha>`) and its
 plan. No issues is a line saying where release looked, exit code 0.
 `--comment`, `--by` and `--yes` go to the verb, for every issue. A verb
 without `batch = true` is exit code 1. So is one that needs `--assignee`
