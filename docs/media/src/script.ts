@@ -1,5 +1,6 @@
 // The story of the main demo. Command output and comments are the real text
-// gh-dojo prints and posts with the kanban preset (internal/config/presets/kanban.toml).
+// gh-dojo prints and posts with the kanban preset (internal/config/presets/kanban.toml)
+// and a [session] link in start's comment.
 import { Chat, FADE } from "./timeline";
 
 const chat = new Chat()

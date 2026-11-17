@@ -11,7 +11,7 @@
 | [`init`](#init) | Write `.github/dojo.toml` for a board and check it |
 | [`describe`](#describe) | Print this project's process, for an agent's context |
 | [`doctor`](#doctor) | Check config, token, board and repositories, with fixes |
-| [`agent install`](#agent-install) | Write the process into a skill or `AGENTS.md` section for agents |
+| [`agent install`](#agent-install) | Write the process into a skill, an `AGENTS.md` section or Copilot instructions for agents |
 | [`<verb>`](#process-verbs) | The project's process verbs, from the config (`start`, `wait`, …) |
 | [`release`](#release) | Apply a verb to the issues a release includes, found through pull requests and commits |
 
