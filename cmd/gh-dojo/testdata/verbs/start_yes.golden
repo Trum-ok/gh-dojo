@@ -1,5 +1,6 @@
-code: 1
+code: 0
 --- stdout
+#42 Backlog → In progress
 --- stderr
-error: start does not take --yes: it needs no confirmation
-fix: gh dojo start 42
+warning: start needs no confirmation: --yes ignored
+warning: no agent session: DOJO_SESSION is not set, so no comment is left

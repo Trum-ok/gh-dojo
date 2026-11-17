@@ -338,7 +338,8 @@ Rules across keys:
     fails to be written.
 - **confirm** `"user"`: without `--yes` the verb exits with code 2 and asks
   you to ask the user; re-run it with `--yes` only once they agree. A repeat
-  with nothing left to do needs no `--yes`. It is a signal, not a lock: an
+  with nothing left to do needs no `--yes`; a verb without `confirm` takes
+  `--yes` with a warning and ignores it. It is a signal, not a lock: an
   agent could add `--yes` itself, so tell agents to ask first (the instructions
   [`agent install`](commands.md#agent-install) writes say so).
 

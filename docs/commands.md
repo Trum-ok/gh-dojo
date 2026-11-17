@@ -507,6 +507,12 @@ A verb takes these flags only when its config asks for them:
 | `--of` | [`close = "duplicate"`](configuration.md#effects), which requires it | The original (`17`, `owner/repo#17` or a URL); also `{of}` |
 | `--yes` | [`confirm = "user"`](configuration.md#checks) | The user's go-ahead |
 
+Any other of these flags given to a verb that does not take it is exit
+code 1, with the flags it takes. `--yes` is the exception: given to a verb
+without `confirm = "user"` it is ignored with a warning (`start needs no
+confirmation: --yes ignored`), since the agent cannot know which verbs of a
+project need the go-ahead, and one the verb does not need loses nothing.
+
 `--dry-run` prints the plan without changing anything:
 
 ```console
@@ -591,7 +597,8 @@ dry run: done #3 "Read the config"
 - A fix reverted in the range is left out, listed as `reverted: #12
   (commit 1a2b3c4)` ([Reverts](#reverts)).
 - No issues is a line saying where release looked, exit code 0.
-- `--comment`, `--by` and `--yes` go to the verb, for every issue.
+- `--comment`, `--by` and `--yes` go to the verb, for every issue; `--yes`
+  to a verb that needs no go-ahead is one warning for the release.
 - Any verb runs but one that needs `--assignee`, `--milestone` or `--of`
   (`assign = "{assignee}"`, `milestone = "{milestone}"`,
   `close = "duplicate"`), which release does not take: that is exit code 1;

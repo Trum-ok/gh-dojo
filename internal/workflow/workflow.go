@@ -343,13 +343,15 @@ func normalizeBy(s string) string {
 //   - --comment or --by given while the verb's comment template does not use
 //     it, --assignee given to a verb without assign = "{assignee}",
 //     --milestone to one without milestone = "{milestone}";
-//   - --yes given to a verb without confirm = "user";
 //   - an argument of require, or all of require_one_of, missing or blank;
 //   - --assignee that is neither "@me" nor a GitHub login. Whether the user
 //     can be assigned is the reader's to check; so is whether an open
 //     milestone matches --milestone.
 //
-// A missing --yes is not an argument error: Plan sets Plan.NeedsYes.
+// --yes is no argument error either way: a missing one sets Plan.NeedsYes,
+// and one given to a verb without confirm = "user" is a warning of Plan
+// (see YesWarning). The agent cannot know which verbs need the go-ahead,
+// and a go-ahead the verb does not need loses nothing.
 func CheckArgs(v config.Verb, a Args, issues ...string) error {
 	var accepted []string
 	for _, arg := range config.Args() {
@@ -368,10 +370,6 @@ func CheckArgs(v config.Verb, a Args, issues ...string) error {
 		return render.Usage("%s does not use %s", v.Name, flag(arg)).
 			WithAllowed(accepted...).WithFix(Example(v, issues...))
 	}
-	if a.Yes && !v.Confirm {
-		return render.Usage("%s does not take --yes: it needs no confirmation", v.Name).WithFix(Example(v, issues...))
-	}
-
 	var missing []string
 	blank := false
 	for _, arg := range v.Require {
@@ -450,6 +448,15 @@ func placeholder(arg string) string {
 
 func flag(arg string) string { return "--" + arg }
 
+// YesWarning is the warning for --yes given to verb v, which has no
+// confirm = "user", or "" when there is none to give.
+func YesWarning(v config.Verb, a Args) string {
+	if !a.Yes || v.Confirm {
+		return ""
+	}
+	return fmt.Sprintf("%s needs no confirmation: --yes ignored", v.Name)
+}
+
 // Plan runs the checks of verb v against issue is and returns the effects to
 // apply. In order:
 //
@@ -516,6 +523,9 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 			is.Name(), closedText(is), v.Name, ReasonText(v.Close), is.Name())
 	}
 	p := &Plan{Verb: v.Name, Issue: is, Target: v.To}
+	if w := YesWarning(v, a); w != "" {
+		p.Warnings = append(p.Warnings, w)
+	}
 	atTarget := v.To != "" && is.Status == v.To
 	if !atTarget && !closedRepeat(v, is) {
 		if err := e.checkFrom(v, is); err != nil {

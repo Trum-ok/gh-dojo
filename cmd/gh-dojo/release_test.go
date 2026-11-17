@@ -199,6 +199,9 @@ func TestReleaseReverted(t *testing.T) {
 		{"revert_dry_run", verbsConfig, []string{"--dry-run"}, 1, 0},
 		{"revert", verbsConfig, nil, 1, 1},
 		{"revert_json", verbsConfig, []string{"--dry-run", "--json"}, 1, 0},
+		// done needs no go-ahead: --yes is a warning, once for the batch.
+		{"revert_yes", verbsConfig, []string{"--yes"}, 1, 1},
+		{"revert_yes_json", verbsConfig, []string{"--yes", "--dry-run", "--json"}, 1, 0},
 		{"revert_all", noKeywords, nil, 0, 0},
 		{"revert_all_json", noKeywords, []string{"--json"}, 0, 0},
 	}
@@ -311,7 +314,6 @@ func TestReleaseArgs(t *testing.T) {
 		{"unknown_verb", []string{"release", "v0.2.0", "--verb", "ship"}},
 		{"verb_needs_assignee", []string{"release", "v0.2.0", "--verb", "hand"}},
 		{"empty_since", []string{"release", "v0.2.0", "--verb", "done", "--since", ""}},
-		{"yes", []string{"release", "v0.2.0", "--verb", "done", "--yes"}},
 		{"by", []string{"release", "v0.2.0", "--verb", "done", "--by", "12"}},
 		{"help", []string{"release", "--help"}},
 	}

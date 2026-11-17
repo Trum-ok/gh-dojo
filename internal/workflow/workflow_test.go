@@ -410,7 +410,8 @@ func TestPlan(t *testing.T) {
 		{name: "drop_closed_as_completed", verb: "drop", code: render.ExitDenied,
 			args:  Args{Comment: "not needed", HasComment: true, Yes: true},
 			issue: Issue{Number: 42, Closed: true, StateReason: "completed", OnBoard: true, Status: "Done"}},
-		{name: "start_yes", verb: "start", issue: onBoard("Backlog"), args: Args{Yes: true}, code: render.ExitUsage},
+		// start needs no go-ahead: --yes is a warning of the plan.
+		{name: "start_yes", verb: "start", issue: onBoard("Backlog"), args: Args{Yes: true}, hasOps: 2},
 		// review: labels = ["+in-review", "-blocked"], assign = true (board.assignee alice).
 		{name: "review_all", verb: "review", hasOps: 4, issue: Issue{Number: 42, Title: "Fix login redirect",
 			OnBoard: true, Status: "In progress", Labels: []string{"bug", "blocked"}, Assignees: []string{"bob"}}},

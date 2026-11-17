@@ -1,0 +1,6 @@
+code: 0
+--- stdout
+{"schema_version":1,"error":null,"verb":"start","default_repo":"acme/shop","dry_run":false,"issues":[{"number":42,"repo":"acme/shop","title":"Fix login redirect","outcome":"applied","planned":[{"op":"set_status","from":"Backlog","to":"In progress"}],"applied":[{"op":"set_status","from":"Backlog","to":"In progress"}],"in_place":[],"needs_yes":false,"warnings":["start needs no confirmation: --yes ignored","no agent session: DOJO_SESSION is not set, so no comment is left"],"error":null,"card":null}],"summary":{"total":1,"done":1,"written":1,"failed":0,"not_attempted":0}}
+--- stderr
+warning: start needs no confirmation: --yes ignored
+warning: no agent session: DOJO_SESSION is not set, so no comment is left

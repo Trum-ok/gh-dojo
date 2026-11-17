@@ -221,7 +221,9 @@ func TestVerbs(t *testing.T) {
 			1: {Number: 1, OnBoard: true, Status: "Backlog"}, 2: {Number: 2, OnBoard: true, Status: "Waiting"},
 		}, "", render.ExitOK, 1, 2},
 		{"unknown_flag", []string{"start", "42", "--nope"}, nil, "", render.ExitUsage, 0, 0},
-		{"start_yes", []string{"start", "42", "--yes"}, issue42("Backlog"), "", render.ExitUsage, 0, 0},
+		// start needs no go-ahead: --yes is a warning, not an error.
+		{"start_yes", []string{"start", "42", "--yes"}, issue42("Backlog"), "", render.ExitOK, 1, 1},
+		{"start_yes_json", []string{"start", "42", "--yes", "--json"}, issue42("Backlog"), "", render.ExitOK, 1, 1},
 		{"done_open", []string{"done", "42"}, issue42("Ready"), "", render.ExitOK, 1, 1},
 	}
 	for _, tt := range tests {
