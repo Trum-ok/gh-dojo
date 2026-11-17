@@ -723,6 +723,7 @@ is done with, whatever the verb: listed as `already closed: #200 (Done)` and
 in the JSON's `skipped` (`closed`), not touched, and without effect on the
 exit code. So issues that went straight to Done without a release (docs, CI)
 are not refused by a verb that runs only on open issues, nor given today's
-sprint by a repeat of `done` when they have none. One the board's own workflows moved there ("Item
-closed" after a `Fixes #12` commit; the status history marks the change
-automated) did not go through the process: the verb gets it as any issue.
+sprint by a repeat of `done` when they have none. One the board's own
+workflows moved there ("Item closed" after a `Fixes #12` commit; the status
+history marks the change automated) did not go through the process: the
+verb gets it as any issue.
