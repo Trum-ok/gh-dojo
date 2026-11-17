@@ -804,6 +804,38 @@ func TestDeprecated(t *testing.T) {
 	}
 }
 
+// TestUnknownKeyAllowedInFull: an unknown key lists every key of its
+// table, even more than render cuts other lists at (#56): in the text and
+// in Allowed, which the JSON error prints. The verb keys are swapped for
+// a longer test-only list.
+func TestUnknownKeyAllowedInFull(t *testing.T) {
+	keys := make([]string, 25)
+	for i := range keys {
+		keys[i] = fmt.Sprintf("key_%02d", i+1)
+	}
+	saved := allowedVerbKeys
+	allowedVerbKeys = keys
+	t.Cleanup(func() { allowedVerbKeys = saved })
+
+	for _, content := range []string{
+		presetOnly + "[verbs.start]\nwhen_ = \"x\"\n",      // unknown key
+		presetOnly + "[verbs.done]\npost = \"./notify\"\n", // unsupported hook key
+	} {
+		_, err := Load(writeConfig(t, content))
+		var e *render.Error
+		if !errors.As(err, &e) {
+			t.Fatalf("Load error %v is not *render.Error", err)
+		}
+		if !slices.Equal(e.Allowed, keys) {
+			t.Errorf("Allowed = %v, want all %d keys", e.Allowed, len(keys))
+		}
+		text := render.FromError(err).Text()
+		if want := "allowed: " + strings.Join(keys, ", "); !slices.Contains(strings.Split(text, "\n"), want) {
+			t.Errorf("text does not list every key:\n%s", text)
+		}
+	}
+}
+
 // TestReadmeExamples keeps the config examples of README.md and docs/*.md
 // loadable.
 func TestReadmeExamples(t *testing.T) {

@@ -1,0 +1,3 @@
+error: load config: unknown key verbs.start.x
+allowed: a_long_config_key_01, a_long_config_key_02, a_long_config_key_03, a_long_config_key_04, a_long_config_key_05, a_long_config_key_06, a_long_config_key_07, a_long_config_key_08, a_long_config_key_09, a_long_config_key_10, a_long_config_key_11, a_long_config_key_12, a_long_config_key_13, a_long_config_key_14, a_long_config_key_15, a_long_config_key_16, a_long_config_key_17, a_long_config_key_18, a_long_config_key_19, a_long_config_key_20, a_long_config_key_21, a_long_config_key_22, a_long_config_key_23, a_long_config_key_24, a_long_config_key_25
+fix: fix the key

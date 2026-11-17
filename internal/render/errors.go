@@ -52,7 +52,7 @@ const MaxLineRunes = 200
 const (
 	maxWhatLines = 3   // the error block is at most 5 lines: what (≤3), allowed, fix
 	maxFixRunes  = 400 // a longer fix is dropped: a cut command would be wrong
-	maxAllowed   = 20  // longer allowed lists end with "and N more"
+	maxAllowed   = 20  // longer allowed lists end with "and N more", unless AllowedAll
 )
 
 // AuthFix is the fix command for missing or insufficient GitHub auth.
@@ -64,12 +64,17 @@ const InternalFix = "re-run the command; if it repeats, report it to the user"
 
 // Error is a user-facing error: what is wrong, which values are allowed and
 // which command fixes it. Build one with a constructor such as Usage or
-// NotFound and refine it with WithAllowed, WithFix and WithCause.
+// NotFound and refine it with WithAllowed (or WithAllowedAll), WithFix and
+// WithCause.
 type Error struct {
 	Code    Code
 	What    string   // what is wrong; one line, at most 3
 	Allowed []string // optional: the values that would have been accepted
-	Fix     string   // optional: a command to run next; never cut, dropped if too long
+	// AllowedAll prints Allowed in full: it is a closed set of gh-dojo's
+	// own names, such as config keys (see WithAllowedAll). Otherwise the
+	// block cuts Allowed after maxAllowed values.
+	AllowedAll bool
+	Fix        string // optional: a command to run next; never cut, dropped if too long
 	// Wait is how long to wait before re-running ("a few minutes", "60s"),
 	// "" for at once: a rate limit sets it, and a partial report built
 	// from the error keeps it next to its "re-run the same command".
@@ -104,8 +109,22 @@ func Internal(format string, args ...any) *Error {
 	return New(ExitUsage, "internal error (not your arguments): "+format, args...).WithFix(InternalFix)
 }
 
-// WithAllowed sets the accepted values and returns e.
-func (e *Error) WithAllowed(values ...string) *Error { e.Allowed = values; return e }
+// WithAllowed sets the accepted values and returns e. The error block
+// lists the first maxAllowed of them, then "and N more": for values read
+// from the board or a repository (statuses, labels, users, milestones),
+// which can be many.
+func (e *Error) WithAllowed(values ...string) *Error {
+	e.Allowed, e.AllowedAll = values, false
+	return e
+}
+
+// WithAllowedAll sets the accepted values, printed in full, and returns e:
+// for a closed set of gh-dojo's own names an agent must type exactly, such
+// as config keys, where a cut list would hide the right one.
+func (e *Error) WithAllowedAll(values ...string) *Error {
+	e.Allowed, e.AllowedAll = values, true
+	return e
+}
 
 // WithFix sets the command that fixes the problem and returns e.
 func (e *Error) WithFix(cmd string) *Error { e.Fix = cmd; return e }
@@ -135,8 +154,10 @@ func (e *Error) Unwrap() error {
 //	fix: gh dojo describe
 //
 // Blank lines of What are dropped, then it is cut to 3 lines; each allowed
-// value is put on one line. The fix line is never cut, since a cut command
-// would be wrong; a fix longer than maxFixRunes is dropped instead.
+// value is put on one line. The allowed line is cut after maxAllowed values
+// and 2×MaxLineRunes runes, unless AllowedAll. The fix line is never cut,
+// since a cut command would be wrong; a fix longer than maxFixRunes is
+// dropped instead.
 func (e *Error) Text() string {
 	var what []string
 	for l := range strings.SplitSeq(e.What, "\n") {
@@ -157,8 +178,12 @@ func (e *Error) Text() string {
 		}
 		lines = append(lines, Clip(l, MaxLineRunes))
 	}
-	if len(e.Allowed) > 0 {
-		lines = append(lines, Clip("allowed: "+joinAllowed(e.Allowed), MaxLineRunes*2))
+	switch {
+	case len(e.Allowed) == 0:
+	case e.AllowedAll:
+		lines = append(lines, "allowed: "+joinAllowed(e.Allowed, len(e.Allowed)))
+	default:
+		lines = append(lines, Clip("allowed: "+joinAllowed(e.Allowed, maxAllowed), MaxLineRunes*2))
 	}
 	if fix := SingleLine(e.Fix); fix != "" && RuneLen(fix) <= maxFixRunes {
 		lines = append(lines, "fix: "+fix)
@@ -166,9 +191,10 @@ func (e *Error) Text() string {
 	return strings.Join(lines, "\n")
 }
 
-func joinAllowed(values []string) string {
-	shown := make([]string, 0, min(len(values), maxAllowed))
-	for _, v := range values[:min(len(values), maxAllowed)] {
+// joinAllowed joins the first limit values, then "and N more" for the rest.
+func joinAllowed(values []string, limit int) string {
+	shown := make([]string, 0, min(len(values), limit))
+	for _, v := range values[:min(len(values), limit)] {
 		shown = append(shown, SingleLine(v))
 	}
 	s := strings.Join(shown, ", ")

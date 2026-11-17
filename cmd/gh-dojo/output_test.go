@@ -14,6 +14,7 @@ import (
 
 	"github.com/cli/go-gh/v2/pkg/api"
 
+	"github.com/Trum-ok/gh-dojo/internal/doctor"
 	"github.com/Trum-ok/gh-dojo/internal/graph/graphtest"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/Trum-ok/gh-dojo/internal/testutil"
@@ -508,6 +509,28 @@ func TestErrorJSON(t *testing.T) {
 			}
 			testutil.Golden(t, "json/error_"+tt.name, out)
 		})
+	}
+}
+
+// TestAllowedAllOutputs: an error whose allowed values are printed in full
+// (config keys, #56) keeps them all, past render's cut of other lists, in
+// the JSON error and in doctor's text, which rebuilds the block from its
+// check.
+func TestAllowedAllOutputs(t *testing.T) {
+	keys := make([]string, 25)
+	for i := range keys {
+		keys[i] = fmt.Sprintf("key_%02d", i+1)
+	}
+	err := fmt.Errorf("load config: %w", render.Usage(".github/dojo.toml: unknown key verbs.start.x").WithAllowedAll(keys...))
+	if got := toErrorJSON(err).Allowed; !slices.Equal(got, keys) {
+		t.Errorf("JSON allowed = %v, want all %d keys", got, len(keys))
+	}
+	r := &doctor.Report{}
+	r.AddProblem("config", err)
+	var buf bytes.Buffer
+	writeDoctor(&buf, r)
+	if want := "allowed: " + strings.Join(keys, ", ") + "\n"; !strings.Contains(buf.String(), want) {
+		t.Errorf("doctor text does not list every key:\n%s", buf.String())
 	}
 }
 

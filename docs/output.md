@@ -167,7 +167,10 @@ comes only with a new `schema_version` in a major release.
 
 An error, top-level or inside a result, is `{exit_code, message, allowed,
 fix}`: the fields of the error block, `fix` `null` when there is none.
-`message` is whole; the block on stderr may cut it.
+`message` and `allowed` are whole; the block on stderr may cut them. Its
+`allowed:` line lists the keys of a config table in full, since a key must
+be typed exactly; other lists, such as the board's statuses or a
+repository's labels, stop after 20 values with `and N more`.
 
 The schemas, by command, after `schema_version` and `error`:
 

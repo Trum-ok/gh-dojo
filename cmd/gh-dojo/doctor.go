@@ -10,7 +10,6 @@ import (
 
 	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/doctor"
-	"github.com/Trum-ok/gh-dojo/internal/render"
 )
 
 func init() { register(newDoctorCmd) }
@@ -72,11 +71,7 @@ func writeDoctor(w io.Writer, r *doctor.Report) {
 	for _, c := range r.Checks {
 		// render's error block keeps long values short and drops a fix too
 		// long to be a command; its first line is the detail.
-		fix := ""
-		if c.Fix != nil {
-			fix = *c.Fix
-		}
-		text := (&render.Error{What: c.Detail, Allowed: c.Allowed, Fix: fix}).Text()
+		text := c.Block().Text()
 		text = strings.TrimPrefix(text, "error: ")
 		fmt.Fprintf(w, "%-8s %-8s %s\n", c.Result, c.Name, strings.ReplaceAll(text, "\n", "\n"+indent))
 	}

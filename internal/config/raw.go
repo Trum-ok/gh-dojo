@@ -376,7 +376,8 @@ func decodeError(display string, err error) error {
 
 // undecodedError explains a key the decoder did not use. Keys below a
 // verb are cut to verbs.<name>.<key>, others to <table>.<key>, so a nested
-// table such as [verbs.start.pre] is reported once, by its own name.
+// table such as [verbs.start.pre] is reported once, by its own name. The
+// table's keys are listed in full, however many there are.
 func undecodedError(display string, key toml.Key) error {
 	var path string
 	var allowed []string
@@ -385,7 +386,7 @@ func undecodedError(display string, key toml.Key) error {
 		path = strings.Join(key[:3], ".")
 		if slices.Contains(unsupportedVerbKeys, key[2]) {
 			return render.Usage("%s: %s is not supported in this version", display, path).
-				WithAllowed(allowedVerbKeys...)
+				WithAllowedAll(allowedVerbKeys...)
 		}
 		allowed = allowedVerbKeys
 	case len(key) >= 2:
@@ -411,7 +412,7 @@ func undecodedError(display string, key toml.Key) error {
 	default:
 		path, allowed = key.String(), topKeys
 	}
-	return render.Usage("%s: unknown key %s", display, path).WithAllowed(allowed...).WithFix(newerFix)
+	return render.Usage("%s: unknown key %s", display, path).WithAllowedAll(allowed...).WithFix(newerFix)
 }
 
 // newerFix is the fix of an unknown config key: a typo, or a key of a

@@ -34,7 +34,18 @@ type Check struct {
 	Allowed []string `json:"allowed"`
 	Fix     *string  `json:"fix"` // null for none
 
-	code render.Code // of a problem: render.ExitNetwork for auth and network, else render.ExitUsage
+	code       render.Code // of a problem: render.ExitNetwork for auth and network, else render.ExitUsage
+	allowedAll bool        // the problem's render.Error.AllowedAll
+}
+
+// Block is the check as an error block for the text output: its detail,
+// allowed values and fix, cut the way the error's own block would be.
+func (c Check) Block() *render.Error {
+	e := &render.Error{What: c.Detail, Allowed: c.Allowed, AllowedAll: c.allowedAll}
+	if c.Fix != nil {
+		e.Fix = *c.Fix
+	}
+	return e
 }
 
 // Report is what doctor found, and its JSON.
@@ -70,6 +81,7 @@ func (r *Report) AddProblem(name string, err error) {
 	}
 	r.Checks = append(r.Checks, Check{
 		Name: name, Result: ResultProblem, Detail: e.What, Allowed: render.OrEmpty(e.Allowed), Fix: render.OrNull(e.Fix), code: code,
+		allowedAll: e.AllowedAll,
 	})
 }
 

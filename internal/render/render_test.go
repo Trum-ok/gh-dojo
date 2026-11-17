@@ -21,6 +21,11 @@ func TestErrorFormat(t *testing.T) {
 	for i := range many {
 		many[i] = fmt.Sprintf("label-%02d", i+1)
 	}
+	// A closed set longer than both cuts: 25 values, over 400 runes.
+	keys := make([]string, 25)
+	for i := range keys {
+		keys[i] = fmt.Sprintf("a_long_config_key_%02d", i+1)
+	}
 	tests := []struct {
 		name string
 		err  error
@@ -33,6 +38,7 @@ func TestErrorFormat(t *testing.T) {
 		{"partial", Partial("applied 3 of 4, #17: status option \"QA\" missing").WithFix("gh dojo done 14 15 16 17"), ExitPartial},
 		{"multiline_clipped", Usage("line one\nline two\nline three\nline four\nline five").WithAllowed("a").WithFix("gh dojo --help"), ExitUsage},
 		{"long_allowed", Usage("unknown label %q", "bgu").WithAllowed(many...), ExitUsage},
+		{"long_allowed_all", fmt.Errorf("load config: %w", Usage("unknown key verbs.start.x").WithAllowedAll(keys...).WithFix("fix the key")), ExitUsage},
 		{"wrapped", fmt.Errorf("load config: %w", Usage("bad version")), ExitUsage},
 		{"plain_error", errors.New("open .github/dojo.toml: permission denied\nsecond line hidden"), ExitUsage},
 		{"http_404", &api.HTTPError{StatusCode: 404, Message: "Not Found", RequestURL: mustURL("https://api.github.com/x")}, ExitNotFound},
