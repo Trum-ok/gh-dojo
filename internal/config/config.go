@@ -391,6 +391,37 @@ func (v Verb) OnlyClearsSprint() bool {
 	return v.Iteration == IterationClear && v.To == "" && len(v.Fields) == 0
 }
 
+// verbEffects are a verb's effects by key, in documentation order, each
+// with whether a verb has it.
+var verbEffects = []struct {
+	key string
+	set func(Verb) bool
+}{
+	{"to", func(v Verb) bool { return v.To != "" }},
+	{"comment", func(v Verb) bool { return v.Comment != "" }},
+	{"labels", func(v Verb) bool { return len(v.AddLabels)+len(v.RemoveLabels) > 0 }},
+	{"assign", Verb.Assigns},
+	{"unassign", func(v Verb) bool { return v.Unassign != "" }},
+	{"milestone", Verb.SetsMilestone},
+	{"close", func(v Verb) bool { return v.Close != "" }},
+	{"reopen", func(v Verb) bool { return v.Reopen }},
+	{"iteration", func(v Verb) bool { return v.Iteration != "" }},
+	{"field", func(v Verb) bool { return len(v.Fields) > 0 }},
+}
+
+// Effects returns the keys of the verb's effects, in documentation order:
+// to, comment, labels, assign, unassign, milestone, close, reopen,
+// iteration and field, each when the verb has it. A verb has at least one.
+func (v Verb) Effects() []string {
+	var keys []string
+	for _, e := range verbEffects {
+		if e.set(v) {
+			keys = append(keys, e.key)
+		}
+	}
+	return keys
+}
+
 // IterationRule is the verb's iteration key as written in the config:
 // "current", "clear" or "by_status_date:Ready"; "" when not set.
 func (v Verb) IterationRule() string {

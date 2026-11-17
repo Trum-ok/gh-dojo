@@ -346,9 +346,12 @@ func (c *Config) buildVerb(name string, r *rawVerb) (Verb, error) {
 	if err := c.buildLabelChecks(name, r, &v); err != nil {
 		return Verb{}, err
 	}
-	if v.To == "" && v.Comment == "" && len(v.AddLabels)+len(v.RemoveLabels) == 0 && !v.Assigns() && v.Unassign == "" &&
-		!v.SetsMilestone() && v.Close == "" && !v.Reopen && v.Iteration == "" && len(v.Fields) == 0 {
-		return Verb{}, c.Errorf("verbs.%s has no effect: set to, comment, labels, assign, unassign, milestone, close, reopen, iteration or field", name)
+	if len(v.Effects()) == 0 {
+		keys := make([]string, len(verbEffects))
+		for i, e := range verbEffects {
+			keys[i] = e.key
+		}
+		return Verb{}, c.Errorf("verbs.%s has no effect: set %s", name, render.JoinWords(keys, "or"))
 	}
 	for _, list := range []struct {
 		key  string

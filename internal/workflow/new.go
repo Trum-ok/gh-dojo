@@ -410,8 +410,7 @@ func MilestoneFix(cfg *config.Config, found *NewFound, repo, title string) strin
 // user's go-ahead, and checks neither labels nor, to refuse, blockers or
 // sub-issues. Such a verb is a safe way to change an issue's milestone.
 func OnlySetsMilestone(v config.Verb) bool {
-	return v.MilestoneArg && v.To == "" && v.Comment == "" && len(v.AddLabels)+len(v.RemoveLabels) == 0 &&
-		!v.Assigns() && v.Unassign == "" && v.Close == "" && !v.Reopen && v.Iteration == "" && len(v.Fields) == 0 &&
+	return v.MilestoneArg && slices.Equal(v.Effects(), []string{"milestone"}) &&
 		!v.Confirm && slices.Equal(v.Require, []string{config.ArgMilestone}) && len(v.RequireOneOf) == 0 &&
 		!v.ChecksLabels() && v.Blockers != config.BlockersDeny && v.SubIssues != config.BlockersDeny
 }
