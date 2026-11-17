@@ -9,7 +9,8 @@ LDFLAGS := -X main.version=$(VERSION)
 # last path element must be gh-dojo.
 INSTALL_DIR ?= $(HOME)/.local/share/gh-dojo/$(BIN)
 
-.PHONY: build test vet lint vuln tools golden agent dist install demo
+.PHONY: build test vet lint vuln tools golden agent dist install demo \
+	check fmt tidy e2e
 
 build:
 	go build -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/gh-dojo
@@ -17,8 +18,41 @@ build:
 test:
 	go test ./...
 
+# go vet on every system the code builds differently for, and on the e2e
+# tests, as CI does.
 vet:
 	go vet ./...
+	GOOS=windows go vet ./...
+	GOOS=darwin go vet ./...
+	go vet -tags e2e ./e2e
+
+# Files gofmt would change; `gofmt -w .` fixes them.
+fmt:
+	@unformatted="$$(gofmt -l .)"; \
+	if [ -n "$$unformatted" ]; then \
+		echo "gofmt needed on:"; echo "$$unformatted"; exit 1; \
+	fi
+
+# go.mod and go.sum, of gh-dojo and of tools/, as go mod tidy would write
+# them.
+tidy:
+	go mod tidy -diff
+	cd tools && go mod tidy -diff
+
+# The checks of CI (.github/workflows/ci.yml) on this machine: format, tidy,
+# vet, staticcheck, the release build and its agent install --check, then
+# go test -race and go build. Not vuln, which needs the network, nor e2e,
+# which needs a token and the sandbox boards. The tests run on this system
+# only; CI runs them on Linux, macOS and Windows.
+check: fmt tidy vet lint dist
+	@bin="dist/$(BIN)_$(VERSION)_$$(go env GOOS)-$$(go env GOARCH)"; \
+	sums="$(BIN)_$(VERSION)_checksums.txt"; set -ex; \
+	"$$bin" --version | grep -Fx "gh dojo version $(VERSION)"; \
+	(cd dist && shasum -a 256 -c --strict "$$sums"); \
+	test "$$(wc -l <"dist/$$sums")" -eq 6; \
+	"$$bin" agent install --check
+	go test -race ./...
+	go build ./...
 
 # The linters, at the versions pinned in tools/go.mod, built for this machine
 # into .tools/ so they can check the code as other systems see it (GOOS).
@@ -39,6 +73,17 @@ lint: tools
 # standard library it is built with.
 vuln: tools
 	$(TOOLS)/govulncheck ./...
+
+# The end-to-end tests against the sandbox boards (see e2e/doc.go), with
+# gh's token; .github/workflows/e2e.yml runs them daily.
+GH_DOJO_E2E_REPO ?= Trum-ok/gh-dojo-sandbox
+GH_DOJO_E2E_KANBAN ?= 6
+GH_DOJO_E2E_SPRINTS ?= 7
+
+e2e:
+	GH_DOJO_E2E_REPO=$(GH_DOJO_E2E_REPO) GH_DOJO_E2E_KANBAN=$(GH_DOJO_E2E_KANBAN) \
+		GH_DOJO_E2E_SPRINTS=$(GH_DOJO_E2E_SPRINTS) \
+		go test -tags e2e -count=1 -v -timeout 15m ./e2e
 
 # Rewrite golden files under testdata/ with the current output; review the
 # diff before committing. Refused when CI is set.
