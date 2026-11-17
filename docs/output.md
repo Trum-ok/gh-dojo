@@ -17,7 +17,7 @@ this is a process rule: ask the user how to proceed
 |------|-----------------------------|--------------------------------------------------------------|
 | 0    | Everything applied          | Go on                                                        |
 | 1    | Bad arguments or config     | Fix them as the error says                                   |
-| 2    | A process check refused     | Don't work around it; ask a human                            |
+| 2    | A process check refused     | Don't work around it; ask the user                           |
 | 3    | Issue or board not found    | Check the number (`gh dojo list`) or `board.owner`/`project` |
 | 4    | Network, rate limit or auth | Retry later, or `gh auth refresh -s project`                 |
 | 5    | Partially applied           | Re-run the same command; it finishes the rest                |
@@ -48,17 +48,16 @@ fix: wait a few minutes, then re-run the same command
 ## Several issues at once
 
 A verb with `batch = true` takes several issue numbers, and
-[`release`](commands.md#release) can run it; other verbs take
-exactly one and say which verbs take several. An issue given twice counts
-once (`12` and `acme/shop#12` too, in the default repository acme/shop).
-The cards are read in one request per 20 issues, from any repositories
-(`gh dojo done 12 acme/api#3`), with the label, user and `--by` lookups once
-in each (labels and users once per repository); then each issue is checked, planned and
-written on its own, with its own mutation, so a lost answer or a refusal
-touches that issue alone. An issue that fails is skipped and the others go
-on. An error that would fail every write alike (the token rejected or missing
-a scope, a rate limit, the run interrupted) stops the writes: the issues
-left are reported as not attempted. `--yes` counts for every issue;
+[`release`](commands.md#release) can run it; other verbs take exactly one
+and say which verbs take several. An issue given twice counts once (`12` and
+`acme/shop#12` too, in the default repository acme/shop). The cards are read
+together, in a few requests, from any repositories
+(`gh dojo done 12 acme/api#3`); then each issue is checked, planned and
+written on its own, with its own mutation, so a lost answer or a
+refusal touches that issue alone. An issue that fails is skipped and the
+others go on. An error that would fail every write alike (the token rejected
+or missing a scope, a rate limit, the run interrupted) stops the writes: the
+issues left are reported as not attempted. `--yes` counts for every issue;
 `--dry-run` prints the plan of each.
 
 Each issue done prints its confirmation line; then a summary. When every
@@ -158,12 +157,11 @@ also printed as the usual short block on stderr, and warnings stay on stderr
 second. Field names are snake_case. Every key is always there: lists are
 `[]` when empty, never `null`; an absent value (no status, no milestone, no
 due date, no fix) is `null`, never `""`. Times are RFC 3339 in UTC, dates
-`YYYY-MM-DD`. GitHub node IDs never appear. A reference to an issue is
-always in full, `owner/name#12` (`ref`, `changed`, `unchanged`, `missed`,
-`blocked_by`, `already_blocked_by`, the `issue` of `add_blocked_by`, the `of` of `close`), and
+`YYYY-MM-DD`. GitHub node IDs never appear. A field that holds a reference
+to an issue or pull request always has it in full, `owner/name#12`, and
 every issue has its `repo`: the default repository as the config spells it,
-others as GitHub does (also in the text). The short `#12` of the text is
-only for reading. New fields may be added;
+others as GitHub does (also in the text). The short `#12` of the text, also
+in `message` and `warnings`, is only for reading. New fields may be added;
 renaming or removing one, or changing its meaning, is a breaking change and
 comes only with a new `schema_version` in a major release.
 
@@ -180,7 +178,7 @@ The schemas, by command, after `schema_version` and `error`:
 | `list` | `sprint_filter` (`null` without `--sprint`, `"none"` for issues without a sprint, `"iteration"` for those in `sprint`), `sprint` (the `--sprint` iteration or `null`), `issues`: `[{repo, number, title, state, status, labels, labels_total, assignees, assignees_total}]` in the printed order, cut to `--limit`; `matched` (before `--limit`), `unchecked`, `hidden`, `filtered`, `skipped`: `{draft_issues, pull_requests, unseen}`, `incomplete`, `warnings` |
 | `next` | as `list`, each issue with `unresolved_blockers`: `[{ref, repo, number, on_board, status, archived, status_unknown_reason}]` (empty unless `--all`) and `unread_blockers` (blockers the token cannot read, unresolved); `matched`: issues to show before `--limit` (with `--all`, the blocked ones too); `hidden`: blocked issues left out (0 with `--all`); `incomplete`: GitHub withheld part of an issue to show or hide, or of its blockers |
 | verbs | `verb`, `default_repo` (where a bare number is), `dry_run`, `issues`: `[{number, repo, title, outcome, planned, applied, in_place, needs_yes, warnings, error, card}]` in argument order (`title` `null` when the issue was not read; `card`: with `--show`, the issue as read before the verb, a card as in `show`, else `null`), `summary`: `{total, done, written, failed, not_attempted}` |
-| `release` | as verbs, with `release`: `{ref, commit, since, since_picked, since_commit, compared, commits}` (`since_picked`: the previous version tag, not `--since`; `compared`: GitHub compared the two, else the history was read down to a `--since` commit; commits are full SHAs), each issue with `found_by`: `[{by, pull_request, commit}]` (`by` `pull_request`, `keyword` or `suffix`: what links the commit to it, a commit that names it by both `keyword`; `pull_request` `owner/name#12` that closes it, with its first commit in the release, or `null`: the commit's message names it), `skipped`: `[{number, repo, ref, reason, status, found_by}]` (`reason` `excluded` by `--exclude`; `pull_request`, `not_found` or `repo_not_found` for a number only commit messages name; `closed` with the final `status` a closed issue is in, done with; or `not_ready` with the `status` the verb's `from` does not allow; `status` is `null` but for `closed` and `not_ready`), and `warnings`; `issues` and `summary` count only the issues the verb ran on, the default repository's first |
+| `release` | as verbs, with `release`: `{ref, commit, since, since_picked, since_commit, compared, commits}` (`since_picked`: the previous version tag, not `--since`; `compared`: GitHub compared the two, else the history was read down to a `--since` commit; commits are full SHAs), each issue with `found_by`: `[{by, pull_request, commit}]` (`by` `pull_request`, `keyword` or `suffix`: what links the commit to it; a commit that names it both ways counts as `keyword`; `pull_request` `owner/name#12` that closes it, with its first commit in the release, or `null`: the commit's message names it), `skipped`: `[{number, repo, ref, reason, on_board, status, found_by}]` (`reason` `excluded` by `--exclude`; `pull_request`, `not_found` or `repo_not_found` for a number only commit messages name; `closed`, a closed issue in a final status, done with; or `not_ready`, its status one the verb's `from` does not allow; for `closed` and `not_ready`, `on_board` and `status` say where the issue stands, `status` `null` for no status, else both are `null`), and `warnings`; `issues` and `summary` count only the issues the verb ran on, the default repository's first |
 | `new` | `number` (`null` in a dry run that would create the issue), `repo`, `title`, `dry_run` (nothing written: the other fields say what would be), `created` (`false`: resumed), `labels`, `status`, `status_set`, `unarchived`, `milestone` (`{title, due_on}` or `null`), `milestone_set`, `blocked_by`, `already_blocked_by`, `parent` (`owner/name#12` or `null`; read only with `--parent`), `parent_set`, `assigned` (the `--assignee` logins assigned now, as GitHub spells them), `already_assigned` (those a resumed issue had) |
 | `comment` | `number`, `repo`, `dry_run`, `posted` (`false`: already the last comment; in a dry run, whether it would be posted) |
 | `block`, `unblock` | `number`, `repo`, `action`, `dry_run` (`changed`: the links it would change), `changed`, `unchanged`, `missed` |
