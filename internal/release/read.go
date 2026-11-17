@@ -443,7 +443,7 @@ func (r *Range) add(nodes []*commitJSON) {
 				continue
 			}
 			pr, err := issue.ParseRepo(p.Repository.NameWithOwner)
-			if err != nil || !strings.EqualFold(pr.String(), r.Repo.String()) {
+			if err != nil || !pr.Same(r.Repo) {
 				continue // a fork's pull request
 			}
 			pull := Pull{Ref: issue.Ref{Repo: r.Repo, Number: p.Number}}

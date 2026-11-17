@@ -313,8 +313,7 @@ func sprintField(cfg *config.Config, s *board.Schema) (*board.Field, error) {
 		return nil, err
 	}
 	if f.Type != board.TypeIteration {
-		return nil, render.Usage("field %q on board %s is %s, not an iteration field", f.Name, s.Ref(), f.Type).
-			WithFix("edit fields.sprint in " + cfg.Display).WithCause(board.ErrFieldType)
+		return nil, s.WrongType(f, board.TypeIteration).WithFix("edit fields.sprint in " + cfg.Display)
 	}
 	return f, nil
 }

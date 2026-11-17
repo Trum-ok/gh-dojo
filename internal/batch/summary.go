@@ -46,7 +46,7 @@ func generalReason(why string, ref issue.Ref) string {
 		case sub[3] != num:
 			return m
 		case sub[2] != "":
-			if r, err := issue.ParseRepo(sub[2]); err != nil || !ref.Same(issue.Ref{Repo: r, Number: ref.Number}) {
+			if r, err := issue.ParseRepo(sub[2]); err != nil || !ref.Repo.Same(r) {
 				return m
 			}
 		}
