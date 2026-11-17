@@ -559,10 +559,11 @@ gh dojo release <ref> --verb <verb> [--since <ref>] [--exclude N]... [--dry-run]
 
 Once a release is tagged, runs a verb with [`batch = true`](output.md#several-issues-at-once)
 on the issues it includes, as `gh dojo done 12 13 14` would: same checks,
-summary and exit codes.
+summary and exit codes. Before the tag, `gh dojo release main --verb done
+--dry-run` shows what the next release holds.
 
 **The range** is the commits of `<ref>` (a tag, branch or commit on GitHub;
-no local checkout) since `--since`, or else since the previous release: the
+no local checkout, so `main`, not `origin/main`) since `--since`, or else since the previous release: the
 highest version tag (`v1.2.3`, `1.2.3`) below `<ref>` when `<ref>` is one,
 else the highest not on `<ref>`'s commit; one that is not in `<ref>`'s
 history, like a `--since` newer than `<ref>`, is exit code 1, not an empty
@@ -656,5 +657,7 @@ plan. No issues is a line saying where release looked, exit code 0.
 without `batch = true` is exit code 1. So is one that needs `--assignee`
 or `--milestone` (`assign = "{assignee}"`, `milestone = "{milestone}"`),
 which release does not take: run it on the issues themselves. A `<ref>`
-or `--since` GitHub does not know is exit code 3. Requests: one for `<ref>` and the start (one per 100
+or `--since` GitHub does not know is exit code 3; for one with a `/`, such as
+`origin/main`, one more request checks the name after it, and if GitHub has
+it the `fix:` names it (`pass main`). Requests: one for `<ref>` and the start (one per 100
 tags), one per 100 commits with their pull requests, then the batch's.

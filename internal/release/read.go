@@ -233,9 +233,9 @@ func Read(ctx context.Context, q graph.Querier, repo issue.Repo, head, since str
 		case rp == nil:
 			return nil, repoMissing(repo)
 		case rp.Head == nil:
-			return nil, refMissing(repo, head, "")
+			return nil, refNotFound(ctx, q, repo, head, "")
 		case rp.Since == nil:
-			return nil, refMissing(repo, since, "--since ")
+			return nil, refNotFound(ctx, q, repo, since, "--since ")
 		}
 		r.HeadCommit, r.SinceCommit = rp.Head.OID, rp.Since.OID
 		// A start newer than the head would walk 1000 commits for nothing:
@@ -290,18 +290,22 @@ func readTags(ctx context.Context, q graph.Querier, vars map[string]any, r *Rang
 	}
 	headCommit := ""
 	var missing error
+	noHead := false
 	page, err := graph.Paginate(ctx, q, tagsQuery, vars, MaxTags, func(x *resp) *graph.Connection[*tagNode] {
 		switch {
 		case x.Repository == nil:
 			missing = repoMissing(r.Repo)
 			return nil
 		case x.Repository.Head == nil:
-			missing = refMissing(r.Repo, r.Head, "")
+			noHead = true
 			return nil
 		}
 		headCommit = x.Repository.Head.OID
 		return &x.Repository.Refs
 	})
+	if noHead {
+		return nil, "", 0, refNotFound(ctx, q, r.Repo, r.Head, "")
+	}
 	if missing != nil {
 		return nil, "", 0, missing
 	}
@@ -485,6 +489,36 @@ func sinceFlag(r *Range) string {
 func repoMissing(repo issue.Repo) error {
 	return render.NotFound("repository %s not found, or the token cannot see it", repo).
 		WithFix("check board.repos in .github/dojo.toml, or gh auth status")
+}
+
+const refQuery = `query ReleaseRef($owner: String!, $repo: String!, $ref: String!) {
+  repository(owner: $owner, name: $repo) {
+    object(expression: $ref) { oid }
+  }
+}`
+
+// refNotFound is the error for ref, named by flag ("--since "), that GitHub
+// did not find in repo. A ref like origin/main is a remote-tracking branch
+// of a local checkout, which GitHub knows only as main (#68): when ref has
+// a "/" and the name after the first one is found, the fix names it. Only
+// a failed read pays this request; if it fails as well, the error is the
+// plain one.
+func refNotFound(ctx context.Context, q graph.Querier, repo issue.Repo, ref, flag string) error {
+	remote, name, ok := strings.Cut(ref, "/")
+	if !ok || remote == "" || name == "" {
+		return refMissing(repo, ref, flag)
+	}
+	var resp struct {
+		Repository *struct {
+			Object *objectJSON `json:"object"`
+		} `json:"repository"`
+	}
+	vars := map[string]any{"owner": repo.Owner, "repo": repo.Name, "ref": commitOf(name)}
+	if err := q.Query(ctx, refQuery, vars, &resp); err != nil || resp.Repository == nil || resp.Repository.Object == nil {
+		return refMissing(repo, ref, flag)
+	}
+	return render.NotFound("%s%s: no tag, branch or commit of %s", flag, ref, repo).
+		WithFix(fmt.Sprintf("if %s is a git remote of your checkout, GitHub names it %s: pass %s%s", remote, name, flag, name))
 }
 
 // refMissing is the error for ref, named by flag ("--since "), that is no

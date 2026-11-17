@@ -42,13 +42,15 @@ func newReleaseCmd() (*cobra.Command, error) {
 		Use:   "release <ref> --verb <verb>",
 		Short: "Apply a verb to the issues a release includes, found through pull requests and commits",
 		Long: "Use it once a release is tagged: it finds the issues the release includes and\n" +
-			"applies a verb with batch = true to them, as gh dojo <verb> 12 13 14 would.\n\n" +
+			"applies a verb with batch = true to them, as gh dojo <verb> 12 13 14 would.\n" +
+			"Before the tag, gh dojo release main --dry-run shows what the next one holds.\n\n" +
 			"The release is the commits of <ref> (a tag, branch or commit on GitHub) since\n" +
 			"the previous release: the highest version tag (v1.2.3) below <ref> when <ref>\n" +
 			"is one, else the highest; prereleases (v1.2.3-rc.1) only for a prerelease.\n" +
 			"--since names the start instead; the first release needs it. A tag or branch\n" +
 			"is compared with <ref> on GitHub; from a commit, <ref>'s history is read down\n" +
-			"to it. At most 1000 commits, read without a local checkout.\n\n" +
+			"to it. At most 1000 commits, read without a local checkout, so a branch is\n" +
+			"named as on GitHub: main, not origin/main.\n\n" +
 			"An issue is in the release when a merged pull request of a commit closes it\n" +
 			"(its closing keywords or linked issues; squash, merge and rebase alike), or\n" +
 			"when a commit message names it after a keyword of [release] keywords, by\n" +
@@ -66,7 +68,8 @@ func newReleaseCmd() (*cobra.Command, error) {
 			"say) is listed as not ready and left out, not failed; only a later release\n" +
 			"whose commits name it again picks it up. A closed one is refused (exit code 2).\n\n" +
 			"--dry-run lists each issue with how it was found and its plan.",
-		Example: `  gh dojo release v0.2.0 --verb done --dry-run
+		Example: `  gh dojo release main --verb done --dry-run
+  gh dojo release v0.2.0 --verb done --dry-run
   gh dojo release v0.2.0 --verb done
   gh dojo release v0.2.0 --verb done --exclude acme/api#3
   gh dojo release v0.1.0 --since 4c40894 --verb done --comment "Released in v0.1.0."`,

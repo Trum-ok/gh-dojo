@@ -129,6 +129,8 @@ version tag, see `[release]` in `.github/dojo.toml`), then the same without
 an open issue still in progress with a `Refs` commit in the release is
 listed as not ready and left alone; a later release picks it up only if its
 commits name it again, else `gh dojo done N` once it is Ready and released.
+Before tagging, `gh dojo release main --verb done --dry-run` shows what the
+next release holds (`main` as GitHub names it, not `origin/main`).
 
 So in a commit message, an issue reference that is not a link, such as an
 example of the syntax, goes in backticks: `` `Fixes #12` ``,

@@ -1,0 +1,2 @@
+error: origin/main: no tag, branch or commit of Trum-ok/gh-dojo
+fix: if origin is a git remote of your checkout, GitHub names it main: pass main

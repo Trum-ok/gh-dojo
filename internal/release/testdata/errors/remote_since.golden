@@ -1,0 +1,2 @@
+error: --since origin/v0.1.0: no tag, branch or commit of Trum-ok/gh-dojo
+fix: if origin is a git remote of your checkout, GitHub names it v0.1.0: pass --since v0.1.0

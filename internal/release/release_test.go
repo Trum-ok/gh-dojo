@@ -345,6 +345,11 @@ func TestReadErrors(t *testing.T) {
 		{"no_previous", "v0.0.1", "", render.ExitUsage, 1},
 		{"head_missing", "v9.9.9", "", render.ExitNotFound, 1},
 		{"since_missing", "v0.2.0", "v0.0.9", render.ExitNotFound, 1},
+		// A remote-tracking name of a local checkout (#68): the fix names
+		// the ref GitHub knows, at the cost of one more request.
+		{"remote_head", "origin/main", "", render.ExitNotFound, 2},
+		{"remote_since", "v0.2.0", "origin/v0.1.0", render.ExitNotFound, 2},
+		{"slash_missing", "feature/gone", "", render.ExitNotFound, 2},
 		{"too_many", "v0.2.0", "v0.0.1", render.ExitUsage, 2},
 		{"not_ancestor", "v0.2.0", "abc1234", render.ExitUsage, 2},
 		{"repo_missing", "v0.2.0", "main", render.ExitNotFound, 1},

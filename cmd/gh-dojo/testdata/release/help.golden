@@ -2,13 +2,15 @@ code: 0
 --- stdout
 Use it once a release is tagged: it finds the issues the release includes and
 applies a verb with batch = true to them, as gh dojo <verb> 12 13 14 would.
+Before the tag, gh dojo release main --dry-run shows what the next one holds.
 
 The release is the commits of <ref> (a tag, branch or commit on GitHub) since
 the previous release: the highest version tag (v1.2.3) below <ref> when <ref>
 is one, else the highest; prereleases (v1.2.3-rc.1) only for a prerelease.
 --since names the start instead; the first release needs it. A tag or branch
 is compared with <ref> on GitHub; from a commit, <ref>'s history is read down
-to it. At most 1000 commits, read without a local checkout.
+to it. At most 1000 commits, read without a local checkout, so a branch is
+named as on GitHub: main, not origin/main.
 
 An issue is in the release when a merged pull request of a commit closes it
 (its closing keywords or linked issues; squash, merge and rebase alike), or
@@ -35,6 +37,7 @@ Usage:
   gh dojo release <ref> --verb <verb> [flags]
 
 Examples:
+  gh dojo release main --verb done --dry-run
   gh dojo release v0.2.0 --verb done --dry-run
   gh dojo release v0.2.0 --verb done
   gh dojo release v0.2.0 --verb done --exclude acme/api#3
