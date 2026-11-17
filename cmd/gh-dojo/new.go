@@ -1033,11 +1033,11 @@ func (r *newRun) finish(ctx context.Context, projectID, fieldID string, initial 
 // code 5, and the re-run finds the issue and sends addSubIssue, whose
 // refusal is told by its path alone.
 func parentRefused(err error, field string, named bool) bool {
-	var gqlErr *api.GraphQLError
-	if errors.Is(err, graph.ErrUnknownOutcome) || !errors.As(err, &gqlErr) || gqlErr == nil || len(gqlErr.Errors) == 0 {
+	items := graph.ErrorItems(err)
+	if errors.Is(err, graph.ErrUnknownOutcome) || len(items) == 0 {
 		return false
 	}
-	for _, item := range gqlErr.Errors {
+	for _, item := range items {
 		if len(item.Path) == 0 || item.Path[0] != field {
 			return false
 		}
@@ -1441,11 +1441,11 @@ func (r *newRun) partial(err error) error {
 	if se != nil && se.parent {
 		// Re-running cannot help a parent GitHub refuses: full, too deep, a
 		// cycle, or out of the token's reach. GitHub's own words say which.
-		var gqlErr *api.GraphQLError
+		items := graph.ErrorItems(cause)
 		forbidden := false
-		if errors.As(cause, &gqlErr) && gqlErr != nil && len(gqlErr.Errors) > 0 {
-			why = "GitHub: " + render.SingleLine(gqlErr.Errors[0].Message)
-			forbidden = slices.ContainsFunc(gqlErr.Errors, func(i api.GraphQLErrorItem) bool { return i.Type == "FORBIDDEN" })
+		if len(items) > 0 {
+			why = "GitHub: " + render.SingleLine(items[0].Message)
+			forbidden = slices.ContainsFunc(items, func(i api.GraphQLErrorItem) bool { return i.Type == "FORBIDDEN" })
 		}
 		fix := "pass another --" + parentFlag + " to make it a sub-issue (gh issue edit " + strconv.Itoa(r.number) +
 			" -R " + r.repo.String() + " --parent <issue>), or leave it without one"

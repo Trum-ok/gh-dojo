@@ -4,14 +4,11 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
-
-	"github.com/cli/go-gh/v2/pkg/api"
 
 	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/graph"
@@ -349,12 +346,12 @@ func isLinkPath(path []any) bool {
 // repository that does not exist or that the token cannot see. Decode
 // marks those links Missing, and the rest of the response is good.
 func onlyLinkErrors(err error) bool {
-	var gqlErr *api.GraphQLError
-	if !errors.As(err, &gqlErr) || gqlErr == nil || len(gqlErr.Errors) == 0 {
+	items := graph.ErrorItems(err)
+	if len(items) == 0 {
 		return false
 	}
-	for _, item := range gqlErr.Errors {
-		if !isLinkPath(item.Path) || item.Type != "NOT_FOUND" && item.Type != "FORBIDDEN" {
+	for _, item := range items {
+		if !isLinkPath(item.Path) || !graph.Withheld(item) {
 			return false
 		}
 	}
@@ -503,11 +500,11 @@ func ReadLinks(ctx context.Context, q graph.Querier, repo Repo, number int, def 
 // NOT_FOUND of the target issue or of a link: the target is missing, and
 // maybe some links too.
 func onlyTargetOrLinks(err error) bool {
-	var gqlErr *api.GraphQLError
-	if !errors.As(err, &gqlErr) || gqlErr == nil {
+	items := graph.ErrorItems(err)
+	if len(items) == 0 {
 		return false
 	}
-	for _, item := range gqlErr.Errors {
+	for _, item := range items {
 		target := len(item.Path) == 2 && item.Path[0] == "repository" && item.Path[1] == "issueOrPullRequest"
 		if item.Type != "NOT_FOUND" || !target && !isLinkPath(item.Path) {
 			return false

@@ -9,8 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cli/go-gh/v2/pkg/api"
-
 	"github.com/Trum-ok/gh-dojo/internal/graph"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 )
@@ -318,13 +316,13 @@ type batchErrors struct {
 // alone (Linked.Missing). ok is false when any error is something else,
 // which fails the whole request.
 func perIssueErrors(err error) (errs batchErrors, ok bool) {
-	var gqlErr *api.GraphQLError
-	if !errors.As(err, &gqlErr) || gqlErr == nil || len(gqlErr.Errors) == 0 {
+	items := graph.ErrorItems(err)
+	if len(items) == 0 {
 		return batchErrors{}, false
 	}
 	errs = batchErrors{missing: map[string]bool{}, hidden: map[string][][]any{}}
-	for _, item := range gqlErr.Errors {
-		if isLinkPath(item.Path) && (item.Type == "NOT_FOUND" || item.Type == "FORBIDDEN") {
+	for _, item := range items {
+		if isLinkPath(item.Path) && graph.Withheld(item) {
 			continue
 		}
 		if len(item.Path) == 0 {
@@ -345,7 +343,7 @@ func perIssueErrors(err error) (errs batchErrors, ok bool) {
 			return batchErrors{}, false
 		case len(item.Path) == 2 && item.Type == "NOT_FOUND":
 			errs.missing[alias] = true
-		case len(item.Path) > 2 && (item.Type == "NOT_FOUND" || item.Type == "FORBIDDEN"):
+		case len(item.Path) > 2 && graph.Withheld(item):
 			errs.hidden[alias] = append(errs.hidden[alias], intIndexes(item.Path[2:]))
 		default:
 			return batchErrors{}, false

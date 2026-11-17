@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cli/go-gh/v2/pkg/api"
-
 	"github.com/Trum-ok/gh-dojo/internal/graph"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 )
@@ -346,18 +344,18 @@ func (t *tolerant) Query(ctx context.Context, query string, vars map[string]any,
 	if err == nil {
 		return nil
 	}
-	var gqlErr *api.GraphQLError
-	if !errors.As(err, &gqlErr) || gqlErr == nil || len(gqlErr.Errors) == 0 {
+	items := graph.ErrorItems(err)
+	if len(items) == 0 {
 		return err
 	}
 	partial := false
 	var page []int
-	for _, e := range gqlErr.Errors {
+	for _, e := range items {
 		p := e.Path
 		if len(p) < 5 || p[0] != "repositoryOwner" || p[1] != "projectV2" || p[2] != "items" || p[3] != "nodes" {
 			return err
 		}
-		if e.Type != "NOT_FOUND" && e.Type != "FORBIDDEN" {
+		if !graph.Withheld(e) {
 			return err
 		}
 		// nodes.<i> and nodes.<i>.content are counted as hidden items.

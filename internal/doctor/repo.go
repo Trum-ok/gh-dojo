@@ -3,12 +3,9 @@ package doctor
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"slices"
 	"strings"
-
-	"github.com/cli/go-gh/v2/pkg/api"
 
 	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/graph"
@@ -135,12 +132,12 @@ func checkToken(ctx context.Context, r *Report, q graph.Querier, repos []*repo) 
 // organization's SAML SSO denying the token; a NOT_FOUND one is null in
 // the data, which reads as not visible.
 func repoErrors(err error) (failed map[int]bool, partial bool) {
-	var gqlErr *api.GraphQLError
-	if !errors.As(err, &gqlErr) || len(gqlErr.Errors) == 0 {
+	items := graph.ErrorItems(err)
+	if len(items) == 0 {
 		return nil, false
 	}
 	failed = map[int]bool{}
-	for _, item := range gqlErr.Errors {
+	for _, item := range items {
 		var i int
 		if len(item.Path) == 0 {
 			return nil, false

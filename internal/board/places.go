@@ -2,13 +2,10 @@ package board
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"slices"
 	"strconv"
 	"strings"
-
-	"github.com/cli/go-gh/v2/pkg/api"
 
 	"github.com/Trum-ok/gh-dojo/internal/graph"
 )
@@ -216,12 +213,12 @@ func (pj *placeJSON) place(boardID, statusFieldID string, hidden bool) Place {
 // NOT_FOUND or FORBIDDEN below a repository alias of placesQuery; ok is
 // false for any other error.
 func placeErrors(err error) (paths [][]any, ok bool) {
-	var gqlErr *api.GraphQLError
-	if !errors.As(err, &gqlErr) || gqlErr == nil || len(gqlErr.Errors) == 0 {
+	items := graph.ErrorItems(err)
+	if len(items) == 0 {
 		return nil, false
 	}
-	for _, e := range gqlErr.Errors {
-		if len(e.Path) == 0 || e.Type != "NOT_FOUND" && e.Type != "FORBIDDEN" {
+	for _, e := range items {
+		if len(e.Path) == 0 || !graph.Withheld(e) {
 			return nil, false
 		}
 		if r, _ := e.Path[0].(string); !strings.HasPrefix(r, "r") {

@@ -526,3 +526,20 @@ func IsNull(v json.RawMessage) bool {
 	s := strings.TrimSpace(string(v))
 	return s == "" || s == "null"
 }
+
+// ErrorItems returns the items of the GraphQL error in err's chain: nil for
+// any other error, or one without items. A partial answer is read by
+// telling its items apart by path and type.
+func ErrorItems(err error) []api.GraphQLErrorItem {
+	var gqlErr *api.GraphQLError
+	if !errors.As(err, &gqlErr) || gqlErr == nil {
+		return nil
+	}
+	return gqlErr.Errors
+}
+
+// Withheld reports whether item is GitHub withholding a field from the
+// token: NOT_FOUND (missing, or not visible) or FORBIDDEN.
+func Withheld(item api.GraphQLErrorItem) bool {
+	return item.Type == "NOT_FOUND" || item.Type == "FORBIDDEN"
+}

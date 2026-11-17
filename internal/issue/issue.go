@@ -35,8 +35,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cli/go-gh/v2/pkg/api"
-
 	"github.com/Trum-ok/gh-dojo/internal/board"
 	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/graph"
@@ -454,12 +452,12 @@ func invalidNumber(n int) *render.Error {
 // or at a link of the Lookup (see onlyLinkErrors), which only that link
 // misses.
 func onlyNested(err error) bool {
-	var gqlErr *api.GraphQLError
-	if !errors.As(err, &gqlErr) || gqlErr == nil || len(gqlErr.Errors) == 0 {
+	items := graph.ErrorItems(err)
+	if len(items) == 0 {
 		return false
 	}
-	for _, item := range gqlErr.Errors {
-		if isLinkPath(item.Path) && (item.Type == "NOT_FOUND" || item.Type == "FORBIDDEN") {
+	for _, item := range items {
+		if isLinkPath(item.Path) && graph.Withheld(item) {
 			continue
 		}
 		if len(item.Path) < 3 || item.Path[0] != "repository" || item.Path[1] != "issueOrPullRequest" {
@@ -477,12 +475,8 @@ func onlyNested(err error) bool {
 // nestedPaths returns the error paths below the issue, without the leading
 // repository.issueOrPullRequest; list indexes are ints.
 func nestedPaths(err error) [][]any {
-	var gqlErr *api.GraphQLError
-	if !errors.As(err, &gqlErr) || gqlErr == nil {
-		return nil
-	}
 	var paths [][]any
-	for _, item := range gqlErr.Errors {
+	for _, item := range graph.ErrorItems(err) {
 		if len(item.Path) < 3 || item.Path[0] != "repository" || item.Path[1] != "issueOrPullRequest" {
 			continue
 		}
