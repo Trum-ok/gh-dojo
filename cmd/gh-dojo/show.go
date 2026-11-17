@@ -164,16 +164,7 @@ var cardSeparator = strings.Repeat("=", 40)
 
 // showArgs accepts one or more issues.
 func showArgs(cmd *cobra.Command, args []string) error {
-	help := cmd.CommandPath() + " --help"
-	if len(args) == 0 {
-		return render.Usage("%s needs an issue number, like %s", cmd.Name(), issueExamples).WithFix(help)
-	}
-	for _, a := range args {
-		if err := checkArg(cmd, a, "issues"); err != nil {
-			return err
-		}
-	}
-	return nil
+	return checkArgs(cmd, args, "an issue number", "issues")
 }
 
 // commentsFlag is --comments: a count from 0 to issue.MaxComments, or

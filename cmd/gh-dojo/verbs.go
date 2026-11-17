@@ -180,21 +180,13 @@ func newVerbCmd(cfg *config.Config, v config.Verb) *cobra.Command {
 // one issue of a batch, also when it is refused (outcome "failed").
 // show prints the issue's card too (see shownCard).
 func runVerb(cmd *cobra.Command, cfg *config.Config, v config.Verb, ref issue.Ref, args workflow.Args, dryRun, show bool) error {
-	if err := workflow.CheckArgs(v, args, ref.Arg(issue.Repo{})); err != nil {
-		return err
-	}
-	be, err := newBackend(cfg)
-	if err != nil {
-		return err
-	}
-	def, err := be.Repo()
+	be, def, err := verbBackend(cfg, v, args, ref.Arg(issue.Repo{}))
 	if err != nil {
 		return err
 	}
 	ref = ref.In(def)
 	ctx := cmd.Context()
-	engine := workflow.New(cfg)
-	engine.Getenv = getenv
+	engine := withGetenv(workflow.New(cfg))
 	it, err := batch.ReadPlan(ctx, be, engine, v, ref, args)
 	if err != nil {
 		return err
@@ -231,6 +223,30 @@ func runVerb(cmd *cobra.Command, cfg *config.Config, v config.Verb, ref issue.Re
 	}, it.Err, it.Wrote())
 }
 
+// verbBackend checks the arguments of verb v on the issues named, as
+// given, before anything is read, then returns the backend and its
+// default repository.
+func verbBackend(cfg *config.Config, v config.Verb, args workflow.Args, named ...string) (Backend, issue.Repo, error) {
+	if err := workflow.CheckArgs(v, args, named...); err != nil {
+		return nil, issue.Repo{}, err
+	}
+	be, err := newBackend(cfg)
+	if err != nil {
+		return nil, issue.Repo{}, err
+	}
+	def, err := be.Repo()
+	if err != nil {
+		return nil, issue.Repo{}, err
+	}
+	return be, def, nil
+}
+
+// withGetenv makes engine e read the session variables through getenv.
+func withGetenv(e *workflow.Engine) *workflow.Engine {
+	e.Getenv = getenv
+	return e
+}
+
 // backendRepo is the default repository of be, owner/name, for the JSON;
 // "" when not known.
 func backendRepo(be Backend) string {
@@ -253,17 +269,28 @@ func readPlan(ctx context.Context, be Backend, e *workflow.Engine, v config.Verb
 	return e.Plan(v, is, args)
 }
 
+// checkArgs checks issue arguments before anything is read: at least one,
+// else "<command> needs <need>", and each as checkArg does, what being the
+// example's noun.
+func checkArgs(cmd *cobra.Command, args []string, need, what string) error {
+	if len(args) == 0 {
+		return render.Usage("%s needs %s, like %s", cmd.Name(), need, issueExamples).WithFix(cmd.CommandPath() + " --help")
+	}
+	for _, a := range args {
+		if err := checkArg(cmd, a, what); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // issueArg accepts exactly one issue number.
 func issueArg(cmd *cobra.Command, args []string) error {
-	help := cmd.CommandPath() + " --help"
-	switch {
-	case len(args) == 0:
-		return render.Usage("%s needs an issue number, like %s", cmd.Name(), issueExamples).WithFix(help)
-	case len(args) > 1:
+	if len(args) > 1 {
 		return render.Usage("%s takes one issue number, got %d; several at once are not supported yet",
-			cmd.Name(), len(args)).WithFix(help)
+			cmd.Name(), len(args)).WithFix(cmd.CommandPath() + " --help")
 	}
-	return checkArg(cmd, args[0], "one")
+	return checkArgs(cmd, args, "an issue number", "one")
 }
 
 // issueArgs accepts the issue numbers of verb v: one, or with batch =
@@ -272,17 +299,12 @@ func issueArg(cmd *cobra.Command, args []string) error {
 // of the default repository, which is not known yet: runBatch tells.
 func issueArgs(cfg *config.Config, v config.Verb) cobra.PositionalArgs {
 	return func(cmd *cobra.Command, args []string) error {
-		help := cmd.CommandPath() + " --help"
-		switch {
-		case len(args) == 0 && v.Batch:
-			return render.Usage("%s needs one or more issue numbers, like %s", cmd.Name(), issueExamples).WithFix(help)
-		case len(args) == 0:
-			return render.Usage("%s needs an issue number, like %s", cmd.Name(), issueExamples).WithFix(help)
+		need := "an issue number"
+		if v.Batch {
+			need = "one or more issue numbers"
 		}
-		for _, a := range args {
-			if err := checkArg(cmd, a, "one"); err != nil {
-				return err
-			}
+		if err := checkArgs(cmd, args, need, "one"); err != nil {
+			return err
 		}
 		refs := argRefs(args, issue.Repo{})
 		numbers := map[int]bool{}
