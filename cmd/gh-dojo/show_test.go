@@ -98,7 +98,7 @@ func TestShowColdCache(t *testing.T) {
 	}
 }
 
-// TestShowTokens keeps typical cards within the spec's ~2k tokens, counted
+// TestShowTokens keeps typical cards within ~2k tokens of context, counted
 // conservatively: 3 ASCII characters or 2 others (Cyrillic) per token.
 func TestShowTokens(t *testing.T) {
 	for _, name := range []string{"card_3", "long_thread", "cyrillic"} {

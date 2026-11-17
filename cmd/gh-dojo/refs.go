@@ -12,12 +12,12 @@ import (
 	"github.com/Trum-ok/gh-dojo/internal/render"
 )
 
-// Issues on the command line and in output (spec F12). Every command that
-// takes an issue takes 12, "#12", owner/repo#12 or the issue's URL; a bare
-// number is in the default repository (board.repos[0], see App.Repo), and
-// any other repository can be named, in board.repos or not. Output names
-// an issue of the default repository #12, and any other owner/repo#12: in
-// the text and in the JSON's refs alike.
+// Issues on the command line and in output. Every command that takes an
+// issue takes 12, "#12", owner/repo#12 or the issue's URL; a bare number
+// is in the default repository (board.repos[0], see App.Repo), and any
+// other repository can be named, in board.repos or not. Output names an
+// issue of the default repository #12, and any other owner/repo#12: in the
+// text and in the JSON's refs alike.
 
 // parseRef parses an issue argument, up to GitHub's maximum number (a
 // GraphQL Int, 2^31-1): 12, "#12", owner/repo#12 or the issue's URL. A

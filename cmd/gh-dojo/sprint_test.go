@@ -16,9 +16,10 @@ import (
 )
 
 // sprintConfig points at the hand-crafted acme/3 board with a Sprint
-// iteration field (Sprint 12 covers testNow, 2026-11-11): the spec's done
-// (the sprint of the day the issue entered Ready), start and plan (today's
-// sprint), unplan (clear) and triage (the field effect).
+// iteration field (Sprint 12 covers testNow, 2026-11-11), with verbs for
+// each iteration and field effect: done (the sprint of the day the issue
+// entered Ready), start and plan (today's sprint), unplan (clear) and
+// triage (the field effect).
 const sprintConfig = `
 version = 1
 
@@ -119,8 +120,8 @@ func TestSprintsPresetDryRun(t *testing.T) {
 	)
 }
 
-// TestSprintDone is the spec's done: #42 entered Ready on 2026-11-05, so
-// the status and Sprint 11 (not today's Sprint 12) go in one mutation
+// TestSprintDone: done sets the sprint of the day #42 entered Ready,
+// 2026-11-05, so the status and Sprint 11 (not today's Sprint 12) go in one mutation
 // after one read. The repeat finds both in place: one read.
 func TestSprintDone(t *testing.T) {
 	srv, before := withSprintApp(t, time.Time{}, verbFixture("sprint_done"))

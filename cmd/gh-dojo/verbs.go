@@ -66,13 +66,14 @@ var getenv = os.Getenv
 // schema ID, also dropping what Apply confirmed in case the re-read lags
 // behind it; after a partial failure the agent re-runs the command.
 type Backend interface {
-	// ReadIssue returns the state of issue ref for verb v, filled as workflow.Issue documents (comments with viewerDidAuthor,
-	// labels, assignees, and the viewer when v assigns or unassigns @me), with a render
-	// error on failure (render.NotFound for a missing issue; a config error
-	// for a label of v to add that is missing in the repo, a label spelled
-	// in another case than the repo's, or an assignee who cannot be
-	// assigned). The issue's repository is ref's, which a caller resolves
-	// with Repo for a bare number.
+	// ReadIssue returns the state of issue ref for verb v, filled as
+	// workflow.Issue documents (comments with viewerDidAuthor, labels,
+	// assignees, and the viewer when v assigns or unassigns @me), with a
+	// render error on failure (render.NotFound for a missing issue; a
+	// config error for a label of v to add that is missing in the repo, a
+	// label spelled in another case than the repo's, or an assignee who
+	// cannot be assigned). The issue's repository is ref's, which a caller
+	// resolves with Repo for a bare number.
 	//
 	// For a verb with blockers = "warn" or "deny" it fills the unresolved
 	// blockers; for blockers = "link" with --by naming issues (a), those
@@ -82,12 +83,13 @@ type Backend interface {
 	ReadIssue(ctx context.Context, v config.Verb, ref issue.Ref, a workflow.Args) (workflow.Issue, error)
 	// ReadIssues reads issues refs like ReadIssue, for a verb with batch =
 	// true: one request per issue.MaxBatch issues, of any repositories,
-	// with what v looks up read once in each. It returns one batch.Read per number, in order; an
-	// issue that fails alone (not found, a pull request, its board place
-	// or sprint not read, the issue --by names) has its own Err. err fails them all:
-	// a config error of v (a label to add missing in the repo) or a
-	// request that read nothing. A request that fails after earlier ones
-	// read their issues is the Err of each issue it did not read.
+	// with what v looks up read once in each. It returns one batch.Read
+	// per number, in order; an issue that fails alone (not found, a pull
+	// request, its board place or sprint not read, the issue --by names)
+	// has its own Err. err fails them all: a config error of v (a label to
+	// add missing in the repo) or a request that read nothing. A request
+	// that fails after earlier ones read their issues is the Err of each
+	// issue it did not read.
 	ReadIssues(ctx context.Context, v config.Verb, refs []issue.Ref, a workflow.Args) ([]batch.Read, error)
 	// Apply applies every op of a non-empty plan, finding the issue's node
 	// IDs in p.Issue.Ref. It returns the ops GitHub confirmed, also with an
@@ -174,7 +176,7 @@ func newVerbCmd(cfg *config.Config, v config.Verb) *cobra.Command {
 	return cmd
 }
 
-// runVerb runs verb v on issue n. An error that read nothing, such as
+// runVerb runs verb v on issue ref. An error that read nothing, such as
 // bad arguments or the network, is the command's alone; once the issue
 // was read (or found missing), its JSON is a verb result for it, as for
 // one issue of a batch, also when it is refused (outcome "failed").

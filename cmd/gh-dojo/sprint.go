@@ -384,7 +384,7 @@ func (b *githubBackend) fieldIDs(s *board.Schema, ops []workflow.Op, ids *effect
 }
 
 // SchemaCached reports whether the board schema the backend reads and
-// writes with came from the cache (see readPlanFresh).
+// writes with came from the cache (see batch.ReadPlan).
 func (b *githubBackend) SchemaCached() bool { return b.app.SchemaCached() }
 
 // SchemaCached reports whether the schema the App keeps came from the
