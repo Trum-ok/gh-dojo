@@ -18,22 +18,15 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+      # The Makefile's targets, so make check runs the same checks.
       - name: Format
-        run: |
-          unformatted="$(gofmt -l .)"
-          if [ -n "$unformatted" ]; then
-            echo "gofmt needed on:"; echo "$unformatted"; exit 1
-          fi
+        run: make fmt
+      # go.mod and go.sum, of gh-dojo and of tools/.
       - name: Tidy
-        run: |
-          go mod tidy -diff
-          (cd tools && go mod tidy -diff)
+        run: make tidy
+      # On Linux, Windows and macOS, and the e2e tests.
       - name: Vet
-        run: |
-          go vet ./...
-          GOOS=windows go vet ./...
-          GOOS=darwin go vet ./...
-          go vet -tags e2e ./e2e
+        run: make vet
       # staticcheck, pinned in tools/go.mod, on the same systems as vet.
       - name: Staticcheck
         run: make lint
