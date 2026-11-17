@@ -33,23 +33,25 @@ fragment board on ProjectV2 {
 
 type schemaResponse struct {
 	RepositoryOwner *struct {
-		Typename  string       `json:"__typename"`
-		Login     string       `json:"login"`
-		ProjectV2 *projectJSON `json:"projectV2"`
+		Typename  string             `json:"__typename"`
+		Login     string             `json:"login"`
+		ProjectV2 *schemaProjectNode `json:"projectV2"`
 	} `json:"repositoryOwner"`
 }
 
-type projectJSON struct {
+// schemaProjectNode is the project as the schema query reads it, with its
+// fields (projectNode is one as ListProjects lists it).
+type schemaProjectNode struct {
 	ID     string `json:"id"`
 	Title  string `json:"title"`
 	URL    string `json:"url"`
 	Closed bool   `json:"closed"`
 	Fields struct {
-		Nodes []fieldJSON `json:"nodes"`
+		Nodes []fieldNode `json:"nodes"`
 	} `json:"fields"`
 }
 
-type fieldJSON struct {
+type fieldNode struct {
 	ID            string    `json:"id"`
 	Name          string    `json:"name"`
 	DataType      FieldType `json:"dataType"`
@@ -60,7 +62,7 @@ type fieldJSON struct {
 	} `json:"configuration"`
 }
 
-func (p *projectJSON) schema(ownerType, login string, number int) *Schema {
+func (p *schemaProjectNode) schema(ownerType, login string, number int) *Schema {
 	s := &Schema{
 		Owner:     login,
 		OwnerType: ownerType,

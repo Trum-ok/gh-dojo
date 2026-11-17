@@ -254,21 +254,21 @@ func (l Lookup) widen(s string) string {
 	return s
 }
 
-// repoJSON is the repository of a card response: the issue, and the
+// repoNode is the repository of a card response: the issue, and the
 // lookups a Lookup added under their aliases.
-type repoJSON struct {
-	IssueOrPullRequest *issueJSON
+type repoNode struct {
+	IssueOrPullRequest *issueNode
 	Assignable         *conn[*User]
 	Milestones         *graph.Connection[OpenMilestone]
-	labels             map[string]*labelJSON // by alias
+	labels             map[string]*labelNode // by alias
 }
 
-type labelJSON struct {
+type labelNode struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 }
 
-func (r *repoJSON) UnmarshalJSON(data []byte) error {
+func (r *repoNode) UnmarshalJSON(data []byte) error {
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(data, &fields); err != nil {
 		return err
@@ -278,7 +278,7 @@ func (r *repoJSON) UnmarshalJSON(data []byte) error {
 
 // fromFields fills r from the fields of the repository object, decoded
 // once by the caller; fields it does not know are skipped.
-func (r *repoJSON) fromFields(fields map[string]json.RawMessage) error {
+func (r *repoNode) fromFields(fields map[string]json.RawMessage) error {
 	for key, raw := range fields {
 		var err error
 		switch {
@@ -290,9 +290,9 @@ func (r *repoJSON) fromFields(fields map[string]json.RawMessage) error {
 			err = json.Unmarshal(raw, &r.Milestones)
 		case strings.HasPrefix(key, "label"):
 			if r.labels == nil {
-				r.labels = map[string]*labelJSON{}
+				r.labels = map[string]*labelNode{}
 			}
-			var l labelJSON
+			var l labelNode
 			if err = json.Unmarshal(raw, &l); err == nil && l.ID != "" {
 				r.labels[key] = &l
 			}
@@ -305,7 +305,7 @@ func (r *repoJSON) fromFields(fields map[string]json.RawMessage) error {
 }
 
 // found turns the lookups of a response into Found.
-func (l Lookup) found(r *repoJSON, viewer *User, data map[string]json.RawMessage) (*Found, error) {
+func (l Lookup) found(r *repoNode, viewer *User, data map[string]json.RawMessage) (*Found, error) {
 	f := &Found{Labels: map[string]string{}}
 	if r != nil {
 		for i, name := range l.Labels {

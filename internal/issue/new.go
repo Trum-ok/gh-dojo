@@ -181,7 +181,7 @@ type NewContext struct {
 	Milestones    graph.Connection[OpenMilestone]
 	allMilestones []OpenMilestone // all of them, once read past the first page
 	// Issues are the repository's newest open issues, oldest first.
-	Issues []*newIssueJSON
+	Issues []*newIssueNode
 	// Links are the NewRequest.Blockers issues, in order.
 	Links []*Linked
 	// Parent is the NewRequest.Parent issue, read as a link; nil without it.
@@ -205,7 +205,7 @@ type BoardItem struct {
 	} `json:"fieldValueByName"`
 }
 
-type newIssueJSON struct {
+type newIssueNode struct {
 	ID              string `json:"id"`
 	Number          int    `json:"number"`
 	Title           string `json:"title"`
@@ -248,7 +248,7 @@ func ReadNewContext(ctx context.Context, q graph.Querier, req NewRequest) (*NewC
 		Labels     graph.Connection[Label]         `json:"labels"`
 		Milestones graph.Connection[OpenMilestone] `json:"milestones"`
 		Issues     struct {
-			Nodes []*newIssueJSON `json:"nodes"`
+			Nodes []*newIssueNode `json:"nodes"`
 		} `json:"issues"`
 	}
 	repo := req.Repo

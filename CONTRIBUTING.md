@@ -196,6 +196,16 @@ JSON too. The JSON keeps the rules and schemas of
 [docs/output.md](docs/output.md#json-output) ("Stability"); each command has
 JSON golden files under `cmd/gh-dojo/testdata/json/`.
 
+The Go types are named by role, so output is never mistaken for what is
+read from GitHub. A command's result, the top level of its `--json`, is
+`xxxResult` (`showResult`, `verbResult`); a nested part of the output is
+`xxxJSON` (`cardJSON`, `milestoneJSON`), and a function that builds one is
+`toXxxJSON`, never the type's own name. A type that decodes a GraphQL
+answer is `xxxResponse` for the whole `data` (`itemsResponse`) and
+`xxxNode` for an object in it (`issueNode`, `itemNode`). The JSON field
+names come from the `json:"…"` tags, so renaming a type never changes the
+output.
+
 ## Design principles
 
 Every command is checked against these rules.

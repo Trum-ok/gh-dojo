@@ -89,31 +89,31 @@ var commitFragment = `fragment releaseCommit on Commit {
   }
 }`
 
-type commitJSON struct {
+type commitNode struct {
 	OID     string `json:"oid"`
 	Message string `json:"message"`
 	Pulls   struct {
 		TotalCount int         `json:"totalCount"`
-		Nodes      []*pullJSON `json:"nodes"`
+		Nodes      []*pullNode `json:"nodes"`
 	} `json:"associatedPullRequests"`
 }
 
-type pullJSON struct {
+type pullNode struct {
 	Number     int      `json:"number"`
 	Merged     bool     `json:"merged"`
-	Repository repoJSON `json:"repository"`
+	Repository repoNode `json:"repository"`
 	Closing    struct {
 		TotalCount int          `json:"totalCount"`
-		Nodes      []*issueJSON `json:"nodes"`
+		Nodes      []*issueNode `json:"nodes"`
 	} `json:"closingIssuesReferences"`
 }
 
-type issueJSON struct {
+type issueNode struct {
 	Number     int      `json:"number"`
-	Repository repoJSON `json:"repository"`
+	Repository repoNode `json:"repository"`
 }
 
-type repoJSON struct {
+type repoNode struct {
 	NameWithOwner string `json:"nameWithOwner"`
 }
 
@@ -173,7 +173,7 @@ var historyQuery = `query ReleaseHistory($owner: String!, $repo: String!, $head:
 
 ` + commitFragment
 
-type objectJSON struct {
+type objectNode struct {
 	OID string `json:"oid"`
 	// CommittedDate is RFC 3339; "" when not read.
 	CommittedDate string `json:"committedDate"`
@@ -218,8 +218,8 @@ func Read(ctx context.Context, q graph.Querier, repo issue.Repo, head, since str
 	} else {
 		var resp struct {
 			Repository *struct {
-				Head     *objectJSON `json:"head"`
-				Since    *objectJSON `json:"since"`
+				Head     *objectNode `json:"head"`
+				Since    *objectNode `json:"since"`
 				SinceRef *struct {
 					Prefix string `json:"prefix"`
 					Name   string `json:"name"`
@@ -286,7 +286,7 @@ type objectType struct {
 func readTags(ctx context.Context, q graph.Querier, vars map[string]any, r *Range) ([]Tag, string, int, error) {
 	type resp struct {
 		Repository *struct {
-			Head *objectJSON                `json:"head"`
+			Head *objectNode                `json:"head"`
 			Refs graph.Connection[*tagNode] `json:"refs"`
 		} `json:"repository"`
 	}
@@ -342,7 +342,7 @@ func (r *Range) compare(ctx context.Context, q graph.Querier, base string) error
 				Ref *struct {
 					Compare *struct {
 						Status  string                        `json:"status"`
-						Commits graph.Connection[*commitJSON] `json:"commits"`
+						Commits graph.Connection[*commitNode] `json:"commits"`
 					} `json:"compare"`
 				} `json:"ref"`
 			} `json:"repository"`
@@ -384,12 +384,12 @@ func (r *Range) compare(ctx context.Context, q graph.Querier, base string) error
 // and keeps the commits before it, oldest first.
 func (r *Range) walk(ctx context.Context, q graph.Querier) error {
 	vars := map[string]any{"owner": r.Repo.Owner, "repo": r.Repo.Name, "head": r.HeadCommit, "cursor": nil}
-	var commits []*commitJSON
+	var commits []*commitNode
 	for {
 		var resp struct {
 			Repository *struct {
 				Object *struct {
-					History *graph.Connection[*commitJSON] `json:"history"`
+					History *graph.Connection[*commitNode] `json:"history"`
 				} `json:"object"`
 			} `json:"repository"`
 		}
@@ -428,7 +428,7 @@ func (r *Range) walk(ctx context.Context, q graph.Querier) error {
 
 // add keeps commits, with their merged pull requests of r.Repo, warning
 // about lists cut by the windows.
-func (r *Range) add(nodes []*commitJSON) {
+func (r *Range) add(nodes []*commitNode) {
 	for _, n := range nodes {
 		if n == nil {
 			continue
@@ -504,7 +504,7 @@ func refNotFound(ctx context.Context, q graph.Querier, repo issue.Repo, ref, fla
 	}
 	var resp struct {
 		Repository *struct {
-			Object *objectJSON `json:"object"`
+			Object *objectNode `json:"object"`
 		} `json:"repository"`
 	}
 	vars := map[string]any{"owner": repo.Owner, "repo": repo.Name, "ref": commitOf(name)}

@@ -397,7 +397,7 @@ func Read(ctx context.Context, q graph.Querier, req Request) (*Card, error) {
 
 	var resp cardResponse
 	err := q.Query(ctx, query, vars, &resp)
-	var node *issueJSON
+	var node *issueNode
 	if resp.Repository != nil {
 		node = resp.Repository.IssueOrPullRequest
 	}
@@ -528,7 +528,7 @@ func withheld(hidden [][]any, prefix ...any) bool {
 	return false
 }
 
-func (n *issueJSON) card(req Request, hidden [][]any) *Card {
+func (n *issueNode) card(req Request, hidden [][]any) *Card {
 	repo := req.Repo
 	if m := urlRefRE.FindStringSubmatch(n.URL); m != nil {
 		repo = canonical(repo, m[2]) // as GitHub spells it
@@ -623,7 +623,7 @@ func (n *issueJSON) card(req Request, hidden [][]any) *Card {
 // historyTruncated reports whether status changes of the board may precede
 // the timeline window: older events exist (of any board) and the oldest
 // event read is not older than the item, so older ones may be the item's.
-func (n *issueJSON) historyTruncated(item *Item) bool {
+func (n *issueNode) historyTruncated(item *Item) bool {
 	tl := n.TimelineItems
 	if tl.TotalCount <= len(tl.Nodes) {
 		return false
@@ -644,8 +644,8 @@ func (n *issueJSON) historyTruncated(item *Item) bool {
 // boardItem finds the issue's item on req.Board. When there is none it
 // returns why the issue may still be on the board, "" when it is not.
 // renamed reports that the status field's name (req.StatusField) no
-// longer finds the status field by its ID (see itemJSON.status).
-func (n *issueJSON) boardItem(req Request, hidden [][]any) (item *Item, unknown string, renamed bool) {
+// longer finds the status field by its ID (see itemNode.status).
+func (n *issueNode) boardItem(req Request, hidden [][]any) (item *Item, unknown string, renamed bool) {
 	items := n.ProjectItems
 	unseen := false // an item whose project GitHub withheld
 	for i, it := range items.Nodes {
@@ -681,7 +681,7 @@ func (n *issueJSON) boardItem(req Request, hidden [][]any) (item *Item, unknown 
 // its ID is looked up among the values read. renamed reports that the
 // lookup by name found another field, or nothing while the lookup by ID
 // found the status: the name no longer finds the status field.
-func (it *itemJSON) status(req Request, item *Item, hidden bool) (status string, unknown, renamed bool) {
+func (it *itemNode) status(req Request, item *Item, hidden bool) (status string, unknown, renamed bool) {
 	match := func(v Value) bool {
 		if v.Type != board.TypeSingleSelect {
 			return false
@@ -710,7 +710,7 @@ func (it *itemJSON) status(req Request, item *Item, hidden bool) (status string,
 // links converts linked issues. hidden are the withheld paths below the
 // list (nodes.<i>...); renamed is boardItem's: the status field's name no
 // longer finds the status field.
-func links(in conn[*linkJSON], req Request, hidden [][]any, renamed bool) graph.Page[Link] {
+func links(in conn[*linkNode], req Request, hidden [][]any, renamed bool) graph.Page[Link] {
 	out := graph.Page[Link]{TotalCount: in.TotalCount}
 	for i, l := range in.Nodes {
 		if l == nil {
@@ -723,7 +723,7 @@ func links(in conn[*linkJSON], req Request, hidden [][]any, renamed bool) graph.
 
 // link converts one linked issue; hidden are the withheld paths below its
 // projectItems.
-func link(l *linkJSON, req Request, hidden [][]any, renamed bool) *Link {
+func link(l *linkNode, req Request, hidden [][]any, renamed bool) *Link {
 	out := &Link{Number: l.Number, Title: l.Title, State: l.State}
 	if l.Repository != nil {
 		out.Repo, _ = ParseRepo(l.Repository.NameWithOwner)
@@ -743,7 +743,7 @@ const (
 // Status, or StatusUnknown when it cannot be told. hidden are the withheld
 // paths below its projectItems. As for the card, a value whose field is
 // not the configured status field (by ID, when known) does not count.
-func (l *linkJSON) board(req Request, link *Link, hidden [][]any, renamed bool) {
+func (l *linkNode) board(req Request, link *Link, hidden [][]any, renamed bool) {
 	if req.Board == nil {
 		link.StatusUnknown = linkNoBoard
 		return
@@ -781,7 +781,7 @@ func (l *linkJSON) board(req Request, link *Link, hidden [][]any, renamed bool) 
 	}
 }
 
-func (v *valueJSON) value() (Value, bool) {
+func (v *valueNode) value() (Value, bool) {
 	if v == nil || v.Field == nil || v.Field.Name == "" {
 		return Value{}, false
 	}

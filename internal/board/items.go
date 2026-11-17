@@ -173,7 +173,7 @@ func ReadItemsWith(ctx context.Context, q graph.Querier, s *Schema, statusField 
 		vars["sprint"] = o.Sprint
 	}
 	first := true
-	page, err := graph.Paginate(ctx, tq, query, vars, 0, func(r *itemsResponse) *graph.Connection[*itemJSON] {
+	page, err := graph.Paginate(ctx, tq, query, vars, 0, func(r *itemsResponse) *graph.Connection[*itemNode] {
 		if r.Viewer != nil && out.Viewer == "" {
 			out.Viewer = r.Viewer.Login
 		}
@@ -230,12 +230,12 @@ type itemsResponse struct {
 			Field *struct {
 				ID string `json:"id"`
 			} `json:"field"`
-			Items graph.Connection[*itemJSON] `json:"items"`
+			Items graph.Connection[*itemNode] `json:"items"`
 		} `json:"projectV2"`
 	} `json:"repositoryOwner"`
 }
 
-type itemJSON struct {
+type itemNode struct {
 	partial bool // GitHub withheld part of it (tolerant)
 
 	Status *struct {
@@ -279,7 +279,7 @@ type itemJSON struct {
 }
 
 // item converts a node; a null node or content is ContentHidden.
-func (n *itemJSON) item() Item {
+func (n *itemNode) item() Item {
 	var it Item
 	if n == nil {
 		return it

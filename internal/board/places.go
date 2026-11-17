@@ -116,7 +116,7 @@ func placesQuery(keys []IssueKey) (query string, vars map[string]any, repos []st
 	return query, vars, repos, nil
 }
 
-type placeJSON struct {
+type placeNode struct {
 	State        string `json:"state"`
 	ProjectItems struct {
 		TotalCount int `json:"totalCount"`
@@ -141,7 +141,7 @@ func readPlaces(ctx context.Context, q graph.Querier, s *Schema, statusField, st
 		return err
 	}
 	vars["status"] = statusField
-	var data map[string]map[string]*placeJSON
+	var data map[string]map[string]*placeNode
 	withheld := map[IssueKey]bool{} // projects withheld below the issue
 	if err := q.Query(ctx, query, vars, &data); err != nil {
 		paths, ok := placeErrors(err)
@@ -163,7 +163,7 @@ func readPlaces(ctx context.Context, q graph.Querier, s *Schema, statusField, st
 	}
 	for _, k := range keys {
 		ri := slices.Index(repos, k.Repo)
-		var pj *placeJSON
+		var pj *placeNode
 		if issues := data["r"+strconv.Itoa(ri)]; issues != nil {
 			pj = issues["i"+strconv.Itoa(k.Number)]
 		}
@@ -174,7 +174,7 @@ func readPlaces(ctx context.Context, q graph.Querier, s *Schema, statusField, st
 
 // place converts an issue's place on the board boardID; nil is an issue
 // the token cannot see. hidden says GitHub withheld some of its projects.
-func (pj *placeJSON) place(boardID, statusFieldID string, hidden bool) Place {
+func (pj *placeNode) place(boardID, statusFieldID string, hidden bool) Place {
 	if pj == nil {
 		return Place{Unknown: placeWithheld, Withheld: true}
 	}

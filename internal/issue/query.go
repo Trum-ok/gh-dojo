@@ -118,7 +118,7 @@ fragment value on ProjectV2ItemFieldValue {
 fragment field on ProjectV2FieldCommon { id name dataType }`
 
 type cardResponse struct {
-	Repository *repoJSON
+	Repository *repoNode
 	Viewer     *User // read for Lookup.Viewer only
 	// data is the whole "data" object, for the links of a Lookup.
 	data map[string]json.RawMessage
@@ -151,7 +151,7 @@ type conn[T any] struct {
 	Nodes      []T `json:"nodes"`
 }
 
-type issueJSON struct {
+type issueNode struct {
 	Typename    string  `json:"__typename"`
 	ID          string  `json:"id"`
 	Number      int     `json:"number"`
@@ -178,17 +178,17 @@ type issueJSON struct {
 		ViewerDidAuthor bool   `json:"viewerDidAuthor"`
 		Body            string `json:"body"`
 	}] `json:"comments"`
-	BlockedBy conn[*linkJSON] `json:"blockedBy"`
-	Blocking  conn[*linkJSON] `json:"blocking"`
-	Parent    *linkJSON       `json:"parent"`
-	SubIssues conn[*linkJSON] `json:"subIssues"`
+	BlockedBy conn[*linkNode] `json:"blockedBy"`
+	Blocking  conn[*linkNode] `json:"blocking"`
+	Parent    *linkNode       `json:"parent"`
+	SubIssues conn[*linkNode] `json:"subIssues"`
 	// SubIssuesSummary counts all sub-issues; completed are the closed
 	// ones, whatever the reason (checked on live issues, #52).
 	SubIssuesSummary *struct {
 		Total     int `json:"total"`
 		Completed int `json:"completed"`
 	} `json:"subIssuesSummary"`
-	ProjectItems  conn[*itemJSON] `json:"projectItems"`
+	ProjectItems  conn[*itemNode] `json:"projectItems"`
 	TimelineItems conn[*struct {
 		CreatedAt      string `json:"createdAt"`
 		PreviousStatus string `json:"previousStatus"`
@@ -201,18 +201,18 @@ type issueJSON struct {
 	}] `json:"timelineItems"`
 }
 
-type itemJSON struct {
+type itemNode struct {
 	ID         string `json:"id"`
 	IsArchived bool   `json:"isArchived"`
 	CreatedAt  string `json:"createdAt"`
 	Project    *struct {
 		ID string `json:"id"`
 	} `json:"project"`
-	Status      *valueJSON       `json:"status"`
-	FieldValues conn[*valueJSON] `json:"fieldValues"`
+	Status      *valueNode       `json:"status"`
+	FieldValues conn[*valueNode] `json:"fieldValues"`
 }
 
-type linkJSON struct {
+type linkNode struct {
 	Number     int    `json:"number"`
 	Title      string `json:"title"`
 	State      string `json:"state"`
@@ -233,7 +233,7 @@ type linkJSON struct {
 	}] `json:"projectItems"`
 }
 
-type valueJSON struct {
+type valueNode struct {
 	Typename    string   `json:"__typename"`
 	Name        string   `json:"name"`
 	Title       string   `json:"title"`

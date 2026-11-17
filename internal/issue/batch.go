@@ -212,7 +212,7 @@ func readBatch(ctx context.Context, q graph.Querier, req Request, refs []Ref) ([
 			r.Repo, r.Number = refs[i].Repo, refs[i].Number
 			alias := batchAlias(i)
 			out[i].Repo, out[i].Number = r.Repo, r.Number
-			var node *issueJSON
+			var node *issueNode
 			if block != nil {
 				node = block.issues[alias]
 			}
@@ -253,8 +253,8 @@ type batchResponse struct {
 // batchRepo is one repository field of a batch: the issues by alias and
 // the lookups of the repository.
 type batchRepo struct {
-	issues  map[string]*issueJSON
-	lookups *repoJSON
+	issues  map[string]*issueNode
+	lookups *repoNode
 }
 
 func (r *batchResponse) UnmarshalJSON(b []byte) error {
@@ -275,7 +275,7 @@ func (r *batchResponse) UnmarshalJSON(b []byte) error {
 		}
 		// The aliases are the issues; the other fields are the lookups,
 		// read from the same decoded object.
-		block := &batchRepo{issues: map[string]*issueJSON{}, lookups: &repoJSON{}}
+		block := &batchRepo{issues: map[string]*issueNode{}, lookups: &repoNode{}}
 		if err := block.lookups.fromFields(fields); err != nil {
 			return err
 		}
@@ -283,7 +283,7 @@ func (r *batchResponse) UnmarshalJSON(b []byte) error {
 			if !isBatchAlias(alias) {
 				continue
 			}
-			var node *issueJSON
+			var node *issueNode
 			if err := json.Unmarshal(f, &node); err != nil {
 				return err
 			}
