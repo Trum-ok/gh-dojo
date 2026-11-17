@@ -25,9 +25,9 @@ func issueReason(err error) string {
 }
 
 // MaxSummaryRunes is how long a line of the summary error may grow: the
-// error block cuts a line at 200 runes, "error: " included, and the
-// summary never relies on that cut, which would hide issues silently.
-const MaxSummaryRunes = 190
+// error block cuts a line at render.MaxLineRunes, "error: " included, and
+// the summary never relies on that cut, which would hide issues silently.
+const MaxSummaryRunes = render.MaxLineRunes - 10
 
 // issueRefRE matches an issue reference in a reason: "#9", "issue #9",
 // "acme/api#9".

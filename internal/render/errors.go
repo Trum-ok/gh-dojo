@@ -43,9 +43,12 @@ var ExitCodes = []struct {
 	{ExitPartial, "partially applied", "re-run the same command; it finishes the rest"},
 }
 
+// MaxLineRunes is how long a line of the error block may be, "error: "
+// included: a longer one is cut with "…".
+const MaxLineRunes = 200
+
 const (
 	maxWhatLines = 3   // the error block is at most 5 lines: what (≤3), allowed, fix
-	maxLineRunes = 200 // long lines are cut with "…"
 	maxFixRunes  = 400 // a longer fix is dropped: a cut command would be wrong
 	maxAllowed   = 20  // longer allowed lists end with "and N more"
 )
@@ -150,10 +153,10 @@ func (e *Error) Text() string {
 		if i == 0 {
 			l = "error: " + l
 		}
-		lines = append(lines, Clip(l, maxLineRunes))
+		lines = append(lines, Clip(l, MaxLineRunes))
 	}
 	if len(e.Allowed) > 0 {
-		lines = append(lines, Clip("allowed: "+joinAllowed(e.Allowed), maxLineRunes*2))
+		lines = append(lines, Clip("allowed: "+joinAllowed(e.Allowed), MaxLineRunes*2))
 	}
 	if fix := SingleLine(e.Fix); fix != "" && RuneLen(fix) <= maxFixRunes {
 		lines = append(lines, "fix: "+fix)

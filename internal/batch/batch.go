@@ -445,9 +445,6 @@ func (b *Run) reread(ctx context.Context, items []*Item, staleErr error) {
 			it.failRun(first, staleErr, perr)
 			continue
 		}
-		// What the first attempt confirmed is not sent again, even if the
-		// re-read does not show it yet.
-		fresh.Ops = Missing(fresh.Ops, it.Writes.Done)
-		it.Writes.Fresh = fresh
+		it.Writes.replanned(fresh)
 	}
 }

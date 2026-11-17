@@ -144,14 +144,19 @@ func (w *Writes) ApplyFresh(ctx context.Context, be Backend, replan func() (*wor
 	if perr != nil {
 		return w.Partial(Missing(plan.Ops, w.Done), err, perr)
 	}
-	// What the first attempt confirmed is not sent again, even if the
-	// re-read does not show it yet.
-	fresh.Ops = Missing(fresh.Ops, w.Done)
-	w.Fresh = fresh
+	w.replanned(fresh)
 	if err := w.Apply(ctx, be, fresh); err != nil {
 		return w.Partial(Missing(fresh.Ops, w.Done), err, err)
 	}
 	return nil
+}
+
+// replanned records fresh, the re-plan of a retry, without what the first
+// attempt confirmed: that is not sent again, even if the re-read does not
+// show it yet.
+func (w *Writes) replanned(fresh *workflow.Plan) {
+	fresh.Ops = Missing(fresh.Ops, w.Done)
+	w.Fresh = fresh
 }
 
 // Apply applies p and records what GitHub confirmed. An error with every
