@@ -10,6 +10,9 @@
 # IDE
 .idea/
 
+# macOS Finder
+.DS_Store
+
 # agent worktrees
 .claude/worktrees/
 
