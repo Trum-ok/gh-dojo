@@ -213,7 +213,7 @@ func showError(repo issue.Repo, unread []issue.Ref, failed []issue.Result, readE
 	var groups []*group
 	for _, r := range failed {
 		i := slices.IndexFunc(groups, func(g *group) bool {
-			return r.Cause != "" && g.cause == r.Cause && strings.EqualFold(g.repo.String(), r.Repo.String())
+			return r.Cause != "" && g.cause == r.Cause && g.repo.Same(r.Repo)
 		})
 		if i < 0 {
 			groups = append(groups, &group{cause: r.Cause, repo: r.Repo, err: render.FromError(r.Err)})

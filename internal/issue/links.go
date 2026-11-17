@@ -91,7 +91,7 @@ func (r Ref) CheckHost(host, arg string) error {
 // String returns "#12" for an issue in def, else "owner/name#12". Repos
 // compare without case, as GitHub's names do.
 func (r Ref) String(def Repo) string {
-	if r.Repo == (Repo{}) || sameRepo(r.Repo, def) {
+	if r.Repo == (Repo{}) || r.Repo.Same(def) {
 		return "#" + strconv.Itoa(r.Number)
 	}
 	return r.Repo.String() + "#" + strconv.Itoa(r.Number)
@@ -105,7 +105,7 @@ func (r Ref) Arg(def Repo) string { return strings.TrimPrefix(r.String(def), "#"
 // number does, or names def in another case: def is spelled as the config
 // spells it.
 func (r Ref) In(def Repo) Ref {
-	if r.Repo == (Repo{}) || sameRepo(r.Repo, def) {
+	if r.Repo == (Repo{}) || r.Repo.Same(def) {
 		r.Repo = def
 	}
 	return r
@@ -114,24 +114,26 @@ func (r Ref) In(def Repo) Ref {
 // canonical is repo as GitHub spells it, "owner/name" from an answer,
 // when that names the same repository; else repo.
 func canonical(repo Repo, spelled string) Repo {
-	if r, err := ParseRepo(spelled); err == nil && sameRepo(r, repo) {
+	if r, err := ParseRepo(spelled); err == nil && r.Same(repo) {
 		return r
 	}
 	return repo
 }
 
 // Same reports whether r and o name the same issue.
-func (r Ref) Same(o Ref) bool { return r.Number == o.Number && sameRepo(r.Repo, o.Repo) }
+func (r Ref) Same(o Ref) bool { return r.Number == o.Number && r.Repo.Same(o.Repo) }
 
-func sameRepo(a, b Repo) bool {
-	return strings.EqualFold(a.Owner, b.Owner) && strings.EqualFold(a.Name, b.Name)
+// Same reports whether r and o are one repository: GitHub ignores case in
+// owners and names.
+func (r Repo) Same(o Repo) bool {
+	return strings.EqualFold(r.Owner, o.Owner) && strings.EqualFold(r.Name, o.Name)
 }
 
 // CompareRefs orders issues of the default repository first, by number,
 // then the others by repository and number.
 func CompareRefs(def Repo) func(a, b Ref) int {
 	return func(a, b Ref) int {
-		ad, bd := a.Same(Ref{Repo: def, Number: a.Number}), b.Same(Ref{Repo: def, Number: b.Number})
+		ad, bd := a.Repo.Same(def), b.Repo.Same(def)
 		switch {
 		case ad != bd && ad:
 			return -1
@@ -375,7 +377,7 @@ func LinksError(what string, links []*Linked, def Repo) error {
 		if !l.Missing && !l.PullRequest {
 			continue
 		}
-		if !sameRepo(l.Ref.Repo, def) {
+		if !l.Ref.Repo.Same(def) {
 			fix = ""
 		}
 		if l.PullRequest {
@@ -383,7 +385,7 @@ func LinksError(what string, links []*Linked, def Repo) error {
 			continue
 		}
 		missing = append(missing, l.Ref.String(def))
-		if !sameRepo(l.Ref.Repo, def) {
+		if !l.Ref.Repo.Same(def) {
 			where = ""
 		}
 	}

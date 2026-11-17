@@ -360,8 +360,8 @@ func TestSprintNotReadFailsOneCard(t *testing.T) {
 	b := &githubBackend{app: app}
 	card := &issue.Card{Number: 42, Repo: issue.Repo{Owner: "acme", Name: "shop"}, State: issue.StateOpen,
 		Item: &issue.Item{ID: "PVTI_acme0042", Status: "Ready", ValuesTruncated: true}}
-	_, failed, err := b.workflowIssue(t.Context(), v, verbLookup(v, workflow.Args{}), card, card.Repo)
+	_, failed, err := b.issueState(t.Context(), v, verbLookup(v, workflow.Args{}), card, card.Repo)
 	if err != nil || failed == nil || !strings.Contains(failed.Error(), "the Sprint of #42 was not read") {
-		t.Errorf("workflowIssue: failed = %v, err = %v; want the sprint of #42 not read, nil", failed, err)
+		t.Errorf("issueState: failed = %v, err = %v; want the sprint of #42 not read, nil", failed, err)
 	}
 }

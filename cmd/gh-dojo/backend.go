@@ -150,7 +150,7 @@ func (b *githubBackend) ReadIssues(ctx context.Context, v config.Verb, refs []is
 			continue
 		}
 		r.Ref = res.Card.Ref() // as GitHub or the config spells it
-		is, failed, err := b.workflowIssue(ctx, v, lookup, res.Card, def)
+		is, failed, err := b.issueState(ctx, v, lookup, res.Card, def)
 		if err != nil {
 			return nil, err
 		}
@@ -159,7 +159,7 @@ func (b *githubBackend) ReadIssues(ctx context.Context, v config.Verb, refs []is
 	return out, nil
 }
 
-// workflowIssue turns a card read with lookup into the state v plans
+// issueState turns a card read with lookup into the state v plans
 // with. failed fails this issue alone: its board place or its sprint could
 // not be read, a label to remove is spelled another way on it, or an issue
 // --by names is this one or blocked by it. err fails every issue: what v
@@ -167,12 +167,12 @@ func (b *githubBackend) ReadIssues(ctx context.Context, v config.Verb, refs []is
 // issue), or the config or the board schema is wrong. A label or an
 // assignee is looked up per repository, so one missing in a repository
 // other than the default, def, fails only that issue.
-func (b *githubBackend) workflowIssue(ctx context.Context, v config.Verb, lookup issue.Lookup, card *issue.Card, def issue.Repo) (is workflow.Issue, failed, err error) {
+func (b *githubBackend) issueState(ctx context.Context, v config.Verb, lookup issue.Lookup, card *issue.Card, def issue.Repo) (is workflow.Issue, failed, err error) {
 	if err := statusUnknown(card, def); err != nil {
 		return workflow.Issue{}, err, nil
 	}
 	if every, err := b.checkFound(ctx, v, lookup, card); err != nil {
-		if every && card.Ref().Same(issue.Ref{Repo: def, Number: card.Number}) {
+		if every && card.Repo.Same(def) {
 			return workflow.Issue{}, nil, err
 		}
 		return workflow.Issue{}, err, nil

@@ -477,10 +477,14 @@ func (p *Plan) Confirm() string {
 	return render.Confirm(p.Issue.Name(), "", effects...)
 }
 
+// MarkerPattern is the grammar of the hidden marker gh-dojo ends its
+// comments and descriptions with: the verb and a hash.
+const MarkerPattern = `<!-- gh-dojo:[a-z][a-z0-9-]*:[0-9a-f]{8} -->`
+
 // markerRE matches the hidden marker gh-dojo puts at the end of a verb's
 // comment, after a blank line (see AddComment.Text). A marker anywhere else,
 // such as one quoted in the middle of a comment, does not count.
-var markerRE = regexp.MustCompile(`\r?\n\r?\n(<!-- gh-dojo:[a-z][a-z0-9-]*:[0-9a-f]{8} -->)\s*$`)
+var markerRE = regexp.MustCompile(`\r?\n\r?\n(` + MarkerPattern + `)\s*$`)
 
 // Marker returns the hidden marker of a comment that verb posts with body:
 // "<!-- gh-dojo:<verb>:<hash> -->", where hash is the first 8 hex digits of

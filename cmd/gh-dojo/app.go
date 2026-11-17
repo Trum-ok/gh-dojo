@@ -222,7 +222,7 @@ func workflowIssue(c *issue.Card, def issue.Repo) workflow.Issue {
 		// With Lookup.AllLabels the window is GitHub's own limit per issue.
 		LabelsTruncated: c.Labels.TotalCount > len(c.Labels.Nodes),
 	}
-	if !c.Ref().Same(issue.Ref{Repo: def, Number: c.Number}) && def != (issue.Repo{}) {
+	if !c.Repo.Same(def) && def != (issue.Repo{}) {
 		is.DefaultRepo = def.String()
 	}
 	if c.Closed() && c.StateReason != "REOPENED" {

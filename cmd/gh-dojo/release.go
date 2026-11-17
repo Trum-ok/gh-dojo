@@ -502,7 +502,7 @@ func (r *releaseRun) keep(cmd *cobra.Command) func(batch.Read) bool {
 
 // ours reports whether repo is one of the project's own (r.repos).
 func (r *releaseRun) ours(repo issue.Repo) bool {
-	return slices.ContainsFunc(r.repos, func(o issue.Repo) bool { return strings.EqualFold(o.String(), repo.String()) })
+	return slices.ContainsFunc(r.repos, repo.Same)
 }
 
 // byMessageOnly reports whether only commit messages name f, no merged

@@ -129,7 +129,7 @@ func readEach(ctx context.Context, q graph.Querier, req Request, refs []Ref) ([]
 			res.Cause = CauseMissing
 		case errors.Is(err, errPullRequest):
 			res.Cause = CausePullRequest
-		case errors.Is(err, errRepoMissing) && !sameRepo(r.Repo, req.Repo):
+		case errors.Is(err, errRepoMissing) && !r.Repo.Same(req.Repo):
 			res.Cause = CauseNoRepo
 		default:
 			return out, err
@@ -161,7 +161,7 @@ func repoNotFound(repo Repo, cause error) *render.Error {
 // indexes of its refs in refs, which number the issues' aliases.
 func batchRepos(refs []Ref) (repos []Repo, groups [][]int) {
 	for i, r := range refs {
-		k := slices.IndexFunc(repos, func(o Repo) bool { return sameRepo(o, r.Repo) })
+		k := slices.IndexFunc(repos, func(o Repo) bool { return o.Same(r.Repo) })
 		if k < 0 {
 			repos = append(repos, r.Repo)
 			groups = append(groups, nil)
@@ -193,7 +193,7 @@ func readBatch(ctx context.Context, q graph.Querier, req Request, refs []Ref) ([
 		errs, ok = perIssueErrors(err)
 		first := resp.Repos[repoAlias(0)]
 		switch {
-		case ok && (len(repos) > 1 || first != nil || !sameRepo(repos[0], req.Repo)):
+		case ok && (len(repos) > 1 || first != nil || !repos[0].Same(req.Repo)):
 		case render.FromError(err).Code == render.ExitNotFound && len(repos) == 1 && first == nil:
 			return nil, repoNotFound(repos[0], err)
 		default:

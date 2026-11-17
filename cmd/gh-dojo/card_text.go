@@ -11,6 +11,7 @@ import (
 	"github.com/Trum-ok/gh-dojo/internal/graph"
 	"github.com/Trum-ok/gh-dojo/internal/issue"
 	"github.com/Trum-ok/gh-dojo/internal/render"
+	"github.com/Trum-ok/gh-dojo/internal/workflow"
 )
 
 // Text of issue cards for show: short, labelled lines an agent reads in one
@@ -42,7 +43,7 @@ var projectAutomation = map[string]bool{"github-project-automation": true}
 // descriptions with: the grammar workflow's dedup looks for, on its own
 // line after a blank one (or alone), at the very end. A marker quoted in
 // text or left unclosed does not match.
-var cardMarkerRE = regexp.MustCompile(`(?:^|\n\n)<!-- gh-dojo:[a-z][a-z0-9-]*:[0-9a-f]{8} -->[ \t\n]*$`)
+var cardMarkerRE = regexp.MustCompile(`(?:^|\n\n)` + workflow.MarkerPattern + `[ \t\n]*$`)
 
 // fenceRE matches a line that opens or closes a fenced code block.
 var fenceRE = regexp.MustCompile("(?m)^ {0,3}(```|~~~)")

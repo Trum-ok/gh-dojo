@@ -820,7 +820,7 @@ func (r *newRun) request(in newInput, found *issue.Created) workflow.NewRequest 
 			// edit takes the new parent's number in the issue's
 			// repository, else its URL.
 			l.EditArg = fmt.Sprintf("https://%s/%s/issues/%d", clientHost(), p.Ref.Repo, p.Ref.Number)
-			if p.Ref.Same(issue.Ref{Repo: r.repo, Number: p.Ref.Number}) {
+			if p.Ref.Repo.Same(r.repo) {
 				l.EditArg = strconv.Itoa(p.Ref.Number)
 			}
 		}
