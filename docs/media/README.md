@@ -24,7 +24,8 @@ uploaded by hand in the repository's Settings; a link card stands out better
 dark than light in both themes. `social-preview-light.png` is the light one.
 
 The gh-dojo output and comments in the stories are the text gh-dojo prints and
-posts with the kanban preset, and the GraphQL mutations are the ones it sends;
+posts with the kanban preset and a [`[session]`](../configuration.md#session)
+link (in `start`'s comment), and the GraphQL mutations are the ones it sends;
 keep them in step with the code. `src/Chat.tsx` draws the chat with the agent,
 `src/theme.ts` has GitHub's light and dark colors. `render.sh` renders all
 four GIFs (lossless frames from Remotion, then ffmpeg for the palette); `make

@@ -4,7 +4,9 @@
 //
 //	GH_DOJO_E2E_REPO=Trum-ok/gh-dojo-sandbox \
 //	GH_DOJO_E2E_KANBAN=6 GH_DOJO_E2E_SPRINTS=7 \
-//	go test -tags e2e -count=1 -v ./e2e
+//	go test -tags e2e -count=1 -v -timeout 15m ./e2e
+//
+// go test's default timeout of 10 minutes can be too short for the run.
 //
 // The token is gh's (GH_TOKEN, else gh auth login) and needs the project and
 // repo (or public_repo) scopes. Variables:

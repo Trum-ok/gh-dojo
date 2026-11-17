@@ -5,9 +5,10 @@ preset kanban). Both sides are set up the way a careful team would:
 
 - **gh**: plain `gh`, with the process, the board's IDs and command recipes in `CLAUDE.md`
   ([bench/conditions/gh.md](../bench/conditions/gh.md));
-- **gh dojo**: `gh dojo` with its config and the skill `gh dojo agent install` writes from it.
+- **gh dojo**: `gh dojo` with its config ([bench/conditions/dojo.toml](../bench/conditions/dojo.toml)) and the skill
+  `gh dojo agent install` writes from it.
 
-The harness and how to run it: [bench/doc.go](../bench/doc.go). Issue #50.
+The harness and how to run it: [bench/doc.go](../bench/doc.go). Issue [#50](https://github.com/Trum-ok/gh-dojo/issues/50).
 
 In short: for a task of one message gh dojo does as well as plain gh with a careful `CLAUDE.md`, at the same cost.
 Over a session of eight messages it takes 37–44% less time and 33–44% less money, with every step right and no
@@ -33,8 +34,8 @@ gh dojo v0.2.0-40-g797f9b1, 2026-11-15:
 | file an issue          |         3 |                 105 |               21 |   8.0 |              1 |                       30 |                    24 |        4.5 |
 | **all**                |    **19** |            **1531** |          **525** |**33.7**|         **7** |                   **55** |               **205** |   **19.8** |
 
-In context before the first command: gh ≈1260 tokens (`CLAUDE.md`), gh dojo ≈1630 (`CLAUDE.md` ≈50 and the skill
-≈1590).
+*all* is computed from the unrounded sums, so it may differ from the sum of the rows by rounding. In context before
+the first command: gh ≈1260 tokens (`CLAUDE.md`), gh dojo ≈1630 (the skill ≈1586 and `CLAUDE.md` ≈47).
 
 What it shows:
 
@@ -44,9 +45,9 @@ What it shows:
 - The commands alone take 40% less time (20 s against 34 s for the seven), though gh dojo checks the process on
   the way: one process and its own few requests instead of several `gh` runs. For an agent each saved call is also
   a saved turn of the model, seconds each, which level 2 measures.
-- The skill costs ≈370 tokens more than the gh `CLAUDE.md` once per session; the seven operations save about
-  1800. Where gh dojo should matter most is the process, which level 1 does not count: with gh the agent checks
-  the allowed moves, the blockers and repeated comments itself. Level 2 measures that.
+- The skill and its `CLAUDE.md` cost ≈370 tokens more than the gh `CLAUDE.md` once per session; the seven
+  operations save about 1800. Where gh dojo should matter most is the process, which level 1 does not count: with
+  gh the agent checks the allowed moves, the blockers and repeated comments itself. Level 2 measures that.
 
 ## Level 2: agents
 
@@ -92,8 +93,9 @@ bug blocked by an issue). 2026-11-16:
 - **The tool errors with gh dojo are not misuse.** 11 of the 14 are in the done-from-backlog trap, looking for the
   release v1.4, which the sandbox does not have: `gh dojo release v1.4` 10 times (the agents reasonably took "v1.4
   is out" for the release command) and once the API for the tags. The other 3 were gaps of gh dojo, filed and
-  fixed after these runs: `new … --dry-run`, which every verb had but `new` did not (#60), and `new … --by N` twice,
-  the flag of `wait` and `block`, where `new` wanted `--blocked-by` (#61).
+  fixed after these runs: `new … --dry-run`, which every verb had but `new` did not
+  ([#60](https://github.com/Trum-ok/gh-dojo/issues/60)), and `new … --by N` twice, the flag of `wait` and `block`, where
+  `new` wanted `--blocked-by` ([#61](https://github.com/Trum-ok/gh-dojo/issues/61)).
 
 ### A workday: where it pays
 
@@ -142,7 +144,8 @@ What it shows:
 ### Limits
 
 - The gh condition is the best case: a CLAUDE.md with IDs and tested recipes, which a team has to write and keep in
-  step with the board. Without it, plain gh is not a fair comparison (decided in #50), so it was not run.
+  step with the board. Without it, plain gh is not a fair comparison (decided in
+  [#50](https://github.com/Trum-ok/gh-dojo/issues/50)), so it was not run.
 - One process (preset kanban) and one session script, 5 runs each: the differences above are far beyond the ranges,
   but a single violation in 30 runs is not a rate.
 - Runs went 4 at a time, so an agent that read the whole board could see other runs' issues (one gh run listed the

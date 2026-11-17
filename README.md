@@ -12,7 +12,7 @@ sprint. The process lives in the repository, in `.github/dojo.toml`.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/media/demo-dark.gif">
-  <img alt="The user asks an agent to take #42. The agent runs gh dojo start 42, wait 42 --by 12 and ready 42; each prints one line, and issue #42 moves on the board from Backlog to In progress, Waiting and Ready with a comment for each step" src="docs/media/demo-light.gif">
+  <img alt="The user asks an agent to take #42. The agent runs gh dojo start 42, wait 42 --by 12 and ready 42 --comment a1b2c3d; each prints one line, and issue #42 moves on the board from Backlog to In progress, Waiting and Ready with a comment for each step" src="docs/media/demo-light.gif">
 </picture>
 
 ## Why
@@ -46,8 +46,8 @@ took 37–44% less time and 33–44% less money, and got every step right:
 The gap widens with every message: with gh the agent writes GraphQL and the
 board's IDs, as above, into every command, three to four times the output
 tokens, and rereads them all later. For a task of one message the two are
-even. Preset kanban, 5 sessions per model; the tasks, numbers and limits are
-in [docs/bench.md](docs/bench.md).
+even. Preset kanban, 5 sessions per model, gh dojo v0.2.0-40 in November
+2026; the tasks, numbers and limits are in [docs/bench.md](docs/bench.md).
 
 ## Built for agents
 
@@ -58,9 +58,8 @@ in [docs/bench.md](docs/bench.md).
 - **One line out, errors that say what to do.** A write prints what was,
   what is now and what was done along the way, so the agent need not re-read
   the issue. An error names the allowed values and the command to run next,
-  and each [exit code](docs/output.md#exit-codes) maps to one action: fix the
-  arguments (1), ask a human (2), check the number (3), retry later (4),
-  re-run the same command (5).
+  and each [exit code](docs/output.md#exit-codes) maps to one action, such
+  as "ask the user" when the process refuses.
 - **Safe retries.** Repeating a command never posts a second comment or
   creates a second issue, and finishes what a failed run left undone.
 - **Self-describing.** `gh dojo describe` prints the project's verbs, when to
@@ -127,26 +126,6 @@ also be authorized for it.
    gh dojo done 42 43      # → Done and closed: released
    ```
 
-## Commands
-
-| Command | What it does |
-|---------|--------------|
-| [`show`](docs/commands.md#show) | Read issues: board status, sprint, blockers, history, description, comments |
-| [`list`](docs/commands.md#list) | One line per open issue on the board, grouped by status |
-| [`next`](docs/commands.md#next) | Issues to take: initial status, no unresolved blockers, in board order |
-| [`new`](docs/commands.md#new) | Create an issue with labels, assignees, milestone, blockers and parent, on the board, in the initial status |
-| [`comment`](docs/commands.md#comment) | Comment without changing the status |
-| [`block`, `unblock`](docs/commands.md#block-unblock) | Add or remove blocked-by links without changing the status |
-| [`init`](docs/commands.md#init) | Write `.github/dojo.toml` for a board and check it |
-| [`describe`](docs/commands.md#describe) | Print this project's process, for an agent's context |
-| [`doctor`](docs/commands.md#doctor) | Check config, token, board and repositories, with fixes |
-| [`agent install`](docs/commands.md#agent-install) | Write the process into a skill or `AGENTS.md` section for agents |
-| [`<verb>`](docs/commands.md#process-verbs) | The project's process verbs, from the config (`start`, `wait`, …) |
-| [`release`](docs/commands.md#release) | Apply a verb to the issues a release includes, found through pull requests and commits |
-
-Every command prints its usage with `--help` and takes `--json`, `--jq` and
-`--template` ([JSON output](docs/output.md#json-output)).
-
 ## Configuration
 
 A preset gives the verbs; the config names the board and changes or adds
@@ -176,11 +155,15 @@ configs to start from are in [`examples/`](examples).
 
 ## Documentation
 
-- [Commands](docs/commands.md): every command, its flags and output.
+- [Commands](docs/commands.md): every command, its flags and output;
+  `gh dojo --help` lists them, and each prints its usage with `--help` and
+  takes `--json`, `--jq` and `--template`.
 - [Configuration](docs/configuration.md): the config format, verbs, presets,
   a process of your own.
 - [Output and exit codes](docs/output.md): text output, exit codes, several
   issues at once, `--json`.
+- [Benchmark](docs/bench.md): gh dojo against plain gh, with an agent and
+  without.
 - [Contributing](CONTRIBUTING.md): building, tests, golden files, releases.
 
 ## Status
