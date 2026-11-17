@@ -45,7 +45,7 @@ notes = "docs/agent-notes.md" # appended as is to the generated instructions
 description = "Also load it before a release."  # added to the skill's description
 
 [release]                    # gh dojo release
-keywords = ["closes", "fixes", "resolves", "refs"]   # words before #12 in a commit message; default: GitHub's closing keywords
+keywords = ["closes", "fixes", "resolves", "refs"]   # words before #12 in a commit message; replaces the default, GitHub's closing keywords
 suffix = true                # "fix: login limit (#12)" names #12 too; default: false
 
 [verbs.start]                # overrides the preset's start key by key
@@ -146,12 +146,15 @@ own name with the [`field`](#effects) effect. Logical names are lowercase:
 | Key        | Meaning |
 |------------|---------|
 | `initial`  | Set by `new`; issues without a status or not on the board count as this one for `from`. `next` shows the issues in it, or without a status |
-| `final`    | Statuses `list` hides, with a counter |
-| `resolved` | Statuses in which an open blocker no longer blocks: its work is done though the issue stays open (kanban: Ready, Done) |
+| `final`    | Statuses of finished work. `list` hides them, with a counter; a verb whose `to` is one also runs on a closed issue, and does not unarchive the item; `release` leaves out a closed issue in one ([already closed](commands.md#already-closed)) |
+| `resolved` | Statuses in which an open blocker no longer blocks: its work is done though the issue stays open (kanban: Ready, Done). `list` folds a group resolved but not final into one line of numbers |
 
-`show`, the `blockers` check and `next` read `resolved`. A closed blocker
-is always resolved. The same rule resolves a sub-issue (`show`, the
-`sub_issues` check).
+A blocker is resolved when it is closed, or on the board in a `resolved`
+status, archived or not. An open one not on the board, one whose board
+status could not be read, and one not read at all (hidden from the token,
+or past what a verb reads: 50 blockers, 100 sub-issues, GitHub's limits)
+are unresolved. A sub-issue is resolved by the same rule. `show`, `next`,
+and the `blockers` and `sub_issues` checks use it.
 
 ## labels
 
@@ -187,7 +190,7 @@ What [`agent install`](commands.md#agent-install) writes. A preset cannot set it
 
 | Key       | Meaning |
 |-----------|---------|
-| `targets` | The agents to write for: `claude`, `agents-md`, `copilot`. Default: `["claude"]`; `[]` writes nothing without `--agent` |
+| `targets` | The agents to write for: `claude`, `agents-md`, `copilot`. Default: `["claude"]`; with `[]`, `agent install` needs `--agent` (a usage error without it) |
 | `notes`   | A markdown file appended as is after the generated instructions: what the config cannot say, in the project's language |
 | `description` | One line added to the end of the skill's generated `description`, which tells Claude Code when to load the skill: say when else to load it. The whole description may be up to 1024 characters |
 
@@ -199,7 +202,7 @@ What [`agent install`](commands.md#agent-install) writes. A preset cannot set it
 - Its headings land as written, so in an `AGENTS.md` section start them one
   level down.
 
-## release keywords
+## release
 
 `[release]`: how [`gh dojo release`](commands.md#release) links a commit to issues besides the pull
 requests it belongs to. A preset cannot set it.
@@ -217,27 +220,22 @@ requests it belongs to. A preset cannot set it.
   `fixes`, `fixed`, `resolve`, `resolves`, `resolved`; a list replaces them.
 - `[]`: no keyword counts, only pull requests and, with `suffix = true`, the
   suffix.
-- With `refs`, keep the verb's `from` to Ready (the presets' `done` also
-  starts from In progress): a `Refs` commit may be partial work, which is
-  then [not ready](commands.md#release) rather than released.
 
-**`suffix`**:
+**`suffix`**: `fix: login limit (#12)`; the rules are in
+[Issues in the release](commands.md#issues-in-the-release). With `true`,
+[`agent install`](commands.md#agent-install) tells the agent to name the
+issue so.
 
-- `fix: login limit (#12)`, `(#12, acme/api#3)`, `fix (#161) (#200)`:
-  [details](commands.md#release). The number of a pull request the commit
-  belongs to, as a squash merge appends, is left out.
-- Default `false`: where pull requests are squash-merged, the parentheses
-  name a pull request, not an issue.
-- With `true`, [`agent install`](commands.md#agent-install) tells the agent
-  to name the issue so.
-- As with `refs`, keep the verb's `from` to Ready: a suffix says only that a
-  commit is about an issue, which may be partial work.
+With `refs` or `suffix = true`, keep the verb's `from` to Ready (the
+presets' `done` also starts from In progress): such a commit may be partial
+work, which is then [not ready](commands.md#not-ready) rather than released.
 
 ## verbs
 
-Each `[verbs.<name>]` table becomes `gh dojo <name>`. Verb names are
-lowercase letters, digits and dashes and cannot shadow built-in or planned
-commands (`show`, `list`, `new`, `comment`, `describe`, `init`, `doctor`,
+Each `[verbs.<name>]` table becomes `gh dojo <name>`. A verb name starts
+with a lowercase letter and has lowercase letters and digits, with single
+dashes between parts (`request-changes`); it cannot shadow a built-in
+command (`show`, `list`, `new`, `comment`, `describe`, `init`, `doctor`,
 `help`, `block`, `unblock`, `agent`, `next`, `release`).
 
 | Key              | Kind   | Meaning |
@@ -251,7 +249,7 @@ commands (`show`, `list`, `new`, `comment`, `describe`, `init`, `doctor`,
 | `blockers`       | check or effect | `"warn"` or `"deny"`: check the issue's unresolved blockers; `"link"`: `--by N` also marks it blocked by #N |
 | `sub_issues`     | check  | `"warn"` or `"deny"`: check the issue's unresolved [sub-issues](commands.md#show) |
 | `confirm`        | check  | `"user"`: the verb is the user's decision and runs only with `--yes` |
-| `batch`          | —      | `true`: the verb takes several issue numbers at once and is one [`release --verb`](commands.md#release) can run (one without it is exit code 1 there) |
+| `batch`          | —      | `true`: the verb takes several issue numbers at once and is one [`release --verb`](commands.md#release) can run (one without it is exit code 1 there, as is one that needs `--assignee`, `--milestone` or `--of`) |
 | `to`             | effect | Target status |
 | `iteration`      | effect | Set the sprint field: `"current"`, `"by_status_date:<status>"` or `"clear"`; needs `fields.sprint` |
 | `field`          | effect | A table of other board fields to set: `[verbs.<name>.field]` with `Priority = "P1"`, `Estimate = 3` |
@@ -270,7 +268,7 @@ Values of the effects that name a user, a milestone or an issue:
   `"{assignee}"`: the user `--assignee` names when the verb runs.
 - **`unassign`**: `true` (`board.assignee`), `"@me"`, a login, or `"all"`:
   everyone but the user the verb assigns.
-- **`milestone`**: a title (`"v1.2"`, or a start only one title has), or
+- **`milestone`**: a title (`"v1.2"`, matched as [below](#effects)), or
   `"{milestone}"`: the one `--milestone` names when the verb runs.
 - **`close = "duplicate"`**: a duplicate of the issue `--of` names when the
   verb runs, linked to it.
@@ -285,8 +283,9 @@ Rules across keys:
 - `assignee` needs `assign = "{assignee}"`, which requires it anyway, so it
   may only be repeated in `require`; so does `milestone`, with
   `milestone = "{milestone}"`, and `of`, with `close = "duplicate"`.
-- Keys from the design that are not implemented yet (`pre`, `post`) are
-  rejected with "not supported in this version".
+- `pre` and `post`, reserved for hooks
+  ([#58](https://github.com/Trum-ok/gh-dojo/issues/58)), are rejected with
+  "not supported in this version".
 
 ### Checks
 
@@ -314,13 +313,10 @@ Rules across keys:
     issue already in the verb's `to`, but not for the repeat of a verb
     without `to` that closes the issue; `--dry-run` refuses the same way.
 - **require**, **require_one_of**: without the arguments, exit code 1.
-- **blockers** `"warn"` and `"deny"` look at the issue's unresolved
-  blockers: open, and not in one of [`statuses.resolved`](#statuses); a
-  blocker whose board status could not be read, or that was not read at all
-  (hidden from the token; a verb reads up to 50, GitHub's limit), counts as
-  unresolved. `"warn"` prints them on stderr and runs; `"deny"` refuses with
-  exit code 2, listing them and asking you to ask the user. `--dry-run` warns
-  or refuses the same way.
+- **blockers** `"warn"` and `"deny"` look at the issue's
+  [unresolved](#statuses) blockers. `"warn"` prints them on stderr and
+  runs; `"deny"` refuses with exit code 2, listing them and asking you to
+  ask the user. `--dry-run` warns or refuses the same way.
 - **blockers** `"link"` is an effect: `--by` naming issues (`12`, `#12`,
   `owner/repo#12` or the issue's URL, comma-separated, rendered `#17, #18`)
   marks them as blocking this one, in the verb's one mutation; free text stays
@@ -329,12 +325,9 @@ Rules across keys:
     itself or an issue it already blocks (exit code 1); issues and text
     mixed are exit code 1 too.
   - The verb's comment template must use `{by}`.
-- **sub_issues** `"warn"` and `"deny"` look at the issue's unresolved
-  sub-issues by the rule of blockers: a sub-issue is resolved when it is
-  closed or in one of [`statuses.resolved`](#statuses), so a parent can move
-  on while its sub-issues wait in Ready for a release; one whose board
-  status could not be read, or that was not read at all (hidden from the
-  token; a verb reads up to 100, GitHub's limit), counts as unresolved.
+- **sub_issues** `"warn"` and `"deny"` look at the issue's
+  [unresolved](#statuses) sub-issues, so a parent can move on while its
+  sub-issues wait in Ready for a release.
   - `"warn"` prints them on stderr and runs; `"deny"` refuses with exit
     code 2. Blockers are checked first.
   - Set it on the verb that finishes an issue, `sub_issues = "deny"` under
@@ -401,9 +394,10 @@ Rules across keys:
   replaced.
   - A title matches the milestone with that title regardless of case, or
     else the only one whose title starts with it, so `"v0.3"` names
-    `v0.3 — extensibility`. A start several titles share is exit code 1
-    listing them, and no match is exit code 1 listing the open milestones,
-    with `gh api repos/<owner>/<repo>/milestones -f title=…` to create one;
+    `v0.3 — extensibility`, as [`new --milestone`](commands.md#new) does.
+    A start several titles share is exit code 1 listing them, and no match
+    is exit code 1 listing the open milestones, with
+    `gh api repos/<owner>/<repo>/milestones -f title=…` to create one;
     either fails before anything is written.
   - `milestone = "{milestone}"` takes the milestone from `--milestone` when
     the verb runs, for one that changes from issue to issue, such as moving
@@ -426,13 +420,16 @@ Rules across keys:
     that, even with a milestone titled so. A title of the config always
     names a milestone.
   - [`gh dojo doctor`](commands.md#doctor) checks that each title of the
-    config matches one open milestone of the default repository;
-    [`release`](commands.md#release) cannot run a verb with
-    `milestone = "{milestone}"`, which needs `--milestone`.
+    config matches one open milestone of the default repository.
 - **close**, **reopen**: a verb sets at most one of them.
   - An issue already closed is not closed again, even with another reason;
-    the line says `already closed as completed`. A verb that closes and has
-    no `to` refuses an issue closed with another reason instead.
+    the line says `already closed as completed`.
+  - A verb that closes and has no `to` runs on an issue closed with its own
+    reason as a repeat, without the `from` check, so a board workflow that
+    moved the issue does not refuse it; an issue closed with another reason
+    it refuses, whatever its status.
+  - A verb that moves an issue closed as not planned or duplicate to a
+    final status warns on stderr and keeps the reason.
   - `duplicate` closes the issue as a duplicate of the issue `--of` names
     (`17`, `#17`, `owner/repo#17` or its URL) and links the two, as
     GitHub's "Close as duplicate" does: the flag is then required, and
@@ -477,9 +474,9 @@ Rules across keys:
   an option name for a single-select field, a string for a text field, a
   number for a number field, a date (`2026-11-30`, or the string
   `"2026-11-30"`) for a date field. The status and sprint fields are set
-  with `to` and `iteration`, not here. Each field is its own write: a
-  partial report names the fields set and those not set (`Priority not
-  set`).
+  with `to` and `iteration`, not here. Each field is its own field of the
+  verb's mutation, applied or failing on its own: a partial report names
+  the fields set and those not set (`Priority not set`).
 - **comment**: see [Comment templates](#comment-templates).
 
 ### Turning preset keys off
@@ -499,6 +496,9 @@ off a key the preset sets:
 | `reopen` | `reopen = false` |
 | `batch` | `batch = false` |
 | `iteration` | `iteration = ""` |
+| `to` | `to = ""` (the status stays) |
+| `comment` | `comment = ""` (no comment) |
+| `require`, `require_one_of` | `require = []`, `require_one_of = []` |
 | `from` | `from = []` (any status) |
 | `from_labels`, `refuse_labels` | `from_labels = []`, `refuse_labels = []` |
 | `labels` | `labels = []` |
@@ -562,8 +562,7 @@ of the preset:
 
 Without `preset` every verb is defined in the file. `when` lines and
 comments are in English: override them to write them in your project's
-language, as [`examples/kanban.toml`](../examples/kanban.toml) and this
-repository's own [`.github/dojo.toml`](../.github/dojo.toml) do.
+language, as [`examples/kanban.toml`](../examples/kanban.toml) does.
 
 Both presets set:
 
@@ -594,16 +593,10 @@ The board's status field must have these options (other options are fine):
 | `ready` | Ready       | In progress, Waiting    |                       |                                        | `--comment`                  |
 | `done`  | Done        | Ready, In progress      |                       | closes as completed; several issues    | `--comment`                  |
 
-- `start` warns on stderr about blockers not yet Ready, Done or closed
-  (`blockers = "warn"`) and still runs; set `blockers = "deny"` to refuse,
-  or `false` to skip the check.
-- `wait --by 17` also marks the issue blocked by #17, `--by 17,18` by both
-  (`blockers = "link"`); `wait --by "the API team"` only comments.
-- `done` closes the issue as completed (Done means released) and takes
-  several issues at once (`batch = true`): `gh dojo done 12 13 14` after a
-  release, or `gh dojo release v1.2.0 --verb done`. An issue a pull request
-  already closed stays closed and still moves to Done. To keep issues open
-  in Done, set `close = false`.
+`start` only warns (`blockers = "deny"` refuses, `false` skips the check);
+`wait --by "the API team"` only comments. `done` closes the issue, since
+Done means released, and runs on a release's issues:
+`gh dojo release v1.2.0 --verb done`.
 
 Its source is [`internal/config/presets/kanban.toml`](../internal/config/presets/kanban.toml).
 The preset has no sprints: use the [sprints preset](#sprints-preset), or add
@@ -626,10 +619,11 @@ iteration = "by_status_date:Ready"   # the sprint in which the work was finished
 ## Sprints preset
 
 The kanban flow with work counted in sprints. The board needs the
-[kanban statuses](#kanban-preset) in its built-in `Status` field, and an
-iteration field named `Sprint` with an iteration for today (GitHub: add a
-field of type Iteration; [`gh dojo doctor`](commands.md#doctor) checks today's). The
-preset sets `fields.sprint = "Sprint"`; everything else is kanban's.
+[kanban statuses](#kanban-preset) in its built-in `Status` field (see
+[`iteration`](#effects)), and an iteration field named `Sprint` with an
+iteration for today (GitHub: add a field of type Iteration;
+[`gh dojo doctor`](commands.md#doctor) checks today's). The preset sets
+`fields.sprint = "Sprint"`; everything else is kanban's.
 
 | Verb    | Moves to    | From                    | Sprint                         |
 |---------|-------------|-------------------------|--------------------------------|
@@ -639,20 +633,11 @@ preset sets `fields.sprint = "Sprint"`; everything else is kanban's.
 | `done`  | Done        | Ready, In progress      | of the day it entered Ready    |
 
 An issue's sprint is the one it is worked in, and in the end the one in
-which it became Ready:
-
-- `start` takes it into today's sprint (an issue carried over from the last
-  sprint moves to the current one).
-- `wait` leaves the sprint alone.
-- `ready` sets the sprint of the day it entered Ready, which is today when
-  `ready` moves it there; a repeat of `ready` keeps that sprint.
-- `done` sets it again from the status history
-  (`iteration = "by_status_date:Ready"`), so an issue released in a later
-  sprint, or moved to Ready on the board by hand, still counts in the
-  sprint it was finished in. An issue that goes from In progress straight
-  to Done never entered Ready: `done` puts it in today's sprint and warns.
-
-"Today" is a date in [`board.timezone`](#board), UTC by default.
+which it became Ready: `start` moves an issue carried over from the last
+sprint to the current one, and `done` sets the sprint again from the status
+history, so an issue released in a later sprint, or moved to Ready on the
+board by hand, still counts in the sprint it was finished in. "Today" is a
+date in [`board.timezone`](#board), UTC by default.
 
 Its source is [`internal/config/presets/sprints.toml`](../internal/config/presets/sprints.toml).
 Override on top of it like any preset; [`examples/sprints.toml`](../examples/sprints.toml)
@@ -676,10 +661,6 @@ blockers = "deny"            # refuse to start a blocked issue
 from = ["Ready"]             # released only after ready
 ```
 
-`ready` and `done` read the status history, which GitHub keeps only for a
-board's built-in `Status` field: with another `fields.status`, the config
-is refused until they set `iteration = "current"`.
-
 ## Your own process
 
 The presets are a starting point, not a requirement: a process that is
@@ -694,7 +675,7 @@ to decide.
 | `start`           | In progress       | Backlog                             | refused while a blocker is unresolved; assigns the author |
 | `hold`            | status unchanged  | In progress, Changes requested      | label `+blocked`; `--by 17` marks it blocked by #17 |
 | `resume`          | status unchanged  | In progress, Changes requested, Approved | label `-blocked`; refused while a blocker is unresolved |
-| `review`          | In review         | In progress, Changes requested      | refused on hold; needs `--comment` (the pull request) and `--assignee` (the reviewer); labels; assigns the reviewer |
+| `review`          | In review         | In progress, Changes requested      | refused on hold or while a blocker is unresolved; needs `--comment` (the pull request) and `--assignee` (the reviewer); labels; assigns the reviewer |
 | `request-changes` | Changes requested | In review                           | needs `--comment`; labels; back to the author alone: the reviewer is unassigned |
 | `approve`         | Approved          | In review                           | refused on hold; the user's decision (`--yes`); back to the author alone |
 | `reject`          | status unchanged  | In progress, In review, Changes requested, Approved | the user's decision; closes as not planned, on hold or not |
@@ -708,38 +689,33 @@ an issue not on hold, `resume` removes nothing. `resume` also runs in
 Approved, so an approved issue labelled `blocked` by hand has a way back
 to `merged` other than `reject`; the refusals name it.
 
-`reject` closes and has no `to`, so on an issue closed as not planned its
-`from` is not checked: it runs as a repeat and posts its comment only if it
-is missing. A merged issue, closed as completed, is refused whatever its
-status, and gets no comment.
+`reject` closes and has no `to`, so it [repeats](#effects) on an issue
+closed as not planned and refuses a merged one, closed as completed.
 `merged` records a merge; it does not merge the pull request.
 
 To write your own:
 
 1. Put the statuses on the board's status field, and the labels the verbs
    add and remove in the repository (`gh label create`).
-2. Without `preset`, only [`fields.status`](#fields) and the verbs are
-   required. [`[statuses]`](#statuses) is optional, but without `initial`
-   `new` sets no status and `next` refuses to run, and without `resolved`
-   only a closed blocker is resolved. On top of a preset, set only what
-   differs, add verbs, and drop the preset's with `disabled = true`.
+2. Without `preset`, only [`board.owner`, `board.project`](#board) and
+   [`fields.status`](#fields) are required; a config without verbs loads,
+   and `describe` asks for them. [`[statuses]`](#statuses) is optional, but
+   without `initial` `new` sets no status and `next` refuses to run, and
+   without `resolved` only a closed blocker is resolved. On top of a
+   preset, set only what differs, add verbs, and drop the preset's with
+   `disabled = true`.
 3. A verb is a `when` line, [checks](#checks) (`from`, `from_labels`,
    `refuse_labels`, `require`, `require_one_of`, `blockers`, `sub_issues`,
-   `confirm`) and [effects](#effects) (`to`,
-   `labels`, `assign`, `unassign`, `milestone`, `comment`, `close`, `reopen`,
-   `iteration`, `field`, the `blockers` link). A verb without `to` leaves
-   the status alone, like `hold` above; one with `confirm = "user"` waits
-   for a person.
-4. Check it:
-   - [`gh dojo doctor`](commands.md#doctor) against the board and the
-     repositories (statuses, the labels verbs add, remove and check, the
-     users they assign and unassign by login, the milestones they name, the
-     type and area labels);
-   - `gh dojo describe` for the process as an agent reads it;
-   - `gh dojo <verb> N --dry-run` for a verb's plan on a real issue.
-
-   Then [`gh dojo agent install`](commands.md#agent-install) writes the
-   agent instructions from the same file.
+   `confirm`) and [effects](#effects) (`to`, `labels`, `assign`,
+   `unassign`, `milestone`, `comment`, `close`, `reopen`, `iteration`,
+   `field`, the `blockers` link). A verb without `to` leaves the status
+   alone, like `hold` above; one with `confirm = "user"` waits for a
+   person.
+4. Check it with [`gh dojo doctor`](commands.md#doctor) against the board
+   and the repositories, `gh dojo describe` for the process as an agent
+   reads it, and `gh dojo <verb> N --dry-run` for a verb's plan. Then
+   [`gh dojo agent install`](commands.md#agent-install) writes the agent
+   instructions from the same file.
 
 What the config cannot say yet, and the example works around:
 
@@ -748,5 +724,5 @@ What the config cannot say yet, and the example works around:
 - `request-changes` and `approve` hand the issue back by removing everyone
   but the author (`unassign = "all"`), not the reviewer by name: gh-dojo
   does not remember who `review` assigned, so someone else assigned by hand
-  is removed too. The author is `@me`, whoever runs the verb: the author's
-  agent runs them; a reviewer running them would remove the author.
+  is removed too, and `@me` is the author only when the author's agent
+  runs them (see [unassign](#effects)).

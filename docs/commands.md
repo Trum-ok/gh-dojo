@@ -18,8 +18,8 @@
 Issues are written `42` or `#42` for the default repository (the first of
 [`board.repos`](configuration.md#board)), and `owner/repo#42` or the issue's URL for any
 other: in a verb, a batch, `show`, `comment`, both sides of `block` and
-`unblock`, `wait --by`, `new --blocked-by` and `--parent`, and `release
---exclude`. A repository outside
+`unblock`, `wait --by`, a verb's `--of`, `new --blocked-by` and `--parent`,
+and `release --exclude`. A repository outside
 `board.repos` is accepted too, since the command names it; a verb adds its
 issue to the board like any other.
 
@@ -57,10 +57,9 @@ A line left out means none: a card without a milestone, labels, assignees,
 blockers, blocked issues, a parent or sub-issues has no line for them.
 Times are UTC.
 
-Unresolved blockers (see [`statuses.resolved`](configuration.md#statuses))
-are listed first; a linked issue is shown with its status, "on the board,
-no status", "not on the board", or "status not read" and why, and a blocker
-whose status was not read counts as unresolved. Sub-issues follow the same
+Unresolved blockers ([the rule](configuration.md#statuses)) are listed
+first; a linked issue is shown with its status, "on the board, no status",
+"not on the board", or "status not read" and why. Sub-issues follow the same
 rule and order, under a header such as `sub-issues: 3 of 5 closed, 1
 unresolved`: the unresolved ones are what a verb with
 [`sub_issues`](configuration.md#checks) checks. The first 20 sub-issues are
@@ -139,12 +138,10 @@ What to work on next: the open issues in the initial status
 in `list`, in the board's own order (issues without a status mixed with the
 initial ones, no groups), leaving out the issues with an unresolved blocker.
 
-A blocker is resolved when it is closed or on the board in a
-[`statuses.resolved`](configuration.md#statuses) status, archived or not: the rule of `show`
-and the `blockers` check. A blocker not on the board, or whose place the
-token cannot read, counts as unresolved. The blocked issues are counted
-(`hidden: 2 blocked, use --all`); `--all` shows them too, each with its
-blockers:
+Blockers are resolved by the rule of `show` and the `blockers` check
+([`statuses.resolved`](configuration.md#statuses)). The blocked issues are
+counted (`hidden: 2 blocked, use --all`); `--all` shows them too, each with
+its blockers:
 
 ```text
 $ gh dojo next
@@ -186,12 +183,10 @@ Creates an issue, labels it, adds it to the board and sets the initial status
   repository, `@me` the authenticated user (repeatable, or comma-separated;
   GitHub allows 10). Logins are matched ignoring case, and `@me` with your
   own login counts once;
-- `--milestone v1.2` puts the issue in the open milestone titled `v1.2`
-  (ignoring case), or else in the only one whose title starts with it:
-  `--milestone v0.3` for `v0.3 — extensibility`. Several such are exit
-  code 1, listing them; `--milestone none` is no milestone, as for a verb. A verb with
-  [`milestone = "{milestone}"`](configuration.md#effects) moves an existing
-  issue to another milestone, matched the same way;
+- `--milestone v1.2` puts the issue in an open milestone, matched as a
+  verb's [`milestone`](configuration.md#effects) is (`v0.3` for
+  `v0.3 — extensibility`); `none` is no milestone. A verb with
+  `milestone = "{milestone}"` moves an existing issue to another one;
 - `--blocked-by 17` marks it blocked by #17 (repeatable, or comma-separated;
   `owner/repo#17` or a URL for another repository); `--by 17`, as
   [`wait`](#process-verbs) and [`block`](#block-unblock) call it, is the
@@ -234,10 +229,7 @@ blocked-by links, parent) instead of creating another:
 - assignees it has stay (`--assignee` only adds; one that would take it
   past 10 assignees is exit code 1 before anything is written);
 - a different milestone or parent it already has (or a parent the token
-  cannot read) is kept, with a warning that names the command to change it:
-  a verb that only sets `milestone = "{milestone}"` (no other effect or
-  required argument, no `confirm`) and starts from the issue's status, when
-  the config has one, else `gh issue edit`.
+  cannot read) is kept, with a warning naming the command to change it.
 
 If a run fails after creating the issue, it exits with code 5: run the
 same command again.
@@ -418,29 +410,12 @@ read, so the rules are written once, in the config:
 | `copilot` | A section of `.github/copilot-instructions.md` |
 
 The instructions are in English and say what `describe` says, with what an
-agent should do about it:
-
-- use only `gh dojo` for issues;
-- how to name an issue of another repository (at length only with several
-  `board.repos`);
-- the lifecycle, the longest way from the initial status to a final one
-  along the verbs (a status a verb can jump over in parentheses);
-- the initial, final and resolved statuses;
-- each verb with its `when`, the statuses it moves between, its arguments,
-  checks and effects, and the rules behind them (ask the user before
-  `--yes`, don't work around a refused blockers or labels check, what `--by`
-  links, ask which assignee or milestone when unknown, several numbers at
-  once, and for a batch verb that finishes issues one line pointing at
-  `release --help`);
-- `next`, `show` and `list`; `new`, `comment`, `block` and `unblock`;
-- safe repeats;
-- what to do on exit codes 2, 4 and 5 (an error's `fix:` line covers the
-  rest);
-- and JSON.
-
-Since the skill is loaded into every session, it repeats nothing: no
-command table and no pointer to `describe`. A command it mentions (`next`,
-`new`, `release`) is named only when the gh-dojo that wrote it has it.
+agent should do about it: use only `gh dojo` for issues, the lifecycle and
+the statuses, each verb with its rules (ask the user before `--yes`, don't
+work around a refused check), the commands to find, read and create issues,
+safe repeats, exit codes and JSON. This repository's own
+[`.claude/skills/gh-dojo/SKILL.md`](../.claude/skills/gh-dojo/SKILL.md) is
+an example.
 
 The skill's `description` names the repository, the board and the verbs,
 and [`[agent] description`](configuration.md#agent) adds to it. The
@@ -452,28 +427,17 @@ matter; a skill without that marker, written by hand, is not overwritten
 (exit code 1): move what is worth keeping into the notes and delete it.
 
 In `AGENTS.md` and the Copilot file gh-dojo owns only the lines from
-`<!-- gh-dojo:begin ... -->` to `<!-- gh-dojo:end -->` (leading spaces
-allowed), and the rest of the file stays byte for byte; a file without the
-markers gets the section at its end. Marker lines count anywhere, fenced code
-blocks included, so don't quote them in those files. Markers out of order are
-an error, and nothing is written. A file with CRLF line endings keeps them.
-
-Every file is written whole, through a temporary file next to it that is
-renamed over it, with the file's permissions. Reads and writes stay inside
-the repository: only relative symbolic links that point inside it are
-followed (an absolute link is an error), and the target of a linked file is
-what gets written. `[agent] notes` cannot be under `.git`, also through a
-link, or be one of the files agent install writes.
+`<!-- gh-dojo:begin ... -->` to `<!-- gh-dojo:end -->`, and the rest of
+the file stays byte for byte; a file without the markers gets the section
+at its end. Marker lines count anywhere, fenced code blocks included, so
+don't quote them in those files; markers out of order are an error, and
+nothing is written. Reads and writes stay inside the repository: only
+relative symbolic links that point inside it are followed.
 
 A repeat with the same config writes nothing and prints `up to date` for
-each file. `--check` writes nothing either, and reports a file that:
-
-- is missing: `missing`;
-- differs from what install would write: `out of date` (with up to 20
-  changed lines);
-- is a hand-written skill: `hand written`.
-
-The exit code is then 1 with the fix: `gh dojo agent install`, or for a
+each file. `--check` writes nothing either, and reports a file `missing`,
+`out of date` (with up to 20 changed lines) or `hand written` (a skill),
+with exit code 1 and the fix: `gh dojo agent install`, or for a
 hand-written skill moving it into the notes first. Paths are relative to
 the repository root, the directory that holds `.github`; agent install
 never uses the network.
@@ -490,14 +454,12 @@ them in CI, and run `agent install` with that version when you upgrade:
 ```
 
 [`doctor`](#doctor) only warns about files out of date: the installed
-gh-dojo may be a different version than the one in CI. In this repository
-CI checks with the build of the branch, so after changing the config, the
-notes or the generator, run `make agent`.
+gh-dojo may be a different version than the one in CI.
 
 ## Process verbs
 
 ```sh
-gh dojo <verb> <N> [--comment TEXT] [--by N|TEXT] [--assignee LOGIN] [--milestone TITLE] [--yes] [--dry-run] [--show]
+gh dojo <verb> <N> [--comment TEXT] [--by N|TEXT] [--assignee LOGIN] [--milestone TITLE] [--of N] [--yes] [--dry-run] [--show]
 gh dojo <verb> <N>... [flags]     # a verb with batch = true, such as done
 ```
 
@@ -508,18 +470,21 @@ their `when` line and the lifecycle; `gh dojo <verb> --help` shows the
 allowed starting statuses, the target status, the required arguments, the
 other effects and the comment template.
 
-A verb takes one issue number (several with [`batch = true`](output.md#several-issues-at-once))
-and, in one command:
+A verb takes one issue number (several with
+[`batch = true`](configuration.md#verbs), see
+[Several issues at once](output.md#several-issues-at-once)) and, in one
+command:
 
 1. checks, in this order, that the required arguments are given, that the
    issue is open (a verb that moves it to a final status, closes it or
-   reopens it also runs on a closed one; one that closes and has no `to`,
-   only on an issue closed with its reason), that its status is one of the
+   reopens it also runs on a closed one, see
+   [`close`](configuration.md#effects)), that its status is one of the
    verb's `from` statuses (no status, or not on the board, counts as
    [`statuses.initial`](configuration.md#statuses)), the issue's labels (`from_labels`,
    `refuse_labels`), its blockers (`blockers`) and sub-issues
    (`sub_issues`), and the user's go-ahead (`confirm`);
-2. adds the issue to the board if it is not there;
+2. adds the issue to the board if it is not there; an archived item is
+   unarchived when the verb moves it to a status that is not final;
 3. applies its [effects](configuration.md#effects): reopens it, sets the status and the
    sprint, sets other board fields, sets the milestone, adds and removes labels, assigns and
    unassigns users, marks it blocked by the `--by` issues, posts the rendered
@@ -528,32 +493,21 @@ and, in one command:
 Each effect already in place is skipped: a status already set, labels
 already there or gone, a comment that is already the latest gh-dojo comment,
 an issue already closed (whatever its reason), and so on. Everything is
-written in one GraphQL mutation (two when the issue is not on the board yet:
-the status needs the new board item), so a verb on an issue on the board
-costs one read and one write.
+written in one GraphQL mutation, each effect its own field of it, applied
+or failing on its own (two mutations when the issue is not on the board
+yet: the status needs the new board item), so a verb on an issue on the
+board costs one read and one write.
 
-The flags:
+A verb takes these flags only when its config asks for them:
 
-- `--comment` and `--by` fill `{comment}` and `{by}` in the template; a
-  verb whose template does not use one of them rejects that flag. `--by`
-  takes an issue number (rendered `#12`) or free text; with
-  [`blockers = "link"`](configuration.md#checks) issues are also marked as
-  blocking this one.
-- `--assignee` (a login, or `@me`) exists only on a verb with
-  [`assign = "{assignee}"`](configuration.md#effects), and is required
-  there: the user to assign, also `{assignee}` in the template.
-- `--milestone` (an open milestone's title, or a start only that title
-  has) exists only on a verb with
-  [`milestone = "{milestone}"`](configuration.md#effects), and is required
-  there: the milestone to set, also `{milestone}` in the template;
-  `--milestone none` (in any case) takes the issue out of its milestone,
-  and `{milestone}` is then `none`: `gh dojo plan 56 --milestone none`.
-- `--of` (`17`, `#17`, `owner/repo#17` or a URL) exists only on a verb
-  with [`close = "duplicate"`](configuration.md#effects), and is required
-  there: the original, which the issue is closed as a duplicate of and
-  linked to, also `{of}` in the template: `gh dojo duplicate 42 --of 17`.
-- `--yes` exists only on a verb with
-  [`confirm = "user"`](configuration.md#checks).
+| Flag | Taken by a verb with | Gives |
+|------|----------------------|-------|
+| `--comment` | `{comment}` in its [template](configuration.md#comment-templates), or `require = ["comment"]` and no template | The text |
+| `--by` | `{by}` in its template | An issue (rendered `#12`) or free text; with [`blockers = "link"`](configuration.md#checks) the issues are marked as blocking this one |
+| `--assignee` | [`assign = "{assignee}"`](configuration.md#effects), which requires it | The user to assign, a login or `@me`; also `{assignee}` |
+| `--milestone` | [`milestone = "{milestone}"`](configuration.md#effects), which requires it | The milestone to set, or `none`; also `{milestone}` |
+| `--of` | [`close = "duplicate"`](configuration.md#effects), which requires it | The original (`17`, `owner/repo#17` or a URL); also `{of}` |
+| `--yes` | [`confirm = "user"`](configuration.md#checks) | The user's go-ahead |
 
 `--dry-run` prints the plan without changing anything:
 
@@ -604,16 +558,11 @@ it set: "Item closed" moves an issue a verb closed (to Done by default),
 "Item reopened" moves one it reopened. Turn them off in the board's workflow
 settings, or point them at the statuses your verbs set.
 
-A verb that closes the issue and has no `to` skips the `from` check on an
-issue closed with the verb's reason, so its repeat is not refused because a
-workflow moved the issue; an issue closed with another reason it refuses,
-whatever its status. A verb that moves an issue closed as not planned or
-duplicate to a final status warns on stderr and keeps the reason.
-
-A verb with `batch = true` (the presets' `done`) takes several numbers:
-`gh dojo done 12 13 14`. Each issue is checked and written on its own; see
-[Several issues at once](output.md#several-issues-at-once) for the summary and the
-exit code. [`release`](#release) runs it on the issues of a release.
+A verb with [`batch = true`](configuration.md#verbs) (the presets' `done`)
+takes several numbers: `gh dojo done 12 13 14`. Each issue is checked and
+written on its own; see [Several issues at once](output.md#several-issues-at-once)
+for the summary and the exit code. [`release`](#release) runs it on the
+issues of a release.
 
 ## release
 
@@ -621,13 +570,48 @@ exit code. [`release`](#release) runs it on the issues of a release.
 gh dojo release <ref> --verb <verb> [--since <ref>] [--exclude N]... [--dry-run] [--yes] [--comment TEXT] [--by TEXT]
 ```
 
-Once a release is tagged, runs a verb with [`batch = true`](output.md#several-issues-at-once)
+Once a release is tagged, runs a verb with [`batch = true`](configuration.md#verbs)
 on the issues it includes, as `gh dojo done 12 13 14` would: same checks,
-summary and exit codes. Before the tag, `gh dojo release main --verb done
---dry-run` shows what the next release holds.
+summary and exit codes ([Several issues at once](output.md#several-issues-at-once)).
+Before the tag, `gh dojo release main --verb done --dry-run` shows what the
+next release holds.
 
-**The range** is the commits of `<ref>` (a tag, branch or commit on GitHub;
-no local checkout, so `main`, not `origin/main`) since `--since`, or else
+```console
+$ gh dojo release v0.2.0 --verb done --dry-run
+release v0.2.0: 5 commits since v0.1.0, 4 issues
+already closed: #9 (Done)
+not ready (done starts only from Ready): #17 (In progress)
+  #3: commit 1111111
+  #7: commit 1212121, commit a1a1a1a
+dry run: done #3 "Read the config"
+  status: Ready → Done
+  close: as completed
+...
+```
+
+- `--dry-run` lists how each issue was found (`PR #N`, `commit <sha>`,
+  `suffix of commit <sha>`) and its plan.
+- No issues is a line saying where release looked, exit code 0.
+- `--comment`, `--by` and `--yes` go to the verb, for every issue.
+- A verb without `batch = true` is exit code 1. So is one that needs
+  `--assignee`, `--milestone` or `--of` (`assign = "{assignee}"`,
+  `milestone = "{milestone}"`, `close = "duplicate"`), which release does
+  not take: run it on the issues themselves.
+- `--exclude N` (`#N`, `owner/repo#N` or a URL; repeatable, or
+  comma-separated) leaves out any issue found, by a pull request or a
+  message, before it is read: the line `excluded: acme/api#3 (commit
+  de25f45)` and the JSON's `skipped` (`excluded`) name it, and an
+  `--exclude` the release does not include is a warning.
+- A `<ref>` or `--since` GitHub does not know is exit code 3; for one with
+  a `/`, such as `origin/main`, one more request checks the name after it,
+  and if GitHub has it the `fix:` names it (`pass main`).
+- Requests: one for `<ref>` and the start (one per 100 tags), one per 100
+  commits with their pull requests, then the batch's.
+
+### The range
+
+The range is the commits of `<ref>` (a tag, branch or commit on GitHub; no
+local checkout, so `main`, not `origin/main`) since `--since`, or else
 since the previous release:
 
 - The previous release is the highest version tag (`v1.2.3`, `1.2.3`)
@@ -644,15 +628,20 @@ since the previous release:
   down to it, exact for a linear history (with merge commits, a merged
   branch's commits older than the start are missed, but their pull request
   is found through the merge commit).
-- At most 1000 commits; a longer range is exit code 1.
+- At most 1000 commits; a longer range is exit code 1. The previous release
+  is looked for among the 1000 newest tags; up to 5 pull requests per
+  commit and 25 closing issues per pull request are read, and the rest are
+  left out with a warning.
 
-**An issue is in the release** when:
+### Issues in the release
+
+An issue is in the release when:
 
 - a merged pull request a commit belongs to closes it (its closing keywords
   or linked issues, `closingIssuesReferences`; squash, merge and rebase
   alike), or
 - a commit message names it after a word of
-  [`[release] keywords`](configuration.md#release-keywords), by default
+  [`[release] keywords`](configuration.md#release), by default
   GitHub's closing keywords: `Fixes #12`, `closes: acme/api#3`,
   `Resolves <issue URL>`, any case; a list after a keyword counts whole up
   to the end of its line (`Fixes #12, #13 and #14`), a mention without one
@@ -662,7 +651,7 @@ since the previous release:
 so `refs` is not a default; a project that commits without pull requests
 adds it, as this one does.
 
-With [`[release] suffix = true`](configuration.md#release-keywords), the
+With [`[release] suffix = true`](configuration.md#release), the
 parentheses that end a message's first line name issues too: `fix: login
 limit (#12)`, `(#12, acme/api#3)`. A project whose commits go without pull
 requests often marks them so.
@@ -683,10 +672,13 @@ The suffix is off by default because where pull requests are
 squash-merged, the parentheses name a pull request, not an issue.
 
 Code in a message does not count, as Markdown does not link it: a code span
-(`` `Refs #12` ``) or a fenced block (```` ``` ````) is an example of the
-syntax, not a link, so put such examples in backticks.
+(`` `Refs #12` ``), a fenced block (```` ``` ````) or an indented block
+(four spaces or a tab, after a blank line) is an example of the syntax, not
+a link, so put such examples in backticks.
 
-**A message is text**, a guess at a link, where a pull request closing an
+### Numbers that are no issue
+
+A message is text, a guess at a link, where a pull request closing an
 issue is GitHub's own. So a number only commit messages name that is no
 issue is left out with a warning on stderr and listed in the JSON's
 `skipped`, not failed:
@@ -709,13 +701,9 @@ These fail the batch as any issue does:
   the token's;
 - an issue a merged pull request closes, even if a message names it too.
 
-`--exclude N` (`#N`, `owner/repo#N` or a URL; repeatable, or
-comma-separated) leaves out any issue found, by a pull request or a
-message, before it is read: the line `excluded: acme/api#3 (commit
-de25f45)` and the JSON's `skipped` (`excluded`) name it, and an
-`--exclude` the release does not include is a warning.
+### Not ready
 
-**Not ready.** An issue whose status the verb's `from` does not allow:
+An issue whose status the verb's `from` does not allow:
 
 - open, such as one still in progress with a `Refs` commit or a suffix
   when `done` starts only from Ready: listed as not ready and left out, not
@@ -728,49 +716,14 @@ de25f45)` and the JSON's `skipped` (`excluded`) name it, and an
 
 The verb's other checks (blockers, `--yes`) fail the batch as well.
 
-**Already closed.** A closed issue in a final status
-([`statuses.final`](configuration.md#statuses)) is done with, whatever the
-verb:
+### Already closed
 
-- listed as `already closed: #200 (Done)` and in the JSON's `skipped`
-  (`closed`);
-- left out, and not touched, with no status, sprint or comment written;
-- it does not change the exit code.
-
-In a process where some issues go straight to Done without a release
-(docs, CI), their commits are still in the next release's range: a verb
-that works only on open issues (`stage`) would refuse them, and a repeat of
-`done` would move them to today's sprint.
-
-A closed issue the board's own workflows moved to the final status, such
-as "Item closed" moving an issue a `Fixes #12` commit closed from In
-progress to Done (the status history marks the change automated), did not
-go through the process: the verb gets it as any issue, and refuses it or
-repeats.
-
-```console
-$ gh dojo release v0.2.0 --verb done --dry-run
-release v0.2.0: 5 commits since v0.1.0, 4 issues
-already closed: #9 (Done)
-not ready (done starts only from Ready): #17 (In progress)
-  #3: commit 1111111
-  #7: commit 1212121, commit a1a1a1a
-dry run: done #3 "Read the config"
-  status: Ready → Done
-  close: as completed
-...
-```
-
-- `--dry-run` lists how each issue was found (`PR #N`, `commit <sha>`,
-  `suffix of commit <sha>`) and its plan.
-- No issues is a line saying where release looked, exit code 0.
-- `--comment`, `--by` and `--yes` go to the verb, for every issue.
-- A verb without `batch = true` is exit code 1. So is one that needs
-  `--assignee` or `--milestone` (`assign = "{assignee}"`,
-  `milestone = "{milestone}"`), which release does not take: run it on the
-  issues themselves.
-- A `<ref>` or `--since` GitHub does not know is exit code 3; for one with
-  a `/`, such as `origin/main`, one more request checks the name after it,
-  and if GitHub has it the `fix:` names it (`pass main`).
-- Requests: one for `<ref>` and the start (one per 100 tags), one per 100
-  commits with their pull requests, then the batch's.
+A closed issue in a final status ([`statuses.final`](configuration.md#statuses))
+is done with, whatever the verb: listed as `already closed: #200 (Done)` and
+in the JSON's `skipped` (`closed`), not touched, and without effect on the
+exit code. So issues that went straight to Done without a release (docs, CI)
+are not refused by a verb that runs only on open issues, nor given today's
+sprint by a repeat of `done` when they have none. One the board's own
+workflows moved there ("Item closed" after a `Fixes #12` commit; the status
+history marks the change automated) did not go through the process: the
+verb gets it as any issue.
