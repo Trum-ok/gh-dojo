@@ -25,10 +25,10 @@ import (
 // mutation, or two for an issue not on the board whose status is set (see
 // effects.Batches). The label and user IDs of the labels, assign and
 // unassign effects, and the issue --by names for blockers = "link", come
-// with the card's query (issue.Lookup); only a label to add or a user
-// that does not exist costs one more read, for the error's allowed list. ReadIssues
-// sends one query per issue.MaxBatch issues, with the lookups once in
-// each.
+// with the card's query (issue.Lookup); only a label to add or a user that
+// does not exist costs one more read, for the error's allowed list.
+// ReadIssues sends one query per issue.MaxBatch issues, with the lookups
+// once in each.
 type githubBackend struct {
 	app   *App
 	added map[string]string // refKey of an issue → board item added in this run
@@ -36,45 +36,43 @@ type githubBackend struct {
 	// kind ("labels", "assignable") and repository, so a batch reads them
 	// once per repository, not once per issue; so are the open milestones
 	// of a repository with more than one card query reads ("milestones").
-	allowed map[string]allowedValues
+	allowed map[string]readValue
 }
 
-// allowedValues is one read of allowed values, or why it failed.
-type allowedValues struct {
-	names      []string
-	milestones []issue.OpenMilestone
-	err        error
+// readValue is one read's answer, or why it failed.
+type readValue struct {
+	value any
+	err   error
+}
+
+// readOnce returns read's answer under key in cache, calling read only the
+// first time.
+func readOnce[T any](cache *map[string]readValue, key string, read func() (T, error)) (T, error) {
+	if v, ok := (*cache)[key]; ok {
+		value, _ := v.value.(T)
+		return value, v.err
+	}
+	value, err := read()
+	if *cache == nil {
+		*cache = map[string]readValue{}
+	}
+	(*cache)[key] = readValue{value: value, err: err}
+	return value, err
 }
 
 // allowedOnce returns read's answer for kind in repo, reading it once per
 // run.
 func (b *githubBackend) allowedOnce(kind string, repo issue.Repo, read func() ([]string, error)) ([]string, error) {
-	key := kind + " " + strings.ToLower(repo.String())
-	if v, ok := b.allowed[key]; ok {
-		return v.names, v.err
-	}
-	names, err := read()
-	if b.allowed == nil {
-		b.allowed = map[string]allowedValues{}
-	}
-	b.allowed[key] = allowedValues{names: names, err: err}
-	return names, err
+	return readOnce(&b.allowed, kind+" "+strings.ToLower(repo.String()), read)
 }
 
 // milestonesOnce returns the open milestones of repo after the cursor
 // after, the end of the first page the card read, read page by page once
 // per run.
 func (b *githubBackend) milestonesOnce(ctx context.Context, repo issue.Repo, after string) ([]issue.OpenMilestone, error) {
-	key := "milestones " + strings.ToLower(repo.String())
-	if v, ok := b.allowed[key]; ok {
-		return v.milestones, v.err
-	}
-	all, err := issue.ReadMilestones(ctx, b.app.Client, repo, after)
-	if b.allowed == nil {
-		b.allowed = map[string]allowedValues{}
-	}
-	b.allowed[key] = allowedValues{milestones: all, err: err}
-	return all, err
+	return readOnce(&b.allowed, "milestones "+strings.ToLower(repo.String()), func() ([]issue.OpenMilestone, error) {
+		return issue.ReadMilestones(ctx, b.app.Client, repo, after)
+	})
 }
 
 func (b *githubBackend) ReadIssue(ctx context.Context, v config.Verb, ref issue.Ref, a workflow.Args) (workflow.Issue, error) {
@@ -386,12 +384,12 @@ func unresolvedLinks(c *issue.Card, all graph.Page[issue.Link], unresolved []iss
 // the card: the IDs of its labels, of the user it assigns (from the
 // config or --assignee), and the open milestones for the one it sets (from
 // the config or --milestone). A verb that removes labels, or checks them
-// (from_labels, refuse_labels), reads all of the issue's labels, so it
-// can tell one is there; a verb that unassigns reads
-// the IDs of the issue's assignees, and the viewer for "@me"; a verb that
-// checks blockers reads all of its blockers (GitHub allows 50), and one
-// that checks sub-issues all of them (GitHub allows 100), so a resolved
-// one is not counted as unread.
+// (from_labels, refuse_labels), reads all of the issue's labels, so it can
+// tell one is there; a verb that unassigns reads the IDs of the issue's
+// assignees, and the viewer for "@me"; a verb that checks blockers reads
+// all of its blockers (GitHub allows 50), and one that checks sub-issues
+// all of them (GitHub allows 100), so a resolved one is not counted as
+// unread.
 func verbLookup(v config.Verb, a workflow.Args) issue.Lookup {
 	l := issue.Lookup{
 		Labels:       append(slices.Clone(v.AddLabels), v.RemoveLabels...),
@@ -490,11 +488,11 @@ func (b *githubBackend) checkFound(ctx context.Context, v config.Verb, l issue.L
 		}
 		return false, e.WithFix(fmt.Sprintf("gh label create %s -R %s, or fix %s", quoted[0], card.Repo, labelsKey))
 	case l.User != "" && f.User == nil:
-		e := cfg.Errorf("%s: %s cannot be assigned issues in %s", cfg.KeyPath(key+"assign"), l.User, card.Repo).
-			WithFix(fmt.Sprintf("check the login, or give %s access to %s", l.User, card.Repo))
+		var e *render.Error
 		if v.AssignArg {
-			e = render.Usage("--%s: %s cannot be assigned issues in %s", config.ArgAssignee, l.User, card.Repo).
-				WithFix(fmt.Sprintf("check the login, or give %s access to %s", l.User, card.Repo))
+			e = notAssignable(render.Usage, "--"+config.ArgAssignee, []string{l.User}, card.Repo)
+		} else {
+			e = notAssignable(cfg.Errorf, cfg.KeyPath(key+"assign"), []string{l.User}, card.Repo)
 		}
 		if logins, err := b.allowedOnce("assignable", card.Repo, func() ([]string, error) {
 			return assignableUsers(ctx, b.app.Client, card.Repo)
@@ -507,6 +505,17 @@ func (b *githubBackend) checkFound(ctx context.Context, v config.Verb, l issue.L
 			WithFix(render.AuthFix)
 	}
 	return false, nil
+}
+
+// notAssignable is the error, made by newError (a usage or a config
+// error), for logins that cannot be assigned issues in repo, as where
+// names them: the flag or the config key.
+func notAssignable(newError func(string, ...any) *render.Error, where string, logins []string, repo issue.Repo) *render.Error {
+	fix := fmt.Sprintf("check the login, or give %s access to %s", logins[0], repo)
+	if len(logins) > 1 {
+		fix = "check the logins, or give them access to " + repo.String()
+	}
+	return newError("%s: %s cannot be assigned issues in %s", where, render.JoinWords(logins, "and"), repo).WithFix(fix)
 }
 
 // matchMilestone finds the open milestone of the card's repository that

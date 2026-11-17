@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -32,17 +33,17 @@ import (
 // workflow.PlanNew (no network), the mutations effects'; this file parses
 // the flags, applies the plan (newRun.apply) and prints the result.
 //
-// Requests with a warm schema cache: one read (issue.ReadNewContext: repo ID,
-// labels, open milestones, recent issues, the --blocked-by and --parent
-// issues, and the --assignee users), createIssue (with its labels,
-// milestone, parent and assignees), addProjectV2ItemById, then the status
-// with the blocked-by links (addBlockedBy, aliased, in the same mutation):
-// four. Without statuses.initial and --blocked-by the last write is
-// skipped. --parent and --assignee cost no request: createIssue takes them
-// (parentIssueId, assigneeIds), and only a resumed issue without them gets
-// addSubIssue or addAssigneesToAssignable, in that last mutation. An
-// --assignee who cannot be assigned costs one more read, for the allowed
-// list, before failing.
+// Requests with a warm schema cache: one read (issue.ReadNewContext: repo
+// ID, labels, open milestones, recent issues, the --blocked-by and
+// --parent issues, and the --assignee users), createIssue (with its
+// labels, milestone, parent and assignees), addProjectV2ItemById, then the
+// status with the blocked-by links (addBlockedBy, aliased, in the same
+// mutation): four. Without statuses.initial and --blocked-by the last
+// write is skipped. --parent and --assignee cost no request: createIssue
+// takes them (parentIssueId, assigneeIds), and only a resumed issue
+// without them gets addSubIssue or addAssigneesToAssignable, in that last
+// mutation. An --assignee who cannot be assigned costs one more read, for
+// the allowed list, before failing.
 //
 // The board item is added explicitly rather than with createIssue's
 // projectV2Ids: GitHub adds those asynchronously, so the createIssue answer
@@ -54,18 +55,18 @@ import (
 // later) and an item found there is used.
 //
 // Retries are safe (principle 5): the body ends with a hidden marker
-// <!-- gh-dojo:new:<hash> --> of the normalized title (workflow.NewDedupKey), and the
-// read looks for it among the repo's issue.NewDedupWindow newest open issues,
-// keeping those the viewer wrote. A match is resumed instead of created
-// again: missing labels and --assignee users are added (assignees it has
-// stay), the --milestone is set if it has none (a
-// different one stays, with a warning), the issue is unarchived or put on
-// the board and, if it has no status, given the initial one; blocked-by
-// links it lacks are added, and so is the --parent if it has no parent (a
-// different one stays, with a warning). So filing an open
-// issue again with the same title within the window resumes it. An issue
-// that dropped out of the window (issue.NewDedupWindow newer open issues in the
-// repo, by anyone) or was closed is created again.
+// <!-- gh-dojo:new:<hash> --> of the normalized title
+// (workflow.NewDedupKey), and the read looks for it among the repo's
+// issue.NewDedupWindow newest open issues, keeping those the viewer wrote.
+// A match is resumed instead of created again: missing labels and
+// --assignee users are added (assignees it has stay), the --milestone is
+// set if it has none (a different one stays, with a warning), the issue is
+// unarchived or put on the board and, if it has no status, given the
+// initial one; blocked-by links it lacks are added, and so is the --parent
+// if it has no parent (a different one stays, with a warning). So filing
+// an open issue again with the same title within the window resumes it.
+// An issue that dropped out of the window (issue.NewDedupWindow newer open
+// issues in the repo, by anyone) or was closed is created again.
 //
 // Nothing is written twice within a run either: a lost createIssue answer
 // is followed by one re-read (newRecheckDelay later), and a stale schema ID
@@ -319,15 +320,24 @@ func newRepo(cfg *config.Config, name string) (issue.Repo, error) {
 // loads.
 func newTypeUsage() string {
 	cfg, err := loadConfig()
-	switch {
-	case err != nil:
+	if err != nil {
 		return "issue type: adds the label <labels.type_prefix><type>; any repo label outside the areas when the prefix is empty"
-	case cfg.Labels.TypePrefix != "":
-		return "issue type: adds the label " + cfg.Labels.TypePrefix + "<type>"
-	case cfg.Labels.AreaPrefix != "":
-		return "issue type: any repo label not starting with " + cfg.Labels.AreaPrefix
 	}
-	return "issue type: any repo label"
+	rule, _ := newTypeRule(cfg.Labels, "<type>")
+	return "issue type: " + rule
+}
+
+// newTypeRule says what --type takes with labels: "adds the label
+// <type_prefix><value>", for which takesValue is true, or which repo
+// labels it may be.
+func newTypeRule(labels config.Labels, value string) (rule string, takesValue bool) {
+	switch {
+	case labels.TypePrefix != "":
+		return "adds the label " + labels.TypePrefix + value, true
+	case labels.AreaPrefix != "":
+		return "any repo label not starting with " + labels.AreaPrefix, false
+	}
+	return "any repo label", false
 }
 
 // newArgs accepts exactly one title.
@@ -378,7 +388,7 @@ An unknown or ambiguous one fails before anything is created, listing the open
 milestones or the candidates. --milestone none is no milestone, as for a verb.
 
 --assignee assigns users by login, @me for yourself (repeatable, or
-comma-separated; GitHub allows 10). One who cannot be assigned issues in
+comma-separated; GitHub allows ` + strconv.Itoa(workflow.MaxAssignees) + `). One who cannot be assigned issues in
 the repo fails before anything is created, listing who can.
 
 The body comes from --body or --body-file (a file, or - for stdin). A title
@@ -403,7 +413,7 @@ repository.
 A repository not in board.repos is exit code 1, listing them.
 
 A repeat is safe: the body ends with a hidden marker of the title, and a run
-that finds it on one of the repo's 20 newest open issues, written by you,
+that finds it on one of the repo's ` + strconv.Itoa(issue.NewDedupWindow) + ` newest open issues, written by you,
 finishes that issue (labels, assignees, milestone, board, status, blocked-by
 links, parent) instead of creating another; assignees it has stay, and a
 different milestone or parent it (or one the token cannot read) already has
@@ -421,13 +431,10 @@ Nothing is created or changed.`)
 		return b.String()
 	}
 	b.WriteString("\n\nThis project:")
-	switch {
-	case cfg.Labels.TypePrefix != "":
-		fmt.Fprintf(&b, "\n  --type X  adds the label %sX", cfg.Labels.TypePrefix)
-	case cfg.Labels.AreaPrefix != "":
-		fmt.Fprintf(&b, "\n  --type    any repo label not starting with %s", cfg.Labels.AreaPrefix)
-	default:
-		b.WriteString("\n  --type    any repo label")
+	if rule, takesValue := newTypeRule(cfg.Labels, "X"); takesValue {
+		b.WriteString("\n  --type X  " + rule)
+	} else {
+		b.WriteString("\n  --type    " + rule)
 	}
 	if cfg.Labels.AreaPrefix != "" {
 		fmt.Fprintf(&b, "\n  --area X  adds the label %sX", cfg.Labels.AreaPrefix)
@@ -456,7 +463,7 @@ func runNew(ctx context.Context, a *App, cfg *config.Config, o newOptions, warn 
 		if err == nil {
 			return r, nil
 		}
-		stale := r.schemaCached && board.IsStale(err)
+		stale := a.SchemaCached() && board.IsStale(err)
 		if r.number == 0 {
 			// Nothing written yet: a schema ID GitHub rejected is fixed by
 			// re-reading the board and trying once more.
@@ -525,18 +532,17 @@ func (r *newRun) wrote() bool {
 		len(r.linked) > 0 || r.parentSet
 }
 
+// issueTitle is the issue's title on GitHub when found, else the one given.
+func (r *newRun) issueTitle() string { return cmp.Or(r.title, r.opts.Title) }
+
 // result is the run as JSON.
 func (r *newRun) result() newResult {
-	title := r.title
-	if title == "" {
-		title = r.opts.Title
-	}
 	var number *int
 	if r.number != 0 {
 		number = &r.number
 	}
 	return newResult{
-		Number: number, Repo: r.repo.String(), Title: render.SingleLine(title), DryRun: r.opts.DryRun, Created: !r.resumed,
+		Number: number, Repo: r.repo.String(), Title: render.SingleLine(r.issueTitle()), DryRun: r.opts.DryRun, Created: !r.resumed,
 		Labels: render.OrEmpty(r.labels), Status: render.OrNull(r.status), StatusSet: r.statusSet, Unarchived: r.unarchived,
 		Milestone: milestoneJSON(r.milestone), MilestoneSet: r.milestoneSet,
 		BlockedBy: refList(r.linked, r.def), AlreadyBlockedBy: refList(r.linkedFound, r.def),
@@ -559,8 +565,7 @@ type newRun struct {
 	cfg  *config.Config
 	opts newOptions
 
-	schemaCached bool     // the board schema came from the cache
-	warnings     []string // for stderr
+	warnings []string // for stderr
 
 	number  int    // the issue's number, once it exists
 	id      string // its node ID
@@ -575,8 +580,7 @@ type newRun struct {
 
 	itemID     string
 	added      bool   // this run added the issue to the board
-	archived   bool   // the board item was archived when found
-	unarchived bool   // and this run restored it
+	unarchived bool   // the board item was archived when found, and this run restored it
 	status     string // the status found, "" for none
 	statusSet  bool   // the status was set to the initial one now
 	noInitial  bool   // statuses.initial is empty: no status was set
@@ -614,7 +618,6 @@ func (r *newRun) run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	r.schemaCached = s.Cached
 	def, err := r.Repo()
 	if err != nil {
 		return err
@@ -637,9 +640,7 @@ func (r *newRun) run(ctx context.Context) error {
 	}
 
 	r.repo, r.def = repo, def
-	logins, viewer := newAssigneeLogins(r.opts.Assignees)
-	nc, err := issue.ReadNewContext(ctx, r.Client, issue.NewRequest{Repo: repo, StatusField: statusField.Name,
-		Blockers: r.opts.Blockers, Parent: r.opts.Parent, Logins: logins, Viewer: viewer})
+	nc, err := issue.ReadNewContext(ctx, r.Client, r.contextRequest(repo, statusField.Name, r.opts.Blockers))
 	if err != nil {
 		return err
 	}
@@ -695,7 +696,7 @@ func (r *newRun) run(ctx context.Context) error {
 	r.warnings = append(r.warnings, plan.Warnings...)
 	if found != nil {
 		r.number, r.id, r.title = found.Number, found.ID, found.Title
-		r.itemID, r.archived, r.status = found.ItemID, found.Archived, found.Status
+		r.itemID, r.status = found.ItemID, found.Status
 		r.milestone = found.Milestone
 		r.assignedFound = plan.AlreadyAssigned
 		r.labelsMissing = plan.Labels
@@ -739,7 +740,7 @@ func (r *newRun) resolveLabels(ctx context.Context, nc *issue.NewContext) ([]iss
 		if !more {
 			out := make([]issue.Label, len(names))
 			for i, n := range names {
-				out[i] = labels[slices.IndexFunc(labels, func(l issue.Label) bool { return l.Name == n })]
+				out[i] = labelNamed(labels, n)
 			}
 			return out, nil
 		}
@@ -764,16 +765,25 @@ func (r *newRun) resolveAssignees(ctx context.Context, nc *issue.NewContext) ([]
 	if len(unknown) == 0 {
 		return users, nil
 	}
-	repo := r.repo
-	fix := fmt.Sprintf("check the login, or give %s access to %s", unknown[0], repo)
-	if len(unknown) > 1 {
-		fix = "check the logins, or give them access to " + repo.String()
-	}
-	e := render.Usage("--%s: %s cannot be assigned issues in %s", assigneeFlag, render.JoinWords(unknown, "and"), repo).WithFix(fix)
-	if logins, err := assignableUsers(ctx, r.Client, repo); err == nil {
+	e := notAssignable(render.Usage, "--"+assigneeFlag, unknown, r.repo)
+	if logins, err := assignableUsers(ctx, r.Client, r.repo); err == nil {
 		e = e.WithAllowed(logins...)
 	}
 	return nil, e
+}
+
+// labelNamed is the label of labels with name, which is among them.
+func labelNamed(labels []issue.Label, name string) issue.Label {
+	return labels[slices.IndexFunc(labels, func(l issue.Label) bool { return l.Name == name })]
+}
+
+// contextRequest is what issue.ReadNewContext reads for the run in repo:
+// the blockers (none for a re-read), the --parent and the --assignee
+// users.
+func (r *newRun) contextRequest(repo issue.Repo, statusField string, blockers []issue.Ref) issue.NewRequest {
+	logins, viewer := newAssigneeLogins(r.opts.Assignees)
+	return issue.NewRequest{Repo: repo, StatusField: statusField, Blockers: blockers, Parent: r.opts.Parent,
+		Logins: logins, Viewer: viewer}
 }
 
 // newAssigneeLogins splits the --assignee values into the logins to look
@@ -879,7 +889,7 @@ func (r *newRun) apply(ctx context.Context, s *board.Schema, statusField *board.
 	if !plan.Create && len(plan.Labels) > 0 {
 		var ids []string
 		for _, n := range plan.Labels {
-			ids = append(ids, in.labels[slices.IndexFunc(in.labels, func(l issue.Label) bool { return l.Name == n })].ID)
+			ids = append(ids, labelNamed(in.labels, n).ID)
 		}
 		vars := map[string]any{"issue": r.id, "labels": ids}
 		if err := r.Client.Mutate(ctx, effects.AddLabelsMutation, vars, nil); err != nil {
@@ -1125,9 +1135,7 @@ func (r *newRun) recheck(ctx context.Context, repo issue.Repo, statusField, mark
 	if !recheckPause(ctx) {
 		return nil
 	}
-	logins, viewer := newAssigneeLogins(r.opts.Assignees)
-	nc, err := issue.ReadNewContext(ctx, r.Client, issue.NewRequest{Repo: repo, StatusField: statusField,
-		Parent: r.opts.Parent, Logins: logins, Viewer: viewer})
+	nc, err := issue.ReadNewContext(ctx, r.Client, r.contextRequest(repo, statusField, nil))
 	if err != nil {
 		return nil
 	}
@@ -1173,15 +1181,10 @@ func (r *newRun) create(ctx context.Context, repoID, body string, in newInput) e
 	}
 	is := out.Create.Issue
 	r.number, r.id = is.Number, is.ID
-	if err != nil && parent != nil && parentRefused(err, "createIssue", true) {
-		// The issue exists with the rest: the run goes on, and ends with
-		// this refusal (see apply).
-		r.parentErr = err
-		r.milestone, r.milestoneSet = milestone, milestone != nil
-		r.assigned = loginsOf(assignees)
-		return nil
-	}
-	if err != nil {
+	// A parent GitHub refused for good leaves the issue with the rest: the
+	// run goes on, and ends with this refusal (see apply).
+	parentErr := err != nil && parent != nil && parentRefused(err, "createIssue", true)
+	if err != nil && !parentErr {
 		parts := []string{"labels"}
 		if milestone != nil {
 			parts = append(parts, "milestone")
@@ -1195,11 +1198,14 @@ func (r *newRun) create(ctx context.Context, repoID, body string, in newInput) e
 		return &newStepError{step: "GitHub refused part of the request (" + render.JoinWords(parts, "or") + ")", err: err}
 	}
 	r.milestone, r.milestoneSet = milestone, milestone != nil
-	if parent != nil {
-		r.parent, r.parentSet = &parent.Ref, true
-	}
 	if len(assignees) > 0 {
 		r.assigned = loginsOf(assignees)
+	}
+	switch {
+	case parentErr:
+		r.parentErr = err
+	case parent != nil:
+		r.parent, r.parentSet = &parent.Ref, true
 	}
 	return nil
 }
@@ -1263,11 +1269,7 @@ func (r *newRun) confirm() string {
 	case r.parent != nil:
 		effects = append(effects, "already a sub-issue of "+r.parentName(r.parent))
 	}
-	title := r.title
-	if title == "" {
-		title = r.opts.Title
-	}
-	return render.Confirm(r.name(), title, effects...)
+	return render.Confirm(r.name(), r.issueTitle(), effects...)
 }
 
 // planDry fills the run's fields as applying plan would leave them, for a
