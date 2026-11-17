@@ -93,12 +93,16 @@ type agentFileResult struct {
 
 func (r *agentResult) write(w io.Writer) {
 	for _, f := range r.Files {
-		fmt.Fprintf(w, "%s: %s\n", f.Path, strings.ReplaceAll(f.State, "_", " "))
+		fmt.Fprintf(w, "%s: %s\n", f.Path, stateText(f.State))
 		for _, l := range f.Diff {
 			fmt.Fprintf(w, "  %s\n", l)
 		}
 	}
 }
+
+// stateText is a file's state (agent.StateOutOfDate, say) as the text
+// says it: "out of date".
+func stateText(state string) string { return strings.ReplaceAll(state, "_", " ") }
 
 func runAgentInstall(cmd *cobra.Command, _ []string) error {
 	cfg, err := loadConfig()
@@ -292,7 +296,7 @@ func checkAgentFiles(r *doctor.Report, cfg *config.Config, cmdRoot *cobra.Comman
 				WithFix(agent.HandWrittenFix(f.Target, config.FileName)))
 			return
 		default:
-			stale = append(stale, f.Path+" ("+strings.ReplaceAll(f.State(), "_", " ")+")")
+			stale = append(stale, f.Path+" ("+stateText(f.State())+")")
 		}
 	}
 	if len(stale) > 0 {

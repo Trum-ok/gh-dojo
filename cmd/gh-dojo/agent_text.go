@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/Trum-ok/gh-dojo/internal/agent"
 	"github.com/Trum-ok/gh-dojo/internal/config"
+	"github.com/Trum-ok/gh-dojo/internal/issue"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/Trum-ok/gh-dojo/internal/workflow"
 	"github.com/spf13/cobra"
@@ -21,8 +23,8 @@ import (
 type agentDoc struct {
 	cfg *config.Config
 	// p is describe's process of cfg without what rules explains (the
-	// blockers check and link, confirm, batch), so a verb's line does not
-	// say it twice.
+	// blockers and sub-issues checks, the link, confirm, batch), so a
+	// verb's line does not say it twice.
 	p     *process
 	cmds  []string // the built-in commands, for hasCommand
 	notes string   // "" or markdown ending in a newline
@@ -154,15 +156,20 @@ func (w *mdWriter) list(items []string) {
 	}
 }
 
+// code marks s as code: `s`.
 func code(s string) string { return "`" + s + "`" }
 
-func codes(list []string) string {
+// codeEach marks each of list as code.
+func codeEach(list []string) []string {
 	out := make([]string, len(list))
 	for i, s := range list {
 		out[i] = code(s)
 	}
-	return strings.Join(out, ", ")
+	return out
 }
+
+// codes marks each of list as code and joins them with ", ".
+func codes(list []string) string { return strings.Join(codeEach(list), ", ") }
 
 // body is the generated instructions; level is the level of their heading.
 func (d *agentDoc) body(level int) string {
@@ -328,7 +335,7 @@ func (d *agentDoc) rules(v config.Verb) []string {
 		s := ""
 		for _, name := range labels {
 			if verbs := labelVerbs(d.cfg, v, name, remove); len(verbs) > 0 {
-				s += " " + render.JoinWords(quoted(verbs), "or") + does + code(name) + "."
+				s += " " + render.JoinWords(codeEach(verbs), "or") + does + code(name) + "."
 			}
 		}
 		return s
@@ -418,7 +425,7 @@ func (d *agentDoc) statuses(w *mdWriter) {
 	}
 	if len(st.Resolved) > 0 {
 		items = append(items, fmt.Sprintf("A blocker is resolved, no longer blocking, when it is closed or its board "+
-			"status is %s: its work is done though the issue may be open.", strings.Join(quoted(st.Resolved), " or ")))
+			"status is %s: its work is done though the issue may be open.", strings.Join(codeEach(st.Resolved), " or ")))
 	} else {
 		items = append(items, "A blocker is resolved, no longer blocking, only when it is closed.")
 	}
@@ -508,14 +515,6 @@ func (d *agentDoc) lifecycle() (path, verbs []string, skip []bool) {
 	return path, slices.Compact(verbs), skip
 }
 
-func quoted(list []string) []string {
-	out := make([]string, len(list))
-	for i, s := range list {
-		out[i] = code(s)
-	}
-	return out
-}
-
 func (d *agentDoc) reading(w *mdWriter) {
 	sprint := ""
 	if d.cfg.SprintField() != "" {
@@ -532,9 +531,10 @@ func (d *agentDoc) reading(w *mdWriter) {
 	items = append(items,
 		"`gh dojo show N` before you work on an issue"+d.takeNote()+": its status, "+sprint+"milestone, labels, blockers both "+
 			"ways (unresolved first, each with its board status), its parent and sub-issues (the same way), "+
-			"status history, description and the last 5 comments; a line left out means none. Several numbers, "+
-			"`gh dojo show 12 13`, print three lines per issue: read the one you take alone. `--comments all` prints "+
-			"the whole thread (up to 100), `--full` everything uncut.",
+			"status history, description and the last "+strconv.Itoa(defaultShownComments)+" comments; a line left "+
+			"out means none. Several numbers, `gh dojo show 12 13`, print three lines per issue: read the one you "+
+			"take alone. `--comments all` prints the whole thread (up to "+strconv.Itoa(issue.MaxComments)+"), "+
+			"`--full` everything uncut.",
 		"`gh dojo list`: an overview of the board, when the user asks for one: the open issues grouped by status; "+
 			"closed issues and final statuses are hidden and counted"+d.foldedList()+". Filters: "+listFilters+
 			", `--all`, `--limit 100`.")
@@ -558,7 +558,7 @@ func (d *agentDoc) foldedList() string {
 	if len(folded) > 1 {
 		is = " are one line of numbers each"
 	}
-	return "; " + strings.Join(quoted(folded), " and ") + is + ", `--status " + statusArg(folded[0]) +
+	return "; " + strings.Join(codeEach(folded), " and ") + is + ", `--status " + statusArg(folded[0]) +
 		"` lists them with titles"
 }
 
@@ -601,7 +601,7 @@ func (d *agentDoc) nextItem() string {
 		filters += ", `--sprint current`"
 	}
 	s := "`gh dojo next`: what to take next, the open issues " + where + ", with no unresolved blocker, in " +
-		"board order, 5 by default (`--limit N`). The blocked ones are hidden and counted; `--all` shows them " +
+		"board order, " + strconv.Itoa(defaultNextLimit) + " by default (`--limit N`). The blocked ones are hidden and counted; `--all` shows them " +
 		"with their blockers. Filters: " + filters + "."
 	if take := d.takeVerb(); take != "" {
 		s += " Once you pick one, " + code("gh dojo "+take+" N --show") + ": it takes the issue and prints its card."
