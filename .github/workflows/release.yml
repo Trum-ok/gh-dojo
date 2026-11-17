@@ -16,15 +16,17 @@ on:
     tags: ["v*"]
 
 permissions:
-  contents: write     # create the release and upload its assets
-  id-token: write     # sign the attestations through Sigstore
-  attestations: write # store them on the repository
+  contents: read
 
 concurrency:
   group: release-${{ github.ref }}
 
 jobs:
-  release:
+  # The tests run in a job of their own: gh-extension-precompile sets up Go
+  # with its own actions/setup-go, which restores the module cache. After
+  # `go test` in the same job the modules are already on disk, and tar logs
+  # "Cannot open: File exists" for each of them.
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -33,6 +35,16 @@ jobs:
           go-version-file: go.mod
       - name: Test
         run: go test ./...
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write     # create the release and upload its assets
+      id-token: write     # sign the attestations through Sigstore
+      attestations: write # store them on the repository
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: cli/gh-extension-precompile@76961aa3bd1123d0a6fd42d0a41aca0696937c39 # v2.2.0
         with:
           go_version_file: go.mod
