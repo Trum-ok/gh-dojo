@@ -514,7 +514,7 @@ func TestReadStatus(t *testing.T) {
 		{"renamed_name_reused", dojoStatus, func(is map[string]any) {
 			renameStatus(is, "Stage")
 			boardItem(is)["status"] = map[string]any{
-				"__typename": "ProjectV2ItemFieldSingleSelectValue", "name": "Urgent", "optionId": "o1",
+				"__typename": "ProjectV2ItemFieldSingleSelectValue", "name": "Urgent",
 				"field": map[string]any{"id": "PVTSSF_new", "name": "Status", "dataType": "SINGLE_SELECT"},
 			}
 		}, "Ready", false},
@@ -788,7 +788,7 @@ func dump(c *issue.Card) []byte {
 		p("item %s archived=%v created %s status=%q unknown=%v values truncated=%v",
 			c.Item.ID, c.Item.Archived, ts(c.Item.CreatedAt), c.Item.Status, c.Item.StatusUnknown, c.Item.ValuesTruncated)
 		for _, v := range c.Item.Values {
-			p("  %s [%s] %q option=%s iteration=%s %s/%d field=%s", v.Field, v.Type, v.Text, v.OptionID, v.IterationID, v.StartDate, v.Duration, v.FieldID)
+			p("  %s [%s] %q iteration=%s %s/%d field=%s", v.Field, v.Type, v.Text, v.IterationID, v.StartDate, v.Duration, v.FieldID)
 		}
 	}
 	p("history (truncated=%v untracked=%v):", c.HistoryTruncated, c.HistoryUntracked)

@@ -360,7 +360,6 @@ type Value struct {
 	// Text is the value as shown: the option name, iteration title, text,
 	// number, or date (YYYY-MM-DD).
 	Text        string
-	OptionID    string // single-select option ID
 	IterationID string // iteration ID
 	StartDate   string // iteration start, YYYY-MM-DD
 	Duration    int    // iteration length in days
@@ -792,7 +791,7 @@ func (v *valueJSON) value() (Value, bool) {
 	}
 	switch v.Typename {
 	case "ProjectV2ItemFieldSingleSelectValue":
-		val.Text, val.OptionID = v.Name, v.OptionID
+		val.Text = v.Name
 	case "ProjectV2ItemFieldIterationValue":
 		val.Text, val.IterationID, val.StartDate, val.Duration = v.Title, v.IterationID, v.StartDate, v.Duration
 	case "ProjectV2ItemFieldTextValue":

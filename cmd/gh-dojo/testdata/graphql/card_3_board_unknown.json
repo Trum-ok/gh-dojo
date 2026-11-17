@@ -4,7 +4,7 @@
   "interactions": [
     {
       "operation": "IssueCard",
-      "query": "query IssueCard($owner: String!, $repo: String!, $number: Int!, $comments: Int!, $status: String!) {\n  repository(owner: $owner, name: $repo) {\n    issueOrPullRequest(number: $number) {\n      __typename\n      ... on Issue {\n        id\n        number\n        title\n        state\n        stateReason(enableDuplicate: true)\n        url\n        createdAt\n        closedAt\n        author { login }\n        body\n        milestone { title dueOn }\n        labels(first: 20) { totalCount nodes { name } }\n        assignees(first: 10) { totalCount nodes { login } }\n        comments(last: $comments) {\n          totalCount\n          nodes { id author { login } createdAt viewerDidAuthor body }\n        }\n        blockedBy(first: 50) { totalCount nodes { ...link } }\n        blocking(first: 20) { totalCount nodes { ...link } }\n        parent { ...link }\n        subIssues(first: 20) { totalCount nodes { ...link } }\n        subIssuesSummary { total completed }\n        projectItems(first: 20) {\n          totalCount\n          nodes {\n            id\n            isArchived\n            createdAt\n            project { id }\n            status: fieldValueByName(name: $status) { ...value }\n            fieldValues(first: 100) { totalCount nodes { ...value } }\n          }\n        }\n        timelineItems(last: 20, itemTypes: [PROJECT_V2_ITEM_STATUS_CHANGED_EVENT]) {\n          totalCount\n          nodes {\n            ... on ProjectV2ItemStatusChangedEvent {\n              createdAt\n              previousStatus\n              status\n              wasAutomated\n              actor { login }\n              project { id }\n            }\n          }\n        }\n      }\n    }\n  }\n}\n\nfragment link on Issue {\n  number\n  title\n  state\n  repository { nameWithOwner }\n  projectItems(first: 10) {\n    totalCount\n    nodes {\n      isArchived\n      project { id }\n      status: fieldValueByName(name: $status) {\n        ... on ProjectV2ItemFieldSingleSelectValue { name field { ... on ProjectV2FieldCommon { id } } }\n      }\n    }\n  }\n}\n\nfragment value on ProjectV2ItemFieldValue {\n  __typename\n  ... on ProjectV2ItemFieldSingleSelectValue { name optionId field { ...field } }\n  ... on ProjectV2ItemFieldIterationValue { title iterationId startDate duration field { ...field } }\n  ... on ProjectV2ItemFieldTextValue { text field { ...field } }\n  ... on ProjectV2ItemFieldNumberValue { number field { ...field } }\n  ... on ProjectV2ItemFieldDateValue { date field { ...field } }\n}\n\nfragment field on ProjectV2FieldCommon { id name dataType }",
+      "query": "query IssueCard($owner: String!, $repo: String!, $number: Int!, $comments: Int!, $status: String!) {\n  repository(owner: $owner, name: $repo) {\n    issueOrPullRequest(number: $number) {\n      __typename\n      ... on Issue {\n        id\n        number\n        title\n        state\n        stateReason(enableDuplicate: true)\n        url\n        createdAt\n        closedAt\n        author { login }\n        body\n        milestone { title dueOn }\n        labels(first: 20) { totalCount nodes { name } }\n        assignees(first: 10) { totalCount nodes { login } }\n        comments(last: $comments) {\n          totalCount\n          nodes { id author { login } createdAt viewerDidAuthor body }\n        }\n        blockedBy(first: 50) { totalCount nodes { ...link } }\n        blocking(first: 20) { totalCount nodes { ...link } }\n        parent { ...link }\n        subIssues(first: 20) { totalCount nodes { ...link } }\n        subIssuesSummary { total completed }\n        projectItems(first: 20) {\n          totalCount\n          nodes {\n            id\n            isArchived\n            createdAt\n            project { id }\n            status: fieldValueByName(name: $status) { ...value }\n            fieldValues(first: 100) { totalCount nodes { ...value } }\n          }\n        }\n        timelineItems(last: 20, itemTypes: [PROJECT_V2_ITEM_STATUS_CHANGED_EVENT]) {\n          totalCount\n          nodes {\n            ... on ProjectV2ItemStatusChangedEvent {\n              createdAt\n              previousStatus\n              status\n              wasAutomated\n              actor { login }\n              project { id }\n            }\n          }\n        }\n      }\n    }\n  }\n}\n\nfragment link on Issue {\n  number\n  title\n  state\n  repository { nameWithOwner }\n  projectItems(first: 10) {\n    totalCount\n    nodes {\n      isArchived\n      project { id }\n      status: fieldValueByName(name: $status) {\n        ... on ProjectV2ItemFieldSingleSelectValue { name field { ... on ProjectV2FieldCommon { id } } }\n      }\n    }\n  }\n}\n\nfragment value on ProjectV2ItemFieldValue {\n  __typename\n  ... on ProjectV2ItemFieldSingleSelectValue { name field { ...field } }\n  ... on ProjectV2ItemFieldIterationValue { title iterationId startDate duration field { ...field } }\n  ... on ProjectV2ItemFieldTextValue { text field { ...field } }\n  ... on ProjectV2ItemFieldNumberValue { number field { ...field } }\n  ... on ProjectV2ItemFieldDateValue { date field { ...field } }\n}\n\nfragment field on ProjectV2FieldCommon { id name dataType }",
       "variables": {
         "comments": 20,
         "number": 3,
@@ -148,7 +148,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "Ready",
-                          "optionId": "61e4505c",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
                             "name": "Status",
@@ -158,7 +157,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "M",
-                          "optionId": "7515a9f1",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
                             "name": "Size",
@@ -197,7 +195,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "Ready",
-                          "optionId": "61e4505c",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
                             "name": "Status",
@@ -207,7 +204,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "M",
-                          "optionId": "7515a9f1",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
                             "name": "Size",
@@ -246,7 +242,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "Ready",
-                          "optionId": "61e4505c",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
                             "name": "Status",
@@ -256,7 +251,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "M",
-                          "optionId": "7515a9f1",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
                             "name": "Size",
@@ -295,7 +289,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "Ready",
-                          "optionId": "61e4505c",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
                             "name": "Status",
@@ -305,7 +298,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "M",
-                          "optionId": "7515a9f1",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
                             "name": "Size",
@@ -344,7 +336,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "Ready",
-                          "optionId": "61e4505c",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
                             "name": "Status",
@@ -354,7 +345,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "M",
-                          "optionId": "7515a9f1",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
                             "name": "Size",
@@ -393,7 +383,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "Ready",
-                          "optionId": "61e4505c",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
                             "name": "Status",
@@ -403,7 +392,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "M",
-                          "optionId": "7515a9f1",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
                             "name": "Size",
@@ -442,7 +430,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "Ready",
-                          "optionId": "61e4505c",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
                             "name": "Status",
@@ -452,7 +439,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "M",
-                          "optionId": "7515a9f1",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
                             "name": "Size",
@@ -491,7 +477,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "Ready",
-                          "optionId": "61e4505c",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
                             "name": "Status",
@@ -501,7 +486,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "M",
-                          "optionId": "7515a9f1",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
                             "name": "Size",
@@ -540,7 +524,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "Ready",
-                          "optionId": "61e4505c",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
                             "name": "Status",
@@ -550,7 +533,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "M",
-                          "optionId": "7515a9f1",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
                             "name": "Size",
@@ -589,7 +571,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "Ready",
-                          "optionId": "61e4505c",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
                             "name": "Status",
@@ -599,7 +580,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "M",
-                          "optionId": "7515a9f1",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
                             "name": "Size",
@@ -638,7 +618,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "Ready",
-                          "optionId": "61e4505c",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
                             "name": "Status",
@@ -648,7 +627,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "M",
-                          "optionId": "7515a9f1",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
                             "name": "Size",
@@ -687,7 +665,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "Ready",
-                          "optionId": "61e4505c",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
                             "name": "Status",
@@ -697,7 +674,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "M",
-                          "optionId": "7515a9f1",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
                             "name": "Size",
@@ -736,7 +712,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "Ready",
-                          "optionId": "61e4505c",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
                             "name": "Status",
@@ -746,7 +721,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "M",
-                          "optionId": "7515a9f1",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
                             "name": "Size",
@@ -785,7 +759,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "Ready",
-                          "optionId": "61e4505c",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
                             "name": "Status",
@@ -795,7 +768,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "M",
-                          "optionId": "7515a9f1",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
                             "name": "Size",
@@ -834,7 +806,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "Ready",
-                          "optionId": "61e4505c",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
                             "name": "Status",
@@ -844,7 +815,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "M",
-                          "optionId": "7515a9f1",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
                             "name": "Size",
@@ -883,7 +853,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "Ready",
-                          "optionId": "61e4505c",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
                             "name": "Status",
@@ -893,7 +862,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "M",
-                          "optionId": "7515a9f1",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
                             "name": "Size",
@@ -932,7 +900,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "Ready",
-                          "optionId": "61e4505c",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
                             "name": "Status",
@@ -942,7 +909,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "M",
-                          "optionId": "7515a9f1",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
                             "name": "Size",
@@ -981,7 +947,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "Ready",
-                          "optionId": "61e4505c",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
                             "name": "Status",
@@ -991,7 +956,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "M",
-                          "optionId": "7515a9f1",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
                             "name": "Size",
@@ -1030,7 +994,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "Ready",
-                          "optionId": "61e4505c",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
                             "name": "Status",
@@ -1040,7 +1003,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "M",
-                          "optionId": "7515a9f1",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
                             "name": "Size",
@@ -1079,7 +1041,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "Ready",
-                          "optionId": "61e4505c",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgKzQ",
                             "name": "Status",
@@ -1089,7 +1050,6 @@
                         {
                           "__typename": "ProjectV2ItemFieldSingleSelectValue",
                           "name": "M",
-                          "optionId": "7515a9f1",
                           "field": {
                             "id": "PVTSSF_lAHOBFGd5c4BrMYFzhpgLF4",
                             "name": "Size",

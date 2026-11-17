@@ -108,7 +108,7 @@ const cardFragments = `fragment link on Issue {
 
 fragment value on ProjectV2ItemFieldValue {
   __typename
-  ... on ProjectV2ItemFieldSingleSelectValue { name optionId field { ...field } }
+  ... on ProjectV2ItemFieldSingleSelectValue { name field { ...field } }
   ... on ProjectV2ItemFieldIterationValue { title iterationId startDate duration field { ...field } }
   ... on ProjectV2ItemFieldTextValue { text field { ...field } }
   ... on ProjectV2ItemFieldNumberValue { number field { ...field } }
@@ -236,7 +236,6 @@ type linkJSON struct {
 type valueJSON struct {
 	Typename    string   `json:"__typename"`
 	Name        string   `json:"name"`
-	OptionID    string   `json:"optionId"`
 	Title       string   `json:"title"`
 	IterationID string   `json:"iterationId"`
 	StartDate   string   `json:"startDate"`
