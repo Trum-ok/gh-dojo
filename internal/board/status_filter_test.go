@@ -26,6 +26,28 @@ func TestReadInStatus(t *testing.T) {
 	testutil.Golden(t, "items/in_status", dumpItems(&board.Items{Items: items, TotalCount: len(items)}))
 }
 
+// TestReadInStatusUnspelled: a status the filter has no checked spelling
+// for (a double quote) reads every item, the recorded board in one
+// request, and still keeps only the issues in the statuses asked for.
+func TestReadInStatusUnspelled(t *testing.T) {
+	srv := graphtest.New(t, fixture("items_dojo"))
+	items, err := board.ReadInStatus(context.Background(), srv.Client(), dojoItemsBoard, "Status", []string{"Ready", `Say "hi"`})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := srv.Requests(); n != 1 {
+		t.Errorf("requests = %d, want 1", n)
+	}
+	if len(items) == 0 {
+		t.Fatal("no issues in Ready")
+	}
+	for _, it := range items {
+		if it.Type != board.ContentIssue || it.Status != "Ready" {
+			t.Errorf("#%d: %s in %q, want an issue in Ready", it.Number, it.Type, it.Status)
+		}
+	}
+}
+
 // TestReadInStatusNone sends nothing for no statuses: no querier at all.
 func TestReadInStatusNone(t *testing.T) {
 	items, err := board.ReadInStatus(context.Background(), nil, dojoItemsBoard, "Status", nil)

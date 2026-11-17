@@ -1,15 +1,15 @@
 {
-  "comment": "Hand-crafted: the gh-dojo board (user Trum-ok, project 5) filtered by status:Ready,\"In review\" (release's issues in Ready not in the release), two pages: issues in Ready and In review, open and closed, of two repositories; an issue in Done the filter matched anyway, a pull request, an item whose content the token cannot see, and an issue repeated on page 2 (the board changed between pages). Error shapes follow GitHub's partial-data errors.",
+  "comment": "Hand-crafted: the gh-dojo board (user Trum-ok, project 5) filtered by status:\"Ready\",\"In review\" (release's issues in Ready not in the release), two pages: issues in Ready and In review, open and closed, of two repositories; an issue in Done the filter matched anyway, a pull request, an item whose content the token cannot see, and an issue repeated on page 2 (the board changed between pages). Error shapes follow GitHub's partial-data errors.",
   "handcrafted": true,
   "interactions": [
     {
-      "operation": "BoardItemsInStatus",
-      "query": "query BoardItemsInStatus($owner: String!, $number: Int!, $status: String!, $filter: String!, $cursor: String) {\n  repositoryOwner(login: $owner) {\n    ... on User { projectV2(number: $number) { ...inStatus } }\n    ... on Organization { projectV2(number: $number) { ...inStatus } }\n  }\n}\n\nfragment inStatus on ProjectV2 {\n  items(first: 100, after: $cursor, query: $filter) {\n    totalCount\n    pageInfo { hasNextPage endCursor }\n    nodes {\n      status: fieldValueByName(name: $status) {\n        ... on ProjectV2ItemFieldSingleSelectValue { name }\n      }\n      content {\n        __typename\n        ... on Issue {\n          number\n          title\n          state\n          repository { nameWithOwner }\n        }\n      }\n    }\n  }\n}",
+      "operation": "BoardItems",
+      "query": "query BoardItems($owner: String!, $number: Int!, $status: String!, $cursor: String, $filter: String!) {\n  viewer { login }\n  repositoryOwner(login: $owner) {\n    ... on User { projectV2(number: $number) { ...items } }\n    ... on Organization { projectV2(number: $number) { ...items } }\n  }\n}\n\nfragment items on ProjectV2 {\n  field(name: $status) { ... on ProjectV2SingleSelectField { id } }\n  items(first: 100, after: $cursor, query: $filter) {\n    totalCount\n    pageInfo { hasNextPage endCursor }\n    nodes {\n      status: fieldValueByName(name: $status) {\n        ... on ProjectV2ItemFieldSingleSelectValue { name }\n      }\n      content {\n        __typename\n        ... on Issue {\n          number\n          title\n          state\n          repository { nameWithOwner }\n          labels(first: 100) { totalCount nodes { name } }\n          assignees(first: 10) { totalCount nodes { login } }\n        }\n      }\n    }\n  }\n}",
       "variables": {
         "owner": "Trum-ok",
         "number": 5,
         "status": "Status",
-        "filter": "is:issue status:Ready,\"In review\"",
+        "filter": "is:issue -is:draft status:\"Ready\",\"In review\"",
         "cursor": null
       },
       "response": {
@@ -36,13 +36,13 @@
       }
     },
     {
-      "operation": "BoardItemsInStatus",
-      "query": "query BoardItemsInStatus($owner: String!, $number: Int!, $status: String!, $filter: String!, $cursor: String) {\n  repositoryOwner(login: $owner) {\n    ... on User { projectV2(number: $number) { ...inStatus } }\n    ... on Organization { projectV2(number: $number) { ...inStatus } }\n  }\n}\n\nfragment inStatus on ProjectV2 {\n  items(first: 100, after: $cursor, query: $filter) {\n    totalCount\n    pageInfo { hasNextPage endCursor }\n    nodes {\n      status: fieldValueByName(name: $status) {\n        ... on ProjectV2ItemFieldSingleSelectValue { name }\n      }\n      content {\n        __typename\n        ... on Issue {\n          number\n          title\n          state\n          repository { nameWithOwner }\n        }\n      }\n    }\n  }\n}",
+      "operation": "BoardItems",
+      "query": "query BoardItems($owner: String!, $number: Int!, $status: String!, $cursor: String, $filter: String!) {\n  viewer { login }\n  repositoryOwner(login: $owner) {\n    ... on User { projectV2(number: $number) { ...items } }\n    ... on Organization { projectV2(number: $number) { ...items } }\n  }\n}\n\nfragment items on ProjectV2 {\n  field(name: $status) { ... on ProjectV2SingleSelectField { id } }\n  items(first: 100, after: $cursor, query: $filter) {\n    totalCount\n    pageInfo { hasNextPage endCursor }\n    nodes {\n      status: fieldValueByName(name: $status) {\n        ... on ProjectV2ItemFieldSingleSelectValue { name }\n      }\n      content {\n        __typename\n        ... on Issue {\n          number\n          title\n          state\n          repository { nameWithOwner }\n          labels(first: 100) { totalCount nodes { name } }\n          assignees(first: 10) { totalCount nodes { login } }\n        }\n      }\n    }\n  }\n}",
       "variables": {
         "owner": "Trum-ok",
         "number": 5,
         "status": "Status",
-        "filter": "is:issue status:Ready,\"In review\"",
+        "filter": "is:issue -is:draft status:\"Ready\",\"In review\"",
         "cursor": "NQ"
       },
       "response": {

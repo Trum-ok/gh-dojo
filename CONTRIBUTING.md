@@ -257,8 +257,11 @@ into issues (verb `when` lines and comment templates) come from the config.
   needs to be among the items read. `list --all`, `--status` naming a final
   status, a name or value the filter has no checked spelling for, and a
   `--label` that no issue has (for `checkLabels`' suggestion) read every
-  item. GitHub's filter lags behind writes for a moment, so what is read is
-  checked again by the item's own fields.
+  item. `release` reads the issues in Ready the same way
+  (`board.ReadInStatus`): every read of the board's items is
+  `board.ReadItemsWith`, every filter a `board.Filter`. GitHub's filter
+  lags behind writes for a moment, so what is read is checked again by the
+  item's own fields.
 - Queries are retried on 5xx and secondary rate limits with exponential
   backoff, at most `MaxAttempts` sends (`internal/graph/graph.go`).
   Mutations are sent once: re-running the command re-reads the state and
