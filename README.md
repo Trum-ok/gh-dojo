@@ -7,12 +7,17 @@
 
 **An AI-native [GitHub CLI](https://cli.github.com/) extension for GitHub
 Projects.** Your agent says what happened, `gh dojo start 42`, and gh-dojo
-applies your board's process: the status, the comment, the blockers, the
-sprint. The process lives in the repository, in `.github/dojo.toml`.
+applies the process from `.github/dojo.toml`: the status, the comment, the
+blockers, the sprint.
+
+Over a day of board work, Claude Code with gh dojo took **37–44% less time**
+and **33–44% less money** than with plain `gh` and a careful `CLAUDE.md`, and
+got every step right ([benchmark](#benchmark)). Works with **Claude Code**,
+**Codex**, **Cursor**, **GitHub Copilot** or any agent with a shell.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/media/demo-dark.gif">
-  <img alt="The user asks an agent to take #42. The agent runs gh dojo start 42, wait 42 --by 12 and ready 42 --comment a1b2c3d; each prints one line, and issue #42 moves on the board from Backlog to In progress, Waiting and Ready with a comment for each step" src="docs/media/demo-light.gif">
+  <img alt="The user asks an agent to take #42. The agent runs three commands, each printing one line. gh dojo start 42 prints “#42 Backlog → In progress, comment left”. gh dojo wait 42 --by 12 prints “#42 In progress → Waiting, blocked by #12, comment left”. Once #12 is Ready, gh dojo ready 42 --comment a1b2c3d prints “#42 Waiting → Ready, comment left”. On the board #42 moves from Backlog to In progress, Waiting and Ready, and its comments read “Started. Session: …”, “Waiting for #12.” and “a1b2c3d”" src="docs/media/demo-light.gif">
 </picture>
 
 ## Why
@@ -24,7 +29,7 @@ process in the repository as data, and turns it into commands:
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/media/compare-dark.gif">
-  <img alt="Told that #42 is stuck until #12 lands, an agent with gh writes GraphQL queries and mutations, carrying node IDs between five calls, and leaves no comment; an agent with gh dojo runs gh dojo wait 42 --by 12, which sets the status, links the blocker and comments in one line" src="docs/media/compare-light.gif">
+  <img alt="Told that #42 is stuck until #12 lands, an agent with plain gh makes five calls and carries node IDs between them: a GraphQL query for the IDs of the issue, its project item and the project; gh project field-list for the Status field and its option IDs; an updateProjectV2ItemFieldValue mutation that sets Status to Waiting; gh issue view 12 for the blocker's ID; an addBlockedBy mutation. It leaves no comment. An agent with gh dojo makes one call, gh dojo wait 42 --by 12, which prints “#42 In progress → Waiting, blocked by #12, comment left”" src="docs/media/compare-light.gif">
 </picture>
 
 gh-dojo is not a planner: it does no sprint planning, standups or reports,
@@ -46,8 +51,8 @@ took 37–44% less time and 33–44% less money, and got every step right:
 The gap widens with every message: with gh the agent writes GraphQL and the
 board's IDs, as above, into every command, three to four times the output
 tokens, and rereads them all later. For a task of one message the two are
-even. Preset kanban, 5 sessions per model, gh dojo v0.2.0-40 in November
-2026; the tasks, numbers and limits are in [docs/bench.md](docs/bench.md).
+even. Preset kanban, 5 sessions per model, measured on 2026-11-16; the
+tasks, numbers and limits are in [docs/bench.md](docs/bench.md).
 
 ## Built for agents
 
@@ -66,8 +71,10 @@ even. Preset kanban, 5 sessions per model, gh dojo v0.2.0-40 in November
   use each, the lifecycle and the exit codes in a few lines; `gh dojo next`
   answers "what do I take now".
 - **Instructions written from the config.** [`gh dojo agent install`](docs/commands.md#agent-install)
-  writes a Claude Code skill, an `AGENTS.md` section or Copilot instructions,
-  and `--check` in CI catches instructions that fell behind the config.
+  writes a Claude Code skill, an `AGENTS.md` section (Codex, Cursor and
+  others read it) or Copilot instructions, and `--check` in CI catches
+  instructions that fell behind the config. Any other agent reads
+  `gh dojo describe`.
 - **The human decides what is theirs.** A verb with
   [`confirm = "user"`](docs/configuration.md#checks) runs only after the agent
   asks the user, and [`[session]`](docs/configuration.md#session) links each
@@ -166,11 +173,35 @@ configs to start from are in [`examples/`](examples).
   without.
 - [Contributing](CONTRIBUTING.md): building, tests, golden files, releases.
 
+## FAQ
+
+**Why a CLI and not an MCP server?** Coding agents already have a shell, so
+there is no server to run and no tool schemas in the context: the agent
+reads a skill of about 1.6k tokens and runs short commands.
+
+**Will it touch what I didn't ask for?** gh-dojo changes issues, never the
+board's own settings, and every command that writes takes `--dry-run`, which
+runs the checks and prints the plan. gh-dojo stores no secrets and sends no
+telemetry.
+
+**My process is not kanban.** Change a preset's verbs key by key, add your
+own, or start without a preset: [your own process](docs/configuration.md#your-own-process),
+[examples](examples).
+
+**One board, several repositories?** Yes: list them in
+[`board.repos`](docs/configuration.md#board); the first is the default, the
+others are named `owner/repo#N`.
+
+**Can people use it too?** Yes, the same commands; the one-line output and
+the refusals are as useful to a human as to an agent.
+
 ## Status
 
-gh-dojo tracks its own development with gh-dojo: its board is driven by
-[`.github/dojo.toml`](.github/dojo.toml), and its agents read the skill
-[`agent install`](docs/commands.md#agent-install) generated from it,
+gh-dojo tracks its own development with gh-dojo. The board is private, but
+the comments its verbs leave are on the public
+[issues](https://github.com/Trum-ok/gh-dojo/issues?q=is%3Aissue). The
+process is [`.github/dojo.toml`](.github/dojo.toml), and its agents read
+the skill [`agent install`](docs/commands.md#agent-install) generated from it,
 [`.claude/skills/gh-dojo/SKILL.md`](.claude/skills/gh-dojo/SKILL.md). The
 config (`version = 1`) and the JSON output (`schema_version: 1`) are
 versioned. See the [releases](https://github.com/Trum-ok/gh-dojo/releases);
