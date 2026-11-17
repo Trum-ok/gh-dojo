@@ -3,6 +3,7 @@ package issue
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/Trum-ok/gh-dojo/internal/graph"
@@ -42,6 +43,10 @@ type Lookup struct {
 	// Links are issues to read for blocked-by links (see Links), such as
 	// the issue --by names for blockers = "link".
 	Links Links
+	// Original is the issue to read as the original of a duplicate, the
+	// one --of names for close = "duplicate"; it is read as the link
+	// after Links.
+	Original *Ref
 	// Milestone is the title of a milestone to set, as given (see
 	// MatchMilestone): the repository's open milestones are read for it
 	// (the first 100, see MilestonesSelection), for the caller to match.
@@ -51,7 +56,15 @@ type Lookup struct {
 // Empty reports whether there is nothing to look up.
 func (l Lookup) Empty() bool {
 	return len(l.Labels) == 0 && l.User == "" && !l.Viewer && !l.AllLabels && !l.AssigneeIDs && !l.AllBlockers &&
-		!l.AllSubIssues && len(l.Links) == 0 && l.Milestone == ""
+		!l.AllSubIssues && len(l.Links) == 0 && l.Original == nil && l.Milestone == ""
+}
+
+// links are the issues the lookup reads as links: Links, then Original.
+func (l Lookup) links() Links {
+	if l.Original == nil {
+		return l.Links
+	}
+	return append(slices.Clone(l.Links), *l.Original)
 }
 
 // Found is what a Lookup found. Its IDs are for mutations only; never
@@ -68,6 +81,9 @@ type Found struct {
 	// Links are the issues of Lookup.Links, in order; a missing one is
 	// Linked.Missing, and the card is still read.
 	Links []*Linked
+	// Original is the issue of Lookup.Original, read the same way; nil
+	// without one.
+	Original *Linked
 	// Milestones are the repository's open milestones for
 	// Lookup.Milestone, oldest first; MoreMilestones says it has more than
 	// were read, after MilestonesCursor (see ReadMilestones).
@@ -195,9 +211,10 @@ func (l Lookup) parts() lookupParts {
 	if l.Viewer {
 		top = "  viewer { id login }\n"
 	}
-	decls.WriteString(l.Links.Decls())
-	top += l.Links.Fields()
-	l.Links.AddVars(vars)
+	links := l.links()
+	decls.WriteString(links.Decls())
+	top += links.Fields()
+	links.AddVars(vars)
 	return lookupParts{decls: decls.String(), repo: repo.String(), top: top, vars: vars}
 }
 
@@ -296,12 +313,18 @@ func (l Lookup) found(r *repoJSON, viewer *User, data map[string]json.RawMessage
 	if l.Viewer && viewer != nil && viewer.ID != "" {
 		f.Viewer = viewer
 	}
-	if len(l.Links) > 0 {
-		links, err := l.Links.Decode(data)
+	if all := l.links(); len(all) > 0 {
+		links, err := all.Decode(data)
 		if err != nil {
 			return nil, err
 		}
-		f.Links = links
+		n := len(l.Links)
+		if n > 0 {
+			f.Links = links[:n]
+		}
+		if l.Original != nil {
+			f.Original = links[n]
+		}
 	}
 	return f, nil
 }

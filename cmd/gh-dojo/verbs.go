@@ -140,6 +140,7 @@ func newVerbCmd(cfg *config.Config, v config.Verb) *cobra.Command {
 			args.HasBy = cmd.Flags().Changed(config.ArgBy)
 			args.HasAssignee = cmd.Flags().Changed(config.ArgAssignee)
 			args.HasMilestone = cmd.Flags().Changed(config.ArgMilestone)
+			args.HasOf = cmd.Flags().Changed(config.ArgOf)
 			refs := argRefs(posArgs, issue.Repo{}) // validated by issueArgs
 			if len(refs) == 1 {
 				return runVerb(cmd, cfg, v, refs[0], args, dryRun, show)
@@ -156,6 +157,7 @@ func newVerbCmd(cfg *config.Config, v config.Verb) *cobra.Command {
 	f.StringVar(&args.By, config.ArgBy, "", byUsage)
 	f.StringVar(&args.Assignee, config.ArgAssignee, "", "the user to assign: a login, or @me for yourself")
 	f.StringVar(&args.Milestone, config.ArgMilestone, "", "the open milestone to set, by `title` or a start only its title has; "+workflow.NoMilestone+" takes the issue out of its milestone")
+	f.StringVar(&args.Of, config.ArgOf, "", "the original issue this one duplicates (17, #17, owner/repo#17 or a URL): closed as its duplicate and linked to it")
 	f.BoolVar(&dryRun, dryRunFlag, false, "print the plan without changing anything")
 	f.BoolVar(&show, showFlag, false, "also print the issue's card, as gh dojo show N does, from the same read")
 	f.BoolVar(&args.Yes, "yes", false, "the user agreed: run a verb that is the user's decision")
@@ -479,7 +481,11 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 	case config.BlockersDeny:
 		line("Children", "refused (exit code 2) while a sub-issue is unresolved (%s): ask the user", unresolvedMeaning(cfg))
 	}
-	if v.Close != "" {
+	switch {
+	case v.ClosesDuplicate():
+		line("Close", "closes the issue as a duplicate of the --%s issue (17, #17, owner/repo#17 or a URL),", config.ArgOf)
+		line("", "which GitHub links it to; an issue already closed stays as it is")
+	case v.Close != "":
 		line("Close", "closes the issue as %s; an issue already closed stays as it is", workflow.ReasonText(v.Close))
 	}
 	if v.Comment != "" {

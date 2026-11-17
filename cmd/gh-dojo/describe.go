@@ -207,7 +207,10 @@ var (
 			return `comments "` + clipRunes(singleLine(v.Comment), maxTemplateRunes) + `"`
 		},
 		func(_ *config.Config, v config.Verb) string {
-			if v.Close == "" {
+			switch {
+			case v.ClosesDuplicate():
+				return "closes as a duplicate of the --" + config.ArgOf + " issue, linked to it"
+			case v.Close == "":
 				return ""
 			}
 			return "closes as " + workflow.ReasonText(v.Close)

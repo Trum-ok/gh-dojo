@@ -12,6 +12,7 @@
 package workflow
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"regexp"
@@ -138,6 +139,10 @@ type Issue struct {
 	// comma-separated list of them; empty otherwise, and then --by is only
 	// text for the comment.
 	ByIssues []ByIssue
+	// Original is the issue --of names, read for a verb with close =
+	// "duplicate": the issue is closed as its duplicate and linked to it.
+	// nil when not read.
+	Original *Original
 
 	// Ref is opaque to this package: the reader may keep the node IDs the
 	// executor needs here. It is never printed.
@@ -197,6 +202,15 @@ type ByIssue struct {
 	PullRequest bool
 }
 
+// Original is the issue --of names for close = "duplicate".
+type Original struct {
+	Ref string // "#17", or "owner/repo#17" outside the default repository
+	// Mention is how the comment names it, as GitHub links it from the
+	// issue: "#17" in the issue's own repository, else "owner/repo#17";
+	// "" reads Ref.
+	Mention string
+}
+
 // Comment is an issue comment.
 type Comment struct {
 	Body string
@@ -221,6 +235,11 @@ type Args struct {
 	// takes the issue out of its milestone.
 	Milestone    string
 	HasMilestone bool // --milestone was given, even if blank
+	// Of is --of, the original issue a verb with close = "duplicate"
+	// closes the issue as a duplicate of: 17, #17, owner/repo#17 or its
+	// URL.
+	Of    string
+	HasOf bool // --of was given, even if blank
 	// Yes is --yes: the user agreed to a verb with confirm = "user".
 	Yes bool
 }
@@ -248,6 +267,8 @@ func (a Args) given(arg string) bool {
 		return a.HasAssignee
 	case config.ArgMilestone:
 		return a.HasMilestone
+	case config.ArgOf:
+		return a.HasOf
 	}
 	return false
 }
@@ -262,6 +283,8 @@ func (a Args) value(arg string) string {
 		return strings.TrimSpace(a.Assignee)
 	case config.ArgMilestone:
 		return strings.TrimSpace(a.Milestone)
+	case config.ArgOf:
+		return strings.TrimSpace(a.Of)
 	}
 	return ""
 }
@@ -415,6 +438,8 @@ func placeholder(arg string) string {
 		return `"<login>"`
 	case config.ArgMilestone:
 		return `"<title>"`
+	case config.ArgOf:
+		return `"<#N>"`
 	}
 	return `"<text>"`
 }
@@ -579,11 +604,20 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 		by = strings.Join(refs, ", ") // as GitHub links them: "#25, #26"
 	}
 
+	of := "" // the --of issue, for close = "duplicate"
+	if v.ClosesDuplicate() && !is.Closed && is.Original == nil {
+		return nil, render.Internal("the issue --%s names was not read", config.ArgOf)
+	}
+	if is.Original != nil {
+		of = cmp.Or(is.Original.Mention, is.Original.Ref)
+	}
+
 	vars := map[string]string{
 		config.VarComment:   a.value(config.ArgComment),
 		config.VarBy:        by,
 		config.VarAssignee:  assigned,
 		config.VarMilestone: milestone,
+		config.VarOf:        of,
 	}
 	noSession := false
 	if v.Uses(config.VarSession) {
@@ -614,7 +648,11 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 		if is.Closed {
 			p.InPlace = append(p.InPlace, Close{Reason: is.StateReason})
 		} else {
-			p.Ops = append(p.Ops, Close{Reason: v.Close})
+			c := Close{Reason: v.Close}
+			if v.ClosesDuplicate() {
+				c.Of = is.Original.Ref
+			}
+			p.Ops = append(p.Ops, c)
 		}
 	}
 	p.NeedsYes = v.Confirm && !a.Yes && !p.Empty()

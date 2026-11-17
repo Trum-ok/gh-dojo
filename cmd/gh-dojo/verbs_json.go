@@ -85,6 +85,7 @@ type jsonOp struct {
 	Issue     string            // add_blocked_by: "owner/name#12", in full
 	Body      string            // add_comment, without the hidden marker; "" (null) when in place
 	Reason    string            // close: completed, not_planned, duplicate
+	Of        string            // close: the original of a duplicate, "owner/name#17" in full; "" (null) otherwise
 }
 
 // MarshalJSON writes op and the fields of its kind, in this order.
@@ -114,7 +115,7 @@ func (o jsonOp) MarshalJSON() ([]byte, error) {
 	case "add_comment":
 		fields = append(fields, kv{"body", orNull(o.Body)})
 	case "close":
-		fields = append(fields, kv{"reason", o.Reason})
+		fields = append(fields, kv{"reason", o.Reason}, kv{"of", orNull(o.Of)})
 	}
 	b := []byte{'{'}
 	for i, f := range fields {
@@ -176,7 +177,7 @@ func opJSON(op workflow.Op, def string) jsonOp {
 	case workflow.AddComment:
 		return jsonOp{Op: "add_comment", Body: op.Body}
 	case workflow.Close:
-		return jsonOp{Op: "close", Reason: op.Reason}
+		return jsonOp{Op: "close", Reason: op.Reason, Of: fullText(op.Of, def)}
 	}
 	return jsonOp{Op: "unknown"}
 }

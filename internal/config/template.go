@@ -18,10 +18,14 @@ const (
 	// VarMilestone is the title of the milestone the verb sets, as GitHub
 	// spells it; only a verb with milestone = "{milestone}" may use it.
 	VarMilestone = ArgMilestone
+	// VarOf is the original issue --of names (#17, or owner/repo#17 in
+	// another repository); only a verb with close = "duplicate" may use
+	// it.
+	VarOf = ArgOf
 )
 
 var (
-	commentVars = []string{VarSession, VarComment, VarBy, VarAssignee, VarMilestone}
+	commentVars = []string{VarSession, VarComment, VarBy, VarAssignee, VarMilestone, VarOf}
 	linkVars    = []string{"id"}
 
 	// placeholderRE matches {name}. Other braces, such as "{}" or "{ x }",

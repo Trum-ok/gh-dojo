@@ -101,6 +101,13 @@ func (b *githubBackend) ReadIssues(ctx context.Context, v config.Verb, refs []is
 		}
 		lookup.Links = issue.Links(bys)
 	}
+	if v.ClosesDuplicate() && a.HasOf {
+		of, err := ofRef(v, a.Of, def)
+		if err != nil {
+			return nil, err
+		}
+		lookup.Original = &of
+	}
 	out := make([]batch.Read, len(refs))
 	var read []issue.Ref
 	for i, ref := range refs {
@@ -108,6 +115,10 @@ func (b *githubBackend) ReadIssues(ctx context.Context, v config.Verb, refs []is
 		out[i].Ref = ref
 		if slices.ContainsFunc(bys, ref.Same) {
 			out[i].Err = selfBlock(ref, def, v.Name+" --by")
+			continue
+		}
+		if o := lookup.Original; o != nil && ref.Same(*o) {
+			out[i].Err = selfDuplicate(ref, def, v.Name)
 			continue
 		}
 		read = append(read, ref)
@@ -194,6 +205,11 @@ func (b *githubBackend) workflowIssue(ctx context.Context, v config.Verb, lookup
 			is.UnresolvedSubIssues, is.UnreadSubIssues = unresolvedLinks(card, card.SubIssues, card.UnresolvedSubIssues(cfg.Statuses.Resolved), def)
 		}
 	}
+	if lookup.Original != nil {
+		if is.Original, failed, err = originalIssue(v, card, def); failed != nil || err != nil {
+			return workflow.Issue{}, failed, err
+		}
+	}
 	if len(lookup.Links) > 0 {
 		if is.ByIssues, failed, err = byIssues(v, card, def); failed != nil || err != nil {
 			return workflow.Issue{}, failed, err
@@ -244,6 +260,55 @@ func byRefs(v config.Verb, by string, def issue.Repo, target issue.Ref) ([]issue
 		}
 	}
 	return refs, nil
+}
+
+// ofRef parses --of of a verb with close = "duplicate": exactly one issue
+// (17, #17, owner/repo#17 or its URL), a bare number in def. Anything
+// else is exit code 1.
+func ofRef(v config.Verb, of string, def issue.Repo) (issue.Ref, error) {
+	refs, text, err := splitRefs([]string{of}, def)
+	if err != nil {
+		return issue.Ref{}, err
+	}
+	if len(refs) != 1 || len(text) > 0 {
+		return issue.Ref{}, render.Usage("%s --%s %q: name the one original issue: 17, #17, owner/repo#17 or its URL",
+			v.Name, config.ArgOf, strings.TrimSpace(of)).
+			WithFix("gh dojo " + v.Name + " --help")
+	}
+	return refs[0], nil
+}
+
+// originalIssue is the issue --of names as read with the card
+// (Lookup.Original): a missing one or a pull request is exit code 3 (err,
+// the same for every issue), the card's issue itself exit code 1 (failed,
+// this issue's alone). It is named relative to def, and mentioned in the
+// comment relative to the card's repository.
+func originalIssue(v config.Verb, card *issue.Card, def issue.Repo) (out *workflow.Original, failed, err error) {
+	var l *issue.Linked
+	if card.Found != nil {
+		l = card.Found.Original
+	}
+	flag := "--" + config.ArgOf
+	switch {
+	case l == nil:
+		return nil, nil, render.Internal("the issue %s names was not read", flag)
+	case l.Missing:
+		return nil, nil, issue.LinksError(flag, []*issue.Linked{l}, def)
+	case l.PullRequest:
+		return nil, nil, render.NotFound("%s %s: a pull request, not an issue; only an issue can be the original of a duplicate",
+			flag, l.Ref.String(def))
+	case l.ID == card.ID:
+		return nil, selfDuplicate(card.Ref(), def, v.Name), nil
+	}
+	return &workflow.Original{Ref: l.Ref.String(def), Mention: l.Ref.String(card.Repo)}, nil, nil
+}
+
+// selfDuplicate is the error for an issue named by verb's --of as its own
+// original.
+func selfDuplicate(target issue.Ref, def issue.Repo, verb string) error {
+	name := target.String(def)
+	return render.Usage("%s --%s names %s itself; an issue cannot duplicate itself", verb, config.ArgOf, name).
+		WithFix(fmt.Sprintf("pass the original issue %s duplicates, not %s itself", name, name))
 }
 
 // byIssues are the issues --by names as read with the card (Lookup.Links):
@@ -683,6 +748,9 @@ func (b *githubBackend) ids(ctx context.Context, p *workflow.Plan, card *issue.C
 			if l.ID != "" {
 				ids.Blockers[l.Ref.String(def)] = l.ID // as workflow.AddBlockedBy names it
 			}
+		}
+		if f.Original != nil {
+			ids.Original = f.Original.ID
 		}
 		ids.Labels = f.Labels
 		ids.Users = map[string]string{}

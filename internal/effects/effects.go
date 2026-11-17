@@ -84,6 +84,9 @@ type IDs struct {
 	Blockers map[string]string
 	// Milestone is the node ID of the milestone SetMilestone sets.
 	Milestone string
+	// Original is the node ID of the issue a Close with Of links the
+	// issue to as its duplicate.
+	Original string
 }
 
 // FieldInput is a board field to set: its node ID and the value, a
@@ -148,6 +151,8 @@ func Batches(ops []workflow.Op) [][]workflow.Op {
 //	  comment: addComment(input: {subjectId: $issue, body: $body}) { commentEdge { node { id } } }
 //	  close: closeIssue(input: {issueId: $issue, stateReason: $reason}) { issue { id } }
 //	}
+//
+// A Close with Of adds the original, duplicateIssueId: $original.
 //
 // A label or user missing from ids is an error: the reader looks them up
 // with the card (see issue.Lookup).
@@ -255,6 +260,13 @@ func Build(ops []workflow.Op, ids IDs) (*Mutation, error) {
 			err = firstErr(declare("issue", "ID!", ids.Issue),
 				declare("reason", "IssueClosedStateReason!", strings.ToUpper(op.Reason)))
 			field = "closeIssue(input: {issueId: $issue, stateReason: $reason}) { issue { id } }"
+			if op.Of != "" {
+				if ids.Original == "" {
+					return nil, fmt.Errorf("effects: no ID for the original issue %s", op.Of)
+				}
+				err = firstErr(err, declare("original", "ID!", ids.Original))
+				field = "closeIssue(input: {issueId: $issue, stateReason: $reason, duplicateIssueId: $original}) { issue { id } }"
+			}
 		case workflow.SetIteration:
 			alias = AliasIteration
 			err = firstErr(declare("project", "ID!", ids.Project), declare("item", "ID!", ids.Item),

@@ -245,11 +245,12 @@ func releaseVerb(cmd *cobra.Command, cfg *config.Config, name string) (config.Ve
 }
 
 // releaseLacks is the argument verb v requires that release has no flag
-// for, "" for none: the user an assign = "{assignee}" verb assigns and the
-// milestone a milestone = "{milestone}" verb sets differ from release to
-// release, so release cannot run such a verb.
+// for, "" for none: the user an assign = "{assignee}" verb assigns, the
+// milestone a milestone = "{milestone}" verb sets and the original a
+// close = "duplicate" verb links differ from release to release, so
+// release cannot run such a verb.
 func releaseLacks(v config.Verb) string {
-	for _, arg := range []string{config.ArgAssignee, config.ArgMilestone} {
+	for _, arg := range []string{config.ArgAssignee, config.ArgMilestone, config.ArgOf} {
 		if slices.Contains(v.Require, arg) {
 			return arg
 		}

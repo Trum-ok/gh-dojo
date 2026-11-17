@@ -353,13 +353,17 @@ func (c *Config) buildVerb(name string, r *rawVerb) (Verb, error) {
 				return Verb{}, c.Errorf("%s: %q is also in %s", key, arg, c.KeyPath(p+"require"))
 			}
 			// An argument an effect takes (assign = "{assignee}",
-			// milestone = "{milestone}") is one that effect requires.
+			// milestone = "{milestone}", close = "duplicate") is one that
+			// effect requires.
 			effect, fromArg, taken, does := "", "", false, ""
 			switch arg {
 			case ArgAssignee:
 				effect, fromArg, taken, does = "assign", AssignFromArg, v.AssignArg, "assign the user --"+arg+" names"
 			case ArgMilestone:
 				effect, fromArg, taken, does = "milestone", MilestoneFromArg, v.MilestoneArg, "set the milestone --"+arg+" names"
+			case ArgOf:
+				effect, fromArg, taken, does = "close", CloseDuplicate, v.ClosesDuplicate(),
+					"close the issue as a duplicate of the one --"+arg+" names"
 			}
 			switch {
 			case effect != "" && list.key == "require_one_of" && taken:
@@ -381,6 +385,10 @@ func (c *Config) buildVerb(name string, r *rawVerb) (Verb, error) {
 	if v.MilestoneArg && !slices.Contains(v.Require, ArgMilestone) {
 		// Nothing else names the milestone to set.
 		v.Require = append(slices.Clone(v.Require), ArgMilestone)
+	}
+	if v.ClosesDuplicate() && !slices.Contains(v.Require, ArgOf) {
+		// Nothing else names the original to link.
+		v.Require = append(slices.Clone(v.Require), ArgOf)
 	}
 	return v, nil
 }
@@ -447,6 +455,12 @@ func (c *Config) buildEffects(name string, r *rawVerb, v *Verb) error {
 	v.Batch = deref(r.Batch)
 	if v.Close != "" && v.Reopen {
 		return c.Errorf("verbs.%s sets both close and reopen; keep one", name)
+	}
+	if !v.ClosesDuplicate() && v.Uses(VarOf) {
+		return c.Errorf("%s uses {%s}, the --%s issue, but %s is not %q",
+			c.KeyPath(p+"comment"), VarOf, ArgOf, c.KeyPath(p+"close"), CloseDuplicate).
+			WithFix(fmt.Sprintf(`set close = %q to close the issue as a duplicate of the one --%s names, or drop {%s}`,
+				CloseDuplicate, ArgOf, VarOf))
 	}
 	if o := r.Confirm; o != nil {
 		key := c.KeyPath(p + "confirm")

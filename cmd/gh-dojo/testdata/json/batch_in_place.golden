@@ -20,7 +20,8 @@ code: 0
         },
         {
           "op": "close",
-          "reason": "completed"
+          "reason": "completed",
+          "of": null
         }
       ],
       "applied": [
@@ -31,7 +32,8 @@ code: 0
         },
         {
           "op": "close",
-          "reason": "completed"
+          "reason": "completed",
+          "of": null
         }
       ],
       "in_place": [],
@@ -55,7 +57,8 @@ code: 0
         },
         {
           "op": "close",
-          "reason": "completed"
+          "reason": "completed",
+          "of": null
         }
       ],
       "needs_yes": false,

@@ -19,7 +19,8 @@ code: 0
         },
         {
           "op": "close",
-          "reason": "not_planned"
+          "reason": "not_planned",
+          "of": null
         }
       ],
       "applied": [
@@ -29,7 +30,8 @@ code: 0
         },
         {
           "op": "close",
-          "reason": "not_planned"
+          "reason": "not_planned",
+          "of": null
         }
       ],
       "in_place": [],

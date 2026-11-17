@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: dup needs --of
+fix: gh dojo dup 3 --of "<#N>"

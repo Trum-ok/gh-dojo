@@ -24,7 +24,8 @@ code: 2
         },
         {
           "op": "close",
-          "reason": "not_planned"
+          "reason": "not_planned",
+          "of": null
         }
       ],
       "applied": [],

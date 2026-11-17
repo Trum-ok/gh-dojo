@@ -30,7 +30,7 @@ verb done
   when: The change is released
   to: "Done"
   from: ["Ready" "In progress"]
-  require: [] require_one_of: []
+  require: ["of"] require_one_of: []
   comment: "{comment}"
   labels: add=[] remove=[] assign: "" close: "duplicate" reopen: false confirm: false
 verb review

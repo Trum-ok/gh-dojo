@@ -38,20 +38,24 @@ var ErrNoConfig = errors.New("no " + FileName + " found")
 const Version = 1
 
 // Verb arguments that require and require_one_of may name. Each is a CLI
-// flag of the verb (--comment, --by, --assignee, --milestone) and a
+// flag of the verb (--comment, --by, --assignee, --milestone, --of) and a
 // placeholder in its comment template. --assignee is the login a verb with
 // assign = "{assignee}" assigns (see Verb.AssignArg); only such a verb
 // takes it. --milestone is the milestone a verb with milestone =
 // "{milestone}" sets (see Verb.MilestoneArg); only such a verb takes it.
+// --of is the original issue a verb with close = "duplicate" links the
+// issue to as its duplicate (see Verb.ClosesDuplicate); only such a verb
+// takes it.
 const (
 	ArgComment   = "comment"
 	ArgBy        = "by"
 	ArgAssignee  = "assignee"
 	ArgMilestone = "milestone"
+	ArgOf        = "of"
 )
 
 var (
-	args     = []string{ArgComment, ArgBy, ArgAssignee, ArgMilestone}
+	args     = []string{ArgComment, ArgBy, ArgAssignee, ArgMilestone, ArgOf}
 	builtins = []string{
 		"agent", "block", "comment", "describe", "doctor", "help", "init",
 		"list", "new", "next", "release", "show", "unblock",
@@ -287,7 +291,7 @@ type Verb struct {
 	When         string   // one line: when to use the verb; first line of its --help
 	To           string   // target status; "" leaves the status alone
 	From         []string // statuses the verb may start from; empty means any
-	Require      []string // arguments (ArgComment, ArgBy, ArgAssignee, ArgMilestone) that must all be given
+	Require      []string // arguments (ArgComment, ArgBy, ArgAssignee, ArgMilestone, ArgOf) that must all be given
 	RequireOneOf []string // arguments of which at least one must be given
 	Comment      string   // comment template (see Render); "" posts no comment
 
@@ -326,8 +330,9 @@ type Verb struct {
 	// --milestone required.
 	MilestoneArg bool
 	// Close is the reason the verb closes the issue with (CloseCompleted,
-	// CloseNotPlanned, CloseDuplicate); "" leaves it open. Reopen reopens
-	// a closed issue. A verb never sets both.
+	// CloseNotPlanned, CloseDuplicate); "" leaves it open. CloseDuplicate
+	// also links the issue to the original --of names, which makes --of
+	// required. Reopen reopens a closed issue. A verb never sets both.
 	Close  string
 	Reopen bool
 	// Confirm says the verb is a decision for the user (confirm = "user"):
@@ -406,13 +411,19 @@ func (v Verb) Assigns() bool { return v.Assign != "" || v.AssignArg }
 // config or the --milestone one.
 func (v Verb) SetsMilestone() bool { return v.Milestone != "" || v.MilestoneArg }
 
+// ClosesDuplicate reports whether the verb closes the issue as a
+// duplicate of the original --of names, linking the two.
+func (v Verb) ClosesDuplicate() bool { return v.Close == CloseDuplicate }
+
 // Takes reports whether the verb takes the argument arg on the command
 // line: its comment template uses {arg}, or, for ArgAssignee, its assign
 // effect assigns the --assignee user, or, for ArgMilestone, its milestone
-// effect sets the --milestone milestone. A verb rejects the arguments it
+// effect sets the --milestone milestone, or, for ArgOf, it closes the
+// issue as a duplicate of the --of issue. A verb rejects the arguments it
 // does not take.
 func (v Verb) Takes(arg string) bool {
-	return v.Uses(arg) || arg == ArgAssignee && v.AssignArg || arg == ArgMilestone && v.MilestoneArg
+	return v.Uses(arg) || arg == ArgAssignee && v.AssignArg || arg == ArgMilestone && v.MilestoneArg ||
+		arg == ArgOf && v.ClosesDuplicate()
 }
 
 // StatusRef is a status name the config refers to, with the key path that

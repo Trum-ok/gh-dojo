@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: dup --of "the old one": name the one original issue: 17, #17, owner/repo#17 or its URL
+fix: gh dojo dup --help

@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: dup --of names #3 itself; an issue cannot duplicate itself
+fix: pass the original issue #3 duplicates, not #3 itself

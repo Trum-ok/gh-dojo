@@ -1,7 +1,7 @@
 code: 1
 --- stdout
 ok       version  gh dojo dev
-ok       config   .github/dojo.toml: preset kanban, 13 verbs
+ok       config   .github/dojo.toml: preset kanban, 14 verbs
 ok       token    github.com as Trum-ok, with the project scope
 ok       board    Trum-ok/5 "gh-dojo": field Status and 6 statuses match
 ok       repo     Trum-ok/gh-dojo (default): visible, issues enabled

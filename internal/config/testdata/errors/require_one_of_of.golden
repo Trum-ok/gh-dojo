@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.drop.require_one_of names "of", which verbs.drop.close = "duplicate" always requires
+fix: remove "of" from verbs.drop.require_one_of

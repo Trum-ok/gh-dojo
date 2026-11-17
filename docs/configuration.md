@@ -65,11 +65,16 @@ Review by {by}.
 {comment}"""
 
 [verbs.drop]
-when = "The issue is not needed or a duplicate"
+when = "The issue is not needed"
 close = "not_planned"        # completed, not_planned or duplicate
 require = ["comment"]        # without a template, --comment is the comment
 confirm = "user"             # runs only with --yes, after asking the user
 unassign = "all"             # everyone; or true (board.assignee), "@me" or a login
+
+[verbs.duplicate]
+when = "The issue duplicates another one"
+close = "duplicate"          # requires --of: the original, linked as such
+comment = "Duplicate of {of}."
 
 [verbs.revive]
 when = "A closed issue is needed after all"
@@ -195,7 +200,7 @@ commands (`show`, `list`, `new`, `comment`, `describe`, `init`, `doctor`,
 | `from`           | check  | Statuses the verb may start from; empty or missing means any |
 | `from_labels`    | check  | Labels the issue must all have: `["blocked"]` |
 | `refuse_labels`  | check  | Labels of which the issue may have none: `["blocked"]` |
-| `require`        | check  | Arguments that must all be given: `comment`, `by`, `assignee`, `milestone` |
+| `require`        | check  | Arguments that must all be given: `comment`, `by`, `assignee`, `milestone`, `of` |
 | `require_one_of` | check  | Arguments of which at least one must be given |
 | `blockers`       | check or effect | `"warn"` or `"deny"`: check the issue's unresolved blockers; `"link"`: `--by N` also marks it blocked by #N |
 | `sub_issues`     | check  | `"warn"` or `"deny"`: check the issue's unresolved [sub-issues](commands.md#show) |
@@ -209,7 +214,7 @@ commands (`show`, `list`, `new`, `comment`, `describe`, `init`, `doctor`,
 | `unassign`       | effect | Who to remove from the assignees: `true` (`board.assignee`), `"@me"`, a login, or `"all"`: everyone but the user the verb assigns |
 | `milestone`      | effect | The open milestone to put the issue in: a title (`"v1.2"`, or a start only one title has), or `"{milestone}"`: the one `--milestone` names when the verb runs |
 | `comment`        | effect | [Comment template](#comment-templates) |
-| `close`          | effect | Close the issue with this reason: `completed`, `not_planned` or `duplicate` |
+| `close`          | effect | Close the issue with this reason: `completed`, `not_planned` or `duplicate`: a duplicate of the issue `--of` names when the verb runs, linked to it |
 | `reopen`         | effect | `true` reopens a closed issue |
 | `disabled`       | —      | `true` removes a verb the preset defines; it stands alone in its table |
 
@@ -219,7 +224,7 @@ A verb needs at least one effect: `to`, `comment`, `labels`, `assign`,
 verb that requires `comment` and has no template posts the `--comment` text
 as is. `assignee` needs `assign = "{assignee}"`, which requires it anyway, so
 it may only be repeated in `require`; so does `milestone`, with
-`milestone = "{milestone}"`.
+`milestone = "{milestone}"`, and `of`, with `close = "duplicate"`.
 Keys from the design that are not implemented yet (`pre`, `post`) are
 rejected with "not supported in this version".
 
@@ -351,8 +356,14 @@ rejected with "not supported in this version".
 - **close**, **reopen**: a verb sets at most one of them. An issue already
   closed is not closed again, even with another reason; the line says
   `already closed as completed`. A verb that closes and has no `to` refuses
-  an issue closed with another reason instead. `duplicate` marks the issue a duplicate
-  without linking the original: name it in the comment.
+  an issue closed with another reason instead. `duplicate` closes the issue
+  as a duplicate of the issue `--of` names (`17`, `#17`, `owner/repo#17` or
+  its URL) and links the two, as GitHub's "Close as duplicate" does: the
+  flag is then required, and `{of}` in the comment template is the original
+  (`#17`, or `owner/repo#17` in another repository). The original is read
+  with the issue: one that does not exist or is a pull request is exit
+  code 3, the issue itself exit code 1, and nothing is written. An issue
+  already closed keeps its reason and its original, if any.
 - **iteration**: sets the [sprint field](#fields) in the same mutation as
   the status. Dates are in [`board.timezone`](#board) (UTC by default), and
   a completed iteration still covers its days.
@@ -410,8 +421,9 @@ off a key the preset sets:
 
 Templates may use `{session}`, `{comment}` (the `--comment` text), `{by}`
 (the `--by` value), in a verb with `assign = "{assignee}"`, `{assignee}`
-(the login it assigns), and in a verb with `milestone = "{milestone}"`,
-`{milestone}` (the title of the milestone it sets). A line whose placeholders all come out empty is
+(the login it assigns), in a verb with `milestone = "{milestone}"`,
+`{milestone}` (the title of the milestone it sets), and in a verb with
+`close = "duplicate"`, `{of}` (the original). A line whose placeholders all come out empty is
 dropped, so `"Waiting for {by}."` disappears when `--by` is not given; runs
 of blank template lines collapse, trailing spaces and leading and trailing
 blank lines are cut, and indentation stays. A template that renders to

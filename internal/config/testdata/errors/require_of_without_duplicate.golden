@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.done.require names "of", but verbs.done.close (from preset kanban) is not "duplicate"
+fix: set close = "duplicate" to close the issue as a duplicate of the one --of names, or remove "of" from verbs.done.require

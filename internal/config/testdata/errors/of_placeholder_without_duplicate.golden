@@ -1,0 +1,2 @@
+error: .github/dojo.toml: verbs.done.comment uses {of}, the --of issue, but verbs.done.close (from preset kanban) is not "duplicate"
+fix: set close = "duplicate" to close the issue as a duplicate of the one --of names, or drop {of}

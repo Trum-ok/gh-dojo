@@ -233,6 +233,25 @@ code: 0
       "effects": [
         "assigns trum-ok"
       ]
+    },
+    {
+      "name": "dup",
+      "when": "A duplicate of another issue",
+      "from": [],
+      "to": null,
+      "requires": [
+        "--of"
+      ],
+      "requires_one_of": [],
+      "optional": [],
+      "batch": false,
+      "checks": [
+        "on a closed issue only if closed as duplicate"
+      ],
+      "effects": [
+        "comments \"Duplicate of {of}.\"",
+        "closes as a duplicate of the --of issue, linked to it"
+      ]
     }
   ],
   "statuses": {

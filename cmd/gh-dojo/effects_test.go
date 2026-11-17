@@ -61,6 +61,11 @@ labels = ["-no-such-label"]
 [verbs.hand]
 when = "Hand it to the owner, login in lowercase"
 assign = "trum-ok"
+
+[verbs.dup]
+when = "A duplicate of another issue"
+close = "duplicate"
+comment = "Duplicate of {of}."
 `
 
 // assignDojoConfig is effectsDojoConfig with pass (assign =
@@ -117,6 +122,40 @@ func TestVerbDropDryRun(t *testing.T) {
 	srv, before := withEffectsApp(t, verbFixture("card_3"))
 	checkRuns(t, srv, before,
 		runs{[]string{"drop", "3", "--comment", "Duplicate of #2.", "--dry-run"}, render.ExitOK, 1, "drop_dry_run"})
+}
+
+// TestVerbDuplicate: close = "duplicate" reads the --of issue with the
+// card and closes the issue as its duplicate, linked to it
+// (duplicateIssueId), in the comment's mutation; {of} names it in the
+// comment. The repeat finds both in place.
+func TestVerbDuplicate(t *testing.T) {
+	srv, before := withEffectsApp(t, verbFixture("duplicate_ok"))
+	checkRuns(t, srv, before,
+		runs{[]string{"dup", "3", "--of", "26"}, render.ExitOK, 2, "duplicate_ok"},
+		runs{[]string{"dup", "3", "--of", "#26"}, render.ExitOK, 1, "duplicate_repeat"},
+	)
+}
+
+// TestVerbDuplicateDryRun shows the original in the plan.
+func TestVerbDuplicateDryRun(t *testing.T) {
+	srv, before := withEffectsApp(t, verbFixture("duplicate_card"))
+	checkRuns(t, srv, before,
+		runs{[]string{"dup", "3", "--of", "26", "--dry-run"}, render.ExitOK, 1, "duplicate_dry_run"})
+}
+
+// TestVerbDuplicateRefused: --of is required, names one issue and not the
+// issue itself, all refused before any read; an original that does not
+// exist is exit code 3 after the read, with nothing written.
+func TestVerbDuplicateRefused(t *testing.T) {
+	srv, before := withEffectsApp(t, verbFixture("duplicate_missing"))
+	checkRuns(t, srv, before,
+		runs{[]string{"dup", "3"}, render.ExitUsage, 0, "duplicate_no_of"},
+		runs{[]string{"dup", "3", "--of", "26, 27"}, render.ExitUsage, 0, "duplicate_two"},
+		runs{[]string{"dup", "3", "--of", "the old one"}, render.ExitUsage, 0, "duplicate_text"},
+		runs{[]string{"dup", "3", "--of", "3"}, render.ExitUsage, 0, "duplicate_self"},
+		runs{[]string{"dup", "3", "--of", "9999"}, render.ExitNotFound, 1, "duplicate_missing"},
+		runs{[]string{"drop", "3", "--comment", "x", "--of", "26"}, render.ExitUsage, 0, "duplicate_not_taken"},
+	)
 }
 
 // TestVerbDoneCloses: kanban's done sets Done and closes the issue as

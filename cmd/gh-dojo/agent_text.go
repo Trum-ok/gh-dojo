@@ -375,6 +375,10 @@ func (d *agentDoc) rules(v config.Verb) []string {
 			"which milestone if you do not know. `--%s %s` takes the issue out of its milestone.",
 			config.ArgMilestone, config.ArgMilestone, config.ArgMilestone, workflow.NoMilestone))
 	}
+	if v.ClosesDuplicate() {
+		r = append(r, fmt.Sprintf("`--%s 17` names the original: the issue is closed as its duplicate and "+
+			"GitHub links the two.", config.ArgOf))
+	}
 	if v.Batch {
 		// A release finishes issues: only a verb that does is pointed there.
 		finishes := v.Close != "" || slices.Contains(d.cfg.Statuses.Final, v.To)

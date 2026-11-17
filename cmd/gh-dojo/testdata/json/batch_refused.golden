@@ -25,7 +25,8 @@ code: 2
         },
         {
           "op": "close",
-          "reason": "completed"
+          "reason": "completed",
+          "of": null
         }
       ],
       "applied": [
@@ -36,7 +37,8 @@ code: 2
         },
         {
           "op": "close",
-          "reason": "completed"
+          "reason": "completed",
+          "of": null
         }
       ],
       "in_place": [],
@@ -58,7 +60,8 @@ code: 2
         },
         {
           "op": "close",
-          "reason": "completed"
+          "reason": "completed",
+          "of": null
         }
       ],
       "applied": [
@@ -69,7 +72,8 @@ code: 2
         },
         {
           "op": "close",
-          "reason": "completed"
+          "reason": "completed",
+          "of": null
         }
       ],
       "in_place": [],
@@ -93,7 +97,8 @@ code: 2
         },
         {
           "op": "close",
-          "reason": "completed"
+          "reason": "completed",
+          "of": null
         }
       ],
       "needs_yes": false,

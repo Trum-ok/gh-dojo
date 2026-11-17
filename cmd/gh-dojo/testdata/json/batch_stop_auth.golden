@@ -25,7 +25,8 @@ code: 4
         },
         {
           "op": "close",
-          "reason": "completed"
+          "reason": "completed",
+          "of": null
         }
       ],
       "applied": [],
@@ -53,7 +54,8 @@ code: 4
         },
         {
           "op": "close",
-          "reason": "completed"
+          "reason": "completed",
+          "of": null
         }
       ],
       "applied": [],
@@ -83,7 +85,8 @@ code: 4
         },
         {
           "op": "close",
-          "reason": "completed"
+          "reason": "completed",
+          "of": null
         }
       ],
       "needs_yes": false,
@@ -104,7 +107,8 @@ code: 4
         },
         {
           "op": "close",
-          "reason": "completed"
+          "reason": "completed",
+          "of": null
         }
       ],
       "applied": [],

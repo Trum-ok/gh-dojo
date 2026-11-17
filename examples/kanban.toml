@@ -65,7 +65,7 @@ when = "изменение вошло в релиз"
 
 [verbs.drop]
 when = "задача не нужна или это дубль"
-close = "not_planned"        # completed, not_planned or duplicate
+close = "not_planned"        # completed, not_planned or duplicate (with --of, the original)
 require = ["comment"]        # the reason; with no template, --comment is the comment
 confirm = "user"             # the user's decision: exit code 2 without --yes
 

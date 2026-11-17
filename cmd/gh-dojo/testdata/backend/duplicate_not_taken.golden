@@ -1,0 +1,6 @@
+code: 1
+--- stdout
+--- stderr
+error: drop does not use --of
+allowed: --comment
+fix: gh dojo drop 3 --comment "<text>"

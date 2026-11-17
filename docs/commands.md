@@ -486,6 +486,10 @@ with [`milestone = "{milestone}"`](configuration.md#effects), and is
 required there: the milestone to set, also `{milestone}` in the template;
 `--milestone none` (in any case) takes the issue out of its milestone, and
 `{milestone}` is then `none`: `gh dojo plan 56 --milestone none`.
+`--of` (`17`, `#17`, `owner/repo#17` or a URL) exists only on a verb with
+[`close = "duplicate"`](configuration.md#effects), and is required there:
+the original, which the issue is closed as a duplicate of and linked to,
+also `{of}` in the template: `gh dojo duplicate 42 --of 17`.
 `--yes` exists only on a verb
 with [`confirm = "user"`](configuration.md#checks).
 `--dry-run` prints the plan without changing anything:
@@ -497,12 +501,15 @@ dry run: wait #42 "Fix login redirect"
   blocked by: #17
   comment: "Waiting for #17."
 
-$ gh dojo drop 42 --comment "Duplicate of #17."
+$ gh dojo drop 42 --comment "Not needed after #17."
 error: drop needs the user's go-ahead for #42 (would be: comment left, closed as not planned)
 this is the user's decision: ask the user, and re-run with --yes only if they agree
 
-$ gh dojo drop 42 --comment "Duplicate of #17." --yes
+$ gh dojo drop 42 --comment "Not needed after #17." --yes
 #42 comment left, closed as not planned
+
+$ gh dojo duplicate 42 --of 17
+#42 comment left, closed as duplicate of #17
 ```
 
 `--show` also prints the issue's card, as [`show`](#show) prints one issue,

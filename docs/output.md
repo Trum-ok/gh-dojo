@@ -159,7 +159,7 @@ second. Field names are snake_case. Every key is always there: lists are
 due date, no fix) is `null`, never `""`. Times are RFC 3339 in UTC, dates
 `YYYY-MM-DD`. GitHub node IDs never appear. A reference to an issue is
 always in full, `owner/name#12` (`ref`, `changed`, `unchanged`, `missed`,
-`blocked_by`, `already_blocked_by`, the `issue` of `add_blocked_by`), and
+`blocked_by`, `already_blocked_by`, the `issue` of `add_blocked_by`, the `of` of `close`), and
 every issue has its `repo`: the default repository as the config spells it,
 others as GitHub does (also in the text). The short `#12` of the text is
 only for reading. New fields may be added;
@@ -213,4 +213,4 @@ error object alone. `planned`, `applied` and `in_place` are lists of ops:
 | `unassign` | `logins` (in `in_place`: the users not assigned; empty for `unassign = "all"` with nobody to remove), `kept` (`true` in `in_place` for a user it names and also assigns, who stays) |
 | `add_blocked_by` | `issue` (`owner/name#12`) |
 | `add_comment` | `body` (`null` in `in_place`: the comment was posted before) |
-| `close` | `reason` (`completed`, `not_planned`, `duplicate`) |
+| `close` | `reason` (`completed`, `not_planned`, `duplicate`), `of` (the original of a duplicate, `owner/name#17`; `null` otherwise) |

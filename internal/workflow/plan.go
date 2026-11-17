@@ -118,9 +118,11 @@ type AddComment struct {
 
 // Close closes the issue with Reason, a config close reason
 // (config.CloseCompleted, ...). It comes last, after the comment that
-// explains it.
+// explains it. Of is the original ("#17" or "owner/repo#17") a duplicate
+// is linked to, for close = "duplicate"; "" otherwise.
 type Close struct {
 	Reason string
+	Of     string
 }
 
 // SetIteration sets the sprint field (fields.sprint) to the iteration To,
@@ -187,8 +189,8 @@ func (c AddComment) Describe() string {
 }
 func (AddComment) Effect() string       { return "comment left" }
 func (AddComment) op()                  {}
-func (c Close) Describe() string        { return "close: as " + ReasonText(c.Reason) }
-func (c Close) Effect() string          { return "closed as " + ReasonText(c.Reason) }
+func (c Close) Describe() string        { return "close: as " + c.reason() }
+func (c Close) Effect() string          { return "closed as " + c.reason() }
 func (Close) op()                       {}
 func (s SetIteration) Describe() string { return "sprint: " + valueTransition(s.From, s.To) }
 func (s SetIteration) Effect() string {
@@ -250,6 +252,15 @@ func signed(sign string, names []string) []string {
 		out[i] = sign + n
 	}
 	return out
+}
+
+// reason is the close reason as output says it, with the original of a
+// duplicate: "duplicate of #17".
+func (c Close) reason() string {
+	if c.Of != "" {
+		return ReasonText(c.Reason) + " of " + c.Of
+	}
+	return ReasonText(c.Reason)
 }
 
 // ReasonText is a close reason as output says it: "completed", "not

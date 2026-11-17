@@ -22,7 +22,8 @@ code: 0
         },
         {
           "op": "close",
-          "reason": "completed"
+          "reason": "completed",
+          "of": null
         }
       ],
       "needs_yes": false,
@@ -45,7 +46,8 @@ code: 0
         },
         {
           "op": "close",
-          "reason": "completed"
+          "reason": "completed",
+          "of": null
         }
       ],
       "needs_yes": false,
@@ -68,7 +70,8 @@ code: 0
         },
         {
           "op": "close",
-          "reason": "completed"
+          "reason": "completed",
+          "of": null
         }
       ],
       "needs_yes": false,

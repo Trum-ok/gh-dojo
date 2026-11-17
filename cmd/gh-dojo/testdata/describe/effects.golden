@@ -33,6 +33,8 @@ Verbs:
               labels -no-such-label
   hand        Hand it to the owner, login in lowercase
               assigns trum-ok
+  dup         A duplicate of another issue
+              needs --of; on a closed issue only if closed as duplicate; comments "Duplicate of {of}."; closes as a duplicate of the --of issue, linked to it
 
 Every verb adds the issue to the board if it is missing and refuses a
 closed issue unless noted. A repeat is safe: an effect already in place
@@ -53,6 +55,7 @@ Lifecycle (from → to):
   tagcase     any status → status unchanged
   untag       any status → status unchanged
   hand        any status → status unchanged
+  dup         any status → status unchanged; closes as duplicate
   Initial:    Backlog (new issues; also an issue with no status or not on the board)
   Final:      Done (gh dojo list hides it unless --all)
   Resolved:   Ready, Done (a blocker in these no longer blocks)
