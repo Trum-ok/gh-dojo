@@ -66,6 +66,9 @@ var getenv = os.Getenv
 // schema ID, also dropping what Apply confirmed in case the re-read lags
 // behind it; after a partial failure the agent re-runs the command.
 type Backend interface {
+	// ReadIssues, Apply and Reset as batch runs them; githubBackend
+	// documents what it reads and writes.
+	batch.Backend
 	// ReadIssue returns the state of issue ref for verb v, filled as
 	// workflow.Issue documents (comments with viewerDidAuthor, labels,
 	// assignees, and the viewer when v assigns or unassigns @me), with a
@@ -81,29 +84,9 @@ type Backend interface {
 	// exist, and 1 when one is the issue itself, would close a cycle, or
 	// --by mixes issues and text.
 	ReadIssue(ctx context.Context, v config.Verb, ref issue.Ref, a workflow.Args) (workflow.Issue, error)
-	// ReadIssues reads issues refs like ReadIssue, for a verb with batch =
-	// true: one request per issue.MaxBatch issues, of any repositories,
-	// with what v looks up read once in each. It returns one batch.Read
-	// per number, in order; an issue that fails alone (not found, a pull
-	// request, its board place or sprint not read, the issue --by names)
-	// has its own Err. err fails them all: a config error of v (a label to
-	// add missing in the repo) or a request that read nothing. A request
-	// that fails after earlier ones read their issues is the Err of each
-	// issue it did not read.
-	ReadIssues(ctx context.Context, v config.Verb, refs []issue.Ref, a workflow.Args) ([]batch.Read, error)
-	// Apply applies every op of a non-empty plan, finding the issue's node
-	// IDs in p.Issue.Ref. It returns the ops GitHub confirmed, also with an
-	// error: the rest of p.Ops did not take effect, or their outcome is
-	// unknown. An error with every op confirmed is only worth a warning.
-	// runVerb reports a partial write (exit code 5); errors keep their
-	// cause, so board.IsStale tells a rejected schema ID.
-	Apply(ctx context.Context, p *workflow.Plan) ([]workflow.Op, error)
 	// Repo is the default repository: where a bare number is, and what
 	// output names issues relative to.
 	Repo() (issue.Repo, error)
-	// Reset drops the cached board schema after GitHub rejected one of its
-	// IDs, so the next ReadIssue and Apply use a fresh one.
-	Reset() error
 }
 
 // newBackend returns the backend for cfg: GitHub through one App per run,
