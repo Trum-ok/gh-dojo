@@ -82,6 +82,15 @@ func SingleLine(s string) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
+// FirstLine is the first line of s, without surrounding spaces.
+func FirstLine(s string) string {
+	s = strings.TrimSpace(s)
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		s = strings.TrimSpace(s[:i])
+	}
+	return s
+}
+
 // HasPrefixFold reports whether s starts with prefix, ignoring case.
 func HasPrefixFold(s, prefix string) bool {
 	_, ok := CutPrefixFold(s, prefix)

@@ -224,9 +224,9 @@ func FromError(err error) *Error {
 	case errors.Is(err, context.Canceled):
 		return Network("interrupted before finishing; re-run the command").WithCause(err)
 	case errors.Is(err, context.DeadlineExceeded), errors.As(err, &netErr):
-		return Network("network error: %s", firstLine(err.Error())).WithCause(err)
+		return Network("network error: %s", FirstLine(err.Error())).WithCause(err)
 	}
-	return Usage("%s", firstLine(err.Error())).WithCause(err)
+	return Usage("%s", FirstLine(err.Error())).WithCause(err)
 }
 
 func fromHTTP(err *api.HTTPError) *Error {
@@ -253,15 +253,39 @@ func fromHTTP(err *api.HTTPError) *Error {
 // isRateLimit tells a primary or secondary rate limit from a permission
 // problem: both come as HTTP 403.
 func isRateLimit(err *api.HTTPError) bool {
-	if err.Headers.Get("X-RateLimit-Remaining") == "0" || err.Headers.Get("Retry-After") != "" {
+	if err.Headers.Get("X-RateLimit-Remaining") == "0" || IsSecondaryRateLimit(err) {
 		return true
 	}
 	msg := strings.ToLower(err.Message)
 	return strings.Contains(msg, "rate limit") || strings.Contains(msg, "abuse detection")
 }
 
+// IsSecondaryRateLimit reports an HTTP 403 or 429 for GitHub's secondary
+// rate limit: a Retry-After header or a message saying so, with requests
+// left. The primary limit (none left) resets in up to an hour, so only a
+// secondary one is worth retrying after a pause.
+func IsSecondaryRateLimit(err *api.HTTPError) bool {
+	if err.StatusCode != http.StatusForbidden && err.StatusCode != http.StatusTooManyRequests {
+		return false
+	}
+	if err.Headers.Get("X-RateLimit-Remaining") == "0" {
+		return false
+	}
+	return err.Headers.Get("Retry-After") != "" ||
+		strings.Contains(strings.ToLower(err.Message), "secondary rate limit")
+}
+
+// RetryAfter returns the seconds of a Retry-After header, 0 when it is
+// absent, not a number or not positive.
+func RetryAfter(header string) int {
+	if secs, err := strconv.Atoi(strings.TrimSpace(header)); err == nil && secs > 0 {
+		return secs
+	}
+	return 0
+}
+
 func rateLimited(retryAfter string) *Error {
-	if secs, err := strconv.Atoi(strings.TrimSpace(retryAfter)); err == nil && secs > 0 {
+	if secs := RetryAfter(retryAfter); secs > 0 {
 		return Network("GitHub API rate limit exceeded; retry in %ds", secs)
 	}
 	return Network("GitHub API rate limit exceeded; retry later")
@@ -278,7 +302,7 @@ const ContentLimitWait = "a few minutes"
 // (see internal/graph), so the fix is a later re-run.
 func ContentLimited(retryAfter string) *Error {
 	wait := ContentLimitWait
-	if secs, err := strconv.Atoi(strings.TrimSpace(retryAfter)); err == nil && secs > 0 {
+	if secs := RetryAfter(retryAfter); secs > 0 {
 		wait = strconv.Itoa(secs) + "s"
 	}
 	e := Network("GitHub's limit on creating issues and comments was hit").
@@ -324,33 +348,67 @@ func GraphQLLimit(err *api.GraphQLError) *Error {
 	return nil
 }
 
-// fromGraphQL maps GraphQL errors by type, looking at all of them: rate
-// limits first, then missing scopes, then not found. Messages of other types
-// are never printed, since they can carry queries, field names and node IDs.
-func fromGraphQL(err *api.GraphQLError) *Error {
-	has := func(types ...string) (api.GraphQLErrorItem, bool) {
-		for _, item := range err.Errors {
-			for _, t := range types {
-				if item.Type == t {
-					return item, true
-				}
-			}
-		}
-		return api.GraphQLErrorItem{}, false
-	}
+// GraphQLWords words the errors MapGraphQL returns for the types of
+// GraphQL error it knows; each is given the first error of its type.
+type GraphQLWords struct {
+	Scopes    func(item api.GraphQLErrorItem) *Error // INSUFFICIENT_SCOPES
+	Forbidden func(item api.GraphQLErrorItem) *Error // FORBIDDEN
+	NotFound  func(item api.GraphQLErrorItem) *Error // NOT_FOUND
+	// Other, when set, is asked after missing scopes and before access
+	// denied for an error of its own; nil means it found none.
+	Other func(err *api.GraphQLError) *Error
+}
+
+// MapGraphQL maps GraphQL errors by type, looking at all of them: rate
+// limits first (GraphQLLimit), then missing scopes, then words.Other, then
+// access denied, then not found. Anything else is "GitHub API rejected the
+// request": messages of other types are never printed, since they can
+// carry queries, field names and node IDs.
+func MapGraphQL(err *api.GraphQLError, words GraphQLWords) *Error {
 	if e := GraphQLLimit(err); e != nil {
 		return e
 	}
-	if item, ok := has("INSUFFICIENT_SCOPES"); ok {
-		return Network("%s", safeMessage(item.Message, "GitHub token lacks a required scope")).WithFix(AuthFix)
+	if item, ok := firstOfType(err, "INSUFFICIENT_SCOPES"); ok {
+		return words.Scopes(item)
 	}
-	if item, ok := has("FORBIDDEN"); ok {
-		return Network("%s", safeMessage(item.Message, "GitHub API: access denied")).WithFix(AuthFix)
+	if words.Other != nil {
+		if e := words.Other(err); e != nil {
+			return e
+		}
 	}
-	if item, ok := has("NOT_FOUND"); ok {
-		return NotFound("%s", safeMessage(item.Message, "GitHub API: not found"))
+	if item, ok := firstOfType(err, "FORBIDDEN"); ok {
+		return words.Forbidden(item)
+	}
+	if item, ok := firstOfType(err, "NOT_FOUND"); ok {
+		return words.NotFound(item)
 	}
 	return Usage("GitHub API rejected the request")
+}
+
+func firstOfType(err *api.GraphQLError, t string) (api.GraphQLErrorItem, bool) {
+	for _, item := range err.Errors {
+		if item.Type == t {
+			return item, true
+		}
+	}
+	return api.GraphQLErrorItem{}, false
+}
+
+// fromGraphQL maps a GraphQL error that did not come through
+// internal/graph's client, which maps its own (only tests and fakes send
+// such errors). It prints GitHub's message when it is safe (safeMessage).
+func fromGraphQL(err *api.GraphQLError) *Error {
+	return MapGraphQL(err, GraphQLWords{
+		Scopes: func(item api.GraphQLErrorItem) *Error {
+			return Network("%s", safeMessage(item.Message, "GitHub token lacks a required scope")).WithFix(AuthFix)
+		},
+		Forbidden: func(item api.GraphQLErrorItem) *Error {
+			return Network("%s", safeMessage(item.Message, "GitHub API: access denied")).WithFix(AuthFix)
+		},
+		NotFound: func(item api.GraphQLErrorItem) *Error {
+			return NotFound("%s", safeMessage(item.Message, "GitHub API: not found"))
+		},
+	})
 }
 
 var (
@@ -377,16 +435,8 @@ func hasNodeID(s string) bool {
 // safeMessage returns the first line of an API message, or fallback when it
 // is empty or mentions a node ID: agents never see IDs.
 func safeMessage(msg, fallback string) string {
-	if msg = firstLine(msg); msg == "" || hasNodeID(msg) {
+	if msg = FirstLine(msg); msg == "" || hasNodeID(msg) {
 		return fallback
 	}
 	return msg
-}
-
-func firstLine(s string) string {
-	s = strings.TrimSpace(s)
-	if i := strings.IndexByte(s, '\n'); i >= 0 {
-		s = strings.TrimSpace(s[:i])
-	}
-	return s
 }
