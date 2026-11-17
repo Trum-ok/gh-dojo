@@ -148,6 +148,8 @@ output means:
   exits 0: a partial commit (`Refs #41`) of an issue still in progress.
   Don't move it by hand for the release; once it is Ready and released, run
   `gh dojo done 41 --comment "vX.Y.Z"`, on the user's word like any `done`.
+- `already closed: #200 (Done)` is normal and exits 0: an issue that went
+  to Done without a release (docs, CI). Release leaves it as it is.
 - Exit code 2 is a refusal, not "not ready": say, the issue is closed
   (`Fixes #12` in a commit) but not in Ready. Release won't move it now or
   later; ask the user.

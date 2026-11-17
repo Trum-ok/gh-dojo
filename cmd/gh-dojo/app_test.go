@@ -364,6 +364,37 @@ func TestWorkflowIssue(t *testing.T) {
 	}
 }
 
+// TestStatusAutomated: the status is the board's workflows' only when the
+// last change read, since the item was added, is into it and automated.
+func TestStatusAutomated(t *testing.T) {
+	added := time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
+	day := func(d int) time.Time { return time.Date(2026, 11, d, 12, 0, 0, 0, time.UTC) }
+	byPerson := issue.StatusChange{At: day(3), From: "Backlog", To: "In progress", Actor: "alice"}
+	closed := issue.StatusChange{At: day(5), From: "In progress", To: "Done", Actor: "github-project-automation", Automated: true}
+	tests := []struct {
+		name    string
+		item    *issue.Item
+		history []issue.StatusChange
+		want    bool
+	}{
+		{"closed by automation", &issue.Item{Status: "Done", CreatedAt: added}, []issue.StatusChange{byPerson, closed}, true},
+		{"moved by a person", &issue.Item{Status: "Done", CreatedAt: added},
+			[]issue.StatusChange{closed, {At: day(6), From: "Done", To: "Done", Actor: "alice"}}, false},
+		{"history behind the status", &issue.Item{Status: "Ready", CreatedAt: added}, []issue.StatusChange{closed}, false},
+		{"no history", &issue.Item{Status: "Done", CreatedAt: added}, nil, false},
+		{"an earlier item's", &issue.Item{Status: "Done", CreatedAt: day(10)}, []issue.StatusChange{closed}, false},
+		{"not on the board", nil, []issue.StatusChange{closed}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			card := &issue.Card{Number: 1, State: issue.StateClosed, Item: tt.item, History: tt.history}
+			if got := workflowIssue(card, issue.Repo{}).StatusAutomated; got != tt.want {
+				t.Errorf("StatusAutomated = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func assertCode(t *testing.T, err error, code render.Code, golden string) {
 	t.Helper()
 	if err == nil {

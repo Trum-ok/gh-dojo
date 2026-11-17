@@ -182,6 +182,21 @@ func (a *App) cards(ctx context.Context, refs []issue.Ref, comments int, lookup 
 	return res, err
 }
 
+// statusAutomated reports whether the board's workflows set the status of
+// c's item (workflow.Issue.StatusAutomated): its last status change, made
+// since the item was added (an earlier change belongs to an item since
+// removed), is into the status and automated.
+func statusAutomated(c *issue.Card) bool {
+	if !c.OnBoard() || len(c.History) == 0 {
+		return false
+	}
+	last := c.History[len(c.History)-1]
+	if c.Item != nil && !c.Item.CreatedAt.IsZero() && last.At.Before(c.Item.CreatedAt) {
+		return false
+	}
+	return last.Automated && last.To == c.Status()
+}
+
 // workflowIssue is the state workflow plans with. Ref keeps the card, so an
 // executor finds the node IDs it needs there: card.ID for the issue,
 // card.ItemID() for the board item ("" when not on the board: add it with
@@ -228,6 +243,7 @@ func workflowIssue(c *issue.Card, def issue.Repo) workflow.Issue {
 	if c.Milestone != nil {
 		is.Milestone = c.Milestone.Title
 	}
+	is.StatusAutomated = statusAutomated(c)
 	for _, cm := range c.Comments.Nodes {
 		is.Comments = append(is.Comments, workflow.Comment{Body: cm.Body, ViewerDidAuthor: cm.ViewerDidAuthor})
 	}

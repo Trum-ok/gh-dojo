@@ -2,16 +2,13 @@ code: 4
 --- stdout
 release HEAD: 4 commits since abc1234, 3 issues
 excluded: #98 (PR #50, commit 1515151), acme/api#7 (PR #50)
+already closed: #43 (Done)
   #42: commit a1a1a1a
-  #43: commit 1313131
   acme/api#3: commit 1212121
 dry run: done #42 "Fix login redirect"
   status: Ready → Done
   close: as completed
-dry run: done #43 "Speed up checkout"
-  status: Done (unchanged)
-  close: already closed
 --- stderr
 warning: #99 not found: left out (commit 1212121)
-error: dry run: 2 of 3 can be applied; acme/api#3: GitHub denied access: the organization enforces SAML single sign-on and the token is not authorized for it
+error: dry run: 1 of 2 can be applied; acme/api#3: GitHub denied access: the organization enforces SAML single sign-on and the token is not authorized for it
 re-run the same command to retry acme/api#3

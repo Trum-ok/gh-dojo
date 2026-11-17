@@ -1,17 +1,14 @@
 code: 3
 --- stdout
 release HEAD: 4 commits since abc1234, 4 issues
+already closed: #43 (Done)
   #42: commit a1a1a1a
-  #43: commit 1313131
   #98: PR #50, commit 1515151
   acme/api#7: PR #50
 dry run: done #42 "Fix login redirect"
   status: Ready → Done
   close: as completed
-dry run: done #43 "Speed up checkout"
-  status: Done (unchanged)
-  close: already closed
 --- stderr
 warning: #99 not found: left out (commit 1212121)
 warning: acme/api#3: repository acme/api not found, or the token cannot see it: left out (commit 1212121)
-error: dry run: 2 of 4 can be applied; #98: issue #98 not found in acme/shop; acme/api#7: repository acme/api not found, or the token cannot see it
+error: dry run: 1 of 3 can be applied; #98: issue #98 not found in acme/shop; acme/api#7: repository acme/api not found, or the token cannot see it

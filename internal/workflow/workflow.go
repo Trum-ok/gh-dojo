@@ -79,6 +79,12 @@ type Issue struct {
 	// no status; it is ignored when OnBoard is false.
 	OnBoard bool
 	Status  string
+	// StatusAutomated reports that the board's own workflows set Status:
+	// the last status change read is into it and GitHub marks it automated,
+	// such as "Item closed" moving an issue closed by a commit to Done. A
+	// status a person or gh dojo set, or one the history does not show,
+	// is not. Only gh dojo release looks at it.
+	StatusAutomated bool
 	// Archived reports that the board item is archived: hidden from the
 	// board's views. A verb unarchives it (see Unarchive). Ignored when
 	// OnBoard is false.

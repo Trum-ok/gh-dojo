@@ -1,0 +1,8 @@
+code: 2
+--- stdout
+release HEAD: 4 commits since abc1234, 2 issues
+#42 Ready (unchanged)
+--- stderr
+warning: #5 is a pull request, not an issue: left out (commit 1212121)
+error: 1 of 2 done (0 written); #43: #43 is closed, ready works only on open issues
+this is a process rule: ask the user what to do with #43

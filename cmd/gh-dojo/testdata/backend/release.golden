@@ -1,9 +1,9 @@
 code: 0
 --- stdout
 release v0.2.0: 5 commits since v0.1.0, 4 issues
+already closed: #9 (Done)
 not ready (done starts only from Ready or In progress): #17 (Backlog)
 #3 Ready → Done, closed as completed
 #7 In progress → Done, closed as completed
-#9 Done (unchanged), already closed as completed
-3 of 3 done (2 written)
+2 of 2 done
 --- stderr

@@ -66,7 +66,9 @@ func newReleaseCmd() (*cobra.Command, error) {
 			"found.\n\n" +
 			"An open issue whose status the verb's from does not allow (still in progress,\n" +
 			"say) is listed as not ready and left out, not failed; only a later release\n" +
-			"whose commits name it again picks it up. A closed one is refused (exit code 2).\n\n" +
+			"whose commits name it again picks it up. A closed one is refused (exit code 2),\n" +
+			"unless it is in a final status (statuses.final): then it is done with, listed as\n" +
+			"already closed and left out, and the verb does not touch it.\n\n" +
 			"--dry-run lists each issue with how it was found and its plan.",
 		Example: `  gh dojo release main --verb done --dry-run
   gh dojo release v0.2.0 --verb done --dry-run
@@ -163,7 +165,8 @@ func runRelease(cmd *cobra.Command, ref string, o *releaseOpts) error {
 	}
 	slices.SortStableFunc(found, func(a, b release.Found) int { return compareRefs(def)(a.Ref, b.Ref) })
 
-	res := &releaseRun{rng: rng, def: def, found: found, keywords: cfg.Release.Keywords, suffix: cfg.Release.Suffix, repos: []issue.Repo{def}}
+	res := &releaseRun{rng: rng, def: def, found: found, keywords: cfg.Release.Keywords, suffix: cfg.Release.Suffix,
+		repos: []issue.Repo{def}, final: cfg.Statuses.Final}
 	for _, s := range cfg.Board.Repos {
 		if r, err := issue.ParseRepo(s); err == nil { // the config checked it
 			res.repos = append(res.repos, r)
@@ -186,14 +189,14 @@ func runRelease(cmd *cobra.Command, ref string, o *releaseOpts) error {
 	b.Keep = res.keep(cmd)
 	out := cmd.OutOrStdout()
 	// Once the issues are read and planned: the numbers a message names
-	// that are no issue are left out (keep), and so are the issues not
-	// ready.
+	// that are no issue are left out (keep), and so are the issues closed
+	// in a final status and those not ready.
 	b.Before = func(items []*batch.Item) []*batch.Item {
 		n := len(items)
-		items = res.ready(v, items)
+		items = res.ready(v, res.settled(items))
 		if !b.JSON {
 			fmt.Fprintln(out, res.head(n))
-			for _, line := range []string{res.excludedLine(), res.notReadyLine(v)} {
+			for _, line := range []string{res.excludedLine(), res.closedLine(), res.notReadyLine(v)} {
 				if line != "" {
 					fmt.Fprintln(out, line)
 				}
@@ -273,9 +276,10 @@ type releaseRun struct {
 	// repos are the project's own: the default repository and
 	// board.repos.
 	repos []issue.Repo
+	final []string // statuses.final
 	// skipped are the issues left out: by --exclude, then once read a
 	// number a commit message names that is no issue, or an issue not
-	// ready for the verb.
+	// ready for the verb or closed in a final status.
 	skipped      []releaseSkipped
 	skipWarnings []string
 }
@@ -287,12 +291,15 @@ const (
 	skipNotFound     = "not_found"      // only a commit message names it, and there is no such issue
 	skipRepoNotFound = "repo_not_found" // only a commit message names it, in a repository outside the project's not found or hidden from the token
 	skipNotReady     = "not_ready"      // the verb's from refuses the issue's status
+	skipClosed       = "closed"         // closed in a final status: done with, the verb is not run
 )
 
 type releaseSkipped struct {
 	found  release.Found
 	reason string // one of the skip constants
-	status string // not ready: where the issue stands ("In progress", "no status", "not on the board")
+	// status is where an issue not ready or closed stands ("In progress",
+	// "Done", "no status", "not on the board").
+	status string
 }
 
 // exclude leaves out of the issues found those --exclude names
@@ -334,6 +341,51 @@ func (r *releaseRun) excludedLine() string {
 		names = append(names[:maxErrorRefs], fmt.Sprintf("and %d more", len(names)-maxErrorRefs))
 	}
 	return "excluded: " + strings.Join(names, ", ")
+}
+
+// settled leaves out of items, with their reason, the issues closed in a
+// final status (statuses.final): done with, whatever the verb. In a
+// process where some issues go to Done without a release (docs, CI),
+// their commits are still in the range of the next one; running the verb
+// on them would refuse them (a verb that works only on open issues, such
+// as stage) or repeat it (done), and a repeat recomputes the sprint. Their
+// plans, if any, are dropped, so nothing is written to them.
+//
+// An issue the board's own workflows moved to the final status
+// (StatusAutomated), such as "Item closed" moving an issue closed by
+// "Fixes #12" from In progress to Done, did not go through the process:
+// it stays with the verb, which refuses it or repeats, as before.
+func (r *releaseRun) settled(items []*batch.Item) []*batch.Item {
+	var out []*batch.Item
+	for _, it := range items {
+		is := it.Issue
+		if is == nil || !is.Closed || !is.OnBoard || is.StatusAutomated || !slices.Contains(r.final, is.Status) {
+			out = append(out, it)
+			continue
+		}
+		r.skipped = append(r.skipped, releaseSkipped{found: r.foundOf(it.Ref), reason: skipClosed, status: is.Status})
+	}
+	return out
+}
+
+// closedLine names the issues closed in a final status, with their
+// statuses; "" for none:
+//
+//	already closed: #200 (Done), #201 (Done)
+func (r *releaseRun) closedLine() string {
+	var names []string
+	for _, s := range r.skipped {
+		if s.reason == skipClosed {
+			names = append(names, s.found.Ref.String(r.def)+" ("+s.status+")")
+		}
+	}
+	if len(names) == 0 {
+		return ""
+	}
+	if len(names) > maxErrorRefs {
+		names = append(names[:maxErrorRefs], fmt.Sprintf("and %d more", len(names)-maxErrorRefs))
+	}
+	return "already closed: " + strings.Join(names, ", ")
 }
 
 // ready leaves out of items, with their reason, the open issues verb v
@@ -559,7 +611,8 @@ type releaseResult struct {
 	Issues []releaseIssue `json:"issues"`
 	// Skipped are the issues found and left out: by --exclude, numbers
 	// only commit messages name that are no issue (a pull request, a
-	// missing issue or repository), and issues not ready for the verb.
+	// missing issue or repository), issues closed in a final status and
+	// issues not ready for the verb.
 	Skipped  []releaseSkip `json:"skipped"`
 	Summary  verbSummary   `json:"summary"`
 	Warnings []string      `json:"warnings"`
@@ -599,11 +652,11 @@ type releaseSkip struct {
 	Number int    `json:"number"`
 	Repo   string `json:"repo"`
 	Ref    string `json:"ref"`
-	// Reason is excluded, pull_request, not_found, repo_not_found or
-	// not_ready.
+	// Reason is excluded, pull_request, not_found, repo_not_found, closed
+	// or not_ready.
 	Reason string `json:"reason"`
-	// Status is where an issue not ready stands: a status, "no status" or
-	// "not on the board"; null for the other reasons.
+	// Status is where an issue closed or not ready stands: a status, "no
+	// status" or "not on the board"; null for the other reasons.
 	Status  *string         `json:"status"`
 	FoundBy []releaseSource `json:"found_by"`
 }

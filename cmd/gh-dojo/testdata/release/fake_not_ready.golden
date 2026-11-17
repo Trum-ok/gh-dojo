@@ -1,8 +1,7 @@
 code: 0
 --- stdout
 release HEAD: 4 commits since abc1234, 2 issues
+already closed: #43 (Done)
 not ready (done starts only from Waiting): #42 (Ready)
-#43 Done (unchanged), already closed
-1 of 1 done (0 written)
 --- stderr
 warning: #5 is a pull request, not an issue: left out (commit 1212121)

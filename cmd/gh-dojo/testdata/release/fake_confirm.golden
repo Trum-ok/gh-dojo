@@ -1,8 +1,8 @@
 code: 2
 --- stdout
 release HEAD: 4 commits since abc1234, 2 issues
-#43 Done (unchanged), already closed
+already closed: #43 (Done)
 --- stderr
 warning: #5 is a pull request, not an issue: left out (commit 1212121)
-error: 1 of 2 done (0 written); #42: done needs the user's go-ahead for #42 (would be: Ready → Done, closed as completed)
+error: 0 of 1 done; #42: done needs the user's go-ahead for #42 (would be: Ready → Done, closed as completed)
 this is the user's decision: ask the user, and re-run with --yes only if they agree

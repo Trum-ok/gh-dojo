@@ -637,13 +637,27 @@ by `from` (closed by a `Fixes #12` while in progress, say) is a refusal
 (exit code 2): no release would move it. The verb's other checks (blockers,
 `--yes`) fail the batch as well.
 
+**Already closed.** A closed issue in a final status
+([`statuses.final`](configuration.md#statuses)) is done with, whatever the
+verb: listed as `already closed: #200 (Done)` and in the JSON's `skipped`
+(`closed`), left out, and not touched, with no status, sprint or comment
+written; it does not change the exit code. In a process where some issues
+go straight to Done without a release (docs, CI), their commits are still
+in the next release's range: a verb that works only on open issues
+(`stage`) would refuse them, and a repeat of `done` would move them to
+today's sprint. One the board's own workflows moved to the final status,
+such as "Item closed" moving an issue a `Fixes #12` commit closed from In
+progress to Done (the status history marks the change automated), did not
+go through the process: the verb gets it as any issue, and refuses it or
+repeats.
+
 ```console
 $ gh dojo release v0.2.0 --verb done --dry-run
 release v0.2.0: 5 commits since v0.1.0, 4 issues
+already closed: #9 (Done)
 not ready (done starts only from Ready): #17 (In progress)
   #3: commit 1111111
   #7: commit 1212121, commit a1a1a1a
-  #9: PR #50
 dry run: done #3 "Read the config"
   status: Ready → Done
   close: as completed

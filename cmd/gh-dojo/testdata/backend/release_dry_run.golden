@@ -1,17 +1,14 @@
 code: 0
 --- stdout
 release v0.2.0: 5 commits since v0.1.0, 4 issues
+already closed: #9 (Done)
 not ready (done starts only from Ready or In progress): #17 (Backlog)
   #3: commit 1111111
   #7: commit 1212121, commit a1a1a1a
-  #9: commit 1212121
 dry run: done #3 "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)"
   status: Ready → Done
   close: as completed
 dry run: done #7 "Issue 7"
   status: In progress → Done
   close: as completed
-dry run: done #9 "Issue 9"
-  status: Done (unchanged)
-  close: already closed as completed
 --- stderr

@@ -17,10 +17,11 @@ keywords = ["closes", "fixes", "resolves", "refs"]
 
 // TestReleaseNotReady: v0.2.0 since the previous version tag, v0.1.0 (two
 // pages of tags), finds #3, #7, #9 and #17 in one page of commits, then
-// runs done on them as gh dojo done 3 7 9 17 does (TestBatchRefused): #9
-// is in place, #3 and #7 are written. #17, in Backlog, is not ready for
-// done: listed, not failed (exit 0). The dry run lists how each issue
-// was found, then the plans.
+// runs done on #3 and #7 as gh dojo done 3 7 does (TestBatchRefused): both
+// are written. #9, closed in Done, is done with: listed as already closed
+// and left out. #17, in Backlog, is not ready for done: listed, not
+// failed (exit 0). The dry run lists how each issue was found, then the
+// plans.
 func TestReleaseNotReady(t *testing.T) {
 	srv, before := withWarmVerbApp(t, verbFixture("release_dojo"), verbFixture("batch_done_refused"))
 	withConfig(t, verbDojoConfig+releaseKeywords)
@@ -71,12 +72,12 @@ func TestReleaseFake(t *testing.T) {
 		{"fake_dry_run", verbsConfig, []string{"--dry-run"}, render.ExitOK, 0, nil},
 		{"fake", verbsConfig, nil, render.ExitOK, 1, nil},
 		{"fake_json", verbsConfig, []string{"--json"}, render.ExitOK, 1, nil},
-		{"fake_comment", verbsConfig, []string{"--comment", "Released in v1.0.0."}, render.ExitOK, 2, nil},
+		{"fake_comment", verbsConfig, []string{"--comment", "Released in v1.0.0."}, render.ExitOK, 1, nil},
 		// No keywords: only pull requests count, and there are none.
 		{"fake_no_keywords", verbsConfig + "[release]\nkeywords = []\n", nil, render.ExitOK, 0, nil},
 		{"fake_no_keywords_json", verbsConfig + "[release]\nkeywords = []\n", []string{"--json"}, render.ExitOK, 0, nil},
 		// A refusal other than from still fails the batch: the user's
-		// go-ahead. #43 is in place and needs none.
+		// go-ahead. #43, closed in Done, is left out and needs none.
 		{"fake_confirm", verbsConfig + "[verbs.done]\nconfirm = \"user\"\n", nil, render.ExitDenied, 0, nil},
 		// #42 in Ready is not ready for a done from Waiting: listed, exit 0.
 		{"fake_not_ready", verbsConfig + "[verbs.done]\nfrom = [\"Waiting\"]\n", nil, render.ExitOK, 0, nil},
@@ -89,6 +90,16 @@ func TestReleaseFake(t *testing.T) {
 				m[43] = workflow.Issue{Number: 43, Title: "Speed up checkout", OnBoard: true, Status: "In progress", Closed: true,
 					StateReason: "completed"}
 			}},
+		// #43, closed in Done, is done with: listed as already closed and
+		// left out, for a verb that works only on open issues too (ready,
+		// which would refuse it), exit 0. #42 is already in Ready.
+		{"fake_closed_open_only", verbsConfig + "[verbs.ready]\nbatch = true\n", []string{"--verb", "ready"}, render.ExitOK, 0, nil},
+		{"fake_closed_open_only_json", verbsConfig + "[verbs.ready]\nbatch = true\n", []string{"--verb", "ready", "--json", "--dry-run"}, render.ExitOK, 0, nil},
+		// #43 moved to Done by the board's "Item closed" workflow when a
+		// commit closed it: it did not go through the process, so the verb
+		// gets it as before: done repeats, ready refuses it (exit code 2).
+		{"fake_closed_automated", verbsConfig, nil, render.ExitOK, 1, closedByAutomation},
+		{"fake_closed_automated_open_only", verbsConfig + "[verbs.ready]\nbatch = true\n", []string{"--verb", "ready"}, render.ExitDenied, 0, closedByAutomation},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -123,7 +134,15 @@ func TestReleaseFake(t *testing.T) {
 	})
 }
 
-// TestReleaseSuffix: with [release] suffix = true, #42 is found in the
+// closedByAutomation makes #43 of acme/shop closed in Done by the board's
+// workflows.
+func closedByAutomation(m map[int]workflow.Issue) {
+	is := m[43]
+	is.StatusAutomated = true
+	m[43] = is
+}
+
+// TestReleaseSuffix:with [release] suffix = true, #42 is found in the
 // suffix of the squash commit of pull request #60, whose "(#60)" is left
 // out with no warning; "(#5)", another pull request, is left out with
 // one; #43, named by keyword and suffix in one commit, is found once, by

@@ -29,7 +29,9 @@ found.
 
 An open issue whose status the verb's from does not allow (still in progress,
 say) is listed as not ready and left out, not failed; only a later release
-whose commits name it again picks it up. A closed one is refused (exit code 2).
+whose commits name it again picks it up. A closed one is refused (exit code 2),
+unless it is in a final status (statuses.final): then it is done with, listed as
+already closed and left out, and the verb does not touch it.
 
 --dry-run lists each issue with how it was found and its plan.
 
