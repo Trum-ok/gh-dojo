@@ -1,2 +1,2 @@
 error: .github/dojo.toml: verbs.done.post is not supported in this version
-allowed: when, to, from, from_labels, refuse_labels, require, require_one_of, comment, labels, assign, unassign, milestone, close, reopen, confirm, iteration, field, blockers, sub_issues, batch and 1 more
+allowed: when, to, from, from_labels, refuse_labels, require, require_one_of, comment, labels, assign, unassign, milestone, close, reopen, confirm, iteration, field, blockers, sub_issues, disabled

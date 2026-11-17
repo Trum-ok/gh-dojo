@@ -97,13 +97,13 @@ func TestReleaseFake(t *testing.T) {
 		// #43, closed in Done, is done with: listed as already closed and
 		// left out, for a verb that works only on open issues too (ready,
 		// which would refuse it), exit 0. #42 is already in Ready.
-		{"fake_closed_open_only", verbsConfig + "[verbs.ready]\nbatch = true\n", []string{"--verb", "ready"}, render.ExitOK, 0, nil},
-		{"fake_closed_open_only_json", verbsConfig + "[verbs.ready]\nbatch = true\n", []string{"--verb", "ready", "--json", "--dry-run"}, render.ExitOK, 0, nil},
+		{"fake_closed_open_only", verbsConfig, []string{"--verb", "ready"}, render.ExitOK, 0, nil},
+		{"fake_closed_open_only_json", verbsConfig, []string{"--verb", "ready", "--json", "--dry-run"}, render.ExitOK, 0, nil},
 		// #43 moved to Done by the board's "Item closed" workflow when a
 		// commit closed it: it did not go through the process, so the verb
 		// gets it as before: done repeats, ready refuses it (exit code 2).
 		{"fake_closed_automated", verbsConfig, nil, render.ExitOK, 1, closedByAutomation},
-		{"fake_closed_automated_open_only", verbsConfig + "[verbs.ready]\nbatch = true\n", []string{"--verb", "ready"}, render.ExitDenied, 0, closedByAutomation},
+		{"fake_closed_automated_open_only", verbsConfig, []string{"--verb", "ready"}, render.ExitDenied, 0, closedByAutomation},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -264,7 +264,7 @@ func TestReleaseArgs(t *testing.T) {
 		{"no_verb", []string{"release", "v0.2.0"}},
 		{"no_verb_json", []string{"release", "v0.2.0", "--json"}},
 		{"unknown_verb", []string{"release", "v0.2.0", "--verb", "ship"}},
-		{"not_batch", []string{"release", "v0.2.0", "--verb", "start"}},
+		{"verb_needs_assignee", []string{"release", "v0.2.0", "--verb", "hand"}},
 		{"empty_since", []string{"release", "v0.2.0", "--verb", "done", "--since", ""}},
 		{"yes", []string{"release", "v0.2.0", "--verb", "done", "--yes"}},
 		{"by", []string{"release", "v0.2.0", "--verb", "done", "--by", "12"}},
@@ -272,7 +272,8 @@ func TestReleaseArgs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			withConfig(t, verbsConfig)
+			// hand needs --assignee, which release does not take.
+			withConfig(t, verbsConfig+"[verbs.hand]\nwhen = \"Hand it over\"\nassign = \"{assignee}\"\n")
 			code, out := runOut(tt.args...)
 			want := render.ExitUsage
 			if tt.name == "help" {

@@ -1,6 +1,7 @@
-code: 1
+code: 0
 --- stdout
+#1 Backlog → In progress
+#2 Waiting → In progress
+2 of 2 done
 --- stderr
-error: start takes one issue number, got 2; several at once need batch = true in verbs.start
-verbs that take several: done
-fix: run gh dojo start once per issue
+warning: no agent session: DOJO_SESSION is not set, so no comment is left

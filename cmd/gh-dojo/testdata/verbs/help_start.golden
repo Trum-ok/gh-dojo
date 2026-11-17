@@ -4,8 +4,13 @@ You begin working on the issue
 
   From:      Backlog, Waiting, Ready (no status or not on the board counts as Backlog)
   To:        In progress; an issue already there keeps it, so a repeat is safe
-  Requires:  nothing besides the issue number
+  Requires:  nothing besides the issue numbers
   Optional:  --comment
+  Batch:     several numbers at once: gh dojo start 12 13 14; each issue is applied
+             on its own, a failed one is skipped, and a summary ends the run:
+             "3 of 4 done; #17: <reason>"; a re-run skips what is done
+             exit code: 0 all done; 5 some written and a re-run may finish the rest;
+             else the failures' code, 2 first, then 1, 4, 3
   Board:     adds the issue if it is not there
   Blockers:  warns about unresolved blockers (open and not in Ready or Done), then runs
   Comment:   posted unless it renders empty or is already the latest gh-dojo comment:
@@ -14,7 +19,7 @@ You begin working on the issue
                {comment}
 
 Usage:
-  gh dojo start <N> [flags]
+  gh dojo start <N>... [flags]
 
 Flags:
       --comment string   text for {comment} in the comment

@@ -23,7 +23,7 @@ import (
 type agentDoc struct {
 	cfg *config.Config
 	// p is describe's process of cfg without what rules explains (the
-	// blockers and sub-issues checks, the link, confirm, batch), so a
+	// blockers and sub-issues checks, the link, confirm, release), so a
 	// verb's line does not say it twice.
 	p     *process
 	cmds  []string // the built-in commands, for hasCommand
@@ -37,10 +37,12 @@ func newAgentDoc(cfg *config.Config, root *cobra.Command, notes string) *agentDo
 	plain := *cfg
 	plain.Verbs = slices.Clone(cfg.Verbs)
 	for i := range plain.Verbs {
-		plain.Verbs[i].Blockers, plain.Verbs[i].Confirm, plain.Verbs[i].Batch = "", false, false
-		plain.Verbs[i].SubIssues = ""
+		plain.Verbs[i].Blockers, plain.Verbs[i].Confirm, plain.Verbs[i].SubIssues = "", false, ""
 	}
 	d := &agentDoc{cfg: cfg, p: describeProcess(&plain), notes: notes}
+	for i := range d.p.Verbs {
+		d.p.Verbs[i].release = false
+	}
 	var walk func(c *cobra.Command, prefix string)
 	walk = func(c *cobra.Command, prefix string) {
 		for _, sub := range c.Commands() {
@@ -247,9 +249,7 @@ func (d *agentDoc) verbs(w *mdWriter) {
 		intro += ", such as " + code(ex)
 	}
 	w.para("%s: there is no need to read the issue again.", intro)
-	if slices.ContainsFunc(d.cfg.Verbs, func(v config.Verb) bool { return v.Batch }) {
-		w.para("`N…` takes several numbers at once: one that fails is skipped and named in the summary.")
-	}
+	w.para("`N…` takes several numbers at once: one that fails is skipped and named in the summary.")
 	for i, pv := range d.p.Verbs {
 		v := d.cfg.Verbs[i]
 		w.heading(2, code(v.Name))
@@ -261,11 +261,7 @@ func (d *agentDoc) verbs(w *mdWriter) {
 		if pv.To != nil {
 			to = *pv.To
 		}
-		n := " N"
-		if v.Batch {
-			n = " N…"
-		}
-		line := code("gh dojo "+v.Name+n) + ": " + from + " → " + to
+		line := code("gh dojo "+v.Name+" N…") + ": " + from + " → " + to
 		if facts := d.facts(v, pv); facts != "" {
 			line += "; " + facts
 		}
@@ -367,7 +363,7 @@ func (d *agentDoc) rules(v config.Verb) []string {
 		r = append(r, "It is refused (exit code 2) while a sub-issue is unresolved: `gh dojo show N` lists them. "+
 			"Finish them first, or ask the user; never move the status another way.")
 	}
-	if v.ChecksSubIssues() && v.Batch && (v.Close != "" || slices.Contains(d.cfg.Statuses.Resolved, v.To)) {
+	if v.ChecksSubIssues() && (v.Close != "" || slices.Contains(d.cfg.Statuses.Resolved, v.To)) {
 		r = append(r, fmt.Sprintf("In one run with its sub-issues (`gh dojo %s 40 41 42`) the sub-issues it "+
 			"moves count as resolved: they go first, and the parent is refused only if one of them is.", v.Name))
 	}
@@ -384,17 +380,13 @@ func (d *agentDoc) rules(v config.Verb) []string {
 		r = append(r, fmt.Sprintf("`--%s 17` names the original: the issue is closed as its duplicate and "+
 			"GitHub links the two.", config.ArgOf))
 	}
-	if v.Batch {
-		// A release finishes issues: only a verb that does is pointed there.
-		finishes := v.Close != "" || slices.Contains(d.cfg.Statuses.Final, v.To)
-		if finishes && d.hasCommand("release") && releaseLacks(v) == "" {
-			r = append(r, d.releaseRule(v))
-		}
+	if releaseFinishes(d.cfg, v) && d.hasCommand("release") {
+		r = append(r, d.releaseRule(v))
 	}
 	return r
 }
 
-// releaseRule points to gh dojo release for batch verb v: its details
+// releaseRule points to gh dojo release for verb v: its details
 // are in release --help, needed only when a release is made.
 func (d *agentDoc) releaseRule(v config.Verb) string {
 	return fmt.Sprintf("For a release, `gh dojo release <tag> --verb %s --dry-run` lists the issues the release "+

@@ -83,8 +83,17 @@ type Config struct {
 	Verbs    []Verb // preset verbs in preset order, then the repo's own in file order
 	Agent    Agent
 	Release  Release
+	// Deprecated are the keys the config sets that still load but do
+	// nothing, verb by verb; gh dojo doctor warns about each.
+	Deprecated []Deprecation
 
 	origin map[string]string // key path → preset name, for values only the preset set
+}
+
+// Deprecation is a key the config sets that still loads but does
+// nothing: Key its path (see KeyPath), Why what took its place.
+type Deprecation struct {
+	Key, Why string
 }
 
 // Board says where the issues live.
@@ -340,10 +349,6 @@ type Verb struct {
 	// Confirm says the verb is a decision for the user (confirm = "user"):
 	// it runs only with --yes, which an agent adds after asking.
 	Confirm bool
-	// Batch says the verb takes several issue numbers at once (batch =
-	// true): it runs on each, skipping the ones that fail, and ends with a
-	// summary. Other verbs take exactly one number.
-	Batch bool
 
 	// Iteration is how the verb sets the sprint field: IterationCurrent,
 	// IterationClear, or IterationByStatusDate with IterationStatus the

@@ -4,7 +4,12 @@ code: 0
 
   From:      any status
   To:        Done; an issue already there keeps it, so a repeat is safe
-  Requires:  nothing besides the issue number
+  Requires:  nothing besides the issue numbers
+  Batch:     several numbers at once: gh dojo done 12 13 14; each issue is applied
+             on its own, a failed one is skipped, and a summary ends the run:
+             "3 of 4 done; #17: <reason>"; a re-run skips what is done
+             exit code: 0 all done; 5 some written and a re-run may finish the rest;
+             else the failures' code, 2 first, then 1, 4, 3
   Board:     adds the issue if it is not there
   Sprint:    sets Sprint to the iteration of the day it entered Ready; dates are in UTC
              never entered Ready, or the day is unknown: today's iteration, with a warning
@@ -13,7 +18,7 @@ code: 0
              a repeat (already in Done) keeps the sprint it has, unless it entered Done today
 
 Usage:
-  gh dojo done <N> [flags]
+  gh dojo done <N>... [flags]
 
 Flags:
       --dry-run   print the plan without changing anything

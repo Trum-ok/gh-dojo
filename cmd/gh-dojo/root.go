@@ -4,11 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"slices"
 	"strconv"
 	"strings"
 
-	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -192,7 +190,7 @@ func exitCodesHelp() string {
 	for _, c := range render.ExitCodes {
 		fmt.Fprintf(&b, "\n  %d  %s: %s", c.Code, c.Meaning, c.Next)
 	}
-	if cfg, err := loadConfig(); err == nil && slices.ContainsFunc(cfg.Verbs, func(v config.Verb) bool { return v.Batch }) {
+	if cfg, err := loadConfig(); err == nil && len(cfg.Verbs) > 0 {
 		b.WriteString("\n  A verb on several issues (batch) exits 0 when all are done, 5 when some were\n" +
 			"  written and a re-run may finish the rest, else with the code of the failed\n" +
 			"  ones (2 first, then 1, 4, 3); a summary names each issue not done.")

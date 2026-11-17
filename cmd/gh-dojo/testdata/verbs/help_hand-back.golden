@@ -4,13 +4,18 @@ Back to the author alone
 
   From:      any status
   To:        the status is not changed
-  Requires:  nothing besides the issue number
+  Requires:  nothing besides the issue numbers
+  Batch:     several numbers at once: gh dojo hand-back 12 13 14; each issue is applied
+             on its own, a failed one is skipped, and a summary ends the run:
+             "3 of 4 done; #17: <reason>"; a re-run skips what is done
+             exit code: 0 all done; 5 some written and a re-run may finish the rest;
+             else the failures' code, 2 first, then 1, 4, 3
   Board:     adds the issue if it is not there
   Assign:    you (the authenticated user)
   Unassign:  everyone else: the user it assigns stays the only assignee
 
 Usage:
-  gh dojo hand-back <N> [flags]
+  gh dojo hand-back <N>... [flags]
 
 Flags:
       --dry-run   print the plan without changing anything

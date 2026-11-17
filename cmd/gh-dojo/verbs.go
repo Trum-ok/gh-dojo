@@ -110,16 +110,12 @@ func newVerbCmd(cfg *config.Config, v config.Verb) *cobra.Command {
 		args         workflow.Args
 		dryRun, show bool
 	)
-	use := v.Name + " <N>"
-	if v.Batch {
-		use = v.Name + " <N>..."
-	}
 	cmd := &cobra.Command{
 		GroupID: verbsGroup.ID,
-		Use:     use,
+		Use:     v.Name + " <N>...",
 		Short:   v.When,
 		Long:    verbHelp(cfg, v),
-		Args:    issueArgs(cfg, v),
+		Args:    issueArgs,
 		RunE: func(cmd *cobra.Command, posArgs []string) error {
 			args.HasComment = cmd.Flags().Changed(config.ArgComment)
 			args.HasBy = cmd.Flags().Changed(config.ArgBy)
@@ -275,51 +271,12 @@ func issueArg(cmd *cobra.Command, args []string) error {
 	return checkArgs(cmd, args, "an issue number", "one")
 }
 
-// issueArgs accepts the issue numbers of verb v: one, or with batch =
-// true one or more. A number repeated counts once. Without batch, refs of
-// one number in different forms (38 and owner/repo#38) may be one issue
-// of the default repository, which is not known yet: runBatch tells.
-func issueArgs(cfg *config.Config, v config.Verb) cobra.PositionalArgs {
-	return func(cmd *cobra.Command, args []string) error {
-		need := "an issue number"
-		if v.Batch {
-			need = "one or more issue numbers"
-		}
-		if err := checkArgs(cmd, args, need, "one"); err != nil {
-			return err
-		}
-		refs := argRefs(args, issue.Repo{})
-		numbers := map[int]bool{}
-		for _, r := range refs {
-			numbers[r.Number] = true
-		}
-		if len(numbers) > 1 && !v.Batch {
-			return notBatch(cmd, cfg, v, len(refs))
-		}
-		return nil
-	}
-}
-
-// notBatch is the error for n issues given to verb v without batch = true.
-func notBatch(cmd *cobra.Command, cfg *config.Config, v config.Verb, n int) error {
-	return render.Usage("%s takes one issue number, got %d; several at once need batch = true in verbs.%s%s",
-		cmd.Name(), n, v.Name, batchVerbsNote(cfg)).
-		WithFix(fmt.Sprintf("run %s once per issue", cmd.CommandPath()))
-}
-
-// batchVerbsNote names the verbs that take several numbers, for the error
-// of a verb that does not.
-func batchVerbsNote(cfg *config.Config) string {
-	var names []string
-	for _, v := range cfg.Verbs {
-		if v.Batch {
-			names = append(names, v.Name)
-		}
-	}
-	if len(names) == 0 {
-		return ""
-	}
-	return "\nverbs that take several: " + strings.Join(names, ", ")
+// issueArgs accepts the issue numbers of a verb: one or more. A number
+// repeated counts once; one number in different forms (38 and
+// owner/repo#38) may be one issue of the default repository, which is not
+// known yet: runBatch tells.
+func issueArgs(cmd *cobra.Command, args []string) error {
+	return checkArgs(cmd, args, "one or more issue numbers", "one")
 }
 
 // helpLine adds a line to a verb's help: label (without its colon, "" to
@@ -413,10 +370,8 @@ func argsHelp(v config.Verb, line helpLine) {
 	}
 	if len(required) > 0 {
 		line("Requires", "%s", strings.Join(required, "; "))
-	} else if v.Batch {
-		line("Requires", "nothing besides the issue numbers")
 	} else {
-		line("Requires", "nothing besides the issue number")
+		line("Requires", "nothing besides the issue numbers")
 	}
 	if len(optional) > 0 {
 		line("Optional", "%s", strings.Join(optional, ", "))

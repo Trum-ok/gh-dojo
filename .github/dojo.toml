@@ -34,7 +34,6 @@ Waiting for {by}.
 
 [verbs.ready]
 when = "done, checked and committed to main"
-batch = true                 # ready 12 13 14: several issues at once
 
 [verbs.done]
 when = "the change has shipped in a release"
@@ -46,7 +45,6 @@ from = ["Ready"]
 when = "the issue moves to another stage"
 from = ["Backlog", "In progress", "Waiting", "Ready"]
 milestone = "{milestone}"
-batch = true
 
 # gh dojo agent install: the Claude Code skill from this config plus our
 # notes (the process, what gh-dojo lacks, which version runs).

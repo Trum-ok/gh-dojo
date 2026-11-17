@@ -41,7 +41,6 @@ resolved = ["Done"]
 when = "The change is released"
 to = "Done"
 from = ["Ready"]
-batch = true
 `
 
 var shop = issue.Repo{Owner: "acme", Name: "shop"}

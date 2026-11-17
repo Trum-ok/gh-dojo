@@ -89,7 +89,7 @@ type rawVerb struct {
 	Field        *rawFields `toml:"field"`
 	Blockers     *rawOff    `toml:"blockers"`
 	SubIssues    *rawOff    `toml:"sub_issues"`
-	Batch        *bool      `toml:"batch"`
+	Batch        *bool      `toml:"batch"` // deprecated: see deprecatedVerbKeys
 	Disabled     *bool      `toml:"disabled"`
 }
 
@@ -188,6 +188,19 @@ var (
 	agentKeys    = []string{"targets", "notes", "description"}
 	releaseKeys  = []string{"keywords", "suffix"}
 	verbKeys     = tomlKeys[rawVerb]()
+	// allowedVerbKeys are the verb keys an error offers: verbKeys
+	// without the deprecated ones.
+	allowedVerbKeys = slices.DeleteFunc(slices.Clone(verbKeys), func(k string) bool {
+		_, ok := deprecatedVerbKeys[k]
+		return ok
+	})
+
+	// deprecatedVerbKeys are verb keys that still load, so configs of an
+	// older gh-dojo keep working, but do nothing: key → what took its
+	// place. Config.Deprecated lists the ones a config sets.
+	deprecatedVerbKeys = map[string]string{
+		"batch": "every verb takes several issue numbers now (#89)",
+	}
 
 	// unsupportedVerbKeys are verb keys reserved for hooks, which this
 	// version does not implement (an open question, issue #58).
@@ -372,9 +385,9 @@ func undecodedError(display string, key toml.Key) error {
 		path = strings.Join(key[:3], ".")
 		if slices.Contains(unsupportedVerbKeys, key[2]) {
 			return render.Usage("%s: %s is not supported in this version", display, path).
-				WithAllowed(verbKeys...)
+				WithAllowed(allowedVerbKeys...)
 		}
-		allowed = verbKeys
+		allowed = allowedVerbKeys
 	case len(key) >= 2:
 		path = strings.Join(key[:2], ".")
 		switch key[0] {

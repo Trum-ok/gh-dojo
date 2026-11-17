@@ -36,6 +36,9 @@ Exit codes:
   3  issue or board not found: check the number (gh dojo list) or board.owner/project in .github/dojo.toml
   4  network, rate limit or auth: retry later, or gh auth refresh -s project
   5  partially applied: re-run the same command; it finishes the rest
+  A verb on several issues (batch) exits 0 when all are done, 5 when some were
+  written and a re-run may finish the rest, else with the code of the failed
+  ones (2 first, then 1, 4, 3); a summary names each issue not done.
 
 Flags:
   -h, --help                help for gh dojo

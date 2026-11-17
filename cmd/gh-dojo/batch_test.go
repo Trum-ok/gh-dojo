@@ -22,7 +22,7 @@ import (
 	"github.com/Trum-ok/gh-dojo/internal/workflow"
 )
 
-// Batches against the real backend: kanban's done has batch = true. The
+// Batches against the real backend, on kanban's done. The
 // fixtures copy the recorded card of #3 for the other numbers.
 
 // TestBatchRefused: one request reads the four cards; #9 is in place, #17
@@ -123,12 +123,11 @@ func TestBatchReadFails(t *testing.T) {
 	checkRuns(t, srv, before, runs{args, render.ExitDenied, 7, "batch_read_fails"})
 }
 
-// TestBatchLookup: review adds and removes labels and assigns @me; with
-// batch = true the label and viewer IDs are looked up once, in the request
-// of both cards, and each issue gets its own mutation.
+// TestBatchLookup: review adds and removes labels and assigns @me; on
+// several issues the label and viewer IDs are looked up once, in the
+// request of both cards, and each issue gets its own mutation.
 func TestBatchLookup(t *testing.T) {
-	withConfig(t, strings.Replace(effectsDojoConfig, "labels = [\"+enhancement\", \"-dogfood\"]\n",
-		"labels = [\"+enhancement\", \"-dogfood\"]\nbatch = true\n", 1))
+	withConfig(t, effectsDojoConfig)
 	withSession(t, "abc")
 	srv := withApp(t, boardFixture, verbFixture("batch_review"))
 	if _, err := newApp().Schema(t.Context()); err != nil {
@@ -142,8 +141,7 @@ func TestBatchLookup(t *testing.T) {
 // repositories; acme/api's issues fail alone with the config error, its
 // allowed labels read once for both; #3 is planned with gh-dojo's labels.
 func TestBatchLookupRepos(t *testing.T) {
-	withConfig(t, strings.Replace(effectsDojoConfig, "labels = [\"+enhancement\", \"-dogfood\"]\n",
-		"labels = [\"+enhancement\", \"-dogfood\"]\nbatch = true\n", 1))
+	withConfig(t, effectsDojoConfig)
 	withSession(t, "abc")
 	srv := withApp(t, boardFixture, verbFixture("batch_review_repos"))
 	if _, err := newApp().Schema(t.Context()); err != nil {
@@ -274,21 +272,24 @@ func TestVerbsOtherRepo(t *testing.T) {
 	}
 }
 
-// TestVerbOneIssueTwoForms: a verb without batch takes 12 and
-// acme/shop#12 together, one issue of the default repository; 4 and
-// other/repo#4 are two issues, refused before anything is read.
+// TestVerbOneIssueTwoForms: 12 and acme/shop#12 are one issue of the
+// default repository, run as one issue is; 4 and other/repo#4 are two
+// issues, a batch.
 func TestVerbOneIssueTwoForms(t *testing.T) {
 	withConfig(t, verbsConfig)
-	f := &fakeBackend{issues: map[int]workflow.Issue{4: {Number: 4, OnBoard: true, Status: "Backlog"}}}
+	f := &fakeBackend{
+		issues: map[int]workflow.Issue{4: {Number: 4, OnBoard: true, Status: "Backlog"}},
+		others: map[string]workflow.Issue{"other/repo#4": {Number: 4, OnBoard: true, Status: "Backlog"}},
+	}
 	withBackend(t, f)
 	code, out := runOut("start", "4", "ACME/shop#4", "--dry-run")
 	if code != render.ExitOK || f.reads != 1 {
 		t.Errorf("exit code = %d, reads %d; want 0, 1\n%s", code, f.reads, out)
 	}
 	testutil.Golden(t, "verbs/one_issue_two_forms", out)
-	code, out = runOut("start", "4", "other/repo#4")
-	if code != render.ExitUsage || f.reads != 1 {
-		t.Errorf("exit code = %d, reads %d; want 1, 1\n%s", code, f.reads, out)
+	code, out = runOut("start", "4", "other/repo#4", "--dry-run")
+	if code != render.ExitOK || f.reads != 2 {
+		t.Errorf("exit code = %d, reads %d; want 0, 2\n%s", code, f.reads, out)
 	}
 	testutil.Golden(t, "verbs/two_issues_one_number", out)
 }
@@ -303,7 +304,6 @@ when = "Not needed"
 from = ["Backlog", "Done"]
 close = "not_planned"
 confirm = "user"
-batch = true
 `)
 	is := map[int]workflow.Issue{
 		1: {Number: 1, OnBoard: true, Status: "Backlog"},
@@ -334,15 +334,13 @@ batch = true
 	}
 }
 
-// TestBatchArgs: a verb without batch takes one number; a batch verb
-// checks every argument before reading anything.
+// TestBatchArgs: a verb checks every argument before reading anything.
 func TestBatchArgs(t *testing.T) {
 	withConfig(t, verbsConfig)
 	for _, tt := range []struct {
 		name string
 		args []string
 	}{
-		{"not_batch", []string{"start", "1", "2"}},
 		{"bad_number", []string{"done", "1", "x"}},
 		{"no_number", []string{"done"}},
 		{"bad_flag_arg", []string{"done", "1", "2", "--by", "3"}},

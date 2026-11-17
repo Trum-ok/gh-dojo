@@ -32,7 +32,7 @@ Run a verb as `gh dojo <verb> N`; `--dry-run` prints its plan (status, links, th
 
 **When:** you take an issue to work on
 
-`gh dojo start N`: Backlog, Waiting, Ready → In progress; optional --comment; assigns you; comments "Taken. Session: {session} {comment}".
+`gh dojo start N…`: Backlog, Waiting, Ready → In progress; optional --comment; assigns you; comments "Taken. Session: {session} {comment}".
 
 - With an unresolved blocker it warns on stderr and still runs: read the card (`--show`) and decide whether to keep the issue, or ask the user.
 
@@ -40,7 +40,7 @@ Run a verb as `gh dojo <verb> N`; `--dry-run` prints its plan (status, links, th
 
 **When:** work has stopped: waiting for another issue or an outside decision
 
-`gh dojo wait N`: In progress → Waiting; needs --by or --comment; comments "Waiting for {by}. {comment}".
+`gh dojo wait N…`: In progress → Waiting; needs --by or --comment; comments "Waiting for {by}. {comment}".
 
 - `--by 12` also marks the issue blocked by #12; text (`--by "the user's decision"`) only goes into the comment.
 

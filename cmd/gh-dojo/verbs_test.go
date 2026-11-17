@@ -216,7 +216,10 @@ func TestVerbs(t *testing.T) {
 		{"max_arg", []string{"start", "2147483647"}, nil, "", render.ExitNotFound, 1, 0},
 		{"too_large_arg", []string{"start", "2147483648"}, nil, "", render.ExitUsage, 0, 0},
 		{"start_not_on_board", []string{"start", "42"}, map[int]workflow.Issue{42: {Number: 42}}, "abc", render.ExitOK, 1, 1},
-		{"two_args", []string{"start", "1", "2"}, nil, "", render.ExitUsage, 0, 0},
+		// Every verb takes several numbers: one read, a write per issue.
+		{"two_args", []string{"start", "1", "2"}, map[int]workflow.Issue{
+			1: {Number: 1, OnBoard: true, Status: "Backlog"}, 2: {Number: 2, OnBoard: true, Status: "Waiting"},
+		}, "", render.ExitOK, 1, 2},
 		{"unknown_flag", []string{"start", "42", "--nope"}, nil, "", render.ExitUsage, 0, 0},
 		{"start_yes", []string{"start", "42", "--yes"}, issue42("Backlog"), "", render.ExitUsage, 0, 0},
 		{"done_open", []string{"done", "42"}, issue42("Ready"), "", render.ExitOK, 1, 1},

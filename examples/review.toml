@@ -139,5 +139,4 @@ to = "Merged"
 from = ["Approved"]
 close = "completed"          # an issue the pull request closed stays closed
 refuse_labels = ["blocked"]
-batch = true                 # gh dojo merged 12 13 14
 comment = "{comment}"

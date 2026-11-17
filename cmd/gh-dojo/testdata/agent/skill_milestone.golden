@@ -32,7 +32,7 @@ Run a verb as `gh dojo <verb> N`; `--dry-run` prints its plan (status, links, th
 
 **When:** You begin working on the issue
 
-`gh dojo start N`: Backlog, Waiting, Ready → In progress; optional --comment; comments "Started. Session: {session} {comment}".
+`gh dojo start N…`: Backlog, Waiting, Ready → In progress; optional --comment; comments "Started. Session: {session} {comment}".
 
 - With an unresolved blocker it warns on stderr and still runs: read the card (`--show`) and decide whether to keep the issue, or ask the user.
 
@@ -40,7 +40,7 @@ Run a verb as `gh dojo <verb> N`; `--dry-run` prints its plan (status, links, th
 
 **When:** Work is stuck: waiting for another issue or an outside decision
 
-`gh dojo wait N`: In progress → Waiting; needs --by or --comment; comments "Waiting for {by}. {comment}".
+`gh dojo wait N…`: In progress → Waiting; needs --by or --comment; comments "Waiting for {by}. {comment}".
 
 - `--by 12` also marks the issue blocked by #12; text (`--by "the user's decision"`) only goes into the comment.
 
@@ -48,7 +48,7 @@ Run a verb as `gh dojo <verb> N`; `--dry-run` prints its plan (status, links, th
 
 **When:** The work is done, verified and committed, but not released yet
 
-`gh dojo ready N`: In progress, Waiting → Ready; comments only with --comment.
+`gh dojo ready N…`: In progress, Waiting → Ready; comments only with --comment.
 
 ### `done`
 
@@ -62,7 +62,7 @@ Run a verb as `gh dojo <verb> N`; `--dry-run` prints its plan (status, links, th
 
 **When:** задача не нужна или дубль
 
-`gh dojo drop N`: any status → status unchanged; needs --comment; on a closed issue only if closed as not planned; comments "{comment}"; closes as not planned.
+`gh dojo drop N…`: any status → status unchanged; needs --comment; on a closed issue only if closed as not planned; comments "{comment}"; closes as not planned.
 
 - It is the user's decision: without `--yes` it exits with code 2. Ask the user, and run it again with `--yes` only if they agree; never add `--yes` on your own.
 
@@ -70,55 +70,55 @@ Run a verb as `gh dojo <verb> N`; `--dry-run` prints its plan (status, links, th
 
 **When:** A pull request waits for review
 
-`gh dojo review N`: In progress, Ready → In review; labels +enhancement -dogfood; assigns you; comments only with --comment.
+`gh dojo review N…`: In progress, Ready → In review; labels +enhancement -dogfood; assigns you; comments only with --comment.
 
 ### `revive`
 
 **When:** A closed issue is needed after all
 
-`gh dojo revive N`: any status → Backlog; also on closed issues; reopens.
+`gh dojo revive N…`: any status → Backlog; also on closed issues; reopens.
 
 ### `tag`
 
 **When:** Tag it
 
-`gh dojo tag N`: any status → status unchanged; labels +enhancment.
+`gh dojo tag N…`: any status → status unchanged; labels +enhancment.
 
 ### `give`
 
 **When:** Hand it over
 
-`gh dojo give N`: any status → status unchanged; assigns octo-nobody.
+`gh dojo give N…`: any status → status unchanged; assigns octo-nobody.
 
 ### `recase`
 
 **When:** Labels, one in another case than the repository's
 
-`gh dojo recase N`: any status → status unchanged; labels +enhancement -Dogfood.
+`gh dojo recase N…`: any status → status unchanged; labels +enhancement -Dogfood.
 
 ### `tagcase`
 
 **When:** Tag it, in another case than the repository's
 
-`gh dojo tagcase N`: any status → status unchanged; labels +Enhancement.
+`gh dojo tagcase N…`: any status → status unchanged; labels +Enhancement.
 
 ### `untag`
 
 **When:** Remove a label the repository does not have
 
-`gh dojo untag N`: any status → status unchanged; labels -no-such-label.
+`gh dojo untag N…`: any status → status unchanged; labels -no-such-label.
 
 ### `hand`
 
 **When:** Hand it to the owner, login in lowercase
 
-`gh dojo hand N`: any status → status unchanged; assigns trum-ok.
+`gh dojo hand N…`: any status → status unchanged; assigns trum-ok.
 
 ### `dup`
 
 **When:** A duplicate of another issue
 
-`gh dojo dup N`: any status → status unchanged; needs --of; on a closed issue only if closed as duplicate; comments "Duplicate of {of}."; closes as a duplicate of the --of issue, linked to it.
+`gh dojo dup N…`: any status → status unchanged; needs --of; on a closed issue only if closed as duplicate; comments "Duplicate of {of}."; closes as a duplicate of the --of issue, linked to it.
 
 - `--of 17` names the original: the issue is closed as its duplicate and GitHub links the two.
 
@@ -134,13 +134,13 @@ Run a verb as `gh dojo <verb> N`; `--dry-run` prints its plan (status, links, th
 
 **When:** Due in the agent release
 
-`gh dojo ship N`: any status → status unchanged; sets milestone v0.2.
+`gh dojo ship N…`: any status → status unchanged; sets milestone v0.2.
 
 ### `ship-later`
 
 **When:** Due in a release without a milestone yet
 
-`gh dojo ship-later N`: any status → status unchanged; sets milestone v9.
+`gh dojo ship-later N…`: any status → status unchanged; sets milestone v9.
 
 ## Reading
 

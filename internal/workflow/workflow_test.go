@@ -131,7 +131,6 @@ when = "The issue moves to another stage"
 from = ["Backlog", "In progress"]
 milestone = "{milestone}"
 comment = "Moved to {milestone}."
-batch = true
 
 [verbs.schedule]
 when = "Due in the next release"

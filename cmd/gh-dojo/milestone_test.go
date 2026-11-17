@@ -18,7 +18,6 @@ var milestoneDojoConfig = effectsDojoConfig + `
 when = "The issue moves to another stage"
 milestone = "{milestone}"
 comment = "Moved to {milestone}."
-batch = true
 
 [verbs.ship]
 when = "Due in the agent release"
@@ -155,7 +154,6 @@ func TestVerbMilestoneLabelBatch(t *testing.T) {
 when = "Moved to another stage, unblocked"
 labels = ["-blocked"]
 milestone = "{milestone}"
-batch = true
 `)
 	checkRuns(t, srv, before,
 		runs{[]string{"replan", "3", "4", "5", "--milestone", "v0.3"}, render.ExitUsage, 4, "milestone_label_batch"})

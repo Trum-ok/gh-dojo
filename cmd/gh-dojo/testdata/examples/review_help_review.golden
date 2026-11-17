@@ -7,6 +7,11 @@ The pull request is open and ready for review
   Refused:   while the issue has the label blocked (exit code 2): ask the user
              resume removes it
   Requires:  --comment; --assignee
+  Batch:     several numbers at once: gh dojo review 12 13 14; each issue is applied
+             on its own, a failed one is skipped, and a summary ends the run:
+             "3 of 4 done; #17: <reason>"; a re-run skips what is done
+             exit code: 0 all done; 5 some written and a re-run may finish the rest;
+             else the failures' code, 2 first, then 1, 4, 3
   Board:     adds the issue if it is not there
   Labels:    +needs-review -changes-requested (+ adds, - removes)
   Assign:    the --assignee user (a login, or @me for you); other assignees stay
@@ -16,7 +21,7 @@ The pull request is open and ready for review
                Ready for review by @{assignee}: {comment}
 
 Usage:
-  gh dojo review <N> [flags]
+  gh dojo review <N>... [flags]
 
 Flags:
       --assignee string   the user to assign: a login, or @me for yourself

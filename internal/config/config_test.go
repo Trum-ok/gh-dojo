@@ -53,7 +53,6 @@ to = "Ready"
 when = "выкачено на прод"
 to = "Done"
 iteration = "by_status_date:Ready"
-batch = true                 # several issues at once
 
 [verbs.drop]
 when = "задача не нужна или дубль"
@@ -304,7 +303,6 @@ unassign = true
 when = "The issue moves to another stage"
 milestone = "{milestone}"
 comment = "Moved to {milestone}. {comment}"
-batch = true
 
 [verbs.ship]
 when = "Due in the next release"
@@ -790,21 +788,19 @@ func TestSessionResolve(t *testing.T) {
 	}
 }
 
-// TestBatch: batch = true is the verb's own key, inherited from the
-// preset (kanban's done) and turned off with false; other verbs take one
-// number.
-func TestBatch(t *testing.T) {
-	c := mustLoad(t, fullExample)
-	for _, v := range c.Verbs {
-		if v.Batch != (v.Name == "done") {
-			t.Errorf("%s: Batch = %v", v.Name, v.Batch)
-		}
+// TestDeprecated: a config with batch, which no longer does anything
+// since every verb takes several numbers (#89), still loads, and
+// Deprecated lists each verb that sets it, true or false, verb by verb;
+// no preset sets it.
+func TestDeprecated(t *testing.T) {
+	if c := mustLoad(t, fullExample); len(c.Deprecated) != 0 {
+		t.Errorf("Deprecated = %v, want none", c.Deprecated)
 	}
-	c = mustLoad(t, presetOnly+"[verbs.done]\nbatch = false\n[verbs.ready]\nbatch = true\n")
-	for _, v := range c.Verbs {
-		if v.Batch != (v.Name == "ready") {
-			t.Errorf("%s: Batch = %v", v.Name, v.Batch)
-		}
+	c := mustLoad(t, presetOnly+"[verbs.ready]\nbatch = true\n[verbs.done]\nbatch = false\n")
+	why := deprecatedVerbKeys["batch"]
+	want := []Deprecation{{"verbs.ready.batch", why}, {"verbs.done.batch", why}}
+	if !slices.Equal(c.Deprecated, want) {
+		t.Errorf("Deprecated = %v, want %v", c.Deprecated, want)
 	}
 }
 
@@ -914,17 +910,17 @@ func TestErrorfAndKeyPath(t *testing.T) {
 func TestMergeVerb(t *testing.T) {
 	to, done, comment, yes := "Doing", "Done", "Started.", true
 	base := &rawVerb{To: &to, Comment: &comment, Disabled: &yes}
-	over := &rawVerb{To: &done, Batch: &yes}
+	over := &rawVerb{To: &done, Reopen: &yes}
 	origin := map[string]string{}
 	got := mergeVerb(merger{preset: "kanban", origin: origin}, "start", base, over)
-	want := &rawVerb{To: &done, Comment: &comment, Batch: &yes}
+	want := &rawVerb{To: &done, Comment: &comment, Reopen: &yes}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("mergeVerb = %+v, want %+v", got, want)
 	}
 	if want := map[string]string{"verbs.start.comment": "kanban"}; !reflect.DeepEqual(origin, want) {
 		t.Errorf("origin = %v, want %v", origin, want)
 	}
-	if keys := got.setKeys(); !slices.Equal(keys, []string{"to", "comment", "batch"}) {
+	if keys := got.setKeys(); !slices.Equal(keys, []string{"to", "comment", "reopen"}) {
 		t.Errorf("setKeys = %v", keys)
 	}
 }

@@ -1,5 +1,5 @@
 {
-  "comment": "Hand-crafted from batch_review.json and assignee_flag.json (from internal/issue/testdata/graphql/card_3.json, recorded), with the open milestones of internal/issue/testdata/graphql/card_55_milestones.json (recorded); mutations are never recorded. gh dojo plan 3 7 --milestone v0.3 with plan batch = true: both cards and the open milestones in one request; #3 (in v0.0) and #7 (no milestone) each get a mutation that sets v0.3 and posts the comment.",
+  "comment": "Hand-crafted from batch_review.json and assignee_flag.json (from internal/issue/testdata/graphql/card_3.json, recorded), with the open milestones of internal/issue/testdata/graphql/card_55_milestones.json (recorded); mutations are never recorded. gh dojo plan 3 7 --milestone v0.3: both cards and the open milestones in one request; #3 (in v0.0) and #7 (no milestone) each get a mutation that sets v0.3 and posts the comment.",
   "handcrafted": true,
   "interactions": [
     {

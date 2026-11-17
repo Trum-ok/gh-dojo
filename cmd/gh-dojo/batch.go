@@ -24,9 +24,6 @@ func runBatch(cmd *cobra.Command, cfg *config.Config, v config.Verb, refs []issu
 	if refs = inRepo(refs, def); len(refs) == 1 { // 12 and owner/repo#12 of the default repository
 		return runVerb(cmd, cfg, v, refs[0], args, dryRun, show)
 	}
-	if !v.Batch { // issueArgs let one number in two forms through
-		return notBatch(cmd, cfg, v, len(refs))
-	}
 	if show {
 		return showOne(len(refs))
 	}
@@ -50,11 +47,8 @@ func newBatchRun(cmd *cobra.Command, be Backend, cfg *config.Config, v config.Ve
 	return b
 }
 
-// batchHelp is the Batch section of the help of a verb with batch = true.
+// batchHelp is the Batch section of the help of verb v.
 func batchHelp(v config.Verb, line helpLine) {
-	if !v.Batch {
-		return
-	}
 	line("Batch", "several numbers at once: gh dojo %s 12 13 14; each issue is applied", v.Name)
 	line("", "on its own, a failed one is skipped, and a summary ends the run:")
 	line("", "\"3 of 4 done; #17: <reason>\"; a re-run skips what is done")

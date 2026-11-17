@@ -62,4 +62,3 @@ from = ["Ready", "In progress"]  # never in Ready: today's sprint, with a warnin
 iteration = "by_status_date:Ready"  # the sprint in which the work was finished
 close = "completed"
 comment = "{comment}"
-batch = true                       # done 12 13 14: several issues at once

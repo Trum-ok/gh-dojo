@@ -42,7 +42,7 @@ func newReleaseCmd() (*cobra.Command, error) {
 		Use:   "release <ref> --verb <verb>",
 		Short: "Apply a verb to the issues a release includes, found through pull requests and commits",
 		Long: "Use it once a release is tagged: it finds the issues the release includes and\n" +
-			"applies a verb with batch = true to them, as gh dojo <verb> 12 13 14 would.\n" +
+			"applies a verb to them, as gh dojo <verb> 12 13 14 would.\n" +
 			"Before the tag, gh dojo release main --dry-run shows what the next one holds.\n\n" +
 			"The release is the commits of <ref> (a tag, branch or commit on GitHub) since\n" +
 			"the previous release: the highest version tag (v1.2.3) below <ref> when <ref>\n" +
@@ -83,7 +83,7 @@ func newReleaseCmd() (*cobra.Command, error) {
 		},
 	}
 	f := cmd.Flags()
-	f.StringVar(&o.verb, "verb", "", "the verb to apply to the release's issues: one with batch = true")
+	f.StringVar(&o.verb, "verb", "", "the verb to apply to the release's issues: any without a required --assignee, --milestone or --of")
 	f.StringVar(&o.since, "since", "", "where the release starts, a tag, branch or commit; default: the previous version tag")
 	f.StringArrayVar(&o.exclude, "exclude", nil,
 		"an `issue` found to leave out, by a pull request or a message: 12, \"#12\", owner/repo#12 or its URL; repeatable, or comma-separated")
@@ -219,31 +219,30 @@ func runRelease(cmd *cobra.Command, ref string, o *releaseOpts) error {
 		func(io.Writer) {}, summary, slices.ContainsFunc(items, (*batch.Item).Wrote))
 }
 
-// releaseVerb is the verb --verb names: one with batch = true.
+// releaseVerb is the verb --verb names: any verb but one that needs an
+// argument release lacks (see releaseLacks).
 func releaseVerb(cmd *cobra.Command, cfg *config.Config, name string) (config.Verb, error) {
-	var batch []string
+	var fit []string
+	example := "<verb>"
 	for _, v := range cfg.Verbs {
-		if v.Batch {
-			batch = append(batch, v.Name)
+		if releaseLacks(v) == "" {
+			fit = append(fit, v.Name)
+		}
+		if example == "<verb>" && releaseFinishes(cfg, v) {
+			example = v.Name
 		}
 	}
-	example := "<verb>"
-	if len(batch) > 0 {
-		example = batch[0]
+	if example == "<verb>" && len(fit) > 0 {
+		example = fit[0]
 	}
 	if name == "" {
 		return config.Verb{}, render.Usage("release needs --verb, the verb to apply to the release's issues").
-			WithAllowed(batch...).WithFix(fmt.Sprintf("%s <ref> --verb %s", cmd.CommandPath(), example))
+			WithAllowed(fit...).WithFix(fmt.Sprintf("%s <ref> --verb %s", cmd.CommandPath(), example))
 	}
 	v, ok := cfg.Verb(name)
 	if !ok {
 		return config.Verb{}, render.Usage("release --verb %s: no such verb in %s", name, cfg.Display).
-			WithAllowed(batch...).WithFix("gh dojo describe")
-	}
-	if !v.Batch {
-		e := render.Usage("release --verb %s: %s takes one issue at a time; release needs a verb with batch = true%s",
-			name, name, batchVerbsNote(cfg))
-		return config.Verb{}, e.WithFix(fmt.Sprintf("add batch = true under [verbs.%s] in %s", name, cfg.Display))
+			WithAllowed(fit...).WithFix("gh dojo describe")
 	}
 	if arg := releaseLacks(v); arg != "" {
 		return config.Verb{}, render.Usage("release --verb %s: %s needs --%s, which release does not take", name, name, arg).
@@ -264,6 +263,15 @@ func releaseLacks(v config.Verb) string {
 		}
 	}
 	return ""
+}
+
+// releaseFinishes reports whether describe, the agent doc and release's
+// own errors point to gh dojo release for verb v: release can run it, and
+// it finishes an issue as a release does (closes it as completed or moves
+// it to a final status). Release runs any verb it can; the others are
+// rarely what a release means.
+func releaseFinishes(cfg *config.Config, v config.Verb) bool {
+	return releaseLacks(v) == "" && (v.Close == config.CloseCompleted || slices.Contains(cfg.Statuses.Final, v.To))
 }
 
 // releaseRun is what release found, for its output.

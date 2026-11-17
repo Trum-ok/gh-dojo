@@ -3,7 +3,7 @@ code: 0
 Process from .github/dojo.toml: board acme/12, issues in acme/payments.
 Find an issue to take with gh dojo next (Backlog or no status, no unresolved blockers);
 read it with gh dojo show <N>.
-Run a verb as gh dojo <verb> <N>; --dry-run shows its plan first.
+Run a verb as gh dojo <verb> <N>...; --dry-run shows its plan first.
 Every command takes --json (schema_version 1), --jq and --template, as gh does.
 
 Verbs:
@@ -22,7 +22,7 @@ Verbs:
   reject          The user decided the change is not wanted
                   needs --comment; on a closed issue only if closed as not planned; the user's decision: ask first, then --yes; labels -needs-review -changes-requested -blocked; comments "{comment}"; closes as not planned
   merged          The approved pull request has been merged into main
-                  several numbers at once (merged 12 13 14) or a release's issues (release <tag> --verb merged); optional --comment; also on closed issues; refused with the label blocked; comments "{comment}"; closes as completed
+                  release <tag> --verb merged runs it on a release's issues; optional --comment; also on closed issues; refused with the label blocked; comments "{comment}"; closes as completed
 
 Every verb adds the issue to the board if it is missing and refuses a
 closed issue unless noted. A repeat is safe: an effect already in place

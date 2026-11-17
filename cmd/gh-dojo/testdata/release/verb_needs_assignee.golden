@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: release --verb hand: hand needs --assignee, which release does not take
+fix: run it on the issues themselves: gh dojo hand <N>... --assignee "<login>"

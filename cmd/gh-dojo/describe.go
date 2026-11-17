@@ -70,11 +70,11 @@ type processVerb struct {
 	Requires      []string `json:"requires"`
 	RequiresOneOf []string `json:"requires_one_of"`
 	Optional      []string `json:"optional"`
-	Batch         bool     `json:"batch"`   // takes several issue numbers
+	Batch         bool     `json:"batch"`   // takes several issue numbers: every verb does (#89)
 	Checks        []string `json:"checks"`  // beyond from and the arguments
 	Effects       []string `json:"effects"` // along the way, beyond the status
 
-	release bool // gh dojo release can apply it: batch, and no argument release lacks
+	release bool // describe points to gh dojo release for it: see releaseFinishes
 }
 
 type processExitCode struct {
@@ -274,8 +274,8 @@ func describeProcess(cfg *config.Config) *process {
 	for _, v := range cfg.Verbs {
 		required, oneOf, optional := verbArgs(v)
 		pv := processVerb{
-			Name: v.Name, When: v.When, From: render.OrEmpty(v.From), To: render.OrNull(v.To), Batch: v.Batch,
-			release:  v.Batch && releaseLacks(v) == "",
+			Name: v.Name, When: v.When, From: render.OrEmpty(v.From), To: render.OrNull(v.To), Batch: true,
+			release:  releaseFinishes(cfg, v),
 			Requires: render.OrEmpty(required), RequiresOneOf: render.OrEmpty(oneOf), Optional: render.OrEmpty(optional),
 			Checks: []string{}, Effects: []string{},
 		}
@@ -304,7 +304,7 @@ func describeProcess(cfg *config.Config) *process {
 // help's sections, so the two never disagree:
 //
 //	Process from .github/dojo.toml (preset kanban): board acme/3, issues in acme/shop.
-//	Run a verb as gh dojo <verb> <N>; --dry-run shows its plan first.
+//	Run a verb as gh dojo <verb> <N>...; --dry-run shows its plan first.
 //	Every command takes --json (schema_version 1), --jq and --template, as gh does.
 //
 //	Verbs:
@@ -329,10 +329,10 @@ func (p *process) text() string {
 		take = "Find an issue to take with gh dojo next (" + *p.Statuses.Initial +
 			" or no status, no unresolved blockers);\nread it with gh dojo show <N>.\n"
 	}
-	run := "Run a verb as gh dojo <verb> <N>; --dry-run shows its plan first."
+	run := "Run a verb as gh dojo <verb> <N>...; --dry-run shows its plan first."
 	if len(p.Repos) > 1 {
 		// Several repositories: say which one a bare number is in.
-		run = fmt.Sprintf("Run a verb as gh dojo <verb> <N>, N in %s, or owner/repo#N in another repository;\n"+
+		run = fmt.Sprintf("Run a verb as gh dojo <verb> <N>..., N in %s, or owner/repo#N in another repository;\n"+
 			"--dry-run shows its plan first; gh dojo new --repo owner/repo creates in another one.", p.Repos[0])
 	}
 	sections := []string{fmt.Sprintf("%s: board %s, issues in %s.\n%s%s\n"+
@@ -382,12 +382,8 @@ func (p *process) text() string {
 // effects, or "" when it has none.
 func (v processVerb) facts() string {
 	var parts []string
-	switch {
-	case v.release:
-		parts = append(parts, "several numbers at once ("+v.Name+" 12 13 14) or a release's issues "+
-			"(release <tag> --verb "+v.Name+")")
-	case v.Batch:
-		parts = append(parts, "several numbers at once ("+v.Name+" 12 13 14)")
+	if v.release {
+		parts = append(parts, "release <tag> --verb "+v.Name+" runs it on a release's issues")
 	}
 	if len(v.Requires) > 0 {
 		parts = append(parts, "needs "+strings.Join(v.Requires, " and "))

@@ -3,7 +3,7 @@ code: 0
 Process from .github/dojo.toml (preset kanban): board Trum-ok/5, issues in Trum-ok/gh-dojo.
 Find an issue to take with gh dojo next (Backlog or no status, no unresolved blockers);
 read it with gh dojo show <N>.
-Run a verb as gh dojo <verb> <N>; --dry-run shows its plan first.
+Run a verb as gh dojo <verb> <N>...; --dry-run shows its plan first.
 Every command takes --json (schema_version 1), --jq and --template, as gh does.
 
 Verbs:
@@ -14,7 +14,7 @@ Verbs:
   ready       The work is done, verified and committed, but not released yet
               optional --comment; comments "{comment}"
   done        The change is released
-              several numbers at once (done 12 13 14) or a release's issues (release <tag> --verb done); optional --comment; also on closed issues; comments "{comment}"; closes as completed
+              release <tag> --verb done runs it on a release's issues; optional --comment; also on closed issues; comments "{comment}"; closes as completed
   drop        задача не нужна или дубль
               needs --comment; on a closed issue only if closed as not planned; the user's decision: ask first, then --yes; comments "{comment}"; closes as not planned
   review      A pull request waits for review

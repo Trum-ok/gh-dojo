@@ -1,5 +1,5 @@
 {
-  "comment": "Hand-crafted from review_ok.json and internal/issue/testdata/graphql/card_3.json (recorded); mutations are never recorded. gh dojo review 3 7 --comment \"PR #50\" with review batch = true: the labels and the viewer are looked up once, in the request of both cards; #3 has dogfood to remove, #7 does not.",
+  "comment": "Hand-crafted from review_ok.json and internal/issue/testdata/graphql/card_3.json (recorded); mutations are never recorded. gh dojo review 3 7 --comment \"PR #50\": the labels and the viewer are looked up once, in the request of both cards; #3 has dogfood to remove, #7 does not.",
   "handcrafted": true,
   "interactions": [
     {

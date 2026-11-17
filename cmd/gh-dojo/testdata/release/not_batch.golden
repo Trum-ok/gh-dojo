@@ -1,6 +1,0 @@
-code: 1
---- stdout
---- stderr
-error: release --verb start: start takes one issue at a time; release needs a verb with batch = true
-verbs that take several: done
-fix: add batch = true under [verbs.start] in .github/dojo.toml

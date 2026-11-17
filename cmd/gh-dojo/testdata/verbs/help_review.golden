@@ -4,8 +4,13 @@ A pull request waits for review
 
   From:      In progress, Ready
   To:        In review; an issue already there keeps it, so a repeat is safe
-  Requires:  nothing besides the issue number
+  Requires:  nothing besides the issue numbers
   Optional:  --comment
+  Batch:     several numbers at once: gh dojo review 12 13 14; each issue is applied
+             on its own, a failed one is skipped, and a summary ends the run:
+             "3 of 4 done; #17: <reason>"; a re-run skips what is done
+             exit code: 0 all done; 5 some written and a re-run may finish the rest;
+             else the failures' code, 2 first, then 1, 4, 3
   Board:     adds the issue if it is not there
   Labels:    +enhancement -dogfood (+ adds, - removes)
   Assign:    you (the authenticated user); other assignees stay
@@ -13,7 +18,7 @@ A pull request waits for review
                {comment}
 
 Usage:
-  gh dojo review <N> [flags]
+  gh dojo review <N>... [flags]
 
 Flags:
       --comment string   text for {comment} in the comment

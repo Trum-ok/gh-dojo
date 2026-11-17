@@ -1,7 +1,7 @@
 code: 1
 --- stdout
-{"schema_version":1,"error":{"exit_code":1,"message":"release needs --verb, the verb to apply to the release's issues","allowed":["done"],"fix":"gh dojo release <ref> --verb done"}}
+{"schema_version":1,"error":{"exit_code":1,"message":"release needs --verb, the verb to apply to the release's issues","allowed":["start","wait","ready","done","park"],"fix":"gh dojo release <ref> --verb done"}}
 --- stderr
 error: release needs --verb, the verb to apply to the release's issues
-allowed: done
+allowed: start, wait, ready, done, park
 fix: gh dojo release <ref> --verb done

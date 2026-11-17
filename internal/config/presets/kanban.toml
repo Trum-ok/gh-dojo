@@ -51,4 +51,3 @@ to = "Done"
 from = ["Ready", "In progress"]
 close = "completed"
 comment = "{comment}"
-batch = true                   # done 12 13 14: several issues at once

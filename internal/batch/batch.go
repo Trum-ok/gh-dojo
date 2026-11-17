@@ -1,7 +1,7 @@
-// Package batch runs a verb on its issues: one, or several for a verb
-// with batch = true (gh dojo done 12 13 14). It reads them through a
-// Backend, plans each with the workflow engine, applies the plans one
-// issue after another, skipping those that fail, and sums the run up.
+// Package batch runs a verb on its issues: one, or several (gh dojo done
+// 12 13 14). It reads them through a Backend, plans each with the
+// workflow engine, applies the plans one issue after another, skipping
+// those that fail, and sums the run up.
 // The command parses the flags, prints and emits the result.
 //
 // Run.Do reads every card in one request per issue.MaxBatch issues, plans

@@ -4,13 +4,18 @@ Put the issue back
 
   From:      any status
   To:        Backlog; an issue already there keeps it, so a repeat is safe
-  Requires:  nothing besides the issue number
+  Requires:  nothing besides the issue numbers
+  Batch:     several numbers at once: gh dojo park 12 13 14; each issue is applied
+             on its own, a failed one is skipped, and a summary ends the run:
+             "3 of 4 done; #17: <reason>"; a re-run skips what is done
+             exit code: 0 all done; 5 some written and a re-run may finish the rest;
+             else the failures' code, 2 first, then 1, 4, 3
   Board:     adds the issue if it is not there
   Comment:   posted unless it renders empty or is already the latest gh-dojo comment:
                Parked.
 
 Usage:
-  gh dojo park <N> [flags]
+  gh dojo park <N>... [flags]
 
 Flags:
       --dry-run   print the plan without changing anything

@@ -5,6 +5,11 @@ code: 0
   From:      any status
   To:        the status is not changed
   Requires:  --comment
+  Batch:     several numbers at once: gh dojo drop 12 13 14; each issue is applied
+             on its own, a failed one is skipped, and a summary ends the run:
+             "3 of 4 done; #17: <reason>"; a re-run skips what is done
+             exit code: 0 all done; 5 some written and a re-run may finish the rest;
+             else the failures' code, 2 first, then 1, 4, 3
   Confirm:   the user's decision: ask the user first; runs only with --yes
   Board:     adds the issue if it is not there
   Close:     closes the issue as not planned; an issue already closed stays as it is
@@ -12,7 +17,7 @@ code: 0
                {comment}
 
 Usage:
-  gh dojo drop <N> [flags]
+  gh dojo drop <N>... [flags]
 
 Flags:
       --comment string   text for {comment} in the comment

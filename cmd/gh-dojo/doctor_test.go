@@ -35,6 +35,9 @@ func TestDoctor(t *testing.T) {
 		requests int
 	}{
 		{"ok", dojoConfig, []string{doctorFixtures + "ok.json", boardFixture}, render.ExitOK, 3},
+		// A deprecated key loads and is a warning: the exit code stays 0.
+		{"deprecated", dojoConfig + "\n[verbs.done]\nbatch = true\n", []string{doctorFixtures + "ok.json", boardFixture},
+			render.ExitOK, 3},
 		{"read_project", dojoConfig, []string{doctorFixtures + "read_project.json", boardFixture}, render.ExitNetwork, 3},
 		{"no_scope", dojoConfig, []string{doctorFixtures + "no_scope.json", boardFixtures + "insufficient_scopes.json"}, render.ExitNetwork, 3},
 		{"unauthorized", dojoConfig, []string{doctorFixtures + "401.json"}, render.ExitNetwork, 1},

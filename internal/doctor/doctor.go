@@ -143,6 +143,10 @@ func Run(ctx context.Context, env Env) *Report {
 		cfg = nil
 	} else {
 		r.AddOK("config", "%s", configSummary(cfg))
+		for _, d := range cfg.Deprecated {
+			r.AddWarn("config", fmt.Sprintf("remove %s from %s", d.Key, cfg.Display),
+				"%s does nothing: %s", d.Key, d.Why)
+		}
 	}
 
 	repos, repoErr := listRepos(cfg, env.CurrentRepo)

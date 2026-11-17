@@ -1,5 +1,5 @@
 {
-  "comment": "Hand-crafted from batch_review.json: gh dojo review 3 acme/api#7 acme/api#8 --dry-run with review batch = true reads the three cards in one request, labels looked up in both repositories: gh-dojo has enhancement and dogfood, acme/api neither. The labels of acme/api are read once, for the allowed list of both its issues; a second RepoLabels request would find no interaction.",
+  "comment": "Hand-crafted from batch_review.json: gh dojo review 3 acme/api#7 acme/api#8 --dry-run reads the three cards in one request, labels looked up in both repositories: gh-dojo has enhancement and dogfood, acme/api neither. The labels of acme/api are read once, for the allowed list of both its issues; a second RepoLabels request would find no interaction.",
   "handcrafted": true,
   "interactions": [
     {

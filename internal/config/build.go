@@ -310,6 +310,11 @@ func (c *Config) buildVerb(name string, r *rawVerb) (Verb, error) {
 	if err := c.checkVerbName(name); err != nil {
 		return Verb{}, err
 	}
+	for _, k := range r.setKeys() {
+		if why, ok := deprecatedVerbKeys[k]; ok {
+			c.Deprecated = append(c.Deprecated, Deprecation{Key: c.KeyPath(p + k), Why: why})
+		}
+	}
 	v := Verb{Name: name, When: strings.TrimSpace(deref(r.When)), To: deref(r.To), Comment: deref(r.Comment)}
 	if r.Comment == nil && requires(r, ArgComment) {
 		// A verb that requires --comment without a template posts the text
@@ -469,7 +474,6 @@ func (c *Config) buildEffects(name string, r *rawVerb, v *Verb) error {
 		v.Close = reason
 	}
 	v.Reopen = deref(r.Reopen)
-	v.Batch = deref(r.Batch)
 	if v.Close != "" && v.Reopen {
 		return c.Errorf("verbs.%s sets both close and reopen; keep one", name)
 	}
