@@ -353,39 +353,29 @@ func GraphQLLimit(err *api.GraphQLError) *Error {
 	return nil
 }
 
-// GraphQLWords words the errors MapGraphQL returns for the types of
-// GraphQL error it knows; each is given the first error of its type.
-type GraphQLWords struct {
-	Scopes    func(item api.GraphQLErrorItem) *Error // INSUFFICIENT_SCOPES
-	Forbidden func(item api.GraphQLErrorItem) *Error // FORBIDDEN
-	NotFound  func(item api.GraphQLErrorItem) *Error // NOT_FOUND
-	// Other, when set, is asked after missing scopes and before access
-	// denied for an error of its own; nil means it found none.
-	Other func(err *api.GraphQLError) *Error
-}
-
 // MapGraphQL maps GraphQL errors by type, looking at all of them: rate
-// limits first (GraphQLLimit), then missing scopes, then words.Other, then
+// limits first (GraphQLLimit), then missing scopes, then other, then
 // access denied, then not found. Anything else is "GitHub API rejected the
-// request": messages of other types are never printed, since they can
-// carry queries, field names and node IDs.
-func MapGraphQL(err *api.GraphQLError, words GraphQLWords) *Error {
+// request". GitHub's messages are never printed, since they can carry
+// queries, field names and node IDs; only the scope names are taken from
+// them. other, when set, is the caller's own cases (nil: none of them).
+func MapGraphQL(err *api.GraphQLError, other func(*api.GraphQLError) *Error) *Error {
 	if e := GraphQLLimit(err); e != nil {
 		return e
 	}
 	if item, ok := firstOfType(err, "INSUFFICIENT_SCOPES"); ok {
-		return words.Scopes(item)
+		return Network("GitHub token is missing a required scope%s", scopesHint(item.Message)).WithFix(AuthFix)
 	}
-	if words.Other != nil {
-		if e := words.Other(err); e != nil {
+	if other != nil {
+		if e := other(err); e != nil {
 			return e
 		}
 	}
-	if item, ok := firstOfType(err, "FORBIDDEN"); ok {
-		return words.Forbidden(item)
+	if _, ok := firstOfType(err, "FORBIDDEN"); ok {
+		return Network("GitHub denied access; the token may lack the project scope or access to the owner").WithFix(AuthFix)
 	}
-	if item, ok := firstOfType(err, "NOT_FOUND"); ok {
-		return words.NotFound(item)
+	if _, ok := firstOfType(err, "NOT_FOUND"); ok {
+		return NotFound("GitHub API: not found")
 	}
 	return Usage("GitHub API rejected the request")
 }
@@ -400,20 +390,39 @@ func firstOfType(err *api.GraphQLError, t string) (api.GraphQLErrorItem, bool) {
 }
 
 // fromGraphQL maps a GraphQL error that did not come through
-// internal/graph's client, which maps its own (only tests and fakes send
-// such errors). It prints GitHub's message when it is safe (safeMessage).
+// internal/graph's client, which adds its own cases (only tests and fakes
+// send such errors), in the same words.
 func fromGraphQL(err *api.GraphQLError) *Error {
-	return MapGraphQL(err, GraphQLWords{
-		Scopes: func(item api.GraphQLErrorItem) *Error {
-			return Network("%s", safeMessage(item.Message, "GitHub token lacks a required scope")).WithFix(AuthFix)
-		},
-		Forbidden: func(item api.GraphQLErrorItem) *Error {
-			return Network("%s", safeMessage(item.Message, "GitHub API: access denied")).WithFix(AuthFix)
-		},
-		NotFound: func(item api.GraphQLErrorItem) *Error {
-			return NotFound("%s", safeMessage(item.Message, "GitHub API: not found"))
-		},
-	})
+	return MapGraphQL(err, nil)
+}
+
+// scopesHint extracts "['read:project']" from GitHub's INSUFFICIENT_SCOPES
+// message ("... requires one of the following scopes: ['read:project'], but
+// your token has only been granted ...") as " (read:project)", or "" when
+// it cannot tell.
+func scopesHint(msg string) string {
+	const marker = "following scopes: ["
+	i := strings.Index(msg, marker)
+	if i < 0 {
+		return ""
+	}
+	rest := msg[i+len(marker):]
+	j := strings.IndexByte(rest, ']')
+	if j < 0 {
+		return ""
+	}
+	var scopes []string
+	for s := range strings.SplitSeq(rest[:j], ",") {
+		s = strings.Trim(strings.TrimSpace(s), `'"`)
+		if s == "" || strings.ContainsAny(s, " \t") || len(s) > 40 {
+			return ""
+		}
+		scopes = append(scopes, s)
+	}
+	if len(scopes) == 0 {
+		return ""
+	}
+	return " (" + strings.Join(scopes, " or ") + ")"
 }
 
 var (

@@ -262,27 +262,16 @@ func describeGraphQL(err *api.GraphQLError) *render.Error {
 			return render.Internal("GitHub rejected gh-dojo's GraphQL query")
 		}
 	}
-	return render.MapGraphQL(err, render.GraphQLWords{
-		Scopes: func(item api.GraphQLErrorItem) *render.Error {
-			return render.Network("GitHub token is missing a required scope%s", scopesHint(item.Message)).WithFix(render.AuthFix)
-		},
-		Other: func(err *api.GraphQLError) *render.Error {
-			for _, item := range err.Errors {
-				if e := orgDenial(item); e != nil {
-					return e
-				}
+	return render.MapGraphQL(err, func(err *api.GraphQLError) *render.Error {
+		for _, item := range err.Errors {
+			if e := orgDenial(item); e != nil {
+				return e
 			}
-			if isCycle(err) {
-				return render.Usage("GitHub refused a blocked-by link: it would make a dependency cycle")
-			}
-			return nil
-		},
-		Forbidden: func(api.GraphQLErrorItem) *render.Error {
-			return render.Network("GitHub denied access; the token may lack the project scope or access to the owner").WithFix(render.AuthFix)
-		},
-		NotFound: func(api.GraphQLErrorItem) *render.Error {
-			return render.NotFound("GitHub API: not found")
-		},
+		}
+		if isCycle(err) {
+			return render.Usage("GitHub refused a blocked-by link: it would make a dependency cycle")
+		}
+		return nil
 	})
 }
 
@@ -473,34 +462,6 @@ func containsAny(s string, subs ...string) bool {
 		}
 	}
 	return false
-}
-
-// scopesHint extracts "['read:project']" from GitHub's INSUFFICIENT_SCOPES
-// message ("... requires one of the following scopes: ['read:project'], but
-// your token has only been granted ...") as " (read:project)".
-func scopesHint(msg string) string {
-	const marker = "following scopes: ["
-	i := strings.Index(msg, marker)
-	if i < 0 {
-		return ""
-	}
-	rest := msg[i+len(marker):]
-	j := strings.IndexByte(rest, ']')
-	if j < 0 {
-		return ""
-	}
-	var scopes []string
-	for s := range strings.SplitSeq(rest[:j], ",") {
-		s = strings.Trim(strings.TrimSpace(s), `'"`)
-		if s == "" || strings.ContainsAny(s, " \t") || len(s) > 40 {
-			return ""
-		}
-		scopes = append(scopes, s)
-	}
-	if len(scopes) == 0 {
-		return ""
-	}
-	return " (" + strings.Join(scopes, " or ") + ")"
 }
 
 func (c *Client) scrub(s string) string {

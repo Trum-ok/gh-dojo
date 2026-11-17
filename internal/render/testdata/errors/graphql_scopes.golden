@@ -1,2 +1,2 @@
-error: Your token has not been granted the required scopes.
+error: GitHub token is missing a required scope
 fix: gh auth refresh -s project
