@@ -15,6 +15,15 @@
 // GraphQL runs the fields of a mutation in order and fails them one by one:
 // a rejected status change leaves the comment after it posted. Outcome
 // tells which ops took effect from the fields that came back non-null.
+//
+// gh dojo new's mutations (new.go) take up to four requests instead:
+// GraphQL cannot feed one field's result into another field of the same
+// document, and each step needs the one before: createIssue the issue ID
+// that adding it to the board takes, addProjectV2ItemById the item ID
+// that setting its status takes. A resumed issue (one an earlier run
+// created) gets the labels, milestone and board item it lacks one
+// mutation each, so a partial report names the step that failed; the
+// status and the rest go into NewFinish.
 package effects
 
 import (
@@ -146,8 +155,10 @@ func Batches(ops []workflow.Op) [][]workflow.Op {
 }
 
 // Build makes one mutation document from ops: at most one op of each kind
-// (AddBlockedBy one per blocking issue), with the IDs it needs. A SetStatus without ids.Item is an error: add the
-// issue to the board first (see Batches).
+// (AddBlockedBy one per blocking issue), with the IDs it needs. An op that
+// sets a field of the board item (SetStatus, SetIteration, SetFields)
+// without ids.Item is an error: add the issue to the board first (see
+// Batches).
 //
 //	mutation Verb($project: ID!, $item: ID!, $field: ID!, $option: String!, $issue: ID!, $body: String!, $reason: IssueClosedStateReason!) {
 //	  status: updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field, value: {singleSelectOptionId: $option}}) { projectV2Item { id } }

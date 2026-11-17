@@ -9,8 +9,6 @@ import (
 	"github.com/rivo/uniseg"
 )
 
-// Text helpers shared by every command's output.
-
 // JoinWords lists words as "a", "a or b", "a, b or c" with conj ("or",
 // "and") before the last.
 func JoinWords(words []string, conj string) string {

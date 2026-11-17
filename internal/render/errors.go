@@ -1,6 +1,8 @@
 // Package render turns command results into the short, predictable output
-// agents rely on: exit codes, error blocks, confirmation lines, warnings and
-// truncation notes.
+// agents rely on: exit codes, error blocks (GitHub's errors mapped to
+// them), confirmation lines, warnings and "showing N of M" notes. Its text
+// helpers (text.go) join, count, clip and sanitize what every command
+// prints.
 package render
 
 import (

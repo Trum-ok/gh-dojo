@@ -3,6 +3,38 @@
 // Backend, plans each with the workflow engine, applies the plans one
 // issue after another, skipping those that fail, and sums the run up.
 // The command parses the flags, prints and emits the result.
+//
+// Run.Do reads every card in one request per issue.MaxBatch issues, plans
+// each issue on its own, and applies the plans one issue after another,
+// each with its own mutation (two for an issue not on the board). An issue
+// that fails is skipped; the others go on, unless its error would fail
+// every write alike (the token, a rate limit, the run interrupted:
+// graph.AffectsAll): then the issues left to write are not attempted.
+//
+// Each issue gets its own mutation rather than one aliased mutation for
+// the batch: a lost answer (timeout, 5xx) leaves one issue's outcome
+// unknown instead of every issue's, a stale schema ID stops one issue,
+// and an issue not on the board needs the item ID of its first mutation
+// anyway. The cost is one mutation per issue, as if the verb ran on each.
+//
+// Output (see "Several issues at once" in docs/output.md): the confirmation
+// line of each issue done (applied, or already in place) on Stdout, in
+// the order of the arguments (but sub-issues before their parent, see
+// Run.resolvesSubIssues), then a summary. With every issue done it is
+// "3 of 3 done" on Stdout ("3 of 3 done (2 written)" when one was in
+// place) and exit code 0. Otherwise it is an error naming each issue not
+// done with its reason, then the next steps:
+//
+//	error: 3 of 4 done; #17: done cannot move #17 from Backlog, it starts only from Ready or In progress
+//	this is a process rule: ask the user how to proceed
+//
+// and the exit code says what to do about the rest (see batchCode). A
+// re-run of the same command re-reads every issue: those done are in
+// place and cost no write, so it touches only what is left (principle 5).
+//
+// A stale schema is retried once per run, as for one issue (see
+// ReadPlan): the schema is dropped and the issues it failed are re-read
+// in one request, then planned and applied afresh.
 package batch
 
 import (
@@ -60,39 +92,6 @@ type Read struct {
 // ErrNotSent marks an Apply error after which the remaining ops were never
 // sent, so they are known not to have happened.
 var ErrNotSent = errors.New("not sent")
-
-// A verb with batch = true runs on several issues: `gh dojo done 12 13 14`
-// (spec F1, "Поведение нескольких номеров"). Do reads every card in one
-// request per issue.MaxBatch issues, plans each issue on its own, and
-// applies the plans one issue after another, each with its own mutation
-// (two for an issue not on the board). An issue that fails is skipped; the
-// others go on, unless its error would fail every write alike (the token,
-// a rate limit, the run interrupted: graph.AffectsAll): then the issues
-// left to write are not attempted.
-//
-// Each issue gets its own mutation rather than one aliased mutation for
-// the batch: a lost answer (timeout, 5xx) leaves one issue's outcome
-// unknown instead of every issue's, a stale schema ID stops one issue,
-// and an issue not on the board needs the item ID of its first mutation
-// anyway. The cost is one mutation per issue, as if the verb ran on each.
-//
-// Output: the confirmation line of each issue done (applied, or already in
-// place) on Stdout, in the order of the arguments (but sub-issues before
-// their parent, see resolvesSubIssues), then a summary. With every issue
-// done it is "3 of 3 done" on Stdout ("3 of 3 done (2
-// written)" when one was in place) and exit code 0. Otherwise it is an
-// error naming each issue not done with its reason, then the next steps:
-//
-//	error: 3 of 4 done; #17: done cannot move #17 from Backlog, it starts only from Ready or In progress
-//	this is a process rule: ask the user how to proceed
-//
-// and the exit code says what to do about the rest (see batchCode). A
-// re-run of the same command re-reads every issue: those done are in
-// place and cost no write, so it touches only what is left (principle 5).
-//
-// A stale schema is retried once per run, as for one issue (see
-// ReadPlan): the schema is dropped and the issues it failed are re-read
-// in one request, then planned and applied afresh.
 
 // Run is one run of a verb on several issues.
 type Run struct {
@@ -175,6 +174,9 @@ func (b *Run) Do(ctx context.Context, refs []issue.Ref, dryRun bool) ([]*Item, e
 	return slices.DeleteFunc(items, func(it *Item) bool { return !slices.Contains(order, it) }), nil
 }
 
+// resolvesSubIssues reports whether the run's verb checks sub-issues and
+// leaves the issues it runs on resolved.
+//
 // A verb with sub_issues = "warn" or "deny" that leaves an issue resolved
 // (it closes it, or moves it to a status of statuses.resolved) counts the
 // sub-issues the same run plans, and so resolves, as resolved: gh dojo
@@ -182,9 +184,6 @@ func (b *Run) Do(ctx context.Context, refs []issue.Ref, dryRun bool) ([]*Item, e
 // three, as running it twice would. The run plans and applies each
 // sub-issue before its parent (planOrder), and a parent whose sub-issue
 // then fails to be written is refused (applyAll).
-
-// resolvesSubIssues reports whether the run's verb checks sub-issues and
-// leaves the issues it runs on resolved.
 func (b *Run) resolvesSubIssues() bool {
 	return b.v.ChecksSubIssues() && (b.v.Close != "" || b.v.To != "" && slices.Contains(b.resolved, b.v.To))
 }

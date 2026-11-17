@@ -8,15 +8,6 @@ import (
 	"github.com/Trum-ok/gh-dojo/internal/graph"
 )
 
-// gh dojo new's mutations. Unlike a verb's, which go into one document
-// (see Build), new's take up to four requests: GraphQL cannot feed one
-// field's result into another field of the same document, and each step
-// needs the one before: createIssue the issue ID that adding it to the
-// board takes, addProjectV2ItemById the item ID that setting its status
-// takes. A resumed issue (one an earlier run created) gets the labels,
-// milestone and board item it lacks one mutation each, so a partial report
-// names the step that failed; the status and the rest go into NewFinish.
-
 // CreateIssueMutation creates the issue with its labels, milestone, parent
 // and assignees ($milestone, $parent and $assignees omitted for none). It
 // is put on the board by AddToBoardMutation, not createIssue's
