@@ -163,7 +163,7 @@ func runRelease(cmd *cobra.Command, ref string, o *releaseOpts) error {
 	for i := range found {
 		found[i].Ref = found[i].Ref.In(def) // the default repository as the config spells it
 	}
-	slices.SortStableFunc(found, func(a, b release.Found) int { return compareRefs(def)(a.Ref, b.Ref) })
+	slices.SortStableFunc(found, func(a, b release.Found) int { return issue.CompareRefs(def)(a.Ref, b.Ref) })
 
 	res := &releaseRun{rng: rng, def: def, found: found, keywords: cfg.Release.Keywords, suffix: cfg.Release.Suffix,
 		repos: []issue.Repo{def}, final: cfg.Statuses.Final}
@@ -336,7 +336,7 @@ func (r *releaseRun) excludedLine() string {
 }
 
 // skippedLine is label and the issues left out for reason, each with what
-// about says of it in parentheses, naming at most maxErrorRefs; "" for
+// about says of it in parentheses, naming at most issue.MaxRefNames; "" for
 // none.
 func (r *releaseRun) skippedLine(label, reason string, about func(releaseSkipped) string) string {
 	var names []string
@@ -348,8 +348,8 @@ func (r *releaseRun) skippedLine(label, reason string, about func(releaseSkipped
 	if len(names) == 0 {
 		return ""
 	}
-	if len(names) > maxErrorRefs {
-		names = append(names[:maxErrorRefs], fmt.Sprintf("and %d more", len(names)-maxErrorRefs))
+	if len(names) > issue.MaxRefNames {
+		names = append(names[:issue.MaxRefNames], fmt.Sprintf("and %d more", len(names)-issue.MaxRefNames))
 	}
 	return label + ": " + strings.Join(names, ", ")
 }

@@ -101,16 +101,6 @@ func refKey(r issue.Ref) string {
 	return strings.ToLower(r.Repo.String()) + "#" + strconv.Itoa(r.Number)
 }
 
-// compareRefs orders issues of the default repository first, by number,
-// then the others by repository and number.
-func compareRefs(def issue.Repo) func(a, b issue.Ref) int { return issue.CompareRefs(def) }
-
-// maxErrorRefs is how many issues an error line names.
-const maxErrorRefs = issue.MaxRefNames
-
-// refNames lists issues as "#9, acme/api#10", naming at most maxErrorRefs.
-func refNames(refs []issue.Ref, def issue.Repo) string { return issue.RefNames(refs, def) }
-
 // fullRef names an issue in full, "owner/name#12", as the JSON does.
 func fullRef(r issue.Ref) string { return r.Repo.String() + "#" + strconv.Itoa(r.Number) }
 

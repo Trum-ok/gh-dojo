@@ -432,6 +432,12 @@ func (v Verb) IterationRule() string {
 	return v.Iteration
 }
 
+// CommentsAlways reports whether the verb's comment template has text of
+// its own besides placeholders, so the verb leaves a comment every time.
+func (v Verb) CommentsAlways() bool {
+	return strings.TrimSpace(placeholderRE.ReplaceAllString(v.Comment, "")) != ""
+}
+
 // Uses reports whether the verb's comment template uses the placeholder
 // {arg}. Every argument in Require and RequireOneOf is taken (see Takes).
 func (v Verb) Uses(arg string) bool {

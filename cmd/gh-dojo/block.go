@@ -233,7 +233,7 @@ func runLinks(cmd *cobra.Command, add bool, ref issue.Ref, bys []string, dryRun 
 	}
 	switch {
 	case len(missed) == 0 && err != nil:
-		render.Warn(cmd.ErrOrStderr(), "GitHub reported an error after applying every change: %s", reason(err))
+		render.Warn(cmd.ErrOrStderr(), "GitHub reported an error after applying every change: %s", render.Reason(err))
 	case len(missed) == 0:
 	case graph.IsCycle(err):
 		// A cycle through other issues: re-running cannot help.
@@ -255,7 +255,7 @@ func runLinks(cmd *cobra.Command, add bool, ref issue.Ref, bys []string, dryRun 
 		}
 		why, fix, next := "GitHub returned no result for it", "", "re-run the same command"
 		if err != nil {
-			why, fix = reason(err), strings.TrimSpace(render.FromError(err).Fix)
+			why, fix = render.Reason(err), strings.TrimSpace(render.FromError(err).Fix)
 		}
 		if fix != "" {
 			next = fix + ", then " + next

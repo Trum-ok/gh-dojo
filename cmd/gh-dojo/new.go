@@ -1009,7 +1009,7 @@ func (r *newRun) finish(ctx context.Context, projectID, fieldID string, initial 
 	}
 	switch {
 	case len(steps) == 0 && err != nil:
-		r.warnings = append(r.warnings, "GitHub reported an error after applying every change: "+reason(err))
+		r.warnings = append(r.warnings, "GitHub reported an error after applying every change: "+render.Reason(err))
 	case len(steps) > 0 && err == nil:
 		err = render.Network("GitHub returned no result for part of the write")
 		fallthrough

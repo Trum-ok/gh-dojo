@@ -444,24 +444,33 @@ func (nc *NewContext) AllLabels(ctx context.Context, q graph.Querier, repo Repo)
 		return nc.Labels.Nodes, nil
 	}
 	if nc.allLabels == nil {
-		type resp struct {
-			Repository *struct {
-				Labels graph.Connection[Label] `json:"labels"`
-			} `json:"repository"`
-		}
-		vars := map[string]any{"owner": repo.Owner, "repo": repo.Name}
-		page, err := graph.Paginate(ctx, q, LabelsQuery, vars, 0, func(r *resp) *graph.Connection[Label] {
-			if r.Repository == nil {
-				return nil
-			}
-			return &r.Repository.Labels
-		})
+		all, err := ReadLabels(ctx, q, repo)
 		if err != nil {
 			return nil, err
 		}
-		nc.allLabels = page.Nodes
+		nc.allLabels = all
 	}
 	return nc.allLabels, nil
+}
+
+// ReadLabels reads all labels of repo, page by page.
+func ReadLabels(ctx context.Context, q graph.Querier, repo Repo) ([]Label, error) {
+	type resp struct {
+		Repository *struct {
+			Labels graph.Connection[Label] `json:"labels"`
+		} `json:"repository"`
+	}
+	vars := map[string]any{"owner": repo.Owner, "repo": repo.Name}
+	page, err := graph.Paginate(ctx, q, LabelsQuery, vars, 0, func(r *resp) *graph.Connection[Label] {
+		if r.Repository == nil {
+			return nil
+		}
+		return &r.Repository.Labels
+	})
+	if err != nil {
+		return nil, err
+	}
+	return page.Nodes, nil
 }
 
 // AllMilestones returns all open milestones of repo: the first page read

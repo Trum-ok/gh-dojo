@@ -226,11 +226,11 @@ func showError(repo issue.Repo, unread []issue.Ref, failed []issue.Result, readE
 		case len(g.refs) == 1:
 			return g.err.What
 		case g.cause == issue.CauseMissing:
-			return fmt.Sprintf("issues %s not found in %s", refNames(g.refs, repo), g.repo)
+			return fmt.Sprintf("issues %s not found in %s", issue.RefNames(g.refs, repo), g.repo)
 		case g.cause == issue.CausePullRequest:
-			return fmt.Sprintf("%s in %s are pull requests; gh dojo works with issues only", refNames(g.refs, repo), g.repo)
+			return fmt.Sprintf("%s in %s are pull requests; gh dojo works with issues only", issue.RefNames(g.refs, repo), g.repo)
 		case g.cause == issue.CauseNoRepo:
-			return refNames(g.refs, repo) + ": " + g.err.What
+			return issue.RefNames(g.refs, repo) + ": " + g.err.What
 		}
 		return g.err.What
 	}
@@ -239,7 +239,7 @@ func showError(repo issue.Repo, unread []issue.Ref, failed []issue.Result, readE
 	var first *render.Error
 	if readErr != nil {
 		first = render.FromError(readErr)
-		lines = append(lines, refNames(unread, repo)+" not read: "+first.What)
+		lines = append(lines, issue.RefNames(unread, repo)+" not read: "+first.What)
 	}
 	for _, g := range groups {
 		line := what(g)

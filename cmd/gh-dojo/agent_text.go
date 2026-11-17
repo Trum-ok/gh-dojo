@@ -280,8 +280,7 @@ func (d *agentDoc) confirmExample() string {
 	for _, v := range d.cfg.Verbs {
 		if v.To != "" && len(v.From) > 0 && v.From[0] != v.To {
 			ex := "#42 " + v.From[0] + " → " + v.To
-			// A template with text of its own comments every time.
-			if strings.TrimSpace(strings.NewReplacer("{comment}", "", "{by}", "", "{session}", "", "{assignee}", "", "{milestone}", "").Replace(v.Comment)) != "" {
+			if v.CommentsAlways() {
 				ex += ", comment left"
 			}
 			return ex

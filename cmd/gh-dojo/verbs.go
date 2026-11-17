@@ -259,9 +259,6 @@ func backendRepo(be Backend) string {
 	return r.String()
 }
 
-// reason is the first clause of an error's message, for a partial report.
-func reason(err error) string { return render.Reason(err) }
-
 // readPlan reads issue ref and plans verb v on it.
 func readPlan(ctx context.Context, be Backend, e *workflow.Engine, v config.Verb, ref issue.Ref, args workflow.Args) (*workflow.Plan, error) {
 	is, err := be.ReadIssue(ctx, v, ref, args)

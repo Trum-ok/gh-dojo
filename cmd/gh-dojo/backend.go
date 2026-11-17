@@ -561,26 +561,11 @@ func (b *githubBackend) matchMilestone(ctx context.Context, v config.Verb, l iss
 
 // repoLabels reads the names of all labels of repo, for an allowed list.
 func repoLabels(ctx context.Context, q graph.Querier, repo issue.Repo) ([]string, error) {
-	type resp struct {
-		Repository *struct {
-			Labels graph.Connection[issue.Label] `json:"labels"`
-		} `json:"repository"`
-	}
-	vars := map[string]any{"owner": repo.Owner, "repo": repo.Name}
-	page, err := graph.Paginate(ctx, q, issue.LabelsQuery, vars, 0, func(r *resp) *graph.Connection[issue.Label] {
-		if r.Repository == nil {
-			return nil
-		}
-		return &r.Repository.Labels
-	})
+	labels, err := issue.ReadLabels(ctx, q, repo)
 	if err != nil {
 		return nil, err
 	}
-	names := make([]string, len(page.Nodes))
-	for i, l := range page.Nodes {
-		names[i] = l.Name
-	}
-	return names, nil
+	return issue.LabelNames(labels), nil
 }
 
 // spelling returns the name among names that equals name but for case, ""
