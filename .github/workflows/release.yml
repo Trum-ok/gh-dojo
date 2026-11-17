@@ -11,6 +11,10 @@ name: Release
 # statement that this workflow built it from this repository at the tagged
 # commit. `gh attestation verify <file> --repo Trum-ok/gh-dojo` checks it
 # (see CONTRIBUTING.md, Releases).
+#
+# The release notes are the commits since the previous tag
+# (script/release-notes.sh): GitHub's generated notes list merged pull
+# requests only, and most commits here go to main directly.
 on:
   push:
     tags: ["v*"]
@@ -45,8 +49,15 @@ jobs:
       attestations: write # store them on the repository
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the previous tag and the commits since it, for the notes
       - uses: cli/gh-extension-precompile@76961aa3bd1123d0a6fd42d0a41aca0696937c39 # v2.2.0
         with:
           go_version_file: go.mod
           build_script_override: script/build-release.sh
           generate_attestations: true
+      - name: Release notes
+        shell: bash # with pipefail: a failed script must not leave empty notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: script/release-notes.sh "$GITHUB_REF_NAME" | gh release edit "$GITHUB_REF_NAME" --notes-file -

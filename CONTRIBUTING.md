@@ -99,6 +99,9 @@ Pushing a `v*` tag runs `.github/workflows/release.yml`: the tests, then
 darwin, linux and windows for amd64 and arm64 with the tag stamped into
 `gh dojo --version`, and publishes them as a GitHub release for
 `gh extension install`. A tag with a `-` (`v0.1.0-rc.1`) makes a prerelease.
+The release notes list the commits since the previous tag, merges left out
+(`script/release-notes.sh`), so a commit's first line is written for them
+too.
 
 Next to the binaries the release has `gh-dojo_<tag>_checksums.txt`, their
 SHA-256 sums, and every asset has a build provenance attestation: a
