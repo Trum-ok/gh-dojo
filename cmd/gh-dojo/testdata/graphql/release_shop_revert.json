@@ -1,0 +1,156 @@
+{
+  "comment": "Hand-crafted from release_shop.json, for reverts (#77): #42 fixed and kept; #43 fixed, then reverted by git revert; #44 closed by the squash commit of merged pull request #60, reverted by the squash commit of pull request #61 that GitHub's Revert button opened; the head reverts a commit of an earlier release whose title named #41.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "ReleaseSince",
+      "query": "query ReleaseSince($owner: String!, $repo: String!, $head: String!, $since: String!, $sinceRef: String!) {\n  repository(owner: $owner, name: $repo) {\n    head: object(expression: $head) { oid ... on Commit { committedDate } }\n    since: object(expression: $since) { oid ... on Commit { committedDate } }\n    sinceRef: ref(qualifiedName: $sinceRef) { prefix name }\n  }\n}",
+      "variables": {
+        "head": "HEAD^{commit}",
+        "owner": "acme",
+        "repo": "shop",
+        "since": "abc1234^{commit}",
+        "sinceRef": "abc1234"
+      },
+      "repeat": true,
+      "response": {
+        "data": {
+          "repository": {
+            "head": {
+              "oid": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "committedDate": "2026-11-10T12:00:00Z"
+            },
+            "since": {
+              "oid": "abababababababababababababababababababab",
+              "committedDate": "2026-11-01T12:00:00Z"
+            },
+            "sinceRef": null
+          }
+        }
+      }
+    },
+    {
+      "operation": "ReleaseHistory",
+      "query": "query ReleaseHistory($owner: String!, $repo: String!, $head: GitObjectID!, $cursor: String) {\n  repository(owner: $owner, name: $repo) {\n    object(oid: $head) {\n      ... on Commit {\n        history(first: 100, after: $cursor) {\n          pageInfo { hasNextPage endCursor }\n          nodes { ...releaseCommit }\n        }\n      }\n    }\n  }\n}\n\n\n\nfragment releaseCommit on Commit {\n  oid\n  message\n  associatedPullRequests(first: 5) {\n    totalCount\n    nodes {\n      number\n      merged\n      repository { nameWithOwner }\n      closingIssuesReferences(first: 25) {\n        totalCount\n        nodes { number repository { nameWithOwner } }\n      }\n    }\n  }\n}",
+      "variables": {
+        "cursor": null,
+        "head": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+        "owner": "acme",
+        "repo": "shop"
+      },
+      "repeat": true,
+      "response": {
+        "data": {
+          "repository": {
+            "object": {
+              "history": {
+                "totalCount": 8,
+                "pageInfo": {
+                  "hasNextPage": false,
+                  "endCursor": "end"
+                },
+                "nodes": [
+                  {
+                    "oid": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+                    "message": "Revert \"Fixes #41\"\n\nThis reverts commit 9999999999999999999999999999999999999999.",
+                    "associatedPullRequests": {
+                      "totalCount": 0,
+                      "nodes": []
+                    }
+                  },
+                  {
+                    "oid": "1616161616161616161616161616161616161616",
+                    "message": "Revert \"Cache the cart\" (#61)\n\nReverts acme/shop#60",
+                    "associatedPullRequests": {
+                      "totalCount": 1,
+                      "nodes": [
+                        {
+                          "number": 61,
+                          "merged": true,
+                          "repository": {
+                            "nameWithOwner": "acme/shop"
+                          },
+                          "closingIssuesReferences": {
+                            "totalCount": 0,
+                            "nodes": []
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "oid": "1515151515151515151515151515151515151515",
+                    "message": "Cache the cart (#60)",
+                    "associatedPullRequests": {
+                      "totalCount": 1,
+                      "nodes": [
+                        {
+                          "number": 60,
+                          "merged": true,
+                          "repository": {
+                            "nameWithOwner": "acme/shop"
+                          },
+                          "closingIssuesReferences": {
+                            "totalCount": 1,
+                            "nodes": [
+                              {
+                                "number": 44,
+                                "repository": {
+                                  "nameWithOwner": "acme/shop"
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "oid": "1414141414141414141414141414141414141414",
+                    "message": "Revert \"Speed up checkout\"\n\nThis reverts commit 1313131313131313131313131313131313131313.",
+                    "associatedPullRequests": {
+                      "totalCount": 0,
+                      "nodes": []
+                    }
+                  },
+                  {
+                    "oid": "1313131313131313131313131313131313131313",
+                    "message": "Speed up checkout\n\nFixes #43",
+                    "associatedPullRequests": {
+                      "totalCount": 0,
+                      "nodes": []
+                    }
+                  },
+                  {
+                    "oid": "1111111111111111111111111111111111111111",
+                    "message": "Fix the login redirect\n\nFixes #42",
+                    "associatedPullRequests": {
+                      "totalCount": 0,
+                      "nodes": []
+                    }
+                  },
+                  {
+                    "oid": "abababababababababababababababababababab",
+                    "message": "Release v0.9.0",
+                    "associatedPullRequests": {
+                      "totalCount": 0,
+                      "nodes": []
+                    }
+                  },
+                  {
+                    "oid": "9999999999999999999999999999999999999999",
+                    "message": "Fixes #41",
+                    "associatedPullRequests": {
+                      "totalCount": 0,
+                      "nodes": []
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

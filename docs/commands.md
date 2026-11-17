@@ -588,6 +588,8 @@ dry run: done #3 "Read the config"
 
 - `--dry-run` lists how each issue was found (`PR #N`, `commit <sha>`,
   `suffix of commit <sha>`) and its plan.
+- A fix reverted in the range is left out, listed as `reverted: #12
+  (commit 1a2b3c4)` ([Reverts](#reverts)).
 - No issues is a line saying where release looked, exit code 0.
 - `--comment`, `--by` and `--yes` go to the verb, for every issue.
 - Any verb runs but one that needs `--assignee`, `--milestone` or `--of`
@@ -656,9 +658,8 @@ requests often marks them so.
 - Each group holds only references separated by commas, and several groups
   in a row all count: `fix (#161) (#200)`, a squash merge's `(#PR)` after a
   title that names its issue.
-- Nothing may follow but spaces, so `(#12).` and the quote of
-  `Revert "fix (#12)"` end no suffix: a revert does not put the issue in
-  the release.
+- Nothing may follow but spaces, so `(#12).` ends no suffix; nor does
+  the quoted title of `Revert "fix (#12)"` (see [Reverts](#reverts)).
 - Parentheses in the middle of the line (`(see #12) fix`) or in the body do
   not count.
 - The number of a pull request the commit belongs to, the `(#PR)` a squash
@@ -672,6 +673,32 @@ Code in a message does not count, as Markdown does not link it: a code span
 (`` `Refs #12` ``), a fenced block (```` ``` ````) or an indented block
 (four spaces or a tab, after a blank line) is an example of the syntax, not
 a link, so put such examples in backticks.
+
+### Reverts
+
+A fix reverted in the same release is not released. A commit that a later
+commit of the range reverts counts for nothing, neither its message nor its
+pull requests, when the revert says so as git and GitHub write it:
+
+- `This reverts commit <sha>.`, which `git revert` and GitHub's Revert
+  button write; a reverted merge commit (`…, reversing changes made to
+  <sha>.`) takes its pull request with it, all its commits;
+- `Reverts owner/repo#20` on a line of its own, the description of the pull
+  request GitHub's Revert button opens, which a squash merge may put in the
+  message: every commit of that pull request in the range is reverted.
+
+A revert reverted in turn (`Reapply "…"`) reverts nothing, so the original
+counts again. One rebased commit of a pull request reverted leaves the pull
+request in, through its other commits. An issue that only reverted commits
+name or close is listed as `reverted: #12 (commit 1a2b3c4)` and in the
+JSON's `skipped` (`reverted`), not read; one a commit that stays names too
+is in the release, found through that commit.
+
+The quoted title of a revert never names an issue: `Revert "Fixes #12"`
+(also in a merge commit's body or a squash merge's list of commits) quotes
+the reverted commit, so a revert of a commit of an earlier release does not
+put `#12` in this one. Words of the revert's own count: `Refs #40` in its
+body, the `(#21)` a squash merge appends after the quote.
 
 ### Numbers that are no issue
 

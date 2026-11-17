@@ -183,6 +183,51 @@ func TestReleaseSuffix(t *testing.T) {
 	}
 }
 
+// TestReleaseReverted (#77): #43, fixed by a commit git revert reverted
+// later in the range, and #44, closed by pull request #60 that the pull
+// request of GitHub's Revert button reverted, are listed as reverted and
+// left out, not read; #42 is released. The head, a revert of an earlier
+// release's `Fixes #41`, names nothing: its title is a quote. With no
+// keywords only #44 is found, reverted: no issues, nothing read.
+func TestReleaseReverted(t *testing.T) {
+	noKeywords := verbsConfig + "[release]\nkeywords = []\n"
+	tests := []struct {
+		name, config   string
+		args           []string
+		reads, applied int
+	}{
+		{"revert_dry_run", verbsConfig, []string{"--dry-run"}, 1, 0},
+		{"revert", verbsConfig, nil, 1, 1},
+		{"revert_json", verbsConfig, []string{"--dry-run", "--json"}, 1, 0},
+		{"revert_all", noKeywords, nil, 0, 0},
+		{"revert_all_json", noKeywords, []string{"--json"}, 0, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			withConfig(t, tt.config)
+			withApp(t, verbFixture("release_shop_revert"))
+			f := &fakeBackend{
+				issues: map[int]workflow.Issue{
+					41: {Number: 41, Title: "Sign out", OnBoard: true, Status: "Ready"},
+					42: {Number: 42, Title: "Fix login redirect", OnBoard: true, Status: "Ready"},
+					43: {Number: 43, Title: "Speed up checkout", OnBoard: true, Status: "Ready"},
+					44: {Number: 44, Title: "Cache the cart", OnBoard: true, Status: "Ready"},
+				},
+				pulls: map[int]bool{60: true, 61: true},
+			}
+			withBackend(t, f)
+			code, out := runOut(append([]string{"release", "HEAD", "--since", "abc1234", "--verb", "done"}, tt.args...)...)
+			if code != render.ExitOK {
+				t.Errorf("exit code = %d, want 0\n%s", code, out)
+			}
+			if f.reads != tt.reads || len(f.applied) != tt.applied {
+				t.Errorf("reads = %d, applied %d plans, want %d and %d", f.reads, len(f.applied), tt.reads, tt.applied)
+			}
+			testutil.Golden(t, "release/"+tt.name, out)
+		})
+	}
+}
+
 // TestReleaseGuesses: a commit message's numbers that are no issue, #99
 // (no such issue) and acme/api#3 (no such repository), are left out with
 // a warning, not failed; #44 in a code span does not count. acme/api#7

@@ -1,0 +1,9 @@
+code: 0
+--- stdout
+release HEAD: 6 commits since abc1234, 1 issue
+reverted: #43 (commit 1313131), #44 (PR #60)
+  #42: commit 1111111
+dry run: done #42 "Fix login redirect"
+  status: Ready → Done
+  close: as completed
+--- stderr

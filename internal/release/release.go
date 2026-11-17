@@ -3,7 +3,8 @@
 // a local git checkout, and for each one the merged pull requests it
 // belongs to with the issues they close, plus the issues its message
 // names after a keyword ([release] keywords) or in a suffix ([release]
-// suffix).
+// suffix). A commit reverted later in the range counts for nothing (see
+// Reverted).
 //
 // Pull requests link a commit to its issues whatever the merge strategy:
 // GitHub associates a squash commit, a merge commit and each rebased
@@ -51,25 +52,19 @@ const (
 // request, or no issue at all: the caller tells once it reads the issues;
 // but a suffix's number that is a pull request of the commit itself, the
 // "(#PR)" of a squash merge, is left out here, with no warning.
-func Collect(r *Range, m *Matcher, host string) (found []Found, warnings []string) {
-	index := map[string]int{}
-	add := func(ref issue.Ref, s Source) {
-		key := strings.ToLower(ref.Repo.String()) + "#" + strconv.Itoa(ref.Number)
-		i, ok := index[key]
-		if !ok {
-			i = len(found)
-			index[key] = i
-			found = append(found, Found{Ref: ref})
+//
+// A commit a later one of the range reverts (see Reverted) counts for
+// nothing: reverted lists, as found would, the issues only such commits
+// name or close, so the release can say why they are left out. An issue a
+// commit that stays names is found, with only such commits as sources.
+func Collect(r *Range, m *Matcher, host string) (found, reverted []Found, warnings []string) {
+	var live, dead collector
+	gone := Reverted(r)
+	for i, c := range r.Commits {
+		add := live.add
+		if gone[i] {
+			add = dead.add
 		}
-		f := &found[i]
-		for _, o := range f.Sources {
-			if s.Pull != nil && o.Pull != nil && s.Pull.Same(*o.Pull) || s.Pull == nil && o.Pull == nil && o.Commit == s.Commit {
-				return
-			}
-		}
-		f.Sources = append(f.Sources, s)
-	}
-	for _, c := range r.Commits {
 		for _, p := range c.Pulls {
 			pull := p.Ref
 			for _, ref := range p.Closes {
@@ -92,5 +87,40 @@ func Collect(r *Range, m *Matcher, host string) (found []Found, warnings []strin
 		named(m.Refs(c.Message, r.Repo), ByKeyword)
 		named(m.Suffix(c.Message, r.Repo), BySuffix)
 	}
-	return found, warnings
+	for _, f := range dead.found {
+		if _, ok := live.index[f.key()]; !ok {
+			reverted = append(reverted, f)
+		}
+	}
+	return live.found, reverted, warnings
+}
+
+// collector gathers issues, each once, with each way it was found once.
+type collector struct {
+	found []Found
+	index map[string]int // by Found.key
+}
+
+func (f Found) key() string {
+	return strings.ToLower(f.Ref.Repo.String()) + "#" + strconv.Itoa(f.Ref.Number)
+}
+
+func (c *collector) add(ref issue.Ref, s Source) {
+	if c.index == nil {
+		c.index = map[string]int{}
+	}
+	key := Found{Ref: ref}.key()
+	i, ok := c.index[key]
+	if !ok {
+		i = len(c.found)
+		c.index[key] = i
+		c.found = append(c.found, Found{Ref: ref})
+	}
+	f := &c.found[i]
+	for _, o := range f.Sources {
+		if s.Pull != nil && o.Pull != nil && s.Pull.Same(*o.Pull) || s.Pull == nil && o.Pull == nil && o.Commit == s.Commit {
+			return
+		}
+	}
+	f.Sources = append(f.Sources, s)
 }

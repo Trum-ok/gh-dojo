@@ -21,6 +21,10 @@ parentheses that end a message's first line: "fix: login limit (#12)",
 "(#12, #13)". Code in a message (`Refs #12`, a ``` block)
 does not count: put examples of the syntax in backticks.
 
+A commit reverted later in the range (git revert, GitHub's Revert button)
+counts for nothing, nor does the quoted title of a revert (Revert "Fixes #12"):
+an issue only such commits name is listed as reverted and left out.
+
 A message names issues as text, so a number only messages name that is no
 issue (a pull request, a missing issue, or one of a repository outside
 board.repos that is not found or the token cannot see) is left out with a

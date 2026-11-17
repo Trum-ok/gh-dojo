@@ -231,7 +231,8 @@ The schemas, by command, after `schema_version` and `error`:
     `owner/name#12` that closes it, with its first commit in the release,
     or `null`: the commit's message names it),
   - `skipped`: `[{number, repo, ref, reason, on_board, status, found_by}]`
-    (`reason` `excluded` by `--exclude`; `pull_request`, `not_found` or
+    (`reason` `reverted`, found only through commits reverted later in
+    the range; `excluded` by `--exclude`; `pull_request`, `not_found` or
     `repo_not_found` for a number only commit messages name; `closed`, a
     closed issue in a final status, done with; or `not_ready`, its status
     one the verb's `from` does not allow; for `closed` and `not_ready`,

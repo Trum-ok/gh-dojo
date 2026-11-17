@@ -119,6 +119,17 @@ func TestMatcher(t *testing.T) {
 		{"Example:\n\n    Fixes #52\n\tRefs #53\n\n    refs #54\nFixes #55", "#55"},
 		{"Refs #56,\n    #57\nwrapped:\n    fixes #58", "#56 #58"},
 		{"    Fixes #59", ""}, // the first line, after nothing
+		// The quoted title of a revert is the reverted commit's words (#77);
+		// the revert's own words count.
+		{`Revert "Fixes #60"`, ""},
+		{"Revert \"Fixes #61\"\n\nThis reverts commit 1234567.\n\nRefs #62", "#62"},
+		{`Revert "Revert "Fixes #63""`, ""},
+		{`Reapply "Fixes #64"`, ""},
+		{"Merge pull request #21 from acme/revert-20\n\nRevert \"Fixes #65\"", ""},     // a merge commit's body
+		{"Revert (#22)\n\n* Revert \"Fixes #66\"\n\nThis reverts commit 1234567.", ""}, // a squash merge's list
+		{`Revert "Fixes #67" and fixes #68`, "#68"},
+		{`Revert "Fixes #69`, "#69"},         // no closing quote: no quote
+		{`Do not revert "Fixes #70"`, "#70"}, // not a revert's title
 	}
 	for _, tt := range tests {
 		var got []string
@@ -151,7 +162,7 @@ func TestCollect(t *testing.T) {
 		{OID: "ddddddd4", Message: "Direct\n\nFixes #9, https://ghe.example.com/a/b/issues/1"},
 		{OID: "eeeeeee5", Message: "No issue"},
 	}}
-	found, warnings := Collect(r, NewMatcher([]string{"fixes", "refs"}, false), "github.com")
+	found, _, warnings := Collect(r, NewMatcher([]string{"fixes", "refs"}, false), "github.com")
 	var b strings.Builder
 	for _, f := range found {
 		fmt.Fprintf(&b, "%s:", f.Ref.String(dojo))
@@ -197,10 +208,12 @@ func TestSuffix(t *testing.T) {
 		{"fix (#12 and #13)", ""},
 		{"fix (12)", ""},
 		{"fix ()", ""},
-		{"fix f(#12)", ""},             // a call
-		{"(#12) fix", ""},              // the middle of the line
-		{"fix\n\nbody (#12)", ""},      // the body
-		{`Revert "fix (#12)"`, ""},     // a revert ends with a quote
+		{"fix f(#12)", ""},                  // a call
+		{"(#12) fix", ""},                   // the middle of the line
+		{"fix\n\nbody (#12)", ""},           // the body
+		{`Revert "fix (#12)"`, ""},          // a revert ends with a quote
+		{`Revert "fix (#12)" (#21)`, "#21"}, // ... the squash merge's "(#PR)" after it counts
+		{`Revert "fix (#12) (#13)"`, ""},
 		{"fix (#12) wip (#13)", "#13"}, // groups read up to one that is not
 		{"fix (#12) (wip) (#13)", "#13"},
 		{"fix `(#12)`", ""}, // code
@@ -234,7 +247,7 @@ func TestCollectSuffix(t *testing.T) {
 		{OID: "ccccccc3", Message: "chore (#150)"}, // a pull request of another commit, or no issue: read later
 		{OID: "ddddddd4", Message: "docs (https://ghe.example.com/a/b/issues/1)"},
 	}}
-	found, warnings := Collect(r, NewMatcher([]string{"refs"}, true), "github.com")
+	found, _, warnings := Collect(r, NewMatcher([]string{"refs"}, true), "github.com")
 	var b strings.Builder
 	for _, f := range found {
 		fmt.Fprintf(&b, "%s:", f.Ref.String(dojo))
@@ -248,6 +261,82 @@ func TestCollectSuffix(t *testing.T) {
 		t.Errorf("found:\n%s\nwant:\n%s", b.String(), want)
 	}
 	if len(warnings) != 1 || !strings.Contains(warnings[0], "ghe.example.com") {
+		t.Errorf("warnings = %q", warnings)
+	}
+}
+
+// TestCollectReverted: a commit a later one of the range reverts counts
+// for nothing (#77), whether the revert names it by oid (git revert), its
+// merge commit ("reversing changes made to") or its pull request ("Reverts
+// #20", GitHub's Revert button); a revert of a revert brings it back. Its
+// issues are listed as reverted, unless a commit that stays names them.
+func TestCollectReverted(t *testing.T) {
+	pull := func(n int, closes ...int) Pull {
+		p := Pull{Ref: issue.Ref{Repo: dojo, Number: n}}
+		for _, c := range closes {
+			p.Closes = append(p.Closes, issue.Ref{Repo: dojo, Number: c})
+		}
+		return p
+	}
+	oid := func(s string) string { return strings.Repeat(s, 20) } // 40 hex digits
+	reverts := func(s string) string { return "\n\nThis reverts commit " + oid(s) + "." }
+	r := &Range{Repo: dojo, Commits: []Commit{
+		// A commit and its revert.
+		{OID: oid("a1"), Message: "Fix login\n\nFixes #1"},
+		{OID: oid("a2"), Message: `Revert "Fix login"` + reverts("a1")},
+		// A commit, its revert and the revert's revert.
+		{OID: oid("b1"), Message: "Fixes #2"},
+		{OID: oid("b2"), Message: `Revert "Fixes #2"` + reverts("b1")},
+		{OID: oid("b3"), Message: `Reapply "Fixes #2"` + reverts("b2")},
+		// A squash merge, and that of the pull request GitHub's Revert
+		// button opens.
+		{OID: oid("c1"), Message: "Fix cart (#20)", Pulls: []Pull{pull(20, 3)}},
+		{OID: oid("c2"), Message: "Revert \"Fix cart\" (#21)\n\nReverts Trum-ok/gh-dojo#20", Pulls: []Pull{pull(21)}},
+		// A merge commit reverted: its branch's commits too.
+		{OID: oid("d1"), Message: "Refs #4", Pulls: []Pull{pull(30, 4)}},
+		{OID: oid("d2"), Message: "Merge pull request #30 from acme/cart", Pulls: []Pull{pull(30, 4)}},
+		{OID: oid("d3"), Message: `Revert "Merge pull request #30 from acme/cart"` + "\n\nThis reverts commit " + oid("d2") +
+			", reversing\nchanges made to " + oid("00") + "."},
+		// One of a rebased pull request's commits reverted: the pull
+		// request stays, through the other.
+		{OID: oid("e1"), Message: "Rebased 1", Pulls: []Pull{pull(40, 5)}},
+		{OID: oid("e2"), Message: "Rebased 2", Pulls: []Pull{pull(40, 5)}},
+		{OID: oid("e3"), Message: `Revert "Rebased 1"` + reverts("e1")},
+		// Another commit names the issue: it stays, found through that one.
+		{OID: oid("f1"), Message: "Fixes #6"},
+		{OID: oid("f2"), Message: "Refs #6"},
+		{OID: oid("f3"), Message: `Revert "Fixes #6"` + reverts("f1")},
+		// A revert of a commit of an earlier release, by a short oid.
+		{OID: oid("11"), Message: "Revert \"Fixes #7\"\n\nThis reverts commit 9999999."},
+		// A revert pull request reverted: the pull request it reverted
+		// stays.
+		{OID: oid("21"), Message: "Fix search (#50)", Pulls: []Pull{pull(50, 8)}},
+		{OID: oid("22"), Message: "Revert \"Fix search\" (#51)\n\nReverts #50", Pulls: []Pull{pull(51)}},
+		{OID: oid("23"), Message: "Revert \"Revert \"Fix search\"\" (#52)\n\nReverts Trum-ok/gh-dojo#51", Pulls: []Pull{pull(52)}},
+	}}
+	found, reverted, warnings := Collect(r, NewMatcher([]string{"fixes", "refs"}, false), "github.com")
+	dump := func(fs []Found) string {
+		var b strings.Builder
+		for _, f := range fs {
+			fmt.Fprintf(&b, "%s:", f.Ref.String(dojo))
+			for _, s := range f.Sources {
+				if s.Pull != nil {
+					fmt.Fprintf(&b, " PR %s@%s", s.Pull.String(dojo), Short(s.Commit))
+				} else {
+					fmt.Fprintf(&b, " commit %s", Short(s.Commit))
+				}
+			}
+			b.WriteString("\n")
+		}
+		return b.String()
+	}
+	if got, want := dump(found), "#2: commit b1b1b1b\n#5: PR #40@e2e2e2e\n#6: commit f2f2f2f\n#8: PR #50@2121212\n"; got != want {
+		t.Errorf("found:\n%s\nwant:\n%s", got, want)
+	}
+	if got, want := dump(reverted), "#1: commit a1a1a1a\n#3: PR #20@c1c1c1c\n#4: PR #30@d1d1d1d commit d1d1d1d\n"; got != want {
+		t.Errorf("reverted:\n%s\nwant:\n%s", got, want)
+	}
+	if len(warnings) != 0 {
 		t.Errorf("warnings = %q", warnings)
 	}
 }
@@ -272,7 +361,7 @@ func dumpRange(r *Range, keywords []string) []byte {
 	for _, w := range r.Warnings {
 		fmt.Fprintf(&b, "warning: %s\n", w)
 	}
-	found, warnings := Collect(r, NewMatcher(keywords, false), "github.com")
+	found, _, warnings := Collect(r, NewMatcher(keywords, false), "github.com")
 	for _, f := range found {
 		var src []string
 		for _, s := range f.Sources {

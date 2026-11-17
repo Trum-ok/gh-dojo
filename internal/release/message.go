@@ -29,7 +29,9 @@ var refRE = regexp.MustCompile(refPattern)
 //
 // Code does not count, as Markdown does not link it: a reference in a code
 // span ("`Refs #12`") or a fenced block (```) is an example of the syntax,
-// not a link (see stripCode).
+// not a link (see stripCode). Nor does the quoted title of a revert
+// (`Revert "Fixes #12"`): the reverted commit's words, not this one's (see
+// maskRevertTitles).
 type Matcher struct {
 	re     *regexp.Regexp // nil: no keywords, nothing matches
 	suffix bool
@@ -67,12 +69,12 @@ var suffixRE = regexp.MustCompile(`^[ \t]*` + refPattern + `(?:[ \t]*,[ \t]*` + 
 // end, up to one that is not such ("(#12, wip)", "()", "(12)"). So
 // parentheses in the middle of the line ("(see #12) fix"), in the body,
 // or followed by anything ("(#12).", the quote of `Revert "fix (#12)"`)
-// do not count. Code does not count either.
+// do not count. Code and the quoted title of a revert do not count either.
 func (m *Matcher) Suffix(message string, repo issue.Repo) []issue.Ref {
 	if m == nil || !m.suffix {
 		return nil
 	}
-	line, _, _ := strings.Cut(stripCode(message), "\n")
+	line, _, _ := strings.Cut(ownText(message), "\n")
 	var groups []string // from the end
 	for {
 		line = strings.TrimRight(line, " \t\r")
@@ -106,7 +108,7 @@ func (m *Matcher) Refs(message string, repo issue.Repo) []issue.Ref {
 		return nil
 	}
 	var out []issue.Ref
-	for _, sub := range m.re.FindAllStringSubmatch(stripCode(message), -1) {
+	for _, sub := range m.re.FindAllStringSubmatch(ownText(message), -1) {
 		for _, tok := range refRE.FindAllString(sub[1], -1) {
 			r, ok := issue.ParseRef(tok, repo)
 			if !ok || r.Pull {
@@ -119,6 +121,11 @@ func (m *Matcher) Refs(message string, repo issue.Repo) []issue.Ref {
 	}
 	return out
 }
+
+// ownText is what of message is the commit's own words, where references
+// count: neither code (stripCode) nor the quoted title of a commit it
+// reverts (maskRevertTitles).
+func ownText(message string) string { return maskRevertTitles(stripCode(message)) }
 
 func containsRef(refs []issue.Ref, r issue.Ref) bool {
 	for _, o := range refs {

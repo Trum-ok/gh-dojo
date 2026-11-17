@@ -1,0 +1,4 @@
+code: 0
+--- stdout
+{"schema_version":1,"error":null,"verb":"done","default_repo":"acme/shop","dry_run":false,"release":{"ref":"HEAD","commit":"a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1","since":"abc1234","since_picked":false,"since_commit":"abababababababababababababababababababab","compared":false,"commits":6},"issues":[],"skipped":[{"number":44,"repo":"acme/shop","ref":"acme/shop#44","reason":"reverted","on_board":null,"status":null,"found_by":[{"by":"pull_request","pull_request":"acme/shop#60","commit":"1515151515151515151515151515151515151515"}]}],"summary":{"total":0,"done":0,"written":0,"failed":0,"not_attempted":0},"warnings":[]}
+--- stderr

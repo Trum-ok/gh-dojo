@@ -59,6 +59,9 @@ func newReleaseCmd() (*cobra.Command, error) {
 			"parentheses that end a message's first line: \"fix: login limit (#12)\",\n" +
 			"\"(#12, #13)\". Code in a message (`Refs #12`, a ``` block)\n" +
 			"does not count: put examples of the syntax in backticks.\n\n" +
+			"A commit reverted later in the range (git revert, GitHub's Revert button)\n" +
+			"counts for nothing, nor does the quoted title of a revert (Revert \"Fixes #12\"):\n" +
+			"an issue only such commits name is listed as reverted and left out.\n\n" +
 			"A message names issues as text, so a number only messages name that is no\n" +
 			"issue (a pull request, a missing issue, or one of a repository outside\n" +
 			"board.repos that is not found or the token cannot see) is left out with a\n" +
@@ -158,15 +161,20 @@ func runRelease(cmd *cobra.Command, ref string, o *releaseOpts) error {
 	if err != nil {
 		return err
 	}
-	found, warnings := release.Collect(rng, release.NewMatcher(cfg.Release.Keywords, cfg.Release.Suffix), clientHost())
+	found, reverted, warnings := release.Collect(rng, release.NewMatcher(cfg.Release.Keywords, cfg.Release.Suffix), clientHost())
 	warnings = append(slices.Clone(rng.Warnings), warnings...)
-	for i := range found {
-		found[i].Ref = found[i].Ref.In(def) // the default repository as the config spells it
+	for _, fs := range [][]release.Found{found, reverted} {
+		for i := range fs {
+			fs[i].Ref = fs[i].Ref.In(def) // the default repository as the config spells it
+		}
+		slices.SortStableFunc(fs, func(a, b release.Found) int { return issue.CompareRefs(def)(a.Ref, b.Ref) })
 	}
-	slices.SortStableFunc(found, func(a, b release.Found) int { return issue.CompareRefs(def)(a.Ref, b.Ref) })
 
 	res := &releaseRun{rng: rng, def: def, found: found, keywords: cfg.Release.Keywords, suffix: cfg.Release.Suffix,
 		repos: []issue.Repo{def}, final: cfg.Statuses.Final}
+	for _, f := range reverted {
+		res.skipped = append(res.skipped, releaseSkipped{found: f, reason: skipReverted})
+	}
 	for _, s := range cfg.Board.Repos {
 		if r, err := issue.ParseRepo(s); err == nil { // the config checked it
 			res.repos = append(res.repos, r)
@@ -180,8 +188,10 @@ func runRelease(cmd *cobra.Command, ref string, o *releaseOpts) error {
 	if len(refs) == 0 {
 		return emit(cmd, res.json(v.Name, backendRepo(be), o.dryRun, nil, warnings), func(w io.Writer) {
 			fmt.Fprintln(w, res.head(0))
-			if line := res.excludedLine(); line != "" {
-				fmt.Fprintln(w, line)
+			for _, line := range []string{res.revertedLine(), res.excludedLine()} {
+				if line != "" {
+					fmt.Fprintln(w, line)
+				}
 			}
 		})
 	}
@@ -196,7 +206,7 @@ func runRelease(cmd *cobra.Command, ref string, o *releaseOpts) error {
 		items = res.ready(v, res.settled(items))
 		if !b.JSON {
 			fmt.Fprintln(out, res.head(n))
-			for _, line := range []string{res.excludedLine(), res.closedLine(), res.notReadyLine(v)} {
+			for _, line := range []string{res.revertedLine(), res.excludedLine(), res.closedLine(), res.notReadyLine(v)} {
 				if line != "" {
 					fmt.Fprintln(out, line)
 				}
@@ -285,15 +295,17 @@ type releaseRun struct {
 	// board.repos.
 	repos []issue.Repo
 	final []string // statuses.final
-	// skipped are the issues left out: by --exclude, then once read a
-	// number a commit message names that is no issue, or an issue not
-	// ready for the verb or closed in a final status.
+	// skipped are the issues left out: those only reverted commits name
+	// or close, by --exclude, then once read a number a commit message
+	// names that is no issue, or an issue not ready for the verb or closed
+	// in a final status.
 	skipped      []releaseSkipped
 	skipWarnings []string
 }
 
 // Why release leaves out an issue it found.
 const (
+	skipReverted     = "reverted"       // only commits reverted later in the range name or close it
 	skipExcluded     = "excluded"       // --exclude names it
 	skipPullRequest  = "pull_request"   // a commit message names a pull request
 	skipNotFound     = "not_found"      // only a commit message names it, and there is no such issue
@@ -341,6 +353,14 @@ func (r *releaseRun) exclude(excluded []issue.Ref) (refs []issue.Ref, warnings [
 //	excluded: acme/api#3 (commit de25f45)
 func (r *releaseRun) excludedLine() string {
 	return r.skippedLine("excluded", skipExcluded, func(s releaseSkipped) string { return r.sources(s.found) })
+}
+
+// revertedLine names the issues only commits reverted later in the range
+// name or close, with how each was found; "" for none:
+//
+//	reverted: #12 (commit 1a2b3c4)
+func (r *releaseRun) revertedLine() string {
+	return r.skippedLine("reverted", skipReverted, func(s releaseSkipped) string { return r.sources(s.found) })
 }
 
 // skippedLine is label and the issues left out for reason, each with what
@@ -522,8 +542,10 @@ func (r *releaseRun) head(n int) string {
 	switch {
 	case len(r.rng.Commits) == 0:
 		return fmt.Sprintf("release %s: no commits since %s, no issues", r.rng.Head, since)
-	case len(r.found) == 0:
+	case len(r.found) == 0 && !slices.ContainsFunc(r.skipped, func(s releaseSkipped) bool { return s.reason == skipReverted }):
 		return fmt.Sprintf("release %s: %s since %s, no issues: %s", r.rng.Head, commits, since, r.noIssues())
+	case len(r.found) == 0: // the reverted line follows
+		return fmt.Sprintf("release %s: %s since %s, no issues", r.rng.Head, commits, since)
 	default:
 		return fmt.Sprintf("release %s: %s since %s, %s", r.rng.Head, commits, since, render.Plural(n, "issue", "issues"))
 	}
@@ -592,10 +614,11 @@ type releaseResult struct {
 	// Issues are those found, in order (the default repository's first,
 	// by number), with how each was found.
 	Issues []releaseIssueJSON `json:"issues"`
-	// Skipped are the issues found and left out: by --exclude, numbers
-	// only commit messages name that are no issue (a pull request, a
-	// missing issue or repository), issues closed in a final status and
-	// issues not ready for the verb.
+	// Skipped are the issues found and left out: those only reverted
+	// commits name or close, by --exclude, numbers only commit messages
+	// name that are no issue (a pull request, a missing issue or
+	// repository), issues closed in a final status and issues not ready
+	// for the verb.
 	Skipped  []releaseSkipJSON `json:"skipped"`
 	Summary  verbSummaryJSON   `json:"summary"`
 	Warnings []string          `json:"warnings"`
@@ -635,8 +658,8 @@ type releaseSkipJSON struct {
 	Number int    `json:"number"`
 	Repo   string `json:"repo"`
 	Ref    string `json:"ref"`
-	// Reason is excluded, pull_request, not_found, repo_not_found, closed
-	// or not_ready.
+	// Reason is reverted, excluded, pull_request, not_found,
+	// repo_not_found, closed or not_ready.
 	Reason string `json:"reason"`
 	// OnBoard and Status are where an issue closed or not ready stands:
 	// whether it is on the board and its status, null for none; both null
