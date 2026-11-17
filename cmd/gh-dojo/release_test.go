@@ -213,7 +213,8 @@ func closedByAutomation(m map[int]workflow.Issue) {
 // suffix of the squash commit of pull request #60, whose "(#60)" is left
 // out with no warning; "(#5)", another pull request, is left out with
 // one; #43, named by keyword and suffix in one commit, is found once, by
-// keyword. Off, the default, only the keyword counts. With no keywords
+// keyword. Off, the default, only the keyword counts, and an issue only a
+// suffix names is a warning that says what to do (#93). With no keywords
 // and no suffix in the messages, the head says where release looked.
 func TestReleaseSuffix(t *testing.T) {
 	suffix := verbsConfig + "[release]\nsuffix = true\n"
@@ -224,6 +225,7 @@ func TestReleaseSuffix(t *testing.T) {
 		{"suffix_dry_run", suffix, "release_shop_suffix", []string{"--dry-run"}},
 		{"suffix_json", suffix, "release_shop_suffix", []string{"--dry-run", "--json"}},
 		{"suffix_off", verbsConfig, "release_shop_suffix", []string{"--dry-run"}},
+		{"suffix_off_json", verbsConfig, "release_shop_suffix", []string{"--dry-run", "--json"}},
 		{"suffix_none", verbsConfig + "[release]\nkeywords = []\nsuffix = true\n", "release_shop", nil},
 	}
 	for _, tt := range tests {
@@ -430,5 +432,42 @@ func TestReleaseSkipPlace(t *testing.T) {
 	want2 := "not ready (done starts only from Ready): #1 (Backlog), #2 (no status), #3 (not on the board)"
 	if got := r.notReadyLine(v); got != want2 {
 		t.Errorf("notReadyLine = %q, want %q", got, want2)
+	}
+}
+
+// TestUnsuffixedWarning (#93): the warning names the issue, its commits
+// (cut after maxSources, counted) and the commands to run: the verb on
+// the issue, an argument as the verb takes it, and a keyword of the
+// project for later commits, Refs over Fixes over the first; with no
+// keywords, the suffix.
+func TestUnsuffixedWarning(t *testing.T) {
+	def := issue.Repo{Owner: "acme", Name: "shop"}
+	oid := func(s string) string { return strings.Repeat(s, 20) }
+	tests := []struct {
+		ref      issue.Ref
+		commits  []string
+		keywords []string
+		want     string
+	}{
+		{issue.Ref{Repo: def, Number: 85}, []string{oid("a1")}, []string{"close", "fixes", "refs"},
+			"#85: named only in the suffix of commit a1a1a1a, and a title's (#85) counts only with [release] suffix = true: " +
+				"left out; if #85 is an issue of this release, run gh dojo done 85, and name issues as Refs #85 in later commits"},
+		{issue.Ref{Repo: issue.Repo{Owner: "acme", Name: "api"}, Number: 3}, []string{oid("a1"), oid("b2"), oid("c3"), oid("d4")},
+			[]string{"close", "Fixes"},
+			"acme/api#3: named only in the suffix of commits a1a1a1a, b2b2b2b, c3c3c3c and 1 more, and a title's (acme/api#3) " +
+				"counts only with [release] suffix = true: left out; if acme/api#3 is an issue of this release, run gh dojo done " +
+				"acme/api#3, and name issues as Fixes acme/api#3 in later commits"},
+		{issue.Ref{Repo: def, Number: 7}, []string{oid("a1"), oid("b2")}, []string{"затрагивает"},
+			"#7: named only in the suffix of commits a1a1a1a, b2b2b2b, and a title's (#7) counts only with [release] suffix = true: " +
+				"left out; if #7 is an issue of this release, run gh dojo done 7, and name issues as Затрагивает #7 in later commits"},
+		{issue.Ref{Repo: def, Number: 7}, []string{oid("a1")}, nil,
+			"#7: named only in the suffix of commit a1a1a1a, and a title's (#7) counts only with [release] suffix = true: " +
+				"left out; if #7 is an issue of this release, run gh dojo done 7, and set [release] suffix = true for later commits"},
+	}
+	for _, tt := range tests {
+		got := unsuffixedWarning(release.Unsuffixed{Ref: tt.ref, Commits: tt.commits}, "done", tt.keywords, def)
+		if got != tt.want {
+			t.Errorf("got  %q\nwant %q", got, tt.want)
+		}
 	}
 }

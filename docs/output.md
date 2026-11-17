@@ -244,7 +244,9 @@ The schemas, by command, after `schema_version` and `error`:
     release](commands.md#ready-not-in-the-release); `state` `open` or
     `closed`; `[]` when none, not read or the read failed, which
     `warnings` then says),
-  - and `warnings`;
+  - and `warnings`, among them each issue only a suffix names while
+    `[release] suffix` is off, with what to do
+    ([Issues in the release](commands.md#issues-in-the-release));
 
   `issues` and `summary` count only the issues the verb ran on, the default
   repository's first.

@@ -6,4 +6,6 @@ dry run: done #43 "Speed up checkout"
   status: Ready → Done
   close: as completed
 --- stderr
+warning: #5: named only in the suffix of commit 1212121, and a title's (#5) counts only with [release] suffix = true: left out; if #5 is an issue of this release, run gh dojo done 5, and name issues as Fixes #5 in later commits
+warning: #42: named only in the suffix of commit a1a1a1a, and a title's (#42) counts only with [release] suffix = true: left out; if #42 is an issue of this release, run gh dojo done 42, and name issues as Fixes #42 in later commits
 warning: in Ready but not found in the release: #42; for any it includes: gh dojo done 42

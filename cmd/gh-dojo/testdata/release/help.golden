@@ -18,7 +18,8 @@ when a commit message names it after a keyword of [release] keywords, by
 default GitHub's closing ones (closes, fixes, resolves); owner/repo#N names
 an issue of another repository. With [release] suffix = true, so do the
 parentheses that end a message's first line: "fix: login limit (#12)",
-"(#12, #13)". Code in a message (`Refs #12`, a ``` block)
+"(#12, #13)"; without it, an issue only such parentheses name is left out
+with a warning. Code in a message (`Refs #12`, a ``` block)
 does not count: put examples of the syntax in backticks.
 
 A commit reverted later in the range (git revert, GitHub's Revert button)

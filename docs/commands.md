@@ -680,6 +680,25 @@ requests often marks them so.
 The suffix is off by default because where pull requests are
 squash-merged, the parentheses name a pull request, not an issue.
 
+With the suffix off, an issue only a suffix names is not in the release,
+and release says so rather than miss it silently: a warning on stderr and
+in the JSON's `warnings` names the issue and its commits, and what to do:
+
+```console
+warning: #85: named only in the suffix of commit b428f16, and a title's (#85) counts only with [release] suffix = true: left out; if #85 is an issue of this release, run gh dojo done 85, and name issues as Refs #85 in later commits
+```
+
+- The command is the `--verb`'s; the keyword, `refs` if
+  [`[release] keywords`](configuration.md#release) has it, else `fixes`,
+  else the first; with no keywords the warning says to set `suffix = true`.
+- The number is not read (no request), so it may be a pull request: hence
+  the "if".
+- No warning for an issue the release includes anyway (a pull request, a
+  keyword, another commit), for the `(#PR)` of the commit's own pull
+  request, nor for the suffix of a commit reverted in the range.
+- [`agent install`](#agent-install) tells the agent to name the issue after
+  a keyword, so the commits it writes do not need the warning.
+
 Code in a message does not count, as Markdown does not link it: a code span
 (`` `Refs #12` ``), a fenced block (```` ``` ````) or an indented block
 (four spaces or a tab, after a blank line) is an example of the syntax, not

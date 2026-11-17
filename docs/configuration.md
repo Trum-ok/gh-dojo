@@ -222,7 +222,8 @@ requests it belongs to. A preset cannot set it.
 **`suffix`**: `fix: login limit (#12)`; the rules are in
 [Issues in the release](commands.md#issues-in-the-release). With `true`,
 [`agent install`](commands.md#agent-install) tells the agent to name the
-issue so.
+issue so; with `false` and keywords, after a keyword (`Refs #12`, if
+`refs` is one), and `release` warns about an issue only a suffix names.
 
 With `refs` or `suffix = true`, keep the verb's `from` to Ready (the
 presets' `done` also starts from In progress): such a commit may be partial

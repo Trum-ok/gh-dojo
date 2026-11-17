@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/spf13/cobra"
 
@@ -62,7 +64,8 @@ func newReleaseCmd() (*cobra.Command, error) {
 			"default GitHub's closing ones (closes, fixes, resolves); owner/repo#N names\n" +
 			"an issue of another repository. With [release] suffix = true, so do the\n" +
 			"parentheses that end a message's first line: \"fix: login limit (#12)\",\n" +
-			"\"(#12, #13)\". Code in a message (`Refs #12`, a ``` block)\n" +
+			"\"(#12, #13)\"; without it, an issue only such parentheses name is left out\n" +
+			"with a warning. Code in a message (`Refs #12`, a ``` block)\n" +
 			"does not count: put examples of the syntax in backticks.\n\n" +
 			"A commit reverted later in the range (git revert, GitHub's Revert button)\n" +
 			"counts for nothing, nor does the quoted title of a revert (Revert \"Fixes #12\"):\n" +
@@ -170,8 +173,12 @@ func runRelease(cmd *cobra.Command, ref string, o *releaseOpts) error {
 	if err != nil {
 		return err
 	}
-	found, reverted, warnings := release.Collect(rng, release.NewMatcher(cfg.Release.Keywords, cfg.Release.Suffix), clientHost())
+	matcher := release.NewMatcher(cfg.Release.Keywords, cfg.Release.Suffix)
+	found, reverted, warnings := release.Collect(rng, matcher, clientHost())
 	warnings = append(slices.Clone(rng.Warnings), warnings...)
+	for _, u := range release.FindUnsuffixed(rng, matcher, found, clientHost()) {
+		warnings = append(warnings, unsuffixedWarning(u, v.Name, cfg.Release.Keywords, def))
+	}
 	for _, fs := range [][]release.Found{found, reverted} {
 		for i := range fs {
 			fs[i].Ref = fs[i].Ref.In(def) // the default repository as the config spells it
@@ -742,6 +749,53 @@ func (r *releaseRun) sources(f release.Found) string {
 		text += fmt.Sprintf(" and %d more", n)
 	}
 	return text
+}
+
+// unsuffixedWarning says that commits name u only in a suffix, which
+// [release] suffix off does not read, and what to do: run verb on it if
+// it is an issue of the release (it is not read, so it may be a pull
+// request), and name issues after a keyword in later commits (keywords,
+// the config's).
+//
+//	#85: named only in the suffix of commit b428f16, and a title's (#85) counts only with [release] suffix = true: left out; if #85 is an issue of this release, run gh dojo done 85, and name issues as Refs #85 in later commits
+func unsuffixedWarning(u release.Unsuffixed, verb string, keywords []string, def issue.Repo) string {
+	name := u.Ref.String(def)
+	var commits []string
+	for _, c := range u.Commits[:min(len(u.Commits), maxSources)] {
+		commits = append(commits, release.Short(c))
+	}
+	which := "commit " + commits[0]
+	if len(u.Commits) > 1 {
+		which = "commits " + strings.Join(commits, ", ")
+		if n := len(u.Commits) - maxSources; n > 0 {
+			which += fmt.Sprintf(" and %d more", n)
+		}
+	}
+	later := "set [release] suffix = true for later commits"
+	if kw := keywordExample(keywords); kw != "" {
+		later = "name issues as " + kw + " " + name + " in later commits"
+	}
+	return fmt.Sprintf("%s: named only in the suffix of %s, and a title's (%s) counts only with "+
+		"[release] suffix = true: left out; if %s is an issue of this release, run gh dojo %s %s, and %s",
+		name, which, name, name, verb, u.Ref.Arg(def), later)
+}
+
+// keywordExample is the word of [release] keywords to show before an
+// issue, capitalized as a message starts a line: Refs, which only says a
+// commit is about the issue, when the project has it, else Fixes, else
+// the first; "" for none.
+func keywordExample(keywords []string) string {
+	if len(keywords) == 0 {
+		return ""
+	}
+	kw := keywords[0]
+	for _, want := range []string{"fixes", "refs"} {
+		if i := slices.IndexFunc(keywords, func(k string) bool { return strings.EqualFold(k, want) }); i >= 0 {
+			kw = keywords[i]
+		}
+	}
+	r, n := utf8.DecodeRuneInString(kw)
+	return string(unicode.ToUpper(r)) + kw[n:]
 }
 
 // releaseResult is release's JSON: the verb's batch (see verbResult) with

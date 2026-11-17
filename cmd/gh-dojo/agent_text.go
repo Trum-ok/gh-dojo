@@ -623,10 +623,18 @@ func (d *agentDoc) writing(w *mdWriter) {
 		"`gh dojo block N --by M` / `gh dojo unblock N --by M`: add or remove a blocked-by link without changing " +
 			"the status. An existing issue becomes a sub-issue with `gh issue edit N --parent M`.",
 	}
-	if cfg.Release.Suffix && d.hasCommand("release") {
+	switch kw := keywordExample(cfg.Release.Keywords); {
+	case !d.hasCommand("release"):
+	case cfg.Release.Suffix:
 		items = append(items, "A commit for an issue names it in parentheses at the end of its first line, "+
 			"`fix: login limit (#12)`, several as `(#12, #13)`: that is how `gh dojo release` finds the issues "+
 			"a release includes.")
+	case kw != "":
+		// Off by default, so an agent used to suffixes elsewhere writes
+		// them here too (#93).
+		items = append(items, "A commit pushed without a pull request names its issue after a keyword in its "+
+			"message, as "+code(kw+" #12")+"; parentheses at the end of the first line, `(#12)`, do not count here: that is how `gh dojo release` "+
+			"finds the issues a release includes.")
 	}
 	w.list(items)
 }

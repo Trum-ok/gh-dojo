@@ -74,6 +74,12 @@ func (m *Matcher) Suffix(message string, repo issue.Repo) []issue.Ref {
 	if m == nil || !m.suffix {
 		return nil
 	}
+	return suffix(message, repo)
+}
+
+// suffix is what the suffix of message names, whether [release] suffix is
+// set or not (see Matcher.Suffix).
+func suffix(message string, repo issue.Repo) []issue.Ref {
 	line, _, _ := strings.Cut(ownText(message), "\n")
 	var groups []string // from the end
 	for {

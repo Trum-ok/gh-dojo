@@ -265,6 +265,44 @@ func TestCollectSuffix(t *testing.T) {
 	}
 }
 
+// TestFindUnsuffixed: with [release] suffix off, the issues only a suffix
+// names are listed, each once with its commits (#93); not those found
+// anyway, the commit's own pull request, a reverted commit's, nor a URL on
+// another host. With the suffix on, nothing.
+func TestFindUnsuffixed(t *testing.T) {
+	oid := func(s string) string { return strings.Repeat(s, 20) }
+	squash := Pull{Ref: issue.Ref{Repo: dojo, Number: 200}, Closes: []issue.Ref{{Repo: dojo, Number: 161}}}
+	r := &Range{Repo: dojo, Commits: []Commit{
+		{OID: oid("a1"), Message: "new: move the run of new (#85)"},
+		{OID: oid("b1"), Message: "release: reverts (#77, acme/api#3)"},
+		{OID: oid("b2"), Message: "docs: reverts (#77)"},
+		{OID: oid("c1"), Message: "render: lists (#56)\n\nRefs #56"},
+		{OID: oid("d1"), Message: "fix: login limit (#161) (#200)", Pulls: []Pull{squash}},
+		{OID: oid("e1"), Message: "fix: cart (#90)"},
+		{OID: oid("e2"), Message: `Revert "fix: cart (#90)"` + "\n\nThis reverts commit " + oid("e1") + "."},
+		{OID: oid("f1"), Message: "docs (https://ghe.example.com/a/b/issues/1)"},
+		{OID: oid("f2"), Message: "fix (#12) and more"},
+	}}
+	m := NewMatcher([]string{"refs"}, false)
+	found, _, _ := Collect(r, m, "github.com")
+	var b strings.Builder
+	for _, u := range FindUnsuffixed(r, m, found, "github.com") {
+		fmt.Fprintf(&b, "%s:", u.Ref.String(dojo))
+		for _, c := range u.Commits {
+			fmt.Fprintf(&b, " %s", Short(c))
+		}
+		b.WriteString("\n")
+	}
+	if got, want := b.String(), "#85: a1a1a1a\n#77: b1b1b1b b2b2b2b\nacme/api#3: b1b1b1b\n"; got != want {
+		t.Errorf("unsuffixed:\n%s\nwant:\n%s", got, want)
+	}
+	on := NewMatcher([]string{"refs"}, true)
+	found, _, _ = Collect(r, on, "github.com")
+	if got := FindUnsuffixed(r, on, found, "github.com"); got != nil {
+		t.Errorf("suffix on: %v", got)
+	}
+}
+
 // TestCollectReverted: a commit a later one of the range reverts counts
 // for nothing (#77), whether the revert names it by oid (git revert), its
 // merge commit ("reversing changes made to") or its pull request ("Reverts
