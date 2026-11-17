@@ -53,9 +53,18 @@ func chart(dir string, files []string) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
+	// The Claude spark, from Anthropic's press kit, marks the panels of its models.
+	spark, err := loadIcon("claude-spark.svg")
+	if err != nil {
+		return err
+	}
 	for _, th := range []theme{lightTheme, darkTheme} {
+		logo, err := loadIcon("logo-" + th.name + ".svg")
+		if err != nil {
+			return err
+		}
 		path := filepath.Join(dir, "bench-workday-"+th.name+".svg")
-		if err := os.WriteFile(path, []byte(drawChart(panels, th)), 0o644); err != nil {
+		if err := os.WriteFile(path, []byte(drawChart(panels, th, logo, spark)), 0o644); err != nil {
 			return err
 		}
 		fmt.Fprintln(os.Stderr, "wrote", path)
@@ -71,8 +80,9 @@ type panel struct {
 
 var chartSeries = []string{"gh dojo + skill", "gh + CLAUDE.md"}
 
-// theme is the ink of one GitHub theme. The series are the first two slots of
-// a categorical palette checked for colour blindness on both surfaces.
+// theme is the ink of one GitHub theme. gh dojo is the orange of the logo of
+// the same theme, gh the blue that pairs with it in a categorical palette
+// checked for colour blindness on both surfaces.
 type theme struct {
 	name                                  string
 	surface                               string // GitHub's page, for the rings around the end markers
@@ -81,11 +91,42 @@ type theme struct {
 }
 
 var (
-	lightTheme = theme{"light", "#ffffff", "#0b0b0b", "#52514e", "#898781", "#e1e0d9", "#c3c2b7", [2]string{"#2a78d6", "#eb6834"}}
-	darkTheme  = theme{"dark", "#0d1117", "#f0efec", "#c3c2b7", "#898781", "#2c2c2a", "#383835", [2]string{"#3987e5", "#d95926"}}
+	lightTheme = theme{"light", "#ffffff", "#0b0b0b", "#52514e", "#898781", "#e1e0d9", "#c3c2b7", [2]string{"#eb6834", "#2a78d6"}}
+	darkTheme  = theme{"dark", "#0d1117", "#f0efec", "#c3c2b7", "#898781", "#2c2c2a", "#383835", [2]string{"#f0713c", "#3987e5"}}
 )
 
-func drawChart(panels []panel, th theme) string {
+// icon is an SVG of docs/media to draw inside the chart: its viewBox and what
+// is inside its root element, less the title. Run from the root of the
+// repository, as the default of -img already assumes.
+type icon struct{ viewBox, body string }
+
+func loadIcon(name string) (icon, error) {
+	b, err := os.ReadFile(filepath.Join("docs", "media", name))
+	if err != nil {
+		return icon{}, err
+	}
+	s := string(b)
+	root, rest, ok := strings.Cut(s[strings.Index(s, "<svg"):], ">")
+	body, _, closed := strings.Cut(rest, "</svg>")
+	_, vb, hasVB := strings.Cut(root, `viewBox="`)
+	vb, _, _ = strings.Cut(vb, `"`)
+	if !ok || !closed || !hasVB {
+		return icon{}, fmt.Errorf("chart: %s is not an SVG with a viewBox", name)
+	}
+	if i := strings.Index(body, "<title>"); i >= 0 {
+		if j := strings.Index(body, "</title>"); j > i {
+			body = body[:i] + body[j+len("</title>"):]
+		}
+	}
+	return icon{vb, strings.TrimSpace(body)}, nil
+}
+
+// draw places the icon in a size by size square at x, y.
+func (ic icon) draw(x, y, size float64) string {
+	return fmt.Sprintf(`<svg x="%.0f" y="%.0f" width="%.0f" height="%.0f" viewBox="%s">`+"\n%s\n</svg>\n", x, y, size, size, ic.viewBox, ic.body)
+}
+
+func drawChart(panels []panel, th theme, logo, spark icon) string {
 	const (
 		height     = 330
 		plotTop    = 92
@@ -126,13 +167,20 @@ func drawChart(panels []panel, th theme) string {
 	}
 	f(`<text x="%d" y="50" font-size="12" fill="%s">Running time of one agent session, in seconds, after each message: median of 5 sessions</text>`+"\n", gutter, th.secondary)
 
+	// The logo in the top right corner, the end labels' column.
+	const logoSize = 40
+	b.WriteString(logo.draw(width-logoSize-8, 8, logoSize))
+
 	for pi, p := range panels {
 		x0 := float64(gutter + pi*(plotWidth+labels+gutter))
 		xs := func(i int) float64 { return x0 + float64(i)/float64(len(p.lines[0])-1)*plotWidth }
 		dojo, gh := p.lines[0][len(p.lines[0])-1], p.lines[1][len(p.lines[1])-1]
-		f(`<text x="%.0f" y="%d" font-size="14" font-weight="600" fill="%s">%s</text>`, x0, plotTop-18, th.primary, p.title)
+		const sparkSize = 16
+		b.WriteString(spark.draw(x0, plotTop-18-13, sparkSize))
+		tx := x0 + sparkSize + 6
+		f(`<text x="%.0f" y="%d" font-size="14" font-weight="600" fill="%s">%s</text>`, tx, plotTop-18, th.primary, p.title)
 		f(`<text x="%.0f" y="%d" font-size="13" fill="%s">%.0f%% less time with gh dojo</text>`+"\n",
-			x0+float64(len(p.title))*9+10, plotTop-18, th.secondary, (1-dojo/gh)*100)
+			tx+float64(len(p.title))*9+10, plotTop-18, th.secondary, (1-dojo/gh)*100)
 
 		for v := 0.0; v <= top; v += tick {
 			stroke := th.grid
