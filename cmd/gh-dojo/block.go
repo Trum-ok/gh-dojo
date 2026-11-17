@@ -380,8 +380,5 @@ func joinRefs(links []*issue.Linked, repo issue.Repo) string {
 	for i, l := range links {
 		refs[i] = l.Ref.String(repo)
 	}
-	if len(refs) <= 1 {
-		return strings.Join(refs, "")
-	}
-	return strings.Join(refs[:len(refs)-1], ", ") + " and " + refs[len(refs)-1]
+	return render.JoinWords(refs, "and")
 }

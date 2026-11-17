@@ -506,14 +506,10 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 // unresolvedMeaning says when a blocker is unresolved under cfg's
 // statuses.resolved: "open and not in Ready or Done".
 func unresolvedMeaning(cfg *config.Config) string {
-	r := cfg.Statuses.Resolved
-	switch len(r) {
-	case 0:
+	if len(cfg.Statuses.Resolved) == 0 {
 		return "open"
-	case 1:
-		return "open and not in " + r[0]
 	}
-	return "open and not in " + strings.Join(r[:len(r)-1], ", ") + " or " + r[len(r)-1]
+	return "open and not in " + render.JoinWords(cfg.Statuses.Resolved, "or")
 }
 
 // configNote is appended to the root help when there is no config or it
