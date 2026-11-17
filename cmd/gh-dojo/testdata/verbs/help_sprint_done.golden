@@ -10,6 +10,7 @@ code: 0
              never entered Ready, or the day is unknown: today's iteration, with a warning
              a past day without an iteration is an error, unless the issue has a sprint already
              none for today is an error, see gh dojo doctor
+             a repeat (already in Done) keeps the sprint it has, unless it entered Done today
 
 Usage:
   gh dojo done <N> [flags]

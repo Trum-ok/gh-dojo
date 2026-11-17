@@ -22,6 +22,14 @@ import (
 // A completed iteration still covers its days. An issue already in the
 // target iteration, or without one for clear, gets it in InPlace.
 //
+// A repeat, an issue already in the verb's target status (atTarget), keeps
+// the sprint it has (in InPlace): the verb's first run or the user set it,
+// and a repeat on a later day must not move the issue to that day's
+// sprint. A repeat on the day the issue entered the status (enteredToday)
+// is the retry of a run that may have written the status but not the
+// sprint, so it plans the sprint as a first run does. An issue without a
+// sprint gets one, and clear clears it, repeat or not.
+//
 // Today without an iteration is exit code 1 with the iterations; so is a
 // past day the issue entered the status, unless the issue has a sprint
 // already: then the user set it, and it stays. Both errors wrap
@@ -44,6 +52,12 @@ func (p *Plan) planIteration(v config.Verb, atTarget bool, loc *time.Location) e
 		now = time.Now()
 	}
 	today := now.In(loc)
+	if atTarget && v.Iteration != config.IterationClear && s.CurrentID != "" && !enteredToday(v, is, today) {
+		// A repeat: the sprint was set by the verb's first run or by the
+		// user since, and it stays.
+		p.InPlace = append(p.InPlace, SetIteration{From: s.Current, To: s.Current})
+		return nil
+	}
 
 	op := SetIteration{From: s.Current}
 	var target *board.Iteration
@@ -89,6 +103,21 @@ func (p *Plan) planIteration(v config.Verb, atTarget bool, loc *time.Location) e
 		p.Ops = append(p.Ops, op)
 	}
 	return nil
+}
+
+// enteredToday reports whether the status history shows issue is
+// entering v.To on today's date (in today's time zone): its last status
+// change since the item was added is into v.To, today. With no such change
+// read, or no history kept, it is false.
+func enteredToday(v config.Verb, is Issue, today time.Time) bool {
+	if len(is.History) == 0 {
+		return false
+	}
+	last := is.History[len(is.History)-1]
+	if last.To != v.To || !is.AddedAt.IsZero() && last.At.Before(is.AddedAt) {
+		return false
+	}
+	return last.At.In(today.Location()).Format(time.DateOnly) == today.Format(time.DateOnly)
 }
 
 // sprintDay is a day the iteration effect picks the iteration of: a time in the

@@ -395,6 +395,15 @@ rejected with "not supported in this version".
   again first. A past day no iteration covers is an error too, unless the
   issue has a sprint already. An issue already in the target iteration (or
   without one, for `clear`) is left alone: `sprint unchanged (Sprint 11)`.
+
+  A repeat, on an issue already in the verb's `to`, keeps the sprint the
+  issue has: the first run or the user set it, so `gh dojo done 200` a week
+  after #200 went to Done does not move it to this week's sprint (with
+  `current`, or with `by_status_date` when the day is unknown). On the day
+  the issue entered `to`, by its status history, a repeat is the retry of a
+  run that may have written the status and not the sprint, and sets the
+  sprint as a first run would. An issue without a sprint gets one, and
+  `clear` clears it, repeat or not.
 - **field**: `[verbs.<name>.field]` names board fields, each with a value:
   an option name for a single-select field, a string for a text field, a
   number for a number field, a date (`2026-11-30`, or the string

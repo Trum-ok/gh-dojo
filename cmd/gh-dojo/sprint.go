@@ -89,6 +89,9 @@ func sprintHelp(cfg *config.Config, v config.Verb, line func(label, format strin
 		line("Sprint", "sets %s to %s (dates in %s); none for today is an error, see gh dojo doctor",
 			cfg.SprintField(), iterationText(v), zone)
 	}
+	if v.Iteration != "" && v.Iteration != config.IterationClear && v.To != "" {
+		line("", "a repeat (already in %s) keeps the sprint it has, unless it entered %s today", v.To, v.To)
+	}
 	if len(v.Fields) > 0 {
 		line("Fields", "sets %s; a field already at its value is left alone", fieldsText(v))
 	}

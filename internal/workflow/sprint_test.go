@@ -166,6 +166,19 @@ func TestPlanSprint(t *testing.T) {
 		{name: "ready_enters_now", verb: "ready", ops: 2, issue: issue("In progress", "", started)},
 		{name: "ready_repeat", verb: "ready", issue: issue("Ready", "it12",
 			StatusChange{At: day("2026-11-11T08:00:00Z"), To: "Ready"})},
+		// A repeat keeps the sprint it has: #42 went to Done in Sprint 11
+		// without entering Ready; today's sprint is 12.
+		{name: "done_repeat_keeps_sprint", verb: "done", ops: 1, issue: issue("Done", "it11", started,
+			StatusChange{At: day("2026-11-02T09:00:00Z"), To: "Done"})},
+		// Entered Done today: the retry of a run that may not have set the
+		// sprint, planned as a first run (Sprint 11, the Ready day's).
+		{name: "done_repeat_today", verb: "done", ops: 2, issue: issue("Done", "it12", started, enteredReady,
+			StatusChange{At: day("2026-11-11T08:00:00Z"), To: "Done"})},
+		// No sprint: a repeat sets one (today's, never in Ready).
+		{name: "done_repeat_no_sprint", verb: "done", ops: 2, issue: issue("Done", "", started,
+			StatusChange{At: day("2026-11-02T09:00:00Z"), To: "Done"})},
+		// The history does not show the entry: the sprint stays.
+		{name: "done_repeat_history_lags", verb: "done", ops: 1, issue: issue("Done", "it11", started)},
 		{name: "plan_current", verb: "plan", ops: 1, issue: issue("Backlog", "")},
 		{name: "plan_move", verb: "plan", ops: 1, issue: issue("Backlog", "it11")},
 		{name: "plan_no_iteration_today", verb: "plan", code: render.ExitUsage, stale: true, issue: func() Issue {
