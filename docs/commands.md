@@ -679,8 +679,8 @@ requests often marks them so.
   merge appends, is left out without a word; that pull request's issues are
   found through it.
 
-The suffix is off by default because there the parentheses name a pull
-request, not an issue.
+The suffix is off by default because where pull requests are
+squash-merged, the parentheses name a pull request, not an issue.
 
 Code in a message does not count, as Markdown does not link it: a code span
 (`` `Refs #12` ``) or a fenced block (```` ``` ````) is an example of the
