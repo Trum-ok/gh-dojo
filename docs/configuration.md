@@ -193,8 +193,8 @@ requests it belongs to. A preset cannot set it.
 
 | Key        | Meaning |
 |------------|---------|
-| `keywords` | Words that, followed by issues on the same line of a commit message (`Fixes #12`, `refs: #12, acme/api#3`), put those issues in the release; whole words, in any case, letters with single spaces or dashes (`"part of"`). Default: GitHub's closing keywords, `close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves`, `resolved`; a list replaces them. `[]`: only pull requests count. With `refs`, keep the verb's `from` to Ready (the presets' `done` also starts from In progress): a `Refs` commit may be partial work, which is then [not ready](commands.md#release) rather than released |
-| `suffix`   | `true`: the parentheses that end the first line of a commit message put the issues in them in the release, `fix: login limit (#12)`, `(#12, acme/api#3)`, `fix (#161) (#200)`: [details](commands.md#release). The number of a pull request the commit belongs to, as a squash merge appends, is left out. Default `false`: where pull requests are squash-merged, the parentheses name a pull request, not an issue. With `true`, [`agent install`](commands.md#agent-install) tells the agent to name the issue so |
+| `keywords` | Words that, followed by issues on the same line of a commit message (`Fixes #12`, `refs: #12, acme/api#3`), put those issues in the release; whole words, in any case, letters with single spaces or dashes (`"part of"`). Default: GitHub's closing keywords, `close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`, `resolves`, `resolved`; a list replaces them. `[]`: no keyword counts, only pull requests and, with `suffix = true`, the suffix. With `refs`, keep the verb's `from` to Ready (the presets' `done` also starts from In progress): a `Refs` commit may be partial work, which is then [not ready](commands.md#release) rather than released |
+| `suffix`   | `true`: the parentheses that end the first line of a commit message put the issues in them in the release, `fix: login limit (#12)`, `(#12, acme/api#3)`, `fix (#161) (#200)`: [details](commands.md#release). The number of a pull request the commit belongs to, as a squash merge appends, is left out. Default `false`: where pull requests are squash-merged, the parentheses name a pull request, not an issue. With `true`, [`agent install`](commands.md#agent-install) tells the agent to name the issue so. As with `refs`, keep the verb's `from` to Ready: a suffix says only that a commit is about an issue, which may be partial work |
 
 ## verbs
 
@@ -214,7 +214,7 @@ commands (`show`, `list`, `new`, `comment`, `describe`, `init`, `doctor`,
 | `blockers`       | check or effect | `"warn"` or `"deny"`: check the issue's unresolved blockers; `"link"`: `--by N` also marks it blocked by #N |
 | `sub_issues`     | check  | `"warn"` or `"deny"`: check the issue's unresolved [sub-issues](commands.md#show) |
 | `confirm`        | check  | `"user"`: the verb is the user's decision and runs only with `--yes` |
-| `batch`          | —      | `true`: the verb takes several issue numbers at once |
+| `batch`          | —      | `true`: the verb takes several issue numbers at once and is one [`release --verb`](commands.md#release) can run (one without it is exit code 1 there) |
 | `to`             | effect | Target status |
 | `iteration`      | effect | Set the sprint field: `"current"`, `"by_status_date:<status>"` or `"clear"`; needs `fields.sprint` |
 | `field`          | effect | A table of other board fields to set: `[verbs.<name>.field]` with `Priority = "P1"`, `Estimate = 3` |
@@ -509,7 +509,7 @@ The board's status field must have these options (other options are fine):
   (`blockers = "link"`); `wait --by "the API team"` only comments.
 - `done` closes the issue as completed (Done means released) and takes
   several issues at once (`batch = true`): `gh dojo done 12 13 14` after a
-  release. An issue a pull request already closed stays closed and still
+  release, or `gh dojo release v1.2.0 --verb done`. An issue a pull request already closed stays closed and still
   moves to Done. To keep issues open in Done, set `close = false`.
 
 Its source is [`internal/config/presets/kanban.toml`](../internal/config/presets/kanban.toml).

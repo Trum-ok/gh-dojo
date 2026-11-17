@@ -628,7 +628,7 @@ request or a message, before it is read: the line `excluded: acme/api#3
 `--exclude` the release does not include is a warning.
 
 **Not ready.** An open issue whose status the verb's `from` does not allow,
-such as one still in progress with a `Refs` commit when `done` starts only
+such as one still in progress with a `Refs` commit or a suffix when `done` starts only
 from Ready, is listed as not ready and left out, not failed: work goes on
 across releases, and a refusal (exit code 2) would end every such release.
 Only a later release whose commits name it again picks it up; otherwise run

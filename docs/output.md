@@ -47,7 +47,8 @@ fix: wait a few minutes, then re-run the same command
 
 ## Several issues at once
 
-A verb with `batch = true` takes several issue numbers; other verbs take
+A verb with `batch = true` takes several issue numbers, and
+[`release`](commands.md#release) can run it; other verbs take
 exactly one and say which verbs take several. An issue given twice counts
 once (`12` and `acme/shop#12` too, in the default repository acme/shop).
 The cards are read in one request per 20 issues, from any repositories
