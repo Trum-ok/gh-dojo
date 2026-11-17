@@ -426,57 +426,28 @@ func checkInitConfig(cfg *config.Config, s *board.Schema) []initProblem {
 }
 
 // boardProblems lists the fields and statuses the config names that the
-// board lacks.
+// board lacks, as board.Problems finds them: one problem per field, and one
+// per missing status with every key that names it. Problems with verbs'
+// field effects are left to checkInitConfig.
 func boardProblems(cfg *config.Config, s *board.Schema) []initProblem {
 	var problems []initProblem
-	var status *board.Field
-	for _, name := range cfg.FieldNames() {
-		key := "fields." + name
-		f, err := s.Field(cfg.Fields[name])
-		switch {
-		case err != nil:
-			kind := "a field"
-			switch name {
-			case "status":
-				kind = "a single-select field"
-			case "sprint":
-				kind = "an iteration field"
-			}
-			problems = append(problems, initProblem{
-				what: fmt.Sprintf("board %s has no field %q (%s)%s", s.Ref(), cfg.Fields[name], key, suggestion(err)),
-				fix: fmt.Sprintf("add %s %q on the board (%s), or set [fields] %s = \"…\" in %s",
-					kind, cfg.Fields[name], s.URL, name, cfg.Display),
-			})
-		case name == "status" && f.Type != board.TypeSingleSelect:
-			problems = append(problems, initProblem{
-				what: fmt.Sprintf("field %q on board %s is %s, not single-select (%s)", f.Name, s.Ref(), f.Type, key),
-				fix:  fmt.Sprintf("set [fields] %s = \"…\" in %s to a single-select field", name, cfg.Display),
-			})
-		case name == "status":
-			status = f
-		case name == "sprint" && f.Type != board.TypeIteration:
-			problems = append(problems, initProblem{
-				what: fmt.Sprintf("field %q on board %s is %s, not an iteration field (%s)", f.Name, s.Ref(), f.Type, key),
-				fix:  fmt.Sprintf("set [fields] %s = \"…\" in %s to an iteration field", name, cfg.Display),
-			})
-		}
-	}
-	if status == nil {
-		return problems
-	}
 	var order []string
 	keys := map[string][]string{}
 	errs := map[string]error{}
-	for _, ref := range cfg.StatusRefs() {
-		_, err := status.Option(ref.Status)
-		if err == nil {
+	for _, p := range board.Problems(cfg, s) {
+		if name, ok := strings.CutPrefix(p.Key, "fields."); ok {
+			problems = append(problems, fieldProblem(cfg, s, name, p.Err))
 			continue
 		}
-		if _, seen := keys[ref.Status]; !seen {
-			order = append(order, ref.Status)
-			errs[ref.Status] = err
+		status := p.Status
+		if status == "" {
+			continue
 		}
-		keys[ref.Status] = append(keys[ref.Status], ref.Key)
+		if _, seen := keys[status]; !seen {
+			order = append(order, status)
+			errs[status] = p.Err
+		}
+		keys[status] = append(keys[status], p.Key)
 	}
 	for _, name := range order {
 		var overrides []string
@@ -487,10 +458,35 @@ func boardProblems(cfg *config.Config, s *board.Schema) []initProblem {
 			what: fmt.Sprintf("board %s has no status %q, used by %s%s",
 				s.Ref(), name, strings.Join(keys[name], ", "), suggestion(errs[name])),
 			fix: fmt.Sprintf("add %q to field %q on the board (%s), or override in %s: %s",
-				name, status.Name, s.URL, cfg.Display, strings.Join(overrides, "; ")),
+				name, cfg.Fields["status"], s.URL, cfg.Display, strings.Join(overrides, "; ")),
 		})
 	}
 	return problems
+}
+
+// fieldProblem words field name, which board.Problems reported with err,
+// for init: missing on the board, or of the wrong type.
+func fieldProblem(cfg *config.Config, s *board.Schema, name string, err error) initProblem {
+	key := "fields." + name
+	kind, short := "a field", ""
+	switch name {
+	case "status":
+		kind, short = "a single-select field", "single-select"
+	case "sprint":
+		kind, short = "an iteration field", "an iteration field"
+	}
+	f, missing := s.Field(cfg.Fields[name])
+	if missing != nil {
+		return initProblem{
+			what: fmt.Sprintf("board %s has no field %q (%s)%s", s.Ref(), cfg.Fields[name], key, suggestion(err)),
+			fix: fmt.Sprintf("add %s %q on the board (%s), or set [fields] %s = \"…\" in %s",
+				kind, cfg.Fields[name], s.URL, name, cfg.Display),
+		}
+	}
+	return initProblem{
+		what: fmt.Sprintf("field %q on board %s is %s, not %s (%s)", f.Name, s.Ref(), f.Type, short, key),
+		fix:  fmt.Sprintf("set [fields] %s = \"…\" in %s to %s", name, cfg.Display, kind),
+	}
 }
 
 // suggestion returns the "; did you mean ...?" part of a lookup error.

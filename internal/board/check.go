@@ -77,8 +77,9 @@ const maxMoreKeys = 4
 
 // Problem is a name in the config that the board does not have.
 type Problem struct {
-	Key string        // the key path, e.g. "verbs.start.to"
-	Err *render.Error // as Check reports it, with allowed values and a fix
+	Key    string        // the key path, e.g. "verbs.start.to"
+	Status string        // the status the board lacks, for a key naming statuses
+	Err    *render.Error // as Check reports it, with allowed values and a fix
 }
 
 // Problems lists every name in the config the board does not have, in the
@@ -94,7 +95,7 @@ func Problems(c *config.Config, s *Schema) []Problem {
 		if c.KeyPath(key) != key { // set by the preset: override it in the file
 			fix = fmt.Sprintf("set %s in %s to override preset %s", key, c.Display, c.Preset)
 		}
-		problems = append(problems, Problem{key, c.Errorf("%s: %s", c.KeyPath(key), e.What).
+		problems = append(problems, Problem{Key: key, Err: c.Errorf("%s: %s", c.KeyPath(key), e.What).
 			WithAllowed(e.Allowed...).WithFix(fix).WithCause(err)})
 	}
 
@@ -121,6 +122,7 @@ func Problems(c *config.Config, s *Schema) []Problem {
 		for _, ref := range c.StatusRefs() {
 			if _, err := status.Option(ref.Status); err != nil {
 				add(ref.Key, err)
+				problems[len(problems)-1].Status = ref.Status
 			}
 		}
 	}

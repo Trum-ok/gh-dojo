@@ -408,3 +408,33 @@ func editedBoard(t *testing.T, name string, edit func(status map[string]any)) st
 	}
 	return path
 }
+
+// TestInitWrongFieldType: a status or sprint field of another type is one
+// problem each, worded for init, and no status is checked without a
+// single-select status field.
+func TestInitWrongFieldType(t *testing.T) {
+	cfg, err := config.Parse([]byte(sprintsPresetConfig), ".github/dojo.toml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &board.Schema{Owner: "acme", OwnerType: "Organization", Number: 3,
+		URL: "https://github.com/orgs/acme/projects/3", Fields: []board.Field{
+			{ID: "F1", Name: "Status", Type: board.TypeIteration},
+			{ID: "F2", Name: "Sprint", Type: board.TypeSingleSelect},
+		}}
+	got := boardProblems(cfg, s)
+	want := []initProblem{
+		{`field "Status" on board acme/3 is ITERATION, not single-select (fields.status)`,
+			`set [fields] status = "…" in .github/dojo.toml to a single-select field`},
+		{`field "Sprint" on board acme/3 is SINGLE_SELECT, not an iteration field (fields.sprint)`,
+			`set [fields] sprint = "…" in .github/dojo.toml to an iteration field`},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("problems = %q, want %q", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("problem %d = %q, want %q", i, got[i], want[i])
+		}
+	}
+}
