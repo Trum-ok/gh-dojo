@@ -20,9 +20,9 @@ import (
 const (
 	// Unless --full, a description is cut at maxBodyRunes and the comments
 	// shown share commentBudgetRunes: each gets an equal part, but at least
-	// minCommentRunes and at most maxCommentRunes. With the default 5
-	// comments that keeps a card near 2k tokens even in Cyrillic (about 2
-	// characters a token).
+	// minCommentRunes and at most maxCommentRunes. With the default
+	// defaultShownComments that keeps a card near 2k tokens even in
+	// Cyrillic (about 2 characters a token).
 	maxBodyRunes       = 2000
 	commentBudgetRunes = 1500
 	minCommentRunes    = 200

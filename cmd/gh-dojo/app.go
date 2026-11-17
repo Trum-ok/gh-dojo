@@ -20,8 +20,8 @@ import (
 // A command gets one App per run from newApp, inside RunE:
 //
 //	a := newApp()
-//	card, err := a.Card(cmd.Context(), n, 0) // config, schema from cache, 1 query
-//	if err != nil { return err }               // render errors, right exit codes
+//	card, err := a.Card(cmd.Context(), ref, 0) // config, schema from cache, 1 query
+//	if err != nil { return err }                 // render errors, right exit codes
 //
 // Requests with a warm schema cache: Schema sends none, Card sends one.
 // Tests swap newApp with withApp (app_test.go) for recorded responses, a
