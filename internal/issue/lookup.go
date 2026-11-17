@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/Trum-ok/gh-dojo/internal/graph"
@@ -112,9 +113,21 @@ type User struct {
 	Login string `json:"login"`
 }
 
-// assignableWindow is how many assignable users matching Lookup.User are
-// read; the login is then matched exactly among them.
+// assignableWindow is how many assignable users matching a login are
+// read, for Lookup.User and each --assignee of gh dojo new; the login is
+// then matched among them, ignoring case (matchUser).
 const assignableWindow = 100
+
+// matchUser returns the user of users with login, ignoring case; nil when
+// there is none.
+func matchUser(users []*User, login string) *User {
+	for _, u := range users {
+		if u != nil && u.ID != "" && strings.EqualFold(u.Login, login) {
+			return u
+		}
+	}
+	return nil
+}
 
 // MilestonesSelection reads the first 100 open milestones of a
 // repository, oldest first, as gh dojo new and a verb that sets a
@@ -129,17 +142,21 @@ const MilestonesSelection = `milestones(first: 100, states: OPEN, orderBy: {fiel
 // widens it to allLabelsWindow. assigneesWindow is its assignees
 // selection; Lookup.AssigneeIDs adds their IDs (assigneeIDsWindow).
 // blockersWindow is its blockers selection; Lookup.AllBlockers widens it
-// to allBlockersWindow. subIssuesWindow is its sub-issues selection;
-// Lookup.AllSubIssues widens it to allSubIssuesWindow.
+// to allBlockersWindow (blockingWindow). subIssuesWindow is its sub-issues
+// selection; Lookup.AllSubIssues widens it to allSubIssuesWindow
+// (MaxSubIssues).
 const (
-	labelsWindow       = "labels(first: 20)"
-	allLabelsWindow    = "labels(first: 100)"
-	assigneesWindow    = "assignees(first: 10) { totalCount nodes { login } }"
-	assigneeIDsWindow  = "assignees(first: 10) { totalCount nodes { id login } }"
-	blockersWindow     = "blockedBy(first: 20)"
-	allBlockersWindow  = "blockedBy(first: 50)"
-	subIssuesWindow    = "subIssues(first: 20)"
-	allSubIssuesWindow = "subIssues(first: 100)"
+	labelsWindow      = "labels(first: 20)"
+	allLabelsWindow   = "labels(first: 100)"
+	assigneesWindow   = "assignees(first: 10) { totalCount nodes { login } }"
+	assigneeIDsWindow = "assignees(first: 10) { totalCount nodes { id login } }"
+	blockersWindow    = "blockedBy(first: 20)"
+	subIssuesWindow   = "subIssues(first: 20)"
+)
+
+var (
+	allBlockersWindow  = "blockedBy(first: " + strconv.Itoa(blockingWindow) + ")"
+	allSubIssuesWindow = "subIssues(first: " + strconv.Itoa(MaxSubIssues) + ")"
 )
 
 // The parts of cardQuery a Lookup extends.
@@ -302,12 +319,7 @@ func (l Lookup) found(r *repoJSON, viewer *User, data map[string]json.RawMessage
 			f.MilestonesCursor = r.Milestones.PageInfo.EndCursor
 		}
 		if l.User != "" && r.Assignable != nil {
-			for _, u := range r.Assignable.Nodes {
-				if u != nil && u.ID != "" && strings.EqualFold(u.Login, l.User) {
-					f.User = u
-					break
-				}
-			}
+			f.User = matchUser(r.Assignable.Nodes, l.User)
 		}
 	}
 	if l.Viewer && viewer != nil && viewer.ID != "" {

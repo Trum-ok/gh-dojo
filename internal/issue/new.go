@@ -72,10 +72,6 @@ const (
 	newIssuesField    = "    issues(last: $window"
 )
 
-// newAssignableWindow is how many assignable users matching an --assignee
-// login are read; the login is then matched among them, ignoring case.
-const newAssignableWindow = 100
-
 // assigneeAlias is the alias of the i-th --assignee login's lookup in
 // newContextQuery, and the name of its variable.
 func assigneeAlias(i int) string { return fmt.Sprintf("assignee%d", i) }
@@ -138,7 +134,7 @@ func newContextQuery(r NewRequest) string {
 	for i := range r.Logins {
 		alias := assigneeAlias(i)
 		fmt.Fprintf(&decls, ", $%s: String!", alias)
-		fmt.Fprintf(&repoFields, "    %s: assignableUsers(query: $%s, first: %d) { nodes { id login } }\n", alias, alias, newAssignableWindow)
+		fmt.Fprintf(&repoFields, "    %s: assignableUsers(query: $%s, first: %d) { nodes { id login } }\n", alias, alias, assignableWindow)
 	}
 	decls.WriteString(links.Decls())
 	if decls.Len() > 0 {
@@ -276,12 +272,11 @@ func ReadNewContext(ctx context.Context, q graph.Querier, req NewRequest) (*NewC
 		}
 	}
 	hidden, others := hiddenParents(err)
-	if err != nil && r != nil && (others == nil || OnlyLinkErrors(others)) {
+	if err != nil && r != nil && (others == nil || onlyLinkErrors(others)) {
 		err = nil // a missing --blocked-by issue (LinksError names it), or a parent withheld
 	}
 	if r == nil && (err == nil || render.FromError(err).Code == render.ExitNotFound) {
-		return nil, render.NotFound("repository %s not found, or the token cannot see it", repo).
-			WithFix("gh repo view " + repo.String()).WithCause(err)
+		return nil, repoNotFound(repo, err)
 	}
 	if err != nil {
 		return nil, err
@@ -509,12 +504,7 @@ func (nc *NewContext) MatchAssignees(logins []string, me string) (users []*User,
 		}
 		var found *User
 		if i < len(nc.Assignable) {
-			for _, u := range nc.Assignable[i] {
-				if u != nil && u.ID != "" && strings.EqualFold(u.Login, login) {
-					found = u
-					break
-				}
-			}
+			found = matchUser(nc.Assignable[i], login)
 		}
 		i++
 		if found == nil {

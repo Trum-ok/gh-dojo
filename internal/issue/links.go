@@ -161,12 +161,12 @@ func RefNames(refs []Ref, def Repo) string {
 	return s
 }
 
-// BlockingWindow is how many of an issue's links are read each way for
+// blockingWindow is how many of an issue's links are read each way for
 // a link: the issues a linked issue blocks (Linked.Blocks) and those that
 // block it (Linked.BlockedBy), and the blockers of the issue gh dojo block
 // and unblock change (Target.BlockedBy). GitHub allows at most 50 blockers
 // per issue, so a blockedBy list read with it is whole.
-const BlockingWindow = 50
+const blockingWindow = 50
 
 // Linked is an issue read by its Ref to link it as a blocker.
 type Linked struct {
@@ -192,7 +192,7 @@ func (l *Linked) Blocks(id string) bool { return id != "" && slices.Contains(l.b
 
 // BlockedBy reports whether the issue with node ID id blocks the linked
 // issue: making the linked issue block it would close a cycle. The list
-// read is whole (see BlockingWindow).
+// read is whole (see blockingWindow).
 func (l *Linked) BlockedBy(id string) bool { return id != "" && slices.Contains(l.blockedBy, id) }
 
 // Links are issues read by Ref in the request of another query, each
@@ -246,7 +246,7 @@ func (ls Links) fields(sub int) string {
 		fmt.Fprintf(&b, "  %s: repository(owner: $%sOwner, name: $%sRepo) {\n    nameWithOwner\n"+
 			"    issueOrPullRequest(number: $%sNumber) { __typename ... on Issue { id title state "+
 			"blocking(first: %d) { nodes { id } } blockedBy(first: %d) { nodes { id } }%s } }\n  }\n",
-			a, a, a, a, BlockingWindow, BlockingWindow, extra)
+			a, a, a, a, blockingWindow, blockingWindow, extra)
 	}
 	return b.String()
 }
@@ -342,11 +342,11 @@ func isLinkPath(path []any) bool {
 	return err == nil
 }
 
-// OnlyLinkErrors reports whether err is a GraphQL error all of whose
+// onlyLinkErrors reports whether err is a GraphQL error all of whose
 // items are NOT_FOUND or FORBIDDEN at link fields: a linked issue or
 // repository that does not exist or that the token cannot see. Decode
 // marks those links Missing, and the rest of the response is good.
-func OnlyLinkErrors(err error) bool {
+func onlyLinkErrors(err error) bool {
 	var gqlErr *api.GraphQLError
 	if !errors.As(err, &gqlErr) || gqlErr == nil || len(gqlErr.Errors) == 0 {
 		return false
@@ -414,7 +414,7 @@ type Target struct {
 	Number    int
 	ID        string // node ID; never print it
 	Title     string
-	blockedBy []string // node IDs of its blockers, all of them (see BlockingWindow)
+	blockedBy []string // node IDs of its blockers, all of them (see blockingWindow)
 }
 
 // BlockedBy reports whether the linked issue blocks the target: the
@@ -423,26 +423,27 @@ type Target struct {
 func (t *Target) BlockedBy(l *Linked) bool { return l.ID != "" && slices.Contains(t.blockedBy, l.ID) }
 
 // linksHead and linksTarget are the parts of the query ReadLinks sends.
-const (
-	linksHead   = `query IssueLinks($owner: String!, $repo: String!, $number: Int!`
-	linksTarget = `) {
+const linksHead = `query IssueLinks($owner: String!, $repo: String!, $number: Int!`
+
+var linksTarget = `) {
   repository(owner: $owner, name: $repo) {
     nameWithOwner
-    issueOrPullRequest(number: $number) { __typename ... on Issue { id title blockedBy(first: 50) { nodes { id } } } }
+    issueOrPullRequest(number: $number) { __typename ... on Issue { id title blockedBy(first: ` +
+	strconv.Itoa(blockingWindow) + `) { nodes { id } } } }
   }
 `
-)
 
 // ReadLinks reads issue number of repo with its blockers, and the issues
 // refs name (see Links), in one request: what gh dojo block and unblock
-// need. Target.BlockedBy tells whether a link is in place, Linked.BlockedBy
-// whether adding it would close a cycle. A missing repository or issue, or a pull request number,
-// is exit code 3; so are missing or pull request refs (see LinksError,
-// with what naming them, and their refs written relative to def, the
-// default repository). The links come back in the order of refs.
+// need. Target.BlockedBy tells whether a link is in place,
+// Linked.BlockedBy whether adding it would close a cycle. A missing
+// repository or issue, or a pull request number, is exit code 3; so are
+// missing or pull request refs (see LinksError, with what naming them, and
+// their refs written relative to def, the default repository). The links
+// come back in the order of refs.
 func ReadLinks(ctx context.Context, q graph.Querier, repo Repo, number int, def Repo, refs []Ref, what string) (*Target, []*Linked, error) {
 	if number <= 0 {
-		return nil, nil, render.Usage("invalid issue number %d: want 1 or greater", number)
+		return nil, nil, invalidNumber(number)
 	}
 	ls := Links(refs)
 	query := linksHead + ls.Decls() + linksTarget + ls.Fields() + "}"
@@ -469,18 +470,17 @@ func ReadLinks(ctx context.Context, q graph.Querier, repo Repo, number int, def 
 	}
 	req := Request{Repo: repo, Number: number}
 	switch {
-	case err == nil, resp.Repository != nil && resp.Repository.Issue != nil && OnlyLinkErrors(err):
+	case err == nil, resp.Repository != nil && resp.Repository.Issue != nil && onlyLinkErrors(err):
 	case resp.Repository == nil && render.FromError(err).Code == render.ExitNotFound:
-		return nil, nil, render.NotFound("repository %s not found, or the token cannot see it", repo).
-			WithFix("gh repo view " + repo.String()).WithCause(err)
+		return nil, nil, repoNotFound(repo, err)
 	case render.FromError(err).Code == render.ExitNotFound && onlyTargetOrLinks(err):
-		return nil, nil, notFound(req).WithCause(err)
+		return nil, nil, notFound(req, err)
 	default:
 		return nil, nil, err
 	}
 	switch {
 	case resp.Repository == nil || resp.Repository.Issue == nil:
-		return nil, nil, notFound(req)
+		return nil, nil, notFound(req, nil)
 	case resp.Repository.Issue.Typename != "Issue":
 		return nil, nil, pullRequest(req)
 	}
