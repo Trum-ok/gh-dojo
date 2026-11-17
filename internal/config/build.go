@@ -176,19 +176,16 @@ func (c *Config) buildStatuses(r rawStatuses) error {
 }
 
 func (c *Config) buildLabels(r rawLabels) error {
+	c.Labels.TypePrefix = deref(r.TypePrefix)
 	c.Labels.AreaPrefix = deref(r.AreaPrefix)
-	if r.Types == nil {
-		return nil
+	// No label may be both a type and an area. GitHub matches label names
+	// regardless of case, so neither prefix may start the other.
+	t, a := strings.ToLower(c.Labels.TypePrefix), strings.ToLower(c.Labels.AreaPrefix)
+	if t != "" && a != "" && (strings.HasPrefix(t, a) || strings.HasPrefix(a, t)) {
+		return c.Errorf("%s %q and %s %q overlap: a label would be both a type and an area",
+			c.KeyPath("labels.type_prefix"), c.Labels.TypePrefix, c.KeyPath("labels.area_prefix"), c.Labels.AreaPrefix).
+			WithFix("change one prefix in " + c.Display + " so that neither starts the other, such as \"type: \" and \"area: \"")
 	}
-	if err := c.checkList("labels.types", *r.Types); err != nil {
-		return err
-	}
-	for _, t := range *r.Types {
-		if p := c.Labels.AreaPrefix; p != "" && strings.HasPrefix(t, p) {
-			return c.Errorf("%s: %q starts with labels.area_prefix %q", c.KeyPath("labels.types"), t, p)
-		}
-	}
-	c.Labels.Types = *r.Types
 	return nil
 }
 

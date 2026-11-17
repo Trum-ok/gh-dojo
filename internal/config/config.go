@@ -275,13 +275,16 @@ func DefaultKeywords() []string {
 	return []string{"close", "closes", "closed", "fix", "fixes", "fixed", "resolve", "resolves", "resolved"}
 }
 
-// Labels maps `new` flags to label names.
+// Labels maps `new` flags to label names. A group of labels is only its
+// prefix: its values are the repository's labels that start with it, so
+// the config lists none of them and cannot drift from the repository.
 type Labels struct {
-	// Types are the labels `new --type` accepts, used as is (`--type bug` →
-	// "bug"). When empty, --type accepts any repo label that does not start
-	// with AreaPrefix.
-	Types []string
+	// TypePrefix is prepended to `new --type`: `--type bug` → "type: bug".
+	// When empty, --type takes any repo label that does not start with
+	// AreaPrefix, as is.
+	TypePrefix string
 	// AreaPrefix is prepended to `new --area`: `--area cli` → "area:cli".
+	// When empty, --area is unavailable.
 	AreaPrefix string
 }
 

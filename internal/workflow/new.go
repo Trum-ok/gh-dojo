@@ -50,20 +50,24 @@ type NewLabels struct {
 	Labels []string
 }
 
-// CheckNewFlags rejects, without a request, a --type outside labels.types
-// and --area without labels.area_prefix.
+// CheckNewFlags rejects, without a request, --area without
+// labels.area_prefix.
 func CheckNewFlags(cfg *config.Config, l NewLabels) error {
 	if len(l.Areas) > 0 && cfg.Labels.AreaPrefix == "" {
 		return cfg.Errorf("--area needs labels.area_prefix, which is not set; pass the label with --label instead").
 			WithFix(newHelp)
 	}
-	if l.Type == "" || len(cfg.Labels.Types) == 0 {
-		return nil
+	return nil
+}
+
+// groupLabel is the label a --type or --area value names in the group with
+// prefix: prefix+value, or value itself when it already starts with the
+// prefix, so `--type "type: bug"` is `--type bug`.
+func groupLabel(prefix, value string) string {
+	if prefix != "" && hasPrefixFold(value, prefix) {
+		return value
 	}
-	if slices.ContainsFunc(cfg.Labels.Types, func(t string) bool { return strings.EqualFold(t, l.Type) }) {
-		return nil
-	}
-	return render.Usage("unknown type %q", l.Type).WithAllowed(cfg.Labels.Types...).WithFix(newHelp)
+	return prefix + value
 }
 
 // ResolveNewLabels maps --type, --area and --label to labels of the
@@ -71,8 +75,8 @@ func CheckNewFlags(cfg *config.Config, l NewLabels) error {
 // named as the repository spells it. labels are the repository's label
 // names read so far, by name; complete says they are all of them. A value
 // not among them while !complete gives more: read all the labels and call
-// again. An empty value, an unknown label, or (without labels.types) an
-// area label given as --type is a usage error with the allowed values.
+// again. An empty value, an unknown label, or (without labels.type_prefix)
+// an area label given as --type is a usage error with the allowed values.
 func ResolveNewLabels(cfg *config.Config, want NewLabels, labels []string, complete bool, repo string) (names []string, more bool, err error) {
 	prefix := cfg.Labels.AreaPrefix
 	type wanted struct {
@@ -80,16 +84,10 @@ func ResolveNewLabels(cfg *config.Config, want NewLabels, labels []string, compl
 	}
 	var wants []wanted
 	if want.Type != "" {
-		name := want.Type
-		for _, t := range cfg.Labels.Types {
-			if strings.EqualFold(t, want.Type) {
-				name = t
-			}
-		}
-		wants = append(wants, wanted{"type", want.Type, name})
+		wants = append(wants, wanted{"type", want.Type, groupLabel(cfg.Labels.TypePrefix, want.Type)})
 	}
 	for _, a := range want.Areas {
-		wants = append(wants, wanted{"area", a, prefix + a})
+		wants = append(wants, wanted{"area", a, groupLabel(prefix, a)})
 	}
 	for _, l := range want.Labels {
 		wants = append(wants, wanted{"label", l, l})
@@ -104,10 +102,10 @@ func ResolveNewLabels(cfg *config.Config, want NewLabels, labels []string, compl
 			return nil, true, nil
 		}
 		if i < 0 {
-			return nil, false, unknownNewLabel(cfg, repo, w.flag, w.value, w.name, labels)
+			return nil, false, unknownNewLabel(cfg, repo, w.flag, w.value, labels)
 		}
 		name := labels[i]
-		if w.flag == "type" && len(cfg.Labels.Types) == 0 && prefix != "" && hasPrefixFold(name, prefix) {
+		if w.flag == "type" && cfg.Labels.TypePrefix == "" && prefix != "" && hasPrefixFold(name, prefix) {
 			return nil, false, render.Usage("--type %q is an area label; pass --area %s instead", w.value, name[len(prefix):]).
 				WithFix(newHelp)
 		}
@@ -119,31 +117,28 @@ func ResolveNewLabels(cfg *config.Config, want NewLabels, labels []string, compl
 }
 
 // unknownNewLabel is the error for a --type, --area or --label value with
-// no matching label among all of the repository's.
-func unknownNewLabel(cfg *config.Config, repo, flag, value, name string, all []string) error {
-	prefix := cfg.Labels.AreaPrefix
+// no matching label among all of the repository's. The allowed values of a
+// group with a prefix are the labels that start with it, without it.
+func unknownNewLabel(cfg *config.Config, repo, flag, value string, all []string) error {
+	prefix := map[string]string{"type": cfg.Labels.TypePrefix, "area": cfg.Labels.AreaPrefix}[flag]
 	var allowed []string
-	switch flag {
-	case "type":
-		if len(cfg.Labels.Types) > 0 {
-			// The type is in labels.types (CheckNewFlags), so the repo lacks it.
-			return cfg.Errorf("labels.types has %q, but %s has no such label", name, repo).
-				WithFix(fmt.Sprintf("gh label create %q -R %s", name, repo))
-		}
+	switch {
+	case flag == "type" && prefix == "":
+		// Any label outside the areas is a type.
 		for _, l := range all {
-			if prefix == "" || !hasPrefixFold(l, prefix) {
+			if a := cfg.Labels.AreaPrefix; a == "" || !hasPrefixFold(l, a) {
 				allowed = append(allowed, l)
 			}
 		}
-	case "area":
+	case prefix != "":
 		for _, l := range all {
-			if prefix != "" && hasPrefixFold(l, prefix) {
+			if hasPrefixFold(l, prefix) {
 				allowed = append(allowed, l[len(prefix):])
 			}
 		}
 		if len(allowed) == 0 {
-			return render.Usage("unknown area %q: %s has no labels starting with %q", value, repo, prefix).
-				WithFix("gh label list -R " + repo)
+			return render.Usage("unknown %s %q: %s has no labels starting with %q", flag, value, repo, prefix).
+				WithFix(fmt.Sprintf("gh label create %q -R %s", groupLabel(prefix, value), repo))
 		}
 	default:
 		allowed = all

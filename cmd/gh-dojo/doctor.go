@@ -31,12 +31,11 @@ warning is followed by the command that fixes it.
   repo     each repository of board.repos (else the current one) is visible
            and has issues enabled; warns when board.repos spells one otherwise
            than GitHub does
-  labels   with labels.types or labels.area_prefix set, in each of those
-           repositories: every type label exists (missing: problem, since
-           new --type fails; in another case: warn), and how many labels
-           start with the area prefix (none: warn when the config sets the
-           prefix, not a preset, since --area finds nothing; past 100
-           labels the count is a lower bound)
+  labels   with labels.type_prefix or labels.area_prefix set, in each of
+           those repositories: how many labels start with each prefix
+           (none: warn when the config sets the prefix, not a preset, since
+           --type or --area finds nothing; past 100 labels a count is a
+           lower bound)
   sprint   with fields.sprint set: the field is an iteration field and an
            iteration covers today
   verbs    the labels verbs add or remove exist in the default repository,
@@ -47,10 +46,8 @@ warning is followed by the command that fixes it.
            up to date with the config and this gh-dojo (out of date: warn)
 
 It sends one request for the token and the repositories, one more for the
-board when its schema is not cached (an hour), one for the labels of
-labels.types and labels.area_prefix when set (and, for a repository with
-over 100 labels where a type is not found, its labels page by page), and
-one for the verbs' labels, assignees and milestones when a verb has them
+board when its schema is not cached (an hour), one for the labels when
+labels.type_prefix or labels.area_prefix is set, and one for the verbs' labels, assignees and milestones when a verb has them
 (and, past 100 open milestones, those page by page).
 
 Exit codes: 0 when every check is ok or warns; 4 when a check failed on auth or the

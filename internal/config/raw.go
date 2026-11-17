@@ -45,8 +45,8 @@ type rawStatuses struct {
 }
 
 type rawLabels struct {
-	Types      *[]string `toml:"types"`
-	AreaPrefix *string   `toml:"area_prefix"`
+	TypePrefix *string `toml:"type_prefix"`
+	AreaPrefix *string `toml:"area_prefix"`
 }
 
 type rawSession struct {
@@ -175,7 +175,7 @@ var (
 	presetKeys   = []string{"version", "fields", "statuses", "labels", "session", "verbs"}
 	boardKeys    = []string{"owner", "project", "repos", "assignee", "timezone"}
 	statusesKeys = []string{"initial", "final", "resolved"}
-	labelsKeys   = []string{"types", "area_prefix"}
+	labelsKeys   = []string{"type_prefix", "area_prefix"}
 	sessionKeys  = []string{"env", "link"}
 	agentKeys    = []string{"targets", "notes", "description"}
 	releaseKeys  = []string{"keywords"}
@@ -429,7 +429,7 @@ func merge(preset, repo *rawFile, name string, origin map[string]string) *rawFil
 	out.Statuses.Initial = pick(m, "statuses.initial", preset.Statuses.Initial, repo.Statuses.Initial)
 	out.Statuses.Final = pick(m, "statuses.final", preset.Statuses.Final, repo.Statuses.Final)
 	out.Statuses.Resolved = pick(m, "statuses.resolved", preset.Statuses.Resolved, repo.Statuses.Resolved)
-	out.Labels.Types = pick(m, "labels.types", preset.Labels.Types, repo.Labels.Types)
+	out.Labels.TypePrefix = pick(m, "labels.type_prefix", preset.Labels.TypePrefix, repo.Labels.TypePrefix)
 	out.Labels.AreaPrefix = pick(m, "labels.area_prefix", preset.Labels.AreaPrefix, repo.Labels.AreaPrefix)
 	out.Session.Env = pick(m, "session.env", preset.Session.Env, repo.Session.Env)
 	out.Session.Link = pick(m, "session.link", preset.Session.Link, repo.Session.Link)

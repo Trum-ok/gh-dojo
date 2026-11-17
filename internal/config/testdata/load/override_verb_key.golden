@@ -4,7 +4,7 @@ preset: "kanban"
 board: owner=Trum-ok project=1 repos=[] assignee=""
 fields.status: "Status"
 statuses: initial="Backlog" final=["Done"] resolved=["Ready" "Done"]
-labels: types=[] area_prefix="area:"
+labels: type_prefix="" area_prefix="area:"
 session: env=[] link="{id}"
 verb start
   when: Take the issue

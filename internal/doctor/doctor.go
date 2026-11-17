@@ -132,8 +132,7 @@ type Env struct {
 // Run runs the checks in order. Requests: one Doctor query (token and
 // repositories), plus the board schema when it is not cached (or the
 // cached one has no iteration for today), plus one DoctorLabels query with
-// labels.types or labels.area_prefix set (and all the labels of a
-// repository with over 100 whose type it did not find), plus one
+// labels.type_prefix or labels.area_prefix set, plus one
 // DoctorVerbs query when a verb has labels or assigns someone.
 func Run(ctx context.Context, env Env) *Report {
 	r := &Report{}

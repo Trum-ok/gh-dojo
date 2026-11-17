@@ -66,14 +66,8 @@ func TestNewMarker(t *testing.T) {
 func TestCheckNewFlags(t *testing.T) {
 	c := parseNewConfig(t, "")
 	if err := CheckNewFlags(c, NewLabels{Type: "anything", Areas: []string{"cli"}}); err != nil {
-		t.Errorf("without labels.types any --type passes: %v", err)
+		t.Errorf("--type is checked against the repository, not offline: %v", err)
 	}
-	typed := parseNewConfig(t, "")
-	typed.Labels.Types = []string{"bug", "enhancement"}
-	if err := CheckNewFlags(typed, NewLabels{Type: "BUG"}); err != nil {
-		t.Errorf("--type is matched ignoring case: %v", err)
-	}
-	usage(t, CheckNewFlags(typed, NewLabels{Type: "chore"}), `unknown type "chore"`)
 	noAreas := parseNewConfig(t, "")
 	noAreas.Labels.AreaPrefix = ""
 	usage(t, CheckNewFlags(noAreas, NewLabels{Areas: []string{"cli"}}), "--area needs labels.area_prefix")
@@ -109,10 +103,31 @@ func TestResolveNewLabels(t *testing.T) {
 	_, _, err = ResolveNewLabels(c, NewLabels{Type: "area:cli"}, page, true, repo)
 	usage(t, err, "pass --area cli instead")
 
-	typed := parseNewConfig(t, "")
-	typed.Labels.Types = []string{"bug", "chore"}
-	_, _, err = ResolveNewLabels(typed, NewLabels{Type: "CHORE"}, page, true, repo)
-	usage(t, err, `labels.types has "chore", but acme/api has no such label`)
+	_, _, err = ResolveNewLabels(c, NewLabels{Areas: []string{"area:web"}}, page, true, repo)
+	usage(t, err, `unknown area "area:web"`)
+}
+
+// TestResolveNewLabelsTypePrefix: with labels.type_prefix, --type names the
+// label with the prefix, given with or without it, and an unknown one
+// lists the types the repository has.
+func TestResolveNewLabelsTypePrefix(t *testing.T) {
+	c := parseNewConfig(t, "")
+	c.Labels.TypePrefix = "type: "
+	repo := "acme/api"
+	all := []string{"Type: Bug", "type: feature", "bug", "area:cli"}
+	for _, want := range []string{"bug", "BUG", "type: bug", "TYPE: bug"} {
+		names, _, err := ResolveNewLabels(c, NewLabels{Type: want, Areas: []string{"area:cli"}}, all, true, repo)
+		if err != nil || !slices.Equal(names, []string{"Type: Bug", "area:cli"}) {
+			t.Errorf("--type %q: names = %q, err = %v", want, names, err)
+		}
+	}
+	_, _, err := ResolveNewLabels(c, NewLabels{Type: "chore"}, all, true, repo)
+	var e *render.Error
+	if !errors.As(err, &e) || !slices.Equal(e.Allowed, []string{"Bug", "feature"}) {
+		t.Errorf("unknown type: err = %v, want allowed Bug, feature", err)
+	}
+	_, _, err = ResolveNewLabels(c, NewLabels{Type: "bug"}, []string{"bug"}, true, repo)
+	usage(t, err, `acme/api has no labels starting with "type: "`)
 }
 
 // TestResolveNewLabelsAllowed: an unknown --type lists the labels outside

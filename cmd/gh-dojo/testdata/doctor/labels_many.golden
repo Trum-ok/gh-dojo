@@ -1,4 +1,4 @@
-code: 1
+code: 0
 --- stdout
 ok       version  gh dojo dev
 ok       config   .github/dojo.toml: preset kanban, 4 verbs
@@ -7,14 +7,7 @@ ok       board    Trum-ok/5 "gh-dojo": field Status and 5 statuses match
 ok       repo     Trum-ok/big (default): visible, issues enabled
 ok       repo     Trum-ok/huge: visible, issues enabled
 ok       repo     Trum-ok/paged: visible, issues enabled
-warn     labels   labels.types: "Docs" is "docs" in Trum-ok/big; new --type finds it regardless of case
-                  fix: gh label edit "docs" --name "Docs" -R Trum-ok/big
-ok       labels   Trum-ok/big: at least 3 area labels (area:…)
-ok       labels   Trum-ok/huge: 2 type labels exist, could not confirm area labels (area:…): none among the first 100 of 739 labels or by search
-warn     labels   labels.types: "bug" is "Bug" in Trum-ok/paged; new --type finds it regardless of case
-                  fix: gh label edit "Bug" --name "bug" -R Trum-ok/paged
-problem  labels   labels.types: no label "Docs" in Trum-ok/paged, so gh dojo new --type Docs fails
-                  fix: gh label create "Docs" -R Trum-ok/paged, or fix labels.types
-ok       labels   Trum-ok/paged: 1 area label (area:…)
+ok       labels   Trum-ok/big: at least 2 type labels (kind/…), at least 3 area labels (area:…)
+ok       labels   Trum-ok/huge: at least 1 type label (kind/…), could not confirm area labels (area:…): none among the first 100 of 739 labels or by search
+ok       labels   Trum-ok/paged: could not confirm type labels (kind/…): none among the first 100 of 150 labels or by search, could not confirm area labels (area:…): none among the first 100 of 150 labels or by…
 --- stderr
-error: doctor found 1 problem; fix as shown above, then run gh dojo doctor again

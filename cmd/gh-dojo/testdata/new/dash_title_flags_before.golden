@@ -1,6 +1,5 @@
 code: 1
 --- stdout
 --- stderr
-error: unknown type "chore"
-allowed: bug
+error: .github/dojo.toml: --area needs labels.area_prefix, which is not set; pass the label with --label instead
 fix: gh dojo new --help

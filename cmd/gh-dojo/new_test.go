@@ -533,13 +533,13 @@ func TestNewUnknownMilestone(t *testing.T) {
 // TestNewDashTitle: flags go before --, the title after it; a flag after
 // -- is part of the arguments. Both fail before any request here.
 func TestNewDashTitle(t *testing.T) {
-	withConfig(t, dojoConfig+"\n[labels]\ntypes = [\"bug\"]\narea_prefix = \"area:\"\n")
+	withConfig(t, dojoConfig+"\n[labels]\narea_prefix = \"\"\n")
 	tests := []struct {
 		name string
 		args []string
 	}{
-		// --type is parsed: refused as outside labels.types.
-		{"dash_title_flags_before", []string{"new", "--type", "chore", "--", "-v is ignored"}},
+		// --area is parsed: refused as labels.area_prefix is not set.
+		{"dash_title_flags_before", []string{"new", "--area", "cli", "--", "-v is ignored"}},
 		// --type after -- is two more arguments.
 		{"dash_title_flags_after", []string{"new", "--", "-v is ignored", "--type", "bug"}},
 	}
@@ -554,27 +554,18 @@ func TestNewDashTitle(t *testing.T) {
 	}
 }
 
-func TestNewConfiguredTypes(t *testing.T) {
-	typed := dojoConfig + "\n[labels]\ntypes = [\"bug\", \"feature\"]\narea_prefix = \"area:\"\n"
-
-	// Outside labels.types: refused before any request (newApp is noApp).
-	withConfig(t, typed)
-	code, out := runOut("new", "Fix login redirect", "--type", "chore")
-	testutil.Golden(t, "new/type_not_configured", out)
-	if code != render.ExitUsage {
-		t.Errorf("code = %d", code)
-	}
-
+func TestNewLabelGroups(t *testing.T) {
 	// --area without labels.area_prefix: refused before any request.
 	withConfig(t, dojoConfig+"\n[labels]\narea_prefix = \"\"\n")
-	code, out = runOut("new", "Fix login redirect", "--area", "cli")
+	code, out := runOut("new", "Fix login redirect", "--area", "cli")
 	testutil.Golden(t, "new/area_without_prefix", out)
 	if code != render.ExitUsage {
 		t.Errorf("code = %d", code)
 	}
 
-	// In labels.types but not in the repo: a config problem.
-	withConfig(t, typed)
+	// A type prefix no label of the repo has: --type finds nothing, and
+	// the error says so rather than listing nothing.
+	withConfig(t, dojoConfig+"\n[labels]\ntype_prefix = \"type: \"\n")
 	withApp(t, boardFixture, newContextFixture)
 	code, out = runOut("new", "Fix login redirect", "--type", "feature")
 	testutil.Golden(t, "new/type_missing_in_repo", out)

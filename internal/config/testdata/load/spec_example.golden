@@ -5,7 +5,7 @@ board: owner=acme project=3 repos=[acme/shop] assignee="@me"
 fields.status: "Status"
 fields.sprint: "Sprint"
 statuses: initial="Backlog" final=["Done"] resolved=["Ready" "Done"]
-labels: types=[] area_prefix="area:"
+labels: type_prefix="" area_prefix="area:"
 session: env=["CLAUDE_CODE_HOST_SESSION_ID"] link="claude://claude.ai/epitaxy/{id}"
 verb start
   when: берёшь задачу в работу

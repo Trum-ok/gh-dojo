@@ -4,7 +4,7 @@ preset: ""
 board: owner=acme project=7 repos=[] assignee=""
 fields.status: "Status"
 statuses: initial="" final=[] resolved=[]
-labels: types=[] area_prefix=""
+labels: type_prefix="" area_prefix=""
 session: env=[] link="{id}"
 verb go
   when: Go

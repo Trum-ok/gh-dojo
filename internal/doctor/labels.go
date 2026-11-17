@@ -4,35 +4,50 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/graph"
-	"github.com/Trum-ok/gh-dojo/internal/issue"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 )
 
-// labelsCheck is what the DoctorLabels query asks about each repository's
-// labels for new: labels.types and labels.area_prefix. In each repository
-// it reads the first 100 labels and searches for each type and for the
-// prefix. Search matches the start of words regardless of case: it finds a
-// type, one letter long or not, but not a prefix of punctuation such as
-// "~" or ".", and it also returns labels that only contain the prefix. So
-// past the first 100 labels an area count is a lower bound, and a type the
-// search did not find is looked up in all the labels, as new does.
-type labelsCheck struct {
-	types  []string
+// labelGroup is a group of labels new takes by prefix: --type or --area.
+type labelGroup struct {
+	flag   string // "type" or "area"
+	key    string // its config key, "labels.type_prefix"
 	prefix string
 }
 
-// newLabelsCheck returns nil when the config has neither labels.types nor
-// labels.area_prefix: there is nothing to ask.
+// labelsCheck is what the DoctorLabels query asks about each repository's
+// labels for new: how many start with labels.type_prefix and with
+// labels.area_prefix. In each repository it reads the first 100 labels and
+// searches for each prefix. Search matches the start of words regardless
+// of case: it does not find a prefix of punctuation such as "~" or ".", and
+// it also returns labels that only contain the prefix. So past the first
+// 100 labels a count is a lower bound.
+type labelsCheck struct {
+	groups []labelGroup
+}
+
+// newLabelsCheck returns nil when the config sets neither prefix: there is
+// nothing to ask, as --type then takes any label and --area none.
 func newLabelsCheck(cfg *config.Config) *labelsCheck {
-	if cfg == nil || len(cfg.Labels.Types) == 0 && cfg.Labels.AreaPrefix == "" {
+	if cfg == nil {
 		return nil
 	}
-	return &labelsCheck{types: cfg.Labels.Types, prefix: cfg.Labels.AreaPrefix}
+	c := &labelsCheck{}
+	for _, g := range []labelGroup{
+		{"type", "labels.type_prefix", cfg.Labels.TypePrefix},
+		{"area", "labels.area_prefix", cfg.Labels.AreaPrefix},
+	} {
+		if g.prefix != "" {
+			c.groups = append(c.groups, g)
+		}
+	}
+	if len(c.groups) == 0 {
+		return nil
+	}
+	return c
 }
 
 // labelsPage is the most labels one field of the DoctorLabels query reads.
@@ -49,23 +64,16 @@ func (c *labelsCheck) query(repos []*repo, idx []int) (string, map[string]any) {
 			fmt.Sprintf("  repo%d: repository(owner: $owner%d, name: $name%d) {", i, i, i),
 			fmt.Sprintf("    labels(first: %d) { totalCount nodes { name } }", labelsPage),
 		}
-		for j := range c.types {
-			f = append(f, fmt.Sprintf("    type%d: labels(first: %d, query: $type%d) { nodes { name } }", j, labelsPage, j))
-		}
-		if c.prefix != "" {
-			f = append(f, fmt.Sprintf("    area: labels(first: %d, query: $area) { nodes { name } }", labelsPage))
+		for _, g := range c.groups {
+			f = append(f, fmt.Sprintf("    %s: labels(first: %d, query: $%s) { nodes { name } }", g.flag, labelsPage, g.flag))
 		}
 		fields = append(fields, strings.Join(f, "\n")+"\n  }")
 		vars[fmt.Sprintf("owner%d", i)] = repos[i].Repo.Owner
 		vars[fmt.Sprintf("name%d", i)] = repos[i].Repo.Name
 	}
-	for j, t := range c.types {
-		params = append(params, fmt.Sprintf("$type%d: String!", j))
-		vars[fmt.Sprintf("type%d", j)] = t
-	}
-	if c.prefix != "" {
-		params = append(params, "$area: String!")
-		vars["area"] = c.prefix
+	for _, g := range c.groups {
+		params = append(params, fmt.Sprintf("$%s: String!", g.flag))
+		vars[g.flag] = g.prefix
 	}
 	return "query DoctorLabels(" + strings.Join(params, ", ") + ") {\n" + strings.Join(fields, "\n") + "\n}", vars
 }
@@ -96,55 +104,26 @@ func (c *labelsCheck) found(answer json.RawMessage) *labelsFound {
 		return conn.TotalCount, len(conn.Nodes)
 	}
 	total, n := read("labels")
-	for j := range c.types {
-		read(fmt.Sprintf("type%d", j))
+	for _, g := range c.groups {
+		read(g.flag)
 	}
-	read("area")
 	f.total, f.complete = total, total <= n
 	return f
 }
 
 func (f *labelsFound) add(name string) {
-	if !slices.Contains(f.names, name) {
-		f.names = append(f.names, name)
-	}
-}
-
-// has reports whether a label matches name regardless of case, as new
-// looks labels up.
-func (f *labelsFound) has(name string) bool {
-	return slices.ContainsFunc(f.names, func(n string) bool { return strings.EqualFold(n, name) })
-}
-
-// allLabels reads every label of repo, page by page, as new does past the
-// first 100.
-func allLabels(ctx context.Context, q graph.Querier, repo issue.Repo) (*labelsFound, error) {
-	type resp struct {
-		Repository *struct {
-			Labels graph.Connection[issue.Label] `json:"labels"`
-		} `json:"repository"`
-	}
-	vars := map[string]any{"owner": repo.Owner, "repo": repo.Name}
-	page, err := graph.Paginate(ctx, q, issue.LabelsQuery, vars, 0, func(r *resp) *graph.Connection[issue.Label] {
-		if r.Repository == nil {
-			return nil
+	for _, n := range f.names {
+		if n == name {
+			return
 		}
-		return &r.Repository.Labels
-	})
-	if err != nil {
-		return nil, err
 	}
-	f := &labelsFound{total: len(page.Nodes), complete: true}
-	for _, l := range page.Nodes {
-		f.add(l.Name)
-	}
-	return f, nil
+	f.names = append(f.names, name)
 }
 
-// run checks labels.types and labels.area_prefix in each repository the
-// repo check found usable: one DoctorLabels query for them all. A failed
-// request is a problem of this check alone; a repository it could not
-// read is a problem of its own.
+// run checks labels.type_prefix and labels.area_prefix in each repository
+// the repo check found usable: one DoctorLabels query for them all. A
+// failed request is a problem of this check alone; a repository it could
+// not read is a problem of its own.
 func (c *labelsCheck) run(ctx context.Context, r *Report, q graph.Querier, cfg *config.Config, repos []*repo) {
 	var idx []int
 	for i, rp := range repos {
@@ -176,72 +155,40 @@ func (c *labelsCheck) run(ctx context.Context, r *Report, q graph.Querier, cfg *
 			}
 			r.AddProblem("labels", named(name, err))
 		default:
-			c.check(ctx, r, q, cfg, rp, len(repos) == 1, c.found(answer))
+			c.check(r, cfg, name, c.found(answer))
 		}
 	}
 }
 
-// check reports one repository's labels. A missing type label is a
-// problem: new --type fails on it. One in another case is a warning, since
-// new matches labels regardless of case; its fix renames the label, or with
-// one repository edits the config. With over 100 labels, a type found
-// neither among the first 100 nor by search is looked up in all of them.
-// No label with the area prefix is a warning when the config sets the
-// prefix (new --area finds nothing), and a note on the ok line when a
-// preset does: many teams never use the preset's areas. Past 100 labels
-// the area count is a lower bound, and none found cannot be confirmed.
-func (c *labelsCheck) check(ctx context.Context, r *Report, q graph.Querier, cfg *config.Config, rp *repo, single bool, f *labelsFound) {
-	name := rp.Repo.String()
-	if !f.complete && slices.ContainsFunc(c.types, func(t string) bool { return !f.has(t) }) {
-		all, err := allLabels(ctx, q, rp.Repo)
-		if err != nil {
-			r.AddProblem("labels", named(name, err))
-			return
-		}
-		f = all
-	}
+// check reports one repository's labels: how many each group has. None is
+// a warning when the config sets the prefix (new with the group's flag
+// finds nothing), and a note on the ok line when a preset does: many teams
+// never use the preset's areas. Past 100 labels a count is a lower bound,
+// and none found cannot be confirmed.
+func (c *labelsCheck) check(r *Report, cfg *config.Config, name string, f *labelsFound) {
 	var found []string
-	key, bad := cfg.KeyPath("labels.types"), 0
-	for _, t := range c.types {
-		switch spelled := spelling(t, f.names); {
-		case slices.Contains(f.names, t):
-		case spelled != "":
-			fix := fmt.Sprintf("gh label edit %q --name %q -R %s", spelled, t, name)
-			if single {
-				fix = fmt.Sprintf("write it as %q in %s, or %s", spelled, key, fix)
-			}
-			r.AddWarn("labels", fix, "%s: %q is %q in %s; new --type finds it regardless of case", key, t, spelled, name)
-			bad++
-		default:
-			r.AddProblem("labels", render.Usage("%s: no label %q in %s, so gh dojo new --type %s fails", key, t, name, t).
-				WithFix(fmt.Sprintf("gh label create %q -R %s, or fix %s", t, name, key)))
-			bad++
-		}
-	}
-	if n := len(c.types); n > 0 && bad == 0 {
-		found = append(found, plural(n, "type label exists", "type labels exist"))
-	}
-	if c.prefix != "" {
-		areas := 0
-		for _, n := range f.names {
-			if hasPrefixFold(n, c.prefix) {
-				areas++
+	for _, g := range c.groups {
+		n := 0
+		for _, l := range f.names {
+			if hasPrefixFold(l, g.prefix) {
+				n++
 			}
 		}
+		one, many := g.flag+" label", g.flag+" labels"
 		switch {
-		case !f.complete && areas == 0:
-			found = append(found, fmt.Sprintf("could not confirm area labels (%s…): none among the first %d of %d labels or by search",
-				c.prefix, labelsPage, f.total))
+		case !f.complete && n == 0:
+			found = append(found, fmt.Sprintf("could not confirm %s (%s…): none among the first %d of %d labels or by search",
+				many, g.prefix, labelsPage, f.total))
 		case !f.complete:
-			found = append(found, fmt.Sprintf("at least %s (%s…)", plural(areas, "area label", "area labels"), c.prefix))
-		case areas == 0 && cfg.FromPreset("labels.area_prefix") != "":
-			found = append(found, fmt.Sprintf("no area labels (%s…) yet: new --area fails until one exists", c.prefix))
-		case areas == 0:
-			r.AddWarn("labels", fmt.Sprintf("gh label create %q -R %s, or set labels.area_prefix = \"\" in %s",
-				c.prefix+"<name>", name, cfg.Display),
-				"%s: no label starts with labels.area_prefix %q, so gh dojo new --area finds nothing", name, c.prefix)
+			found = append(found, fmt.Sprintf("at least %s (%s…)", plural(n, one, many), g.prefix))
+		case n == 0 && cfg.FromPreset(g.key) != "":
+			found = append(found, fmt.Sprintf("no %s (%s…) yet: new --%s fails until one exists", many, g.prefix, g.flag))
+		case n == 0:
+			r.AddWarn("labels", fmt.Sprintf("gh label create %q -R %s, or set %s = \"\" in %s",
+				g.prefix+"<name>", name, g.key, cfg.Display),
+				"%s: no label starts with %s %q, so gh dojo new --%s finds nothing", name, g.key, g.prefix, g.flag)
 		default:
-			found = append(found, fmt.Sprintf("%s (%s…)", plural(areas, "area label", "area labels"), c.prefix))
+			found = append(found, fmt.Sprintf("%s (%s…)", plural(n, one, many), g.prefix))
 		}
 	}
 	if len(found) > 0 {

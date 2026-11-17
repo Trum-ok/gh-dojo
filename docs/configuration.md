@@ -32,7 +32,7 @@ final = ["Done"]             # hidden by `list`, with a counter
 resolved = ["Ready", "Done"] # a blocker in these no longer blocks
 
 [labels]
-types = ["bug", "feature"]   # labels `new --type` accepts; empty = any label without area_prefix
+type_prefix = "type: "       # `new --type bug` → label "type: bug"; "" = any label outside the areas
 area_prefix = "area:"        # `new --area cli` → label "area:cli"
 
 [session]                    # fills {session} in comment templates
@@ -152,8 +152,15 @@ own name with the [`field`](#effects) effect. Logical names are lowercase:
 
 | Key           | Meaning |
 |---------------|---------|
-| `types`       | Labels `new --type` accepts. Empty: any repo label that does not start with `area_prefix` |
-| `area_prefix` | Prepended by `new --area`: `--area cli` → `area:cli`. Types may not start with it |
+| `type_prefix` | Prepended by `new --type`: `--type bug` → `type: bug`. Empty: `--type` takes any repo label that does not start with `area_prefix`, as is |
+| `area_prefix` | Prepended by `new --area`: `--area cli` → `area:cli`. Empty: `--area` is unavailable |
+
+A type or an area is a label of the repository that starts with its prefix;
+the config lists none, so it cannot drift from the repository: a new type
+is `gh label create "type: chore"`. A value may also be given with its
+prefix (`--type "type: bug"`), and an unknown one fails listing the values
+the repository has. Neither prefix may start the other, ignoring case, or a
+label would be both a type and an area.
 
 ## session
 
@@ -462,8 +469,8 @@ English: override them to write them in your project's language, as
 Both presets set `fields.status = "Status"`, `statuses.initial = "Backlog"`,
 `statuses.final = ["Done"]`, `statuses.resolved = ["Ready", "Done"]` (a
 blocker in Ready is done, so it no longer blocks, though its issue stays
-open until Done), `labels.types = []` (any label without the area prefix is
-a type) and `labels.area_prefix = "area:"`.
+open until Done), `labels.type_prefix = ""` (any label without the area
+prefix is a type) and `labels.area_prefix = "area:"`.
 
 ## Kanban preset
 

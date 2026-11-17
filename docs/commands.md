@@ -152,9 +152,10 @@ gh dojo new <title> [--type T] [--area A]... [--label L]... [--assignee LOGIN]..
 Creates an issue, labels it, adds it to the board and sets the initial status
 ([`statuses.initial`](configuration.md#statuses)) in one command:
 
-- `--type` takes one of [`labels.types`](configuration.md#labels) (or any repo label outside
-  the areas when that list is empty), `--area cli` adds the label
-  `<labels.area_prefix>cli`, `--label` adds any existing label;
+- `--type bug` adds the label `<labels.type_prefix>bug` (with an empty
+  [`labels.type_prefix`](configuration.md#labels), any repo label outside the
+  areas), `--area cli` adds the label `<labels.area_prefix>cli`, a value may
+  also carry its prefix, and `--label` adds any existing label;
 - `--assignee octocat` assigns a user who can be assigned issues in the
   repository, `@me` the authenticated user (repeatable, or comma-separated;
   GitHub allows 10). Logins are matched ignoring case, and `@me` with your
@@ -344,15 +345,14 @@ ok       verbs    octocat/shop: 2 labels exist, 1 assignee can be assigned
 | `token` | gh is logged in, and the token has the `project` scope (from `GH_TOKEN`: "set GH_TOKEN to …") |
 | `board` | The board exists, is open, and has every field and status the config names, each mismatch on its own line |
 | `repo` | Each repository of [`board.repos`](configuration.md#board), or the current one, is visible with issues enabled; a warning when `board.repos` spells one otherwise than GitHub does |
-| `labels` | With [`labels.types`](configuration.md#labels) or `labels.area_prefix` set, in each repository of the `repo` check: every type label exists (missing is a problem, since `new --type` fails on it, fixed by `gh label create`; spelled in another case is `warn`, since `new` matches labels regardless of case, fixed by `gh label edit`), and how many labels start with the area prefix. None is `warn` when `.github/dojo.toml` sets the prefix, since `new --area` finds nothing (create one, or set the prefix to `""`); with the prefix from a preset, which many teams never use, it is a note on the `ok` line. Past 100 labels the area count is a lower bound ("at least"), and none found is "could not confirm" rather than a warning |
+| `labels` | With [`labels.type_prefix`](configuration.md#labels) or `labels.area_prefix` set, in each repository of the `repo` check: how many labels start with each prefix. None is `warn` when `.github/dojo.toml` sets the prefix, since `new --type` or `--area` finds nothing (create one, or set the prefix to `""`); with the prefix from a preset, which many teams never use, it is a note on the `ok` line. Past 100 labels a count is a lower bound ("at least"), and none found is "could not confirm" rather than a warning |
 | `sprint` | With [`fields.sprint`](configuration.md#fields): an iteration covers today, a date in [`board.timezone`](configuration.md#board) |
 | `verbs` | When verbs have labels, assignees or milestones: the labels exist in the default repository, spelled exactly as there (those of `from_labels` and `refuse_labels` in any case, as the checks match them), the users can be assigned, and each milestone a verb names in the config matches one open milestone there, as the verb matches it (none or several is a problem) |
 | `agent` | With [`[agent]`](configuration.md#agent) set (and `targets` not empty), or a file with a gh-dojo marker: the files [`agent install`](#agent-install) writes are up to date (`agent install --check`, without the diff). Out of date or missing is `warn`, since the text also depends on the gh-dojo version; a hand-written skill under `[agent]` is a problem |
 
 It sends one request for the token and the repositories, one more for the
 board when its schema is not cached, one for the labels when
-`labels.types` or `labels.area_prefix` is set (plus a repository's labels
-page by page when it has over 100 and a type is not found), and one for
+`labels.type_prefix` or `labels.area_prefix` is set, and one for
 the verbs' labels, assignees and milestones when a verb has them (plus the
 open milestones page by page past 100). The exit code is 0
 when no check is a problem (warnings included), 4 when one failed on auth

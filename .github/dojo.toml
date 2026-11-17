@@ -11,7 +11,7 @@ project = 5
 repos = ["Trum-ok/gh-dojo"]
 
 [labels]
-types = ["bug", "enhancement", "documentation", "dogfood"]
+type_prefix = "type: "       # new --type bug adds "type: bug"; the types are the repo's "type: " labels
 
 [session]
 env = ["CLAUDE_CODE_HOST_SESSION_ID"]

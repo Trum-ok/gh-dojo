@@ -53,29 +53,28 @@ from = ["In Progress"]
 		{"repos", strings.Replace(dojoConfig, `repos = ["Trum-ok/gh-dojo"]`,
 			`repos = ["Trum-ok/gh-dojo", "Trum-ok/no-such-repo", "Trum-ok/wiki"]`, 1),
 			[]string{doctorFixtures + "repos.json", boardFixture}, render.ExitUsage, 3},
-		// labels.types and labels.area_prefix take one DoctorLabels query
-		// for every repository: a missing type is a problem, one in
-		// another case and no area label are warnings.
+		// labels.type_prefix and labels.area_prefix take one DoctorLabels
+		// query for every repository: no label with a prefix the config
+		// sets is a warning; labels in another case count.
 		{"labels", strings.Replace(dojoConfig, `repos = ["Trum-ok/gh-dojo"]`,
 			`repos = ["Trum-ok/gh-dojo", "Trum-ok/gh-dojo-site"]`, 1) + `
 [labels]
-types = ["bug", "Enhancement", "chore"]
+type_prefix = "type: "
 area_prefix = "service:"
-`, []string{doctorFixtures + "labels.json", boardFixture}, render.ExitUsage, 3},
+`, []string{doctorFixtures + "labels.json", boardFixture}, render.ExitOK, 3},
 		// The preset's area_prefix written in the config itself: no area
 		// label is a warning, as with any prefix the config sets.
 		{"area_in_config", dojoConfig + `
 [labels]
 area_prefix = "area:"
 `, []string{doctorFixtures + "ok.json", boardFixture}, render.ExitOK, 3},
-		// Over 100 labels: a type the search finds needs no more reads, an
-		// area count is a lower bound and none found is not confirmed; a
-		// type not found reads all the labels (two pages for 150).
+		// Over 100 labels: a count is a lower bound and none found is not
+		// confirmed, with no more reads.
 		{"labels_many", strings.Replace(dojoConfig, `repos = ["Trum-ok/gh-dojo"]`,
 			`repos = ["Trum-ok/big", "Trum-ok/huge", "Trum-ok/paged"]`, 1) + `
 [labels]
-types = ["bug", "Docs"]
-`, []string{doctorFixtures + "labels_many.json", boardFixture}, render.ExitUsage, 5},
+type_prefix = "kind/"
+`, []string{doctorFixtures + "labels_many.json", boardFixture}, render.ExitOK, 3},
 		// Verbs' labels and assignees take one more read: each label
 		// missing or spelled in another case and each user who cannot be
 		// assigned is a problem.

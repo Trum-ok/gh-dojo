@@ -62,7 +62,7 @@ const skillPath = ".claude/skills/gh-dojo/SKILL.md"
 // agentConfig covers every rule the instructions explain: confirm, the
 // blockers check (deny) and link, the sub_issues check (warn and deny),
 // the label checks (from_labels and refuse_labels, with the verbs that
-// add and remove their labels), batch, a sprint, labels.types, notes.
+// add and remove their labels), batch, a sprint, labels.type_prefix, notes.
 const agentConfig = `
 version = 1
 preset = "sprints"
@@ -73,7 +73,7 @@ project = 3
 repos = ["acme/shop"]
 
 [labels]
-types = ["bug", "feature"]
+type_prefix = "type: "
 
 [session]
 env = ["CLAUDE_CODE_HOST_SESSION_ID"]

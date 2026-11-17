@@ -4,7 +4,7 @@ preset: "kanban"
 board: owner=acme project=3 repos=[] assignee=""
 fields.status: "Stage"
 statuses: initial="Backlog" final=["Done" "Won't do"] resolved=[]
-labels: types=["bug" "feature"] area_prefix=""
+labels: type_prefix="type: " area_prefix=""
 session: env=[] link="{id}"
 verb start
   when: You begin working on the issue

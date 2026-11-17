@@ -21,10 +21,10 @@ assignee = "@me"             # who assign = true assigns: "@me" or a login
 # [fields], [statuses] and [labels] default to the preset's values:
 #   fields.status = "Status"
 #   statuses.initial = "Backlog", final = ["Done"], resolved = ["Ready", "Done"]
-#   labels.types = [] (any label without the area prefix), area_prefix = "area:"
+#   labels.type_prefix = "" (any label without the area prefix), area_prefix = "area:"
 
 [labels]
-types = ["bug", "feature", "docs"]   # what new --type accepts
+type_prefix = "type: "       # new --type bug adds "type: bug": the types are the repo's type: labels
 
 [session]                    # fills {session}: a link back to the agent session
 env = ["CLAUDE_CODE_HOST_SESSION_ID"]

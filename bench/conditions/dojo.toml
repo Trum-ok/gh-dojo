@@ -10,9 +10,6 @@ owner = "{{.Owner}}"
 project = {{.Project}}
 repos = ["{{.Repo}}"]
 
-[labels]
-types = ["bug", "enhancement", "documentation"]
-
 [verbs.start]
 comment = """
 Started.

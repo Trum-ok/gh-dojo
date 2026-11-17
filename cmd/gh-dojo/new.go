@@ -326,9 +326,9 @@ func newTypeUsage() string {
 	cfg, err := loadConfig()
 	switch {
 	case err != nil:
-		return "issue type: a label from labels.types, or any repo label outside the areas when it is empty"
-	case len(cfg.Labels.Types) > 0:
-		return "issue type: one of " + strings.Join(cfg.Labels.Types, ", ")
+		return "issue type: adds the label <labels.type_prefix><type>; any repo label outside the areas when the prefix is empty"
+	case cfg.Labels.TypePrefix != "":
+		return "issue type: adds the label " + cfg.Labels.TypePrefix + "<type>"
 	case cfg.Labels.AreaPrefix != "":
 		return "issue type: any repo label not starting with " + cfg.Labels.AreaPrefix
 	}
@@ -370,10 +370,12 @@ func newHelp() string {
 	b.WriteString(`Create an issue, label it, add it to the board and set its initial status
 (statuses.initial) in one command.
 
-Labels: --type takes one of labels.types, or any repo label outside the areas
-when labels.types is empty; --area X adds the label <labels.area_prefix>X;
---label adds any existing label. An unknown one fails before anything is
-created, listing the allowed values.
+Labels: --type X adds the label <labels.type_prefix>X, or with no prefix
+any repo label outside the areas; --area X adds the label
+<labels.area_prefix>X; a value may also carry its prefix. The types and
+areas are the repo's labels with the prefix: the config lists none. --label
+adds any existing label. An unknown one fails before anything is created,
+listing the allowed values.
 
 --milestone puts the issue in an open milestone of the repo, by title
 (ignoring case) or a start only its title has: v0.3 for "v0.3 — extensibility".
@@ -425,8 +427,8 @@ Nothing is created or changed.`)
 	}
 	b.WriteString("\n\nThis project:")
 	switch {
-	case len(cfg.Labels.Types) > 0:
-		fmt.Fprintf(&b, "\n  --type    %s", strings.Join(cfg.Labels.Types, ", "))
+	case cfg.Labels.TypePrefix != "":
+		fmt.Fprintf(&b, "\n  --type X  adds the label %sX", cfg.Labels.TypePrefix)
 	case cfg.Labels.AreaPrefix != "":
 		fmt.Fprintf(&b, "\n  --type    any repo label not starting with %s", cfg.Labels.AreaPrefix)
 	default:

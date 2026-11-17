@@ -15,7 +15,7 @@ final = ["Done"]
 resolved = ["Ready", "Done"]  # a blocker in these no longer blocks
 
 [labels]
-types = []
+type_prefix = ""
 area_prefix = "area:"
 
 [verbs.start]

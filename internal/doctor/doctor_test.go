@@ -359,18 +359,18 @@ func TestCheckRepo(t *testing.T) {
 // TestLabelsFound: label names come from the first page and the
 // searches; they are complete only when the first page has every label.
 func TestLabelsFound(t *testing.T) {
-	c := &labelsCheck{types: []string{"bug"}, prefix: "area:"}
+	c := &labelsCheck{groups: []labelGroup{{"type", "labels.type_prefix", "type: "}, {"area", "labels.area_prefix", "area:"}}}
 	for _, tt := range []struct {
 		name     string
 		answer   string
 		names    int
 		complete bool
 	}{
-		{"one page", `{"labels": {"totalCount": 2, "nodes": [{"name": "bug"}, {"name": "area:cli"}]},
-			"type0": {"nodes": [{"name": "bug"}]}, "area": {"nodes": [{"name": "area:cli"}]}}`, 2, true},
+		{"one page", `{"labels": {"totalCount": 2, "nodes": [{"name": "type: bug"}, {"name": "area:cli"}]},
+			"type": {"nodes": [{"name": "type: bug"}]}, "area": {"nodes": [{"name": "area:cli"}]}}`, 2, true},
 		// Search found these past the first page, but not necessarily all.
 		{"more labels", `{"labels": {"totalCount": 101, "nodes": [{"name": "x"}]},
-			"type0": {"nodes": [{"name": "Bug"}]}, "area": {"nodes": [{"name": "area:cli"}, {"name": "area:db"}]}}`, 4, false},
+			"type": {"nodes": [{"name": "Type: Bug"}]}, "area": {"nodes": [{"name": "area:cli"}, {"name": "area:db"}]}}`, 4, false},
 		{"repository null", `null`, 0, true},
 	} {
 		f := c.found(json.RawMessage(tt.answer))
@@ -378,19 +378,16 @@ func TestLabelsFound(t *testing.T) {
 			t.Errorf("%s: %d names, complete %v; want %d, %v", tt.name, len(f.names), f.complete, tt.names, tt.complete)
 		}
 	}
-	if f := c.found(json.RawMessage(`{"type0": {"nodes": [{"name": "Bug"}]}}`)); !f.has("bug") || f.has("bugs") {
-		t.Error("has: want a match regardless of case, and only of the whole name")
-	}
 }
 
 // TestLabelsCheck: in one DoctorLabels query for the usable repositories,
-// a missing type is a problem, one in another case a warning, and no
-// label with a prefix the config sets a warning; past 100 labels a type
-// not found reads all the labels.
+// how many labels each prefix has, counted regardless of case; none with a
+// prefix the config sets is a warning, and past 100 labels a count is a
+// lower bound.
 func TestLabelsCheck(t *testing.T) {
 	cfg := parse(t, strings.Replace(kanbanConfig, `repos = ["acme/api"]`, `repos = ["acme/api", "acme/big", "acme/off"]`, 1)+`
 [labels]
-types = ["bug", "Docs", "chore"]
+type_prefix = "kind/"
 area_prefix = "svc:"
 `)
 	usable := func(name string, ok bool) *repo {
@@ -404,24 +401,23 @@ area_prefix = "svc:"
 	repos := []*repo{usable("api", true), usable("big", true), usable("off", false)}
 	gh := &fakeGitHub{data: map[string]string{
 		"DoctorLabels": `{
-			"repo0": {"labels": {"totalCount": 2, "nodes": [{"name": "bug"}, {"name": "docs"}]}},
-			"repo1": {"labels": {"totalCount": 150, "nodes": [{"name": "bug"}]}, "area": {"nodes": [{"name": "svc:db"}]}}}`,
-		"RepoLabels": `{"repository": {"labels": {"pageInfo": {"hasNextPage": false},
-			"nodes": [{"name": "bug"}, {"name": "Docs"}, {"name": "chore"}, {"name": "svc:db"}, {"name": "svc:ui"}]}}}`,
+			"repo0": {"labels": {"totalCount": 3, "nodes": [{"name": "Kind/Bug"}, {"name": "kind/docs"}, {"name": "bug"}]},
+				"type": {"nodes": [{"name": "Kind/Bug"}, {"name": "kind/docs"}]}, "area": {"nodes": []}},
+			"repo1": {"labels": {"totalCount": 150, "nodes": [{"name": "bug"}]}, "type": {"nodes": []},
+				"area": {"nodes": [{"name": "svc:db"}, {"name": "svc:ui"}]}}}`,
 	}}
 	r := &Report{}
 	newLabelsCheck(cfg).run(context.Background(), r, gh, cfg, repos)
 	wantLines(t, r,
-		`warn labels: labels.types: "Docs" is "docs" in acme/api; new --type finds it regardless of case [fix: gh label edit "docs" --name "Docs" -R acme/api]`,
-		`problem labels: labels.types: no label "chore" in acme/api, so gh dojo new --type chore fails [fix: gh label create "chore" -R acme/api, or fix labels.types]`,
 		`warn labels: acme/api: no label starts with labels.area_prefix "svc:", so gh dojo new --area finds nothing [fix: gh label create "svc:<name>" -R acme/api, or set labels.area_prefix = "" in .github/dojo.toml]`,
-		"ok labels: acme/big: 3 type labels exist, 2 area labels (svc:…)",
+		"ok labels: acme/api: 2 type labels (kind/…)",
+		"ok labels: acme/big: could not confirm type labels (kind/…): none among the first 100 of 150 labels or by search, at least 2 area labels (svc:…)",
 		"skip labels: acme/off: needs the repository (see repo)",
 	)
-	if !slices.Equal(gh.sent, []string{"DoctorLabels", "RepoLabels"}) {
-		t.Errorf("sent %v, want DoctorLabels, then RepoLabels for acme/big", gh.sent)
+	if !slices.Equal(gh.sent, []string{"DoctorLabels"}) {
+		t.Errorf("sent %v, want DoctorLabels alone", gh.sent)
 	}
-	if v := gh.vars[0]; v["owner0"] != "acme" || v["name1"] != "big" || v["owner2"] != nil || v["type1"] != "Docs" || v["area"] != "svc:" {
+	if v := gh.vars[0]; v["owner0"] != "acme" || v["name1"] != "big" || v["owner2"] != nil || v["type"] != "kind/" || v["area"] != "svc:" {
 		t.Errorf("DoctorLabels vars = %v, want repo0 and repo1 only", v)
 	}
 

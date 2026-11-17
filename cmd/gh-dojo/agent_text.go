@@ -612,9 +612,13 @@ func (d *agentDoc) nextItem() string {
 
 func (d *agentDoc) writing(w *mdWriter) {
 	cfg := d.cfg
-	typ := "<label>"
-	if t := cfg.Labels.Types; len(t) > 0 {
-		typ = "<" + strings.Join(t, "|") + ">"
+	// The types are the repository's labels, not the config's: the skill
+	// names the prefix and leaves the list to new's error, which stays true.
+	typ, types := "<label>", ""
+	if p := cfg.Labels.TypePrefix; p != "" {
+		typ = "<type>"
+		types = " `--type bug` adds the label " + code(p+"bug") + "; the types are the repository's labels starting with " +
+			code(p) + ", and an unknown one fails listing them."
 	}
 	status := ""
 	if cfg.Statuses.Initial != "" {
@@ -624,7 +628,7 @@ func (d *agentDoc) writing(w *mdWriter) {
 	w.list([]string{
 		"`gh dojo new \"<title>\" --type " + typ + " --body \"…\"`: the issue, its labels, the board" + status +
 			", in one command; a long body: `--body-file <file>`, or `--body-file -` for stdin. More labels, assignees, a " +
-			"milestone, blockers or a parent: `gh dojo new --help`.",
+			"milestone, blockers or a parent: `gh dojo new --help`." + types,
 		"`gh dojo comment N \"text\"`: a comment without changing the status.",
 		"`gh dojo block N --by M` / `gh dojo unblock N --by M`: add or remove a blocked-by link without changing " +
 			"the status. An existing issue becomes a sub-issue with `gh issue edit N --parent M`.",

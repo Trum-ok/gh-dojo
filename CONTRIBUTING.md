@@ -229,6 +229,13 @@ Every command is checked against these rules.
   error's `fix:` line covers the rest); other repositories get detail only
   with several `board.repos`, and `release` one line pointing to its
   `--help`. Keep it that way when changing `internal/agent`.
+- **Label groups are a prefix, not a list** (#75). `labels.type_prefix` and
+  `labels.area_prefix` work alike: the values are the repository's labels
+  with the prefix, so the config cannot drift from them, and a new type is
+  `gh label create`. The price: `--type` is no longer checked offline and
+  the skill names the prefix, not the types; `new`'s error lists them. An
+  earlier `labels.types` list was dropped for this; do not bring it back,
+  nor add a key per new label scheme.
 
 ## Layout
 

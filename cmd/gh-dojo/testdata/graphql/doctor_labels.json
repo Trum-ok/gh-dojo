@@ -1,5 +1,5 @@
 {
-  "comment": "Hand-crafted: doctor with labels.types = [\"bug\", \"Enhancement\", \"chore\"] and labels.area_prefix = \"service:\" on two repositories. The Doctor answer is made up as in doctor_ok.json; in DoctorLabels, repo0 is the real API's answer for Trum-ok/gh-dojo, saved by hand (enhancement differs in case, no chore, no service: label), and repo1, Trum-ok/gh-dojo-site, is made up: every type and three service: labels, one in another case.",
+  "comment": "Hand-crafted: doctor with labels.type_prefix = \"type: \" and labels.area_prefix = \"service:\" on two repositories. The Doctor answer is made up as in doctor_ok.json; in DoctorLabels, repo0 is the real API's answer for Trum-ok/gh-dojo, saved by hand (no type: and no service: label), and repo1, Trum-ok/gh-dojo-site, is made up: three type: and three service: labels, one of each in another case.",
   "handcrafted": true,
   "interactions": [
     {
@@ -32,15 +32,13 @@
     },
     {
       "operation": "DoctorLabels",
-      "query": "query DoctorLabels($owner0: String!, $name0: String!, $owner1: String!, $name1: String!, $type0: String!, $type1: String!, $type2: String!, $area: String!) {\n  repo0: repository(owner: $owner0, name: $name0) {\n    labels(first: 100) { totalCount nodes { name } }\n    type0: labels(first: 100, query: $type0) { nodes { name } }\n    type1: labels(first: 100, query: $type1) { nodes { name } }\n    type2: labels(first: 100, query: $type2) { nodes { name } }\n    area: labels(first: 100, query: $area) { nodes { name } }\n  }\n  repo1: repository(owner: $owner1, name: $name1) {\n    labels(first: 100) { totalCount nodes { name } }\n    type0: labels(first: 100, query: $type0) { nodes { name } }\n    type1: labels(first: 100, query: $type1) { nodes { name } }\n    type2: labels(first: 100, query: $type2) { nodes { name } }\n    area: labels(first: 100, query: $area) { nodes { name } }\n  }\n}",
+      "query": "query DoctorLabels($owner0: String!, $name0: String!, $owner1: String!, $name1: String!, $type: String!, $area: String!) {\n  repo0: repository(owner: $owner0, name: $name0) {\n    labels(first: 100) { totalCount nodes { name } }\n    type: labels(first: 100, query: $type) { nodes { name } }\n    area: labels(first: 100, query: $area) { nodes { name } }\n  }\n  repo1: repository(owner: $owner1, name: $name1) {\n    labels(first: 100) { totalCount nodes { name } }\n    type: labels(first: 100, query: $type) { nodes { name } }\n    area: labels(first: 100, query: $area) { nodes { name } }\n  }\n}",
       "variables": {
         "owner0": "Trum-ok",
         "name0": "gh-dojo",
         "owner1": "Trum-ok",
         "name1": "gh-dojo-site",
-        "type0": "bug",
-        "type1": "Enhancement",
-        "type2": "chore",
+        "type": "type: ",
         "area": "service:"
       },
       "response": {
@@ -84,21 +82,7 @@
                 }
               ]
             },
-            "type0": {
-              "nodes": [
-                {
-                  "name": "bug"
-                }
-              ]
-            },
-            "type1": {
-              "nodes": [
-                {
-                  "name": "enhancement"
-                }
-              ]
-            },
-            "type2": {
+            "type": {
               "nodes": []
             },
             "area": {
@@ -110,13 +94,13 @@
               "totalCount": 6,
               "nodes": [
                 {
-                  "name": "bug"
+                  "name": "type: bug"
                 },
                 {
-                  "name": "Enhancement"
+                  "name": "Type: Enhancement"
                 },
                 {
-                  "name": "chore"
+                  "name": "type: chore"
                 },
                 {
                   "name": "service:billing"
@@ -129,24 +113,16 @@
                 }
               ]
             },
-            "type0": {
+            "type": {
               "nodes": [
                 {
-                  "name": "bug"
-                }
-              ]
-            },
-            "type1": {
-              "nodes": [
+                  "name": "type: bug"
+                },
                 {
-                  "name": "Enhancement"
-                }
-              ]
-            },
-            "type2": {
-              "nodes": [
+                  "name": "Type: Enhancement"
+                },
                 {
-                  "name": "chore"
+                  "name": "type: chore"
                 }
               ]
             },

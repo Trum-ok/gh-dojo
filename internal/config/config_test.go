@@ -120,7 +120,7 @@ func dump(c *Config) string {
 		w("fields.%s: %q", name, c.Fields[name])
 	}
 	w("statuses: initial=%q final=%q resolved=%q", c.Statuses.Initial, c.Statuses.Final, c.Statuses.Resolved)
-	w("labels: types=%q area_prefix=%q", c.Labels.Types, c.Labels.AreaPrefix)
+	w("labels: type_prefix=%q area_prefix=%q", c.Labels.TypePrefix, c.Labels.AreaPrefix)
 	w("session: env=%q link=%q", c.Session.Env, c.Session.Link)
 	if c.Agent.Set { // left out otherwise: the default is always ["claude"]
 		w("agent: targets=%q notes=%q description=%q", c.Agent.Targets, c.Agent.Notes, c.Agent.Description)
@@ -370,7 +370,7 @@ final = ["Done", "Won't do"]
 resolved = []
 [labels]
 area_prefix = ""
-types = ["bug", "feature"]
+type_prefix = "type: "
 `},
 		{"no_preset", `
 version = 1
@@ -536,9 +536,9 @@ func TestLoadErrors(t *testing.T) {
 		{"when_carriage_return", presetOnly + "[verbs.start]\nwhen = \"a\\rb\"\n"},
 		{"repo_duplicate", "preset = \"kanban\"\n" + board + "repos = [\"acme/shop\", \"acme/shop\"]\n"},
 		{"repo_git_suffix", "preset = \"kanban\"\n" + board + "repos = [\"acme/shop.git\"]\n"},
-		{"types_area_prefix", presetOnly + "[labels]\ntypes = [\"bug\", \"area:cli\"]\n"},
-		{"types_duplicate", presetOnly + "[labels]\ntypes = [\"bug\", \"bug\"]\n"},
-		{"old_type_prefix", presetOnly + "[labels]\ntype_prefix = \"\"\n"},
+		{"type_area_overlap", presetOnly + "[labels]\ntype_prefix = \"Area\"\n"},
+		{"area_type_overlap", presetOnly + "[labels]\ntype_prefix = \"kind/\"\narea_prefix = \"kind/area/\"\n"},
+		{"old_types", presetOnly + "[labels]\ntypes = [\"bug\"]\n"},
 		{"verbs_not_table", "verbs = 1\n" + presetOnly},
 		{"field_not_string", strings.Replace(presetOnly, `"Status"`, `2`, 1)},
 		{"unknown_session_key", presetOnly + "[session]\nenvs = [\"X\"]\n"},

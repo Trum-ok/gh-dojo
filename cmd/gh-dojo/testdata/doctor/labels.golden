@@ -1,4 +1,4 @@
-code: 1
+code: 0
 --- stdout
 ok       version  gh dojo dev
 ok       config   .github/dojo.toml: preset kanban, 4 verbs
@@ -6,12 +6,9 @@ ok       token    github.com as Trum-ok, with the project scope
 ok       board    Trum-ok/5 "gh-dojo": field Status and 5 statuses match
 ok       repo     Trum-ok/gh-dojo (default): visible, issues enabled
 ok       repo     Trum-ok/gh-dojo-site: visible, issues enabled
-warn     labels   labels.types: "Enhancement" is "enhancement" in Trum-ok/gh-dojo; new --type finds it regardless of case
-                  fix: gh label edit "enhancement" --name "Enhancement" -R Trum-ok/gh-dojo
-problem  labels   labels.types: no label "chore" in Trum-ok/gh-dojo, so gh dojo new --type chore fails
-                  fix: gh label create "chore" -R Trum-ok/gh-dojo, or fix labels.types
+warn     labels   Trum-ok/gh-dojo: no label starts with labels.type_prefix "type: ", so gh dojo new --type finds nothing
+                  fix: gh label create "type: <name>" -R Trum-ok/gh-dojo, or set labels.type_prefix = "" in .github/dojo.toml
 warn     labels   Trum-ok/gh-dojo: no label starts with labels.area_prefix "service:", so gh dojo new --area finds nothing
                   fix: gh label create "service:<name>" -R Trum-ok/gh-dojo, or set labels.area_prefix = "" in .github/dojo.toml
-ok       labels   Trum-ok/gh-dojo-site: 3 type labels exist, 3 area labels (service:…)
+ok       labels   Trum-ok/gh-dojo-site: 3 type labels (type: …), 3 area labels (service:…)
 --- stderr
-error: doctor found 1 problem; fix as shown above, then run gh dojo doctor again

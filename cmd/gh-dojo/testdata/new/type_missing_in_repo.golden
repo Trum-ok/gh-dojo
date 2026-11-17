@@ -1,5 +1,5 @@
 code: 1
 --- stdout
 --- stderr
-error: .github/dojo.toml: labels.types has "feature", but Trum-ok/gh-dojo has no such label
-fix: gh label create "feature" -R Trum-ok/gh-dojo
+error: unknown type "feature": Trum-ok/gh-dojo has no labels starting with "type: "
+fix: gh label create "type: feature" -R Trum-ok/gh-dojo

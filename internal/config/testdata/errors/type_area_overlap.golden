@@ -1,0 +1,2 @@
+error: .github/dojo.toml: labels.type_prefix "Area" and labels.area_prefix (from preset kanban) "area:" overlap: a label would be both a type and an area
+fix: change one prefix in .github/dojo.toml so that neither starts the other, such as "type: " and "area: "

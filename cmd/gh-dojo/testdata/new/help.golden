@@ -3,10 +3,12 @@ code: 0
 Create an issue, label it, add it to the board and set its initial status
 (statuses.initial) in one command.
 
-Labels: --type takes one of labels.types, or any repo label outside the areas
-when labels.types is empty; --area X adds the label <labels.area_prefix>X;
---label adds any existing label. An unknown one fails before anything is
-created, listing the allowed values.
+Labels: --type X adds the label <labels.type_prefix>X, or with no prefix
+any repo label outside the areas; --area X adds the label
+<labels.area_prefix>X; a value may also carry its prefix. The types and
+areas are the repo's labels with the prefix: the config lists none. --label
+adds any existing label. An unknown one fails before anything is created,
+listing the allowed values.
 
 --milestone puts the issue in an open milestone of the repo, by title
 (ignoring case) or a start only its title has: v0.3 for "v0.3 — extensibility".

@@ -8,14 +8,13 @@
 # Board: a GitHub Projects v2 board whose Status field has the options
 # Backlog, In progress, In review, Changes requested, Approved and Merged
 # (other options are fine).
-# Repository labels (gh label create needs-review; GitHub's defaults have
-# only bug of them):
-#   - types, for new --type: bug, feature, chore;
+# Repository labels (gh label create needs-review):
+#   - types, for new --type bug: kind/bug, kind/feature and the like;
 #   - areas, for new --area billing: service:billing and the like;
 #   - the verbs': blocked, needs-review, changes-requested.
-# gh dojo doctor checks them and prints a gh label create for each one
-# missing; of the areas, it warns when none exists (area_prefix is set here,
-# not by a preset). The reviewer, named with review --assignee, must be able
+# gh dojo doctor checks them: it prints a gh label create for each verb
+# label missing, and warns when no type or no area exists (the prefixes are
+# set here, not by a preset). The reviewer, named with review --assignee, must be able
 # to be assigned issues in the repository.
 #
 # Reference: https://github.com/Trum-ok/gh-dojo/blob/main/docs/configuration.md
@@ -37,7 +36,7 @@ final = ["Merged"]           # list hides merged issues, with a counter
 resolved = ["Merged"]        # a blocker blocks until merged: approved is not in main yet
 
 [labels]
-types = ["bug", "feature", "chore"]
+type_prefix = "kind/"        # new --type bug adds the label kind/bug
 area_prefix = "service:"     # new --area billing adds the label service:billing
 
 [session]
