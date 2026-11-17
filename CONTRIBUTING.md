@@ -26,7 +26,10 @@ videos in [`docs/media/`](docs/media).
 CI (`.github/workflows/ci.yml`, on pushes to `main` and pull requests)
 checks once, on Linux, `gofmt -l .`, `go mod tidy -diff` (`tools/` too),
 `go vet` (also for Windows, macOS and `-tags e2e`), `make lint`, the release
-build and its `agent install --check` (see below); then runs `go test ./...`
+build and its `agent install --check` (see below), its `checks` job running
+Format, Tidy and Vet through `make fmt`, `make tidy` and `make vet` (like
+Staticcheck through `make lint`), so they match the local targets by
+construction; then runs `go test ./...`
 and `go build ./...` on Ubuntu, macOS and Windows, on Ubuntu with `-race`
 through `script/unused-golden.sh`, which also fails on golden files no test
 reads.
@@ -50,6 +53,86 @@ Code and tests must work on all three: build paths with `path/filepath`,
 show them to users with `filepath.ToSlash`, and keep OS error texts out of
 golden files. `.gitattributes` checks every file out with LF line endings,
 Windows included.
+
+## Golden files
+
+Command output, errors and help are compared with `testdata/**/*.golden`
+files. After an intended output change, rewrite them and review the diff
+before committing:
+
+```sh
+make golden   # UPDATE_GOLDEN=1 go test ./...
+```
+
+Rewriting is refused when `CI` is set, so CI can never pass by accepting its
+own output. A golden file no test reads any more fails
+`script/unused-golden.sh` (in `make check` and CI): delete it with its test. `internal/config`'s `TestReadmeExamples` loads every `toml` block
+in `README.md` and `docs/*.md`, and `TestExampleConfigs` every `examples/*.toml`, so README
+examples and example configs must stay valid configs. `cmd/gh-dojo`'s
+`TestExampleReview` runs `describe`, a dry run of every verb and
+`agent install` on `examples/review.toml`, against the hand-crafted board
+and cards in `review_board.json` and `review_example.json`: a new verb
+there needs a dry run and a card. Another example without a preset needs
+such a test too, and a line in `examplesWithoutPreset`, or
+`TestExampleConfigs` fails.
+
+## GraphQL fixtures
+
+Tests never touch the network: GraphQL responses are replayed from
+`testdata/graphql/*.json` through `internal/graph/graphtest`. A request
+matches an interaction by operation name, query and variables; each
+interaction answers once unless it has `"repeat": true`, an unexpected
+request fails the test, and so does an interaction never requested.
+
+To re-record read-only fixtures from the real API with your gh token:
+
+```sh
+GH_DOJO_RECORD=1 go test ./internal/board -run TestUserBoard
+```
+
+Mutations are refused while recording unless `GH_DOJO_RECORD_MUTATIONS=1`
+is set too; only use that against a sandbox board. Fixtures marked
+`"handcrafted": true` (errors, outages) cannot be recorded, and their tests
+are skipped in record mode. Tests point the schema cache at a temporary
+directory through `GH_DOJO_CACHE_DIR`.
+
+## End-to-end tests
+
+`e2e/` runs the built gh-dojo against real boards, behind the `e2e` build
+tag, so `go test ./...` never touches the network. For each preset it goes
+through `init`, `doctor`, `new`, `next`, the verbs, `comment`, `block` and
+`unblock`, `show` and `list` up to closing the issues, then deletes the
+issues it created. `.github/workflows/e2e.yml` runs it daily and by hand
+(Actions → e2e → Run workflow), not on pull requests, in the sandbox
+repository `Trum-ok/gh-dojo-sandbox` with boards `Trum-ok/6` (kanban) and
+`Trum-ok/7` (sprints), with the `E2E_TOKEN` secret: a classic token with
+the `project` and `public_repo` scopes of an admin of the sandbox. Locally,
+with gh's token, `make e2e` runs the same (the `GH_DOJO_E2E_*` variables
+override the sandbox and boards):
+
+```sh
+make e2e   # go test -tags e2e -count=1 -v -timeout 15m ./e2e
+```
+
+The sprints board's Sprint field has iterations up to November 2027: add
+more before then, or the sprint checks fail. `e2e/doc.go` lists the
+variables and what the boards need.
+
+## Debugging GitHub errors
+
+Errors never print GitHub's raw response, so a GraphQL error of a type
+gh-dojo does not map shows only as "GitHub API rejected the request". To see what GitHub actually answered, run the command again with
+go-gh's debug logging, which gh-dojo's client keeps on:
+
+```sh
+GH_DEBUG=api gh dojo <command> 2> debug.log
+```
+
+`GH_DEBUG=api` logs every request and response, headers and bodies, to
+stderr; the `errors` array of the failing response holds the type and
+message. The `Authorization` header is redacted, but bodies are logged as
+is, so review the log before sharing it. Any other `GH_DEBUG` value except
+`0`, `false` and `no` logs only the request lines and timings.
 
 ## Install from source
 
@@ -80,82 +163,38 @@ go build -ldflags "-X main.version=$(git describe --always --dirty)" -o gh-dojo.
 gh extension install .
 ```
 
-## End-to-end tests
+## Layout
 
-`e2e/` runs the built gh-dojo against real boards, behind the `e2e` build
-tag, so `go test ./...` never touches the network. For each preset it goes
-through `init`, `doctor`, `new`, `next`, the verbs, `comment`, `block` and
-`unblock`, `show` and `list` up to closing the issues, then deletes the
-issues it created. `.github/workflows/e2e.yml` runs it daily and by hand
-(Actions → e2e → Run workflow), not on pull requests, in the sandbox
-repository `Trum-ok/gh-dojo-sandbox` with boards `Trum-ok/6` (kanban) and
-`Trum-ok/7` (sprints), with the `E2E_TOKEN` secret: a classic token with
-the `project` and `public_repo` scopes of an admin of the sandbox. Locally,
-with gh's token, `make e2e` runs the same (the `GH_DOJO_E2E_*` variables
-override the sandbox and boards):
+| Package                    | Responsible for                                                                       |
+|----------------------------|---------------------------------------------------------------------------------------|
+| `cmd/gh-dojo`              | Entry point; cobra commands, verbs built from the config                              |
+| `internal/config`          | Loading and validating `.github/dojo.toml`; embedded presets                          |
+| `internal/board`           | Board schema, its cache, config checks; items for `list`, `next`; projects for `init` |
+| `internal/workflow`        | Verb checks and the effect plan; `new`'s checks and plan                              |
+| `internal/effects`         | Effects → one GraphQL mutation; `new`'s mutations                                     |
+| `internal/batch`           | Running a verb on its issues: one by one, retries, the summary                        |
+| `internal/issue`           | Reading issues (cards) and batches of them; what `new` reads                          |
+| `internal/graph`           | GraphQL client over go-gh: retries, pagination, errors, partial answers               |
+| `internal/graph/graphtest` | Replaying recorded GraphQL responses in tests ([above](#graphql-fixtures))            |
+| `internal/render`          | Errors, exit codes, confirmations, folding with counts, text helpers                  |
+| `internal/agent`           | `agent install`'s files: targets, markers, writing, diffs                             |
+| `internal/doctor`          | `doctor`'s checks of the setup and its report                                         |
+| `internal/release`         | `release`: a release's commits, their pull requests and keywords                      |
+| `internal/testutil`        | Test helpers shared across packages: golden files                                     |
+| `bench`                    | The benchmark against plain gh ([docs/bench.md](docs/bench.md))                       |
+| `e2e`                      | Tests against real boards ([above](#end-to-end-tests))                                |
 
-```sh
-make e2e   # go test -tags e2e -count=1 -v -timeout 15m ./e2e
-```
+The plan is separate from its execution: the workflow engine returns the
+operations without touching the network, which is what `--dry-run`, the
+tests and finishing a partially applied command rely on.
 
-The sprints board's Sprint field has iterations up to November 2027: add
-more before then, or the sprint checks fail. `e2e/doc.go` lists the
-variables and what the boards need.
-
-## Releases
-
-Pushing a `v*` tag runs `.github/workflows/release.yml`: the tests, then
-`cli/gh-extension-precompile` with `script/build-release.sh`, which builds
-darwin, linux and windows for amd64 and arm64 with the tag stamped into
-`gh dojo --version`, and publishes them as a GitHub release for
-`gh extension install`. A tag with a `-` (`v0.1.0-rc.1`) makes a prerelease.
-The release notes list the commits since the previous tag, merges left out
-(`script/release-notes.sh`), so a commit's first line is written for them
-too.
-
-Next to the binaries the release has `gh-dojo_<tag>_checksums.txt`, their
-SHA-256 sums, and every asset has a build provenance attestation: a
-statement, signed through Sigstore with the workflow's OIDC identity, that
-`release.yml` of this repository built that file from the tagged commit.
-Anyone can check a downloaded binary against it:
-
-```sh
-gh release download v0.5.0 --repo Trum-ok/gh-dojo --pattern '*darwin-arm64'
-gh attestation verify gh-dojo_v0.5.0_darwin-arm64 --repo Trum-ok/gh-dojo
-```
-
-The actions in the workflows are pinned to commit SHAs, with the version in
-a comment: a tag or branch can be moved to other code, a SHA cannot.
-Dependabot updates the SHA and the comment together.
-
-Once the tag is pushed, its issues move to Done with the installed
-`gh dojo` through [`release`](docs/commands.md#release), which explains how
-it finds a release's issues and what its output means. This project's rules:
-
-- `done` starts only from Ready here, and `[release]` in
-  `.github/dojo.toml` adds `Refs #N` to the closing keywords. Before
-  tagging, `gh dojo release main --verb done --dry-run` shows what the next
-  release holds.
-- An agent moves a release's issues only on the user's word: it runs
-  `gh dojo release vX.Y.Z --verb done --dry-run`, shows the list to the
-  user, and once they agree runs the same without `--dry-run`, with
-  `--comment "vX.Y.Z"`.
-- `not ready (done starts only from Ready): #41 (In progress)` exits 0: a
-  `Refs #41` commit of an issue still in progress. Don't move it by hand for
-  the release; a later release picks it up only if its commits name it
-  again, so once it is Ready and released, run
-  `gh dojo done 41 --comment "vX.Y.Z"`, on the user's word like any `done`.
-- Exit code 2 is a refusal, not "not ready": say, an issue closed by
-  `Fixes #12` but not in Ready. Release won't move it now or later; ask the
-  user.
-- A number only a commit message names that is no issue the token can see
-  is left out with a warning (exit code 0): a false match needs nothing (or
-  `--exclude`), a real issue the token can't see goes to the user. Our own
-  repository "not found" fails the batch (exit code 3), almost surely a
-  token without access: tell the user.
-- In a commit message, an issue reference that is not a link, such as an
-  example of the syntax, goes in backticks (`` `Fixes #12` ``), or release
-  takes it for one of the release's issues.
+A command prints its result through `emit` (`cmd/gh-dojo/output.go`;
+`emitWrite` for a command that writes): it builds one typed result and
+passes the function that prints it as text, so the text and `--json` come
+from the same data. A command returns its error as usual: `run` prints it as
+JSON too. The JSON keeps the rules and schemas of
+[docs/output.md](docs/output.md#json-output) ("Stability"); each command has
+JSON golden files under `cmd/gh-dojo/testdata/json/`.
 
 ## Design principles
 
@@ -242,97 +281,6 @@ into issues (verb `when` lines and comment templates) come from the config.
   `new`'s error lists them. An earlier `labels.types` list was dropped for
   this; do not bring it back, nor add a key per new label scheme.
 
-## Layout
-
-| Package                    | Responsible for                                                                       |
-|----------------------------|---------------------------------------------------------------------------------------|
-| `cmd/gh-dojo`              | Entry point; cobra commands, verbs built from the config                              |
-| `internal/config`          | Loading and validating `.github/dojo.toml`; embedded presets                          |
-| `internal/board`           | Board schema, its cache, config checks; items for `list`, `next`; projects for `init` |
-| `internal/workflow`        | Verb checks and the effect plan; `new`'s checks and plan                              |
-| `internal/effects`         | Effects → one GraphQL mutation; `new`'s mutations                                     |
-| `internal/batch`           | Running a verb on its issues: one by one, retries, the summary                        |
-| `internal/issue`           | Reading issues (cards) and batches of them; what `new` reads                          |
-| `internal/graph`           | GraphQL client over go-gh: retries, pagination, errors, partial answers               |
-| `internal/graph/graphtest` | Replaying recorded GraphQL responses in tests ([below](#graphql-fixtures))            |
-| `internal/render`          | Errors, exit codes, confirmations, folding with counts, text helpers                  |
-| `internal/agent`           | `agent install`'s files: targets, markers, writing, diffs                             |
-| `internal/doctor`          | `doctor`'s checks of the setup and its report                                         |
-| `internal/release`         | `release`: a release's commits, their pull requests and keywords                      |
-| `internal/testutil`        | Test helpers shared across packages: golden files                                     |
-| `bench`                    | The benchmark against plain gh ([docs/bench.md](docs/bench.md))                       |
-| `e2e`                      | Tests against real boards ([above](#end-to-end-tests))                                |
-
-The plan is separate from its execution: the workflow engine returns the
-operations without touching the network, which is what `--dry-run`, the
-tests and finishing a partially applied command rely on.
-
-A command prints its result through `emit` (`cmd/gh-dojo/output.go`;
-`emitWrite` for a command that writes): it builds one typed result and
-passes the function that prints it as text, so the text and `--json` come
-from the same data. A command returns its error as usual: `run` prints it as
-JSON too. The JSON keeps the rules and schemas of
-[docs/output.md](docs/output.md#json-output) ("Stability"); each command has
-JSON golden files under `cmd/gh-dojo/testdata/json/`.
-
-## Golden files
-
-Command output, errors and help are compared with `testdata/**/*.golden`
-files. After an intended output change, rewrite them and review the diff
-before committing:
-
-```sh
-make golden   # UPDATE_GOLDEN=1 go test ./...
-```
-
-Rewriting is refused when `CI` is set, so CI can never pass by accepting its
-own output. A golden file no test reads any more fails
-`script/unused-golden.sh` (in `make check` and CI): delete it with its test. `internal/config`'s `TestReadmeExamples` loads every `toml` block
-in `README.md` and `docs/*.md`, and `TestExampleConfigs` every `examples/*.toml`, so README
-examples and example configs must stay valid configs. `cmd/gh-dojo`'s
-`TestExampleReview` runs `describe`, a dry run of every verb and
-`agent install` on `examples/review.toml`, against the hand-crafted board
-and cards in `review_board.json` and `review_example.json`: a new verb
-there needs a dry run and a card. Another example without a preset needs
-such a test too, and a line in `examplesWithoutPreset`, or
-`TestExampleConfigs` fails.
-
-## GraphQL fixtures
-
-Tests never touch the network: GraphQL responses are replayed from
-`testdata/graphql/*.json` through `internal/graph/graphtest`. A request
-matches an interaction by operation name, query and variables; each
-interaction answers once unless it has `"repeat": true`, an unexpected
-request fails the test, and so does an interaction never requested.
-
-To re-record read-only fixtures from the real API with your gh token:
-
-```sh
-GH_DOJO_RECORD=1 go test ./internal/board -run TestUserBoard
-```
-
-Mutations are refused while recording unless `GH_DOJO_RECORD_MUTATIONS=1`
-is set too; only use that against a sandbox board. Fixtures marked
-`"handcrafted": true` (errors, outages) cannot be recorded, and their tests
-are skipped in record mode. Tests point the schema cache at a temporary
-directory through `GH_DOJO_CACHE_DIR`.
-
-## Debugging GitHub errors
-
-Errors never print GitHub's raw response, so a GraphQL error of a type
-gh-dojo does not map shows only as "GitHub API rejected the request". To see what GitHub actually answered, run the command again with
-go-gh's debug logging, which gh-dojo's client keeps on:
-
-```sh
-GH_DEBUG=api gh dojo <command> 2> debug.log
-```
-
-`GH_DEBUG=api` logs every request and response, headers and bodies, to
-stderr; the `errors` array of the failing response holds the type and
-message. The `Authorization` header is redacted, but bodies are logged as
-is, so review the log before sharing it. Any other `GH_DEBUG` value except
-`0`, `false` and `no` logs only the request lines and timings.
-
 ## Working on gh-dojo with gh-dojo
 
 gh-dojo tracks its own development on its board with the repository's
@@ -352,3 +300,58 @@ Issue tracking uses the installed `gh dojo`, the last `make install` from
 After a change is merged, run `make install` on `main` again. Unknown config
 keys are errors, so a change that adds a key to `.github/dojo.toml` (as
 `[agent]` did) breaks the installed `gh dojo` until that reinstall.
+
+## Releases
+
+Pushing a `v*` tag runs `.github/workflows/release.yml`: the tests, then
+`cli/gh-extension-precompile` with `script/build-release.sh`, which builds
+darwin, linux and windows for amd64 and arm64 with the tag stamped into
+`gh dojo --version`, and publishes them as a GitHub release for
+`gh extension install`. A tag with a `-` (`v0.1.0-rc.1`) makes a prerelease.
+The release notes list the commits since the previous tag, merges left out
+(`script/release-notes.sh`), so a commit's first line is written for them
+too.
+
+Next to the binaries the release has `gh-dojo_<tag>_checksums.txt`, their
+SHA-256 sums, and every asset has a build provenance attestation: a
+statement, signed through Sigstore with the workflow's OIDC identity, that
+`release.yml` of this repository built that file from the tagged commit.
+Anyone can check a downloaded binary against it:
+
+```sh
+gh release download v0.5.0 --repo Trum-ok/gh-dojo --pattern '*darwin-arm64'
+gh attestation verify gh-dojo_v0.5.0_darwin-arm64 --repo Trum-ok/gh-dojo
+```
+
+The actions in the workflows are pinned to commit SHAs, with the version in
+a comment: a tag or branch can be moved to other code, a SHA cannot.
+Dependabot updates the SHA and the comment together.
+
+Once the tag is pushed, its issues move to Done with the installed
+`gh dojo` through [`release`](docs/commands.md#release), which explains how
+it finds a release's issues and what its output means. This project's rules:
+
+- `done` starts only from Ready here, and `[release]` in
+  `.github/dojo.toml` adds `Refs #N` to the closing keywords. Before
+  tagging, `gh dojo release main --verb done --dry-run` shows what the next
+  release holds.
+- An agent moves a release's issues only on the user's word: it runs
+  `gh dojo release vX.Y.Z --verb done --dry-run`, shows the list to the
+  user, and once they agree runs the same without `--dry-run`, with
+  `--comment "vX.Y.Z"`.
+- `not ready (done starts only from Ready): #41 (In progress)` exits 0: a
+  `Refs #41` commit of an issue still in progress. Don't move it by hand for
+  the release; a later release picks it up only if its commits name it
+  again, so once it is Ready and released, run
+  `gh dojo done 41 --comment "vX.Y.Z"`, on the user's word like any `done`.
+- Exit code 2 is a refusal, not "not ready": say, an issue closed by
+  `Fixes #12` but not in Ready. Release won't move it now or later; ask the
+  user.
+- A number only a commit message names that is no issue the token can see
+  is left out with a warning (exit code 0): a false match needs nothing (or
+  `--exclude`), a real issue the token can't see goes to the user. Our own
+  repository "not found" fails the batch (exit code 3), almost surely a
+  token without access: tell the user.
+- In a commit message, an issue reference that is not a link, such as an
+  example of the syntax, goes in backticks (`` `Fixes #12` ``), or release
+  takes it for one of the release's issues.
