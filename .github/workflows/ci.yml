@@ -9,15 +9,27 @@ on:
 permissions:
   contents: read
 
+# A new push to a pull request cancels its older run; every commit on main
+# keeps its own.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   # OS-independent checks, run once.
   checks:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+          # tools/ (staticcheck) has its own modules: a version bump there
+          # must not reuse the old cache.
+          cache-dependency-path: |
+            go.sum
+            tools/go.sum
       # The Makefile's targets, so make check runs the same checks.
       - name: Format
         run: make fmt
@@ -56,6 +68,7 @@ jobs:
           - os: windows-latest
             test: go test ./...
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     defaults:
       run:
         shell: bash
