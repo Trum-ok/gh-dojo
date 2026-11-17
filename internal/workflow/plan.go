@@ -29,14 +29,14 @@ type Plan struct {
 
 	StatusUnchanged bool // the issue is already in Target; no SetStatus
 	CommentPresent  bool // the same comment is the latest gh-dojo comment already; no AddComment
-	// InPlace are the verb's effects found already in place, as the ops
-	// that would have applied them: Reopen, SetIteration (From = To),
-	// SetFields (the fields already set), SetMilestone (From = To),
-	// AddLabels, RemoveLabels,
-	// Assign, Unassign (the users not assigned, none for "all" with nobody
-	// to remove; or Kept, the user the verb assigns), AddBlockedBy, and Close with the reason the issue was
-	// closed with ("" when unknown). They are never applied; they give the "already" wording of
-	// the dry run and the confirmation line.
+	// InPlace are the verb's effects found already in place, as the ops that
+	// would have applied them: Reopen, SetIteration (From = To), SetFields
+	// (the fields already set), SetMilestone (From = To), AddLabels,
+	// RemoveLabels, Assign, Unassign (the users not assigned, none for "all"
+	// with nobody to remove; or Kept, the user the verb assigns),
+	// AddBlockedBy, and Close with the reason the issue was closed with (""
+	// when unknown). They are never applied; they give the "already" wording
+	// of the dry run and the confirmation line.
 	InPlace []Op
 
 	// NeedsYes is set for a verb with confirm = "user" run without --yes
@@ -298,15 +298,15 @@ func (p *Plan) Unconfirmed() error {
 }
 
 // lines returns one entry per effect, in a fixed order: board, reopen,
-// status, sprint, fields (one entry per field), milestone, labels, assignees (who is
-// removed, then who is assigned, as the mutation does), blocked-by link,
-// comment, close. dry picks the dry-run wording
-// (Describe), otherwise the confirmation wording (Effect). Effects already
-// in place are included. The status change of an issue not on the board
-// reads "not on the board → In progress"; in the confirmation that line
-// alone stands for adding the issue to the board. Unarchiving is a board
-// effect too, but always has its own line. Labels added and removed share
-// one line; so do the blocked-by links added, and those already in place.
+// status, sprint, fields (one entry per field), milestone, labels, assignees
+// (who is removed, then who is assigned, as the mutation does), blocked-by
+// link, comment, close. dry picks the dry-run wording (Describe), otherwise
+// the confirmation wording (Effect). Effects already in place are included.
+// The status change of an issue not on the board reads "not on the board → In
+// progress"; in the confirmation that line alone stands for adding the issue
+// to the board. Unarchiving is a board effect too, but always has its own
+// line. Labels added and removed share one line; so do the blocked-by links
+// added, and those already in place.
 func (p *Plan) lines(dry bool) []string {
 	pick := Op.Effect
 	if dry {

@@ -423,8 +423,8 @@ func requires(r *rawVerb, arg string) bool {
 	return false
 }
 
-// buildEffects validates labels, assign, unassign, milestone, close, reopen, confirm, blockers,
-// sub_issues, iteration and field.
+// buildEffects validates labels, assign, unassign, milestone, close,
+// reopen, confirm, blockers, sub_issues, iteration and field.
 func (c *Config) buildEffects(name string, r *rawVerb, v *Verb) error {
 	p := "verbs." + name + "."
 	if r.Labels != nil {

@@ -224,10 +224,10 @@ func fieldError(display, name string) error {
 }
 
 // fieldsKeyError returns the fieldError of the first [fields] entry that is
-// not status or sprint, in file order, nil when there is none or data does not parse.
-// It reads [fields] values of any type, so an unsupported field written as
-// a table ([fields.sprint]) is reported as unsupported rather than as a
-// type mismatch.
+// not status or sprint, in file order, nil when there is none or data does
+// not parse. It reads [fields] values of any type, so an unsupported field
+// written as a table ([fields.sprint]) is reported as unsupported rather
+// than as a type mismatch.
 func fieldsKeyError(data []byte, display string) error {
 	var probe struct {
 		Fields map[string]any `toml:"fields"`

@@ -141,7 +141,7 @@ func (d sprintDay) String() string {
 	return d.at.Format(time.DateOnly) + " (" + when + ")"
 }
 
-// statusDate returns the day issue is entered v.IterationStatus (X), in
+// statusDate returns the day the issue entered v.IterationStatus (X), in
 // today's time zone. entersNow says the verb moves the issue there itself:
 // the day is today. Otherwise:
 //

@@ -480,20 +480,20 @@ func flag(arg string) string { return "--" + arg }
 // allowed with a warning: the verb does not change why it was closed.
 //
 // The plan adds the issue to the board when it is not there (unless the
-// verb's only board effect clears the sprint, which such an issue has
-// none of), reopens it,
-// sets the target status, sets the sprint (see planIteration; a day
-// without an iteration is exit code 1) and the fields of the field effect,
-// sets the milestone (see planMilestone), adds and removes labels, assigns and unassigns (see planAssign), marks
-// the issue blocked by each of Issue.ByIssues (blockers = "link"; a pull
-// request among them is only named in the comment, with a warning), posts
-// the rendered comment unless it renders empty or the same comment is already
-// the verb's latest (see AlreadyPosted), and closes it. Each effect
-// already in place is left out of Ops (StatusUnchanged, CommentPresent,
-// InPlace): a closed issue is not closed again, whatever its reason. An
-// archived item is unarchived only when the verb moves it to a status that
-// is not final: the issue is live again. A repeat that changes nothing, a
-// comment alone, or a move to a final status leaves it archived.
+// verb's only board effect clears the sprint, which such an issue has none
+// of), reopens it, sets the target status, sets the sprint (see
+// planIteration; a day without an iteration is exit code 1) and the fields of
+// the field effect, sets the milestone (see planMilestone), adds and removes
+// labels, assigns and unassigns (see planAssign), marks the issue blocked by
+// each of Issue.ByIssues (blockers = "link"; a pull request among them is
+// only named in the comment, with a warning), posts the rendered comment
+// unless it renders empty or the same comment is already the verb's latest
+// (see AlreadyPosted), and closes it. Each effect already in place is left
+// out of Ops (StatusUnchanged, CommentPresent, InPlace): a closed issue is
+// not closed again, whatever its reason. An archived item is unarchived only
+// when the verb moves it to a status that is not final: the issue is live
+// again. A repeat that changes nothing, a comment alone, or a move to a final
+// status leaves it archived.
 //
 // A verb with confirm = "user" run without --yes gets NeedsYes when the
 // plan is not empty: a repeat with nothing left to do needs no go-ahead.

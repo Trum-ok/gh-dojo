@@ -172,9 +172,9 @@ const (
 func labelAlias(i int) string { return fmt.Sprintf("label%d", i) }
 
 // lookupQuery is cardQuery with the fields of l: aliased label lookups,
-// the assignable user and the open milestones below the repository, the viewer and the links at
-// the top. It returns the extra variables too. An empty l gives cardQuery
-// itself.
+// the assignable user and the open milestones below the repository, the
+// viewer and the links at the top. It returns the extra variables too. An
+// empty l gives cardQuery itself.
 //
 // AllLabels widens the issue's labels window, AllBlockers its blockers
 // window, AllSubIssues its sub-issues window; AssigneeIDs reads the
