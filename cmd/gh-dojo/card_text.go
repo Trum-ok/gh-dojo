@@ -583,7 +583,7 @@ func (v cardView) writeComments(b *strings.Builder, c *issue.Card) {
 	}
 	for i, cm := range shown {
 		fmt.Fprintf(b, "--- %s, %s\n", cardLogin(cm.Author), cardMinute(cm.CreatedAt))
-		text, note := fold(bodies[i], limit)
+		text, note := fold(cmp.Or(bodies[i], emptyComment), limit)
 		b.WriteString(indent(text) + "\n")
 		if note != "" {
 			b.WriteString("  " + note + "\n")
@@ -591,9 +591,12 @@ func (v cardView) writeComments(b *strings.Builder, c *issue.Card) {
 	}
 }
 
+// emptyComment is how the text card shows a comment with no text.
+const emptyComment = "(empty)"
+
 // shownComments returns the last v.comments comments of c, oldest first,
-// their cleaned bodies ("(empty)" for an empty one) and where to cut them
-// (see commentLimit).
+// their cleaned bodies and where to cut them (see commentLimit). An empty
+// body counts as long as emptyComment, so text and JSON cut alike.
 func (v cardView) shownComments(c *issue.Card) (shown []issue.Comment, bodies []string, limit int) {
 	nodes := c.Comments.Nodes
 	shown = nodes[len(nodes)-min(len(nodes), v.comments):]
@@ -601,10 +604,7 @@ func (v cardView) shownComments(c *issue.Card) (shown []issue.Comment, bodies []
 	lengths := make([]int, len(shown))
 	for i, cm := range shown {
 		bodies[i] = v.shortSessions(cleanText(cm.Body, cm.ViewerDidAuthor))
-		if bodies[i] == "" {
-			bodies[i] = "(empty)"
-		}
-		lengths[i] = render.RuneLen(bodies[i])
+		lengths[i] = render.RuneLen(cmp.Or(bodies[i], emptyComment))
 	}
 	return shown, bodies, v.commentLimit(lengths)
 }

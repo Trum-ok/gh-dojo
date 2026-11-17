@@ -251,12 +251,8 @@ func (v cardView) cardJSON(c *issue.Card, brief bool) showCard {
 	out.Body = textJSON(body, v.bodyRunes)
 	shown, bodies, limit := v.shownComments(c)
 	for i, cm := range shown {
-		text := bodies[i]
-		if text == "(empty)" && cleanText(cm.Body, cm.ViewerDidAuthor) == "" {
-			text = ""
-		}
 		out.Comments = append(out.Comments, showComment{
-			Author: cardLogin(cm.Author), CreatedAt: jsonTime(cm.CreatedAt), showText: *textJSON(text, limit),
+			Author: cardLogin(cm.Author), CreatedAt: jsonTime(cm.CreatedAt), showText: *textJSON(bodies[i], limit),
 		})
 	}
 	return out
