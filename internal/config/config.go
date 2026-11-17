@@ -392,6 +392,17 @@ func (v Verb) StartsFrom(status, initial string) bool {
 	return len(v.From) == 0 || slices.Contains(v.From, cmp.Or(status, initial))
 }
 
+// FromRule says where the verb runs, in the words of its refusal and of
+// release's not ready line: "starts only from Ready or In progress", or for
+// a verb without to, which moves nothing, "runs only in In review".
+func (v Verb) FromRule() string {
+	from := render.JoinWords(v.From, "or")
+	if v.To == "" {
+		return "runs only in " + from
+	}
+	return "starts only from " + from
+}
+
 // verbEffects are a verb's effects by key, in documentation order, each
 // with whether a verb has it.
 var verbEffects = []struct {

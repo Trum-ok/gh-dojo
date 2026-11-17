@@ -414,7 +414,7 @@ func (r *releaseRun) ready(v config.Verb, items []*batch.Item) []*batch.Item {
 				in = where
 			}
 			it.Fail(render.Denied("%s is closed but %s; %s\nthis is a process rule: ask the user how to proceed",
-				it.Ref.String(r.def), in, fromRule(v)).WithCause(it.Err))
+				it.Ref.String(r.def), in, v.Name+" "+v.FromRule()).WithCause(it.Err))
 			out = append(out, it)
 			continue
 		}
@@ -435,22 +435,12 @@ func placeOf(onBoard bool, status string) string {
 	return status
 }
 
-// fromRule says where verb v runs: "done starts only from Ready or In
-// progress", "hold runs only in In review", as its refusal does.
-func fromRule(v config.Verb) string {
-	from := render.JoinWords(v.From, "or")
-	if v.To == "" {
-		return v.Name + " runs only in " + from
-	}
-	return v.Name + " starts only from " + from
-}
-
 // notReadyLine names the issues not ready for verb v, with their
 // statuses; "" for none:
 //
 //	not ready (done starts only from Ready): #41 (In progress), #44 (Backlog)
 func (r *releaseRun) notReadyLine(v config.Verb) string {
-	return r.skippedLine("not ready ("+fromRule(v)+")", skipNotReady, releaseSkipped.place)
+	return r.skippedLine("not ready ("+v.Name+" "+v.FromRule()+")", skipNotReady, releaseSkipped.place)
 }
 
 // foundOf is how ref was found.

@@ -1031,9 +1031,9 @@ func (e *Engine) checkFrom(v config.Verb, is Issue) error {
 	}
 	current := cmp.Or(is.Status, e.Initial)
 	// The same words as the dry run and confirmation line use.
-	in, allowed := " from ", "it starts only from"
+	in := " from "
 	if v.To == "" {
-		in, allowed = " in ", "it runs only in"
+		in = " in "
 	}
 	var from string
 	switch {
@@ -1053,9 +1053,9 @@ func (e *Engine) checkFrom(v config.Verb, is Issue) error {
 	}
 	// No fix line and no allowed line: a refusal ends with asking the user,
 	// never with a command that works around the process.
-	return render.Denied("%s cannot %s %s%s; %s %s\n"+
+	return render.Denied("%s cannot %s %s%s; it %s\n"+
 		"this is a process rule: ask the user how to proceed",
-		v.Name, action(v), name, from, allowed, render.JoinWords(v.From, "or")).WithCause(ErrFrom)
+		v.Name, action(v), name, from, v.FromRule()).WithCause(ErrFrom)
 }
 
 // action is what a refusal of v says it does to the issue: "move" for a
