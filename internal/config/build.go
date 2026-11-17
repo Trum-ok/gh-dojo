@@ -12,11 +12,13 @@ import (
 	"strings"
 	"time"
 	_ "time/tzdata" // board.timezone loads on systems without a zoneinfo database
+
+	"github.com/Trum-ok/gh-dojo/internal/render"
 )
 
 var (
 	verbNameRE = regexp.MustCompile(`^[a-z][a-z0-9]*(-[a-z0-9]+)*$`)
-	repoRE     = regexp.MustCompile(`^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$`)
+	repoRE     = regexp.MustCompile(`^` + RepoPattern + `$`)
 	loginRE    = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9-]{0,38}$`)
 )
 
@@ -120,9 +122,27 @@ func (c *Config) loadTimezone(name string) (*time.Location, error) {
 	return loc, nil
 }
 
+// RepoPattern matches "owner/name": an owner of letters, digits, dashes
+// and underscores (enterprise managed users), not starting with a dash,
+// and a name of letters, digits, dots, dashes and underscores. Every
+// regexp for a repository is built from it.
+const RepoPattern = `[A-Za-z0-9][A-Za-z0-9_-]*/[A-Za-z0-9._-]+`
+
 // IsLogin reports whether s is spelled as a GitHub login: letters,
 // digits and dashes, not starting with a dash, at most 39 long.
 func IsLogin(s string) bool { return loginRE.MatchString(s) }
+
+// AssigneeArgError is why login, given to the command-line flag, cannot
+// be an assignee, or nil for Me or a GitHub login. The caller adds the fix.
+func AssigneeArgError(flag, login string) *render.Error {
+	switch {
+	case login == Me || IsLogin(login):
+		return nil
+	case strings.HasPrefix(login, "@"):
+		return render.Usage("--%s %q: write the login without @, or %s for yourself", flag, login, Me)
+	}
+	return render.Usage("--%s %q is not a GitHub login; pass a login, or %s for yourself", flag, login, Me)
+}
 
 // checkAssignee accepts Me or a GitHub login.
 func (c *Config) checkAssignee(key, s string) error {

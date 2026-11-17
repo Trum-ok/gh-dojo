@@ -136,11 +136,11 @@ func TestClipGraphemes(t *testing.T) {
 		{"short", "short"},
 		{"abcdefgh ijk", "abcdefgh…"},
 	} {
-		if got := clip(tt.s, 10); got != tt.want {
-			t.Errorf("clip(%q, 10) = %q, want %q", tt.s, got, tt.want)
+		if got := Clip(tt.s, 10); got != tt.want {
+			t.Errorf("Clip(%q, 10) = %q, want %q", tt.s, got, tt.want)
 		}
-		if n := runeLen(clip(tt.s, 10)); n > 10 {
-			t.Errorf("clip(%q, 10) has %d runes", tt.s, n)
+		if n := RuneLen(Clip(tt.s, 10)); n > 10 {
+			t.Errorf("Clip(%q, 10) has %d runes", tt.s, n)
 		}
 	}
 }

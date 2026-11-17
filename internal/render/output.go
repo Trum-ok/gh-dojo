@@ -4,9 +4,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"unicode/utf8"
-
-	"github.com/rivo/uniseg"
 )
 
 // MaxConfirmRunes is the length limit of a confirmation line.
@@ -28,19 +25,19 @@ const minTitleRunes = 8
 // left out if too little of it would fit. The subject and effects are never
 // cut: they say what was done, so a line without a title may be longer.
 func Confirm(subject, title string, effects ...string) string {
-	head := oneLine(subject)
-	tail := oneLine(strings.Join(nonEmpty(effects), ", "))
-	if title = oneLine(title); title != "" {
+	head := SingleLine(subject)
+	tail := SingleLine(strings.Join(nonEmpty(effects), ", "))
+	if title = SingleLine(title); title != "" {
 		// room left for `"title"` between head and tail, with separators.
-		room := MaxConfirmRunes - runeLen(head) - runeLen(tail) - 2
+		room := MaxConfirmRunes - RuneLen(head) - RuneLen(tail) - 2
 		if head != "" {
 			room--
 		}
 		if tail != "" {
 			room--
 		}
-		if room >= minTitleRunes || room >= runeLen(title) {
-			head = strings.TrimSpace(head + ` "` + clip(title, room) + `"`)
+		if room >= minTitleRunes || room >= RuneLen(title) {
+			head = strings.TrimSpace(head + ` "` + Clip(title, room) + `"`)
 		}
 	}
 	return strings.TrimSpace(head + " " + tail)
@@ -63,7 +60,7 @@ func Transition(from, to string) string {
 
 // Warn prints a one-line warning to w, which should be stderr.
 func Warn(w io.Writer, format string, args ...any) {
-	fmt.Fprintln(w, "warning: "+oneLine(fmt.Sprintf(format, args...)))
+	fmt.Fprintln(w, "warning: "+SingleLine(fmt.Sprintf(format, args...)))
 }
 
 // Shown returns the note for a list cut to shown of total items, or "" when
@@ -92,6 +89,24 @@ func Truncate[T any](items []T, limit, total int, hint string) ([]T, string) {
 	return items, Shown(len(items), total, hint)
 }
 
+// OrEmpty returns s, or an empty slice for nil: JSON lists are [], never
+// null.
+func OrEmpty[T any](s []T) []T {
+	if s == nil {
+		return []T{}
+	}
+	return s
+}
+
+// OrNull returns &s, or nil (null) for "": an absent value is null in
+// JSON, never "".
+func OrNull(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
 func nonEmpty(ss []string) []string {
 	out := ss[:0:0]
 	for _, s := range ss {
@@ -100,33 +115,4 @@ func nonEmpty(ss []string) []string {
 		}
 	}
 	return out
-}
-
-// oneLine collapses all whitespace runs, including newlines, to single spaces.
-func oneLine(s string) string { return strings.Join(strings.Fields(s), " ") }
-
-// runeLen is the length of s in runes, the unit of all length limits.
-func runeLen(s string) int { return utf8.RuneCountInString(s) }
-
-// clip cuts s to at most n runes, ending with "…" when cut. It cuts between
-// grapheme clusters, so an accented letter or emoji is never split.
-func clip(s string, n int) string {
-	if runeLen(s) <= n {
-		return s
-	}
-	if n <= 0 {
-		return ""
-	}
-	var b strings.Builder
-	used := 0
-	g := uniseg.NewGraphemes(s)
-	for g.Next() {
-		r := g.Runes()
-		if used+len(r) > n-1 { // keep one rune for "…"
-			break
-		}
-		b.WriteString(g.Str())
-		used += len(r)
-	}
-	return strings.TrimRight(b.String(), " \t") + "…"
 }

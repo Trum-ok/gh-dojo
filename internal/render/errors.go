@@ -150,12 +150,12 @@ func (e *Error) Text() string {
 		if i == 0 {
 			l = "error: " + l
 		}
-		lines = append(lines, clip(l, maxLineRunes))
+		lines = append(lines, Clip(l, maxLineRunes))
 	}
 	if len(e.Allowed) > 0 {
-		lines = append(lines, clip("allowed: "+joinAllowed(e.Allowed), maxLineRunes*2))
+		lines = append(lines, Clip("allowed: "+joinAllowed(e.Allowed), maxLineRunes*2))
 	}
-	if fix := oneLine(e.Fix); fix != "" && runeLen(fix) <= maxFixRunes {
+	if fix := SingleLine(e.Fix); fix != "" && RuneLen(fix) <= maxFixRunes {
 		lines = append(lines, "fix: "+fix)
 	}
 	return strings.Join(lines, "\n")
@@ -164,7 +164,7 @@ func (e *Error) Text() string {
 func joinAllowed(values []string) string {
 	shown := make([]string, 0, min(len(values), maxAllowed))
 	for _, v := range values[:min(len(values), maxAllowed)] {
-		shown = append(shown, oneLine(v))
+		shown = append(shown, SingleLine(v))
 	}
 	s := strings.Join(shown, ", ")
 	if n := len(values) - len(shown); n > 0 {

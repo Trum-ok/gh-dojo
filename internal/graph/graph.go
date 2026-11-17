@@ -533,3 +533,9 @@ func sleep(ctx context.Context, d time.Duration) error {
 		return nil
 	}
 }
+
+// IsNull reports whether v, a field of a GraphQL answer, is null or absent.
+func IsNull(v json.RawMessage) bool {
+	s := strings.TrimSpace(string(v))
+	return s == "" || s == "null"
+}

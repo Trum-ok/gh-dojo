@@ -31,6 +31,7 @@ import (
 	"github.com/cli/go-gh/v2/pkg/api"
 
 	"github.com/Trum-ok/gh-dojo/internal/board"
+	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/graph"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 )
@@ -58,7 +59,7 @@ type Repo struct {
 
 func (r Repo) String() string { return r.Owner + "/" + r.Name }
 
-var repoRE = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]*/[A-Za-z0-9._-]+$`)
+var repoRE = regexp.MustCompile(`^` + config.RepoPattern + `$`)
 
 // ParseRepo parses "owner/name". A malformed value is a usage error.
 func ParseRepo(s string) (Repo, error) {

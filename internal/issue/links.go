@@ -13,6 +13,7 @@ import (
 
 	"github.com/cli/go-gh/v2/pkg/api"
 
+	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/graph"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 )
@@ -35,8 +36,8 @@ type Ref struct {
 // Enterprise Server URLs name issues the same way, and CheckHost compares
 // it with the client's.
 var (
-	refRE    = regexp.MustCompile(`^(?:([A-Za-z0-9][A-Za-z0-9_-]*/[A-Za-z0-9._-]+)#|#)?([1-9][0-9]*)$`)
-	urlRefRE = regexp.MustCompile(`^https?://([^/\s?#]+)/([A-Za-z0-9][A-Za-z0-9_-]*/[A-Za-z0-9._-]+)/(issues|pull)/([1-9][0-9]*)/?(?:[?#]\S*)?$`)
+	refRE    = regexp.MustCompile(`^(?:(` + config.RepoPattern + `)#|#)?([1-9][0-9]*)$`)
+	urlRefRE = regexp.MustCompile(`^https?://([^/\s?#]+)/(` + config.RepoPattern + `)/(issues|pull)/([1-9][0-9]*)/?(?:[?#]\S*)?$`)
 )
 
 // RefExamples shows how to write an issue reference.
