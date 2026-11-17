@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/Trum-ok/gh-dojo/internal/board"
 	"github.com/Trum-ok/gh-dojo/internal/config"
@@ -82,49 +83,71 @@ func newListCmd() (*cobra.Command, error) {
   gh dojo list --status none
   gh dojo list --sprint current
   gh dojo list --label bug --label area:cli --limit 100`,
-		Args: listArgs,
+		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error { return runList(cmd, &o) },
 	}
 	f := cmd.Flags()
 	f.StringArrayVar(&o.statuses, "status", nil, `only issues in this status ("none": without a status); repeat for several`)
-	f.BoolVar(&o.mine, "mine", false, "only issues assigned to you")
-	f.StringVar(&o.sprint, "sprint", "", `only issues in this sprint (fields.sprint): "current" (today, in board.timezone), a title, or "none"`)
-	f.StringArrayVar(&o.labels, "label", nil, "only issues with this label; repeat to require several")
+	o.filterFlags(f)
 	f.BoolVar(&o.all, "all", false, "also show closed issues and issues in a final status")
 	f.IntVar(&o.limit, "limit", defaultListLimit, "print at most this many issues")
 	return cmd, nil
 }
 
-// listArgs rejects arguments; an issue number points at show.
-func listArgs(cmd *cobra.Command, args []string) error {
+// filterFlags adds the filters list and next share: --mine, --sprint and
+// --label.
+func (o *listOpts) filterFlags(f *pflag.FlagSet) {
+	f.BoolVar(&o.mine, "mine", false, "only issues assigned to you")
+	f.StringVar(&o.sprint, "sprint", "", `only issues in this sprint (fields.sprint): "current" (today, in board.timezone), a title, or "none"`)
+	f.StringArrayVar(&o.labels, "label", nil, "only issues with this label; repeat to require several")
+}
+
+// noArgs rejects the arguments of list and next; an issue number points
+// at show.
+func noArgs(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return nil
 	}
 	if ref, ok := parseRef(args[0]); ok {
-		return render.Usage("list takes no arguments; to see one issue: gh dojo show %s", ref.Arg(issue.Repo{}))
+		return render.Usage("%s takes no arguments; to see one issue: gh dojo show %s", cmd.Name(), ref.Arg(issue.Repo{}))
 	}
-	return render.Usage("list takes no arguments").WithFix(cmd.CommandPath() + " --help")
+	return render.Usage("%s takes no arguments", cmd.Name()).WithFix(cmd.CommandPath() + " --help")
+}
+
+// checkLimit rejects a --limit below 1.
+func checkLimit(cmd *cobra.Command, limit int) error {
+	if limit < 1 {
+		return render.Usage("invalid --limit %d: want 1 or greater", limit).WithFix(cmd.CommandPath() + " --help")
+	}
+	return nil
+}
+
+// refRepo is the default repository, which shortens refs to "#12" and
+// spells them as the config does; "" when it is unknown, as list and next
+// work without it.
+func refRepo(a *App) string {
+	if r, err := a.Repo(); err == nil {
+		return r.String()
+	}
+	return ""
 }
 
 func runList(cmd *cobra.Command, o *listOpts) error {
-	if o.limit < 1 {
-		return render.Usage("invalid --limit %d: want 1 or greater", o.limit).WithFix(cmd.CommandPath() + " --help")
+	if err := checkLimit(cmd, o.limit); err != nil {
+		return err
 	}
-	a := newApp()
-	cfg, err := a.Config()
+	cfg, err := loadConfig()
 	if err != nil {
 		return err
 	}
+	a := newApp()
 	rb, err := readBoard(cmd, a, cfg, o, false)
 	if err != nil {
 		return err
 	}
 	field, items := rb.field, rb.items
 	warnings := readWarnings(cmd, items, items.Incomplete)
-	repo := ""
-	if r, err := a.Repo(); err == nil { // only shortens refs; list works without it
-		repo = r.String()
-	}
+	repo := refRepo(a)
 	l := buildList(cfg, field.OptionNames(), items, o)
 	res := l.result(o, items)
 	res.Warnings = render.OrEmpty(warnings)
@@ -180,8 +203,8 @@ func readBoard(cmd *cobra.Command, a *App, cfg *config.Config, o *listOpts, bloc
 	if err := checkLabels(items, o.labels); err != nil {
 		return nil, err
 	}
-	if def, err := a.Repo(); err == nil { // only the spelling; list works without it
-		spellDefault(items, def.String())
+	if def := refRepo(a); def != "" {
+		spellDefault(items, def)
 	}
 	return &boardRead{schema: s, field: field, items: items}, nil
 }
@@ -242,18 +265,34 @@ type listResult struct {
 	Matched int            `json:"matched"` // issues that pass the filters; more than len(issues) when cut by --limit
 	// Unchecked counts issues listed though a --label may be among their
 	// labels not read.
-	Unchecked int `json:"unchecked"`
-	Hidden    int `json:"hidden"`   // closed or in a final status: --all shows them
-	Filtered  int `json:"filtered"` // not matching the filters
-	Skipped   struct {
-		DraftIssues  int `json:"draft_issues"`
-		PullRequests int `json:"pull_requests"`
-		Unseen       int `json:"unseen"` // items the token cannot see
-	} `json:"skipped"`
+	Unchecked int         `json:"unchecked"`
+	Hidden    int         `json:"hidden"`   // closed or in a final status: --all shows them
+	Filtered  int         `json:"filtered"` // not matching the filters
+	Skipped   skippedJSON `json:"skipped"`
 	// Incomplete: GitHub withheld parts of some items (warned on stderr).
 	Incomplete bool `json:"incomplete"`
 	// Warnings are also printed on stderr.
 	Warnings []string `json:"warnings"`
+}
+
+// skippedJSON counts the items list and next skip, as they show issues
+// only.
+type skippedJSON struct {
+	DraftIssues  int `json:"draft_issues"`
+	PullRequests int `json:"pull_requests"`
+	Unseen       int `json:"unseen"` // items the token cannot see
+}
+
+// sprintFilterJSON is the sprint_filter of list and next for o: see
+// listResult.SprintFilter.
+func sprintFilterJSON(o *listOpts) *string {
+	switch {
+	case o.sprintIt != nil:
+		return render.OrNull("iteration")
+	case o.sprint != "":
+		return render.OrNull(sprintNone)
+	}
+	return nil
 }
 
 type listIssue struct {
@@ -271,17 +310,10 @@ type listIssue struct {
 // result is the list as JSON, cut to o.limit as write cuts it.
 func (l *list) result(o *listOpts, items *board.Items) listResult {
 	r := listResult{
-		Sprint: iterationJSON(o.sprintIt), Issues: []listIssue{}, Matched: l.shown,
-		Unchecked: l.unchecked, Hidden: l.hidden, Filtered: l.filtered, Incomplete: items.Incomplete,
-		Warnings: []string{},
+		SprintFilter: sprintFilterJSON(o), Sprint: iterationJSON(o.sprintIt), Issues: []listIssue{}, Matched: l.shown,
+		Unchecked: l.unchecked, Hidden: l.hidden, Filtered: l.filtered, Skipped: l.skippedJSON(),
+		Incomplete: items.Incomplete, Warnings: []string{},
 	}
-	switch {
-	case o.sprintIt != nil:
-		r.SprintFilter = render.OrNull("iteration")
-	case o.sprint != "":
-		r.SprintFilter = render.OrNull(sprintNone)
-	}
-	r.Skipped.DraftIssues, r.Skipped.PullRequests, r.Skipped.Unseen = l.drafts, l.pulls, l.unseen
 	for _, g := range l.groups {
 		for _, it := range g.items {
 			if len(r.Issues) == o.limit {
@@ -392,18 +424,86 @@ type listGroup struct {
 	items  []board.Item
 }
 
-// list is what list prints: the groups and the counts of what is left out.
-// Every item on the board is in exactly one of shown, hidden, filtered,
-// drafts, pulls and unseen.
-type list struct {
-	groups    []*listGroup
-	shown     int // issues in groups
+// leftOut counts what list and next leave out, and the issues they show
+// though a --label may be among their labels not read.
+type leftOut struct {
 	unchecked int // shown, but a --label may be among labels not read
-	hidden    int // match the filters but closed or in a final status
+	hidden    int // --all shows them
 	filtered  int // don't match the filters
 	drafts    int
 	pulls     int
 	unseen    int // items the token cannot see
+}
+
+// skip counts an item that is not an issue and reports whether it is not:
+// list and next show issues only.
+func (c *leftOut) skip(it board.Item) bool {
+	switch it.Type {
+	case board.ContentIssue:
+		return false
+	case board.ContentDraftIssue:
+		c.drafts++
+	case board.ContentPullRequest:
+		c.pulls++
+	default:
+		c.unseen++
+	}
+	return true
+}
+
+func (c *leftOut) skippedJSON() skippedJSON {
+	return skippedJSON{DraftIssues: c.drafts, PullRequests: c.pulls, Unseen: c.unseen}
+}
+
+// write prints a line for each kind of issue left out (principle 7). hidden
+// says what the hidden issues are; cmd is the command's name.
+func (c *leftOut) write(w io.Writer, cmd, hidden string, o *listOpts) {
+	if c.unchecked > 0 {
+		fmt.Fprintf(w, "%s not fully checked: more than %d labels\n",
+			render.Plural(c.unchecked, "issue", "issues"), board.LabelsWindow)
+	}
+	if c.hidden > 0 {
+		fmt.Fprintf(w, "hidden: %d %s, use --all\n", c.hidden, hidden)
+	}
+	if c.filtered > 0 {
+		fmt.Fprintf(w, "filtered out: %s not matching %s\n",
+			render.Plural(c.filtered, "issue", "issues"), strings.Join(o.filterNames(), " "))
+	}
+	var skipped []string
+	if c.drafts > 0 {
+		skipped = append(skipped, render.Plural(c.drafts, "draft issue", "draft issues"))
+	}
+	if c.pulls > 0 {
+		skipped = append(skipped, render.Plural(c.pulls, "pull request", "pull requests"))
+	}
+	if c.unseen > 0 {
+		skipped = append(skipped, render.Plural(c.unseen, "item the token cannot see", "items the token cannot see"))
+	}
+	if len(skipped) > 0 {
+		fmt.Fprintf(w, "skipped: %s (%s shows issues only)\n", strings.Join(skipped, ", "), cmd)
+	}
+}
+
+// writeSprint prints the sprint --sprint selects, the first line of list
+// and next.
+func writeSprint(w io.Writer, o *listOpts) {
+	switch {
+	case o.sprint == "":
+	case o.sprintIt == nil:
+		fmt.Fprintln(w, "sprint: none")
+	default:
+		fmt.Fprintln(w, "sprint: "+o.sprintIt.Span())
+	}
+}
+
+// list is what list prints: the groups and the counts of what is left out.
+// Every item on the board is in exactly one of shown, hidden (matching the
+// filters but closed or in a final status), filtered, drafts, pulls and
+// unseen.
+type list struct {
+	leftOut
+	groups []*listGroup
+	shown  int // issues in groups
 }
 
 // buildList sorts the board's items into status groups: issues without a
@@ -419,16 +519,7 @@ func buildList(cfg *config.Config, options []string, items *board.Items, o *list
 		order = append(order, opt)
 	}
 	for _, it := range items.Items {
-		switch it.Type {
-		case board.ContentIssue:
-		case board.ContentDraftIssue:
-			l.drafts++
-			continue
-		case board.ContentPullRequest:
-			l.pulls++
-			continue
-		default:
-			l.unseen++
+		if l.skip(it) {
 			continue
 		}
 		ok, unsure := o.matches(it, items.Viewer)
@@ -493,13 +584,7 @@ func containsFold(list []string, s string) bool {
 // write prints the groups, cut to o.limit issues, then a line for each kind
 // of issue left out (principle 7).
 func (l *list) write(w io.Writer, repo string, cfg *config.Config, o *listOpts) {
-	switch {
-	case o.sprint == "":
-	case o.sprintIt == nil:
-		fmt.Fprintln(w, "sprint: none")
-	default:
-		fmt.Fprintln(w, "sprint: "+o.sprintIt.Span())
-	}
+	writeSprint(w, o)
 	left := o.limit
 	var cut []string // groups not printed in full
 	for _, g := range l.groups {
@@ -531,36 +616,13 @@ func (l *list) write(w io.Writer, repo string, cfg *config.Config, o *listOpts) 
 	if note := render.Shown(min(l.shown, o.limit), l.shown, "use --limit "+strconv.Itoa(l.shown)); note != "" {
 		fmt.Fprintln(w, note+"; not shown: "+strings.Join(cut, ", "))
 	}
-	if l.unchecked > 0 {
-		fmt.Fprintf(w, "%s not fully checked: more than %d labels\n",
-			render.Plural(l.unchecked, "issue", "issues"), board.LabelsWindow)
+	// With --status, final statuses not asked for are filtered out, so only
+	// closed issues can be hidden.
+	hidden := "closed"
+	if len(cfg.Statuses.Final) > 0 && len(o.statuses) == 0 {
+		hidden += " or " + strings.Join(cfg.Statuses.Final, "/")
 	}
-	if l.hidden > 0 {
-		// With --status, final statuses not asked for are filtered out, so
-		// only closed issues can be hidden.
-		what := "closed"
-		if len(cfg.Statuses.Final) > 0 && len(o.statuses) == 0 {
-			what += " or " + strings.Join(cfg.Statuses.Final, "/")
-		}
-		fmt.Fprintf(w, "hidden: %d %s, use --all\n", l.hidden, what)
-	}
-	if l.filtered > 0 {
-		fmt.Fprintf(w, "filtered out: %s not matching %s\n",
-			render.Plural(l.filtered, "issue", "issues"), strings.Join(o.filterNames(), " "))
-	}
-	var skipped []string
-	if l.drafts > 0 {
-		skipped = append(skipped, render.Plural(l.drafts, "draft issue", "draft issues"))
-	}
-	if l.pulls > 0 {
-		skipped = append(skipped, render.Plural(l.pulls, "pull request", "pull requests"))
-	}
-	if l.unseen > 0 {
-		skipped = append(skipped, render.Plural(l.unseen, "item the token cannot see", "items the token cannot see"))
-	}
-	if len(skipped) > 0 {
-		fmt.Fprintf(w, "skipped: %s (list shows issues only)\n", strings.Join(skipped, ", "))
-	}
+	l.leftOut.write(w, "list", hidden, o)
 }
 
 // folded reports whether group g prints as one line of numbers: its status
