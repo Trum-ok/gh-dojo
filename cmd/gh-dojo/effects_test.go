@@ -283,10 +283,11 @@ func TestVerbUnassignAll(t *testing.T) {
 }
 
 // TestVerbEffectsHelp: the help of a verb says what it does besides the
-// status, and that a confirm verb needs the user and --yes.
+// status, that a confirm verb needs the user and --yes, and whom it
+// assigns and unassigns.
 func TestVerbEffectsHelp(t *testing.T) {
-	withConfig(t, effectsDojoConfig)
-	for _, verb := range []string{"drop", "review", "revive", "done"} {
+	withConfig(t, assignDojoConfig)
+	for _, verb := range []string{"drop", "review", "revive", "done", "pass", "hand-back"} {
 		code, out := runOut(verb, "--help")
 		if code != render.ExitOK {
 			t.Fatalf("%s --help = %d\n%s", verb, code, out)
