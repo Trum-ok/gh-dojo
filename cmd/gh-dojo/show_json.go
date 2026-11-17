@@ -17,21 +17,21 @@ type showResult struct {
 	// Brief: --brief, so history and comments are [] and body null in
 	// every card.
 	Brief  bool         `json:"brief"`
-	Issues []showCard   `json:"issues"`
-	Failed []showFailed `json:"failed"` // numbers not shown; the error on stderr names them too
+	Issues []cardJSON   `json:"issues"`
+	Failed []failedJSON `json:"failed"` // numbers not shown; the error on stderr names them too
 	// Warnings are also printed on stderr.
 	Warnings []string `json:"warnings"`
 }
 
-// showFailed is an issue show could not print: not found, a pull
+// failedJSON is an issue show could not print: not found, a pull
 // request, or not read.
-type showFailed struct {
+type failedJSON struct {
 	Number int        `json:"number"`
 	Repo   string     `json:"repo"`
-	Error  *jsonError `json:"error"`
+	Error  *errorJSON `json:"error"`
 }
 
-type showCard struct {
+type cardJSON struct {
 	Number      int        `json:"number"`
 	Repo        string     `json:"repo"`
 	URL         string     `json:"url"`
@@ -44,44 +44,44 @@ type showCard struct {
 	// Incomplete: GitHub withheld part of the issue from the token.
 	Incomplete bool `json:"incomplete"`
 
-	Board     showBoard      `json:"board"`
+	Board     boardJSON      `json:"board"`
 	Sprint    *sprintJSON    `json:"sprint"` // null without fields.sprint
-	Milestone *jsonMilestone `json:"milestone"`
+	Milestone *milestoneJSON `json:"milestone"`
 
 	Labels         []string `json:"labels"`
 	LabelsTotal    int      `json:"labels_total"`
 	Assignees      []string `json:"assignees"`
 	AssigneesTotal int      `json:"assignees_total"`
 
-	BlockedBy []showLink `json:"blocked_by"`
+	BlockedBy []linkJSON `json:"blocked_by"`
 	// BlockedByTotal counts every blocker, also those not read; Unresolved
 	// counts the blockers read that still block.
 	BlockedByTotal int        `json:"blocked_by_total"`
 	Unresolved     int        `json:"unresolved_blockers"`
-	Blocking       []showLink `json:"blocking"`
+	Blocking       []linkJSON `json:"blocking"`
 	BlockingTotal  int        `json:"blocking_total"`
 	// Parent is the issue this one is a sub-issue of, null for none or
 	// when ParentHidden: GitHub withheld it from the token. SubIssues are
 	// its own; SubIssuesTotal and SubIssuesClosed count all of them, also
 	// those not read; UnresolvedSubIssues counts the ones read that are
 	// unresolved (as blockers are).
-	Parent              *showLink  `json:"parent"`
+	Parent              *linkJSON  `json:"parent"`
 	ParentHidden        bool       `json:"parent_hidden"`
-	SubIssues           []showLink `json:"sub_issues"`
+	SubIssues           []linkJSON `json:"sub_issues"`
 	SubIssuesTotal      int        `json:"sub_issues_total"`
 	SubIssuesClosed     int        `json:"sub_issues_closed"`
 	UnresolvedSubIssues int        `json:"unresolved_sub_issues"`
 
 	// History and Comments are [] and Body null with --brief.
-	History          []showChange  `json:"history"`
+	History          []changeJSON  `json:"history"`
 	HistoryTruncated bool          `json:"history_truncated"`
 	HistoryUntracked bool          `json:"history_untracked"`
-	Body             *showText     `json:"body"`
-	Comments         []showComment `json:"comments"`
+	Body             *textJSON     `json:"body"`
+	Comments         []commentJSON `json:"comments"`
 	CommentsTotal    int           `json:"comments_total"`
 }
 
-type showBoard struct {
+type boardJSON struct {
 	OnBoard bool `json:"on_board"` // false also when unknown_reason is set
 	// UnknownReason says why board membership is unknown: the issue may be
 	// on the board; null when known.
@@ -90,48 +90,48 @@ type showBoard struct {
 	StatusUnknown bool    `json:"status_unknown"` // the status could not be read
 	Archived      bool    `json:"archived"`
 	// Fields are the item's other set field values, sprint and status aside.
-	Fields          []showField `json:"fields"`
+	Fields          []fieldJSON `json:"fields"`
 	FieldsTruncated bool        `json:"fields_truncated"`
 }
 
-type showField struct {
+type fieldJSON struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
 }
 
 type sprintJSON struct {
 	Field     string         `json:"field"`
-	Iteration *jsonIteration `json:"iteration"` // null for none
+	Iteration *iterationJSON `json:"iteration"` // null for none
 	// UnknownReason says why the iteration is not known; null when known.
 	UnknownReason *string `json:"unknown_reason"`
 }
 
-// jsonIteration is a sprint iteration with its days, as JSON.
-type jsonIteration struct {
+// iterationJSON is a sprint iteration with its days, as JSON.
+type iterationJSON struct {
 	Title        string  `json:"title"`
 	StartDate    string  `json:"start_date"` // YYYY-MM-DD
 	EndDate      *string `json:"end_date"`   // the last day; null when not known
 	DurationDays int     `json:"duration_days"`
 }
 
-// iterationJSON is it as JSON, nil for nil.
-func iterationJSON(it *board.Iteration) *jsonIteration {
+// toIterationJSON is it as JSON, nil for nil.
+func toIterationJSON(it *board.Iteration) *iterationJSON {
 	if it == nil {
 		return nil
 	}
-	out := &jsonIteration{Title: it.Title, StartDate: it.StartDate, DurationDays: it.Duration}
+	out := &iterationJSON{Title: it.Title, StartDate: it.StartDate, DurationDays: it.Duration}
 	if start, err := time.Parse(time.DateOnly, it.StartDate); err == nil && it.Duration > 0 {
 		out.EndDate = render.OrNull(start.AddDate(0, 0, it.Duration-1).Format(time.DateOnly))
 	}
 	return out
 }
 
-type jsonMilestone struct {
+type milestoneJSON struct {
 	Title string  `json:"title"`
 	DueOn *string `json:"due_on"` // YYYY-MM-DD; null without a due date
 }
 
-type showLink struct {
+type linkJSON struct {
 	Ref    string `json:"ref"` // "owner/name#12", always in full
 	Repo   string `json:"repo"`
 	Number int    `json:"number"`
@@ -149,7 +149,7 @@ type showLink struct {
 	Resolved bool `json:"resolved"`
 }
 
-type showChange struct {
+type changeJSON struct {
 	At        *time.Time `json:"at"`
 	From      *string    `json:"from"` // null for no status
 	To        *string    `json:"to"`   // null for no status
@@ -157,40 +157,40 @@ type showChange struct {
 	Automated bool       `json:"automated"`
 }
 
-// showText is a description or comment body as show prints it: cut
+// textJSON is a description or comment body as show prints it: cut
 // unless --full, the hidden gh-dojo marker dropped.
-type showText struct {
+type textJSON struct {
 	Text   string `json:"text"`
 	Cut    bool   `json:"cut"`    // Text is the start only; --full gives all
 	Length int    `json:"length"` // characters of the whole text
 }
 
-type showComment struct {
+type commentJSON struct {
 	Author    string     `json:"author"`
 	CreatedAt *time.Time `json:"created_at"`
-	showText
+	textJSON
 }
 
 // result is show's JSON for the cards read, the ones that failed and
 // those left unread by readErr.
 func (v cardView) result(cards []*issue.Card, brief bool, failed []issue.Result, unread []issue.Ref, readErr error) showResult {
-	out := showResult{Brief: brief, Issues: []showCard{}, Failed: []showFailed{}, Warnings: []string{}}
+	out := showResult{Brief: brief, Issues: []cardJSON{}, Failed: []failedJSON{}, Warnings: []string{}}
 	for _, c := range cards {
-		out.Issues = append(out.Issues, v.cardJSON(c, brief))
+		out.Issues = append(out.Issues, v.toCardJSON(c, brief))
 	}
 	for _, r := range unread {
-		out.Failed = append(out.Failed, showFailed{Number: r.Number, Repo: r.Repo.String(), Error: errorJSON(readErr)})
+		out.Failed = append(out.Failed, failedJSON{Number: r.Number, Repo: r.Repo.String(), Error: toErrorJSON(readErr)})
 	}
 	for _, r := range failed {
-		out.Failed = append(out.Failed, showFailed{Number: r.Number, Repo: r.Repo.String(), Error: errorJSON(r.Err)})
+		out.Failed = append(out.Failed, failedJSON{Number: r.Number, Repo: r.Repo.String(), Error: toErrorJSON(r.Err)})
 	}
 	return out
 }
 
-// cardJSON is one card as JSON; brief leaves out the history, the
+// toCardJSON is one card as JSON; brief leaves out the history, the
 // description and the comments.
-func (v cardView) cardJSON(c *issue.Card, brief bool) showCard {
-	out := showCard{
+func (v cardView) toCardJSON(c *issue.Card, brief bool) cardJSON {
+	out := cardJSON{
 		Number:              c.Number,
 		Repo:                c.Repo.String(),
 		URL:                 c.URL,
@@ -201,37 +201,37 @@ func (v cardView) cardJSON(c *issue.Card, brief bool) showCard {
 		CreatedAt:           jsonTime(c.CreatedAt),
 		ClosedAt:            jsonTime(c.ClosedAt),
 		Incomplete:          c.Incomplete,
-		Board:               v.boardJSON(c),
+		Board:               v.toBoardJSON(c),
 		Labels:              render.OrEmpty(c.Labels.Nodes),
 		LabelsTotal:         max(c.Labels.TotalCount, len(c.Labels.Nodes)),
 		Assignees:           render.OrEmpty(c.Assignees.Nodes),
 		AssigneesTotal:      max(c.Assignees.TotalCount, len(c.Assignees.Nodes)),
-		BlockedBy:           v.linksJSON(c, c.BlockedBy.Nodes),
+		BlockedBy:           v.toLinksJSON(c, c.BlockedBy.Nodes),
 		BlockedByTotal:      max(c.BlockedBy.TotalCount, len(c.BlockedBy.Nodes)),
 		Unresolved:          len(c.UnresolvedBlockers(v.resolved)),
-		Blocking:            v.linksJSON(c, c.Blocking.Nodes),
+		Blocking:            v.toLinksJSON(c, c.Blocking.Nodes),
 		BlockingTotal:       max(c.Blocking.TotalCount, len(c.Blocking.Nodes)),
-		SubIssues:           v.linksJSON(c, c.SubIssues.Nodes),
+		SubIssues:           v.toLinksJSON(c, c.SubIssues.Nodes),
 		SubIssuesTotal:      max(c.SubIssues.TotalCount, len(c.SubIssues.Nodes)),
 		SubIssuesClosed:     c.SubIssuesClosed,
 		ParentHidden:        c.ParentHidden,
 		UnresolvedSubIssues: len(c.UnresolvedSubIssues(v.resolved)),
 		HistoryTruncated:    c.HistoryTruncated,
 		HistoryUntracked:    c.HistoryUntracked,
-		History:             []showChange{},
-		Comments:            []showComment{},
+		History:             []changeJSON{},
+		Comments:            []commentJSON{},
 		CommentsTotal:       max(c.Comments.TotalCount, len(c.Comments.Nodes)),
 	}
 	if c.Parent != nil {
-		p := v.linkJSON(c, *c.Parent)
+		p := v.toLinkJSON(c, *c.Parent)
 		out.Parent = &p
 	}
 	if v.sprintField != "" {
 		it, unknown := v.sprintOf(c)
-		out.Sprint = &sprintJSON{Field: v.sprintField, Iteration: iterationJSON(it), UnknownReason: render.OrNull(unknown)}
+		out.Sprint = &sprintJSON{Field: v.sprintField, Iteration: toIterationJSON(it), UnknownReason: render.OrNull(unknown)}
 	}
 	if m := c.Milestone; m != nil {
-		out.Milestone = &jsonMilestone{Title: render.SingleLine(m.Title)}
+		out.Milestone = &milestoneJSON{Title: render.SingleLine(m.Title)}
 		if !m.DueOn.IsZero() {
 			out.Milestone.DueOn = render.OrNull(cardDay(m.DueOn))
 		}
@@ -241,38 +241,38 @@ func (v cardView) cardJSON(c *issue.Card, brief bool) showCard {
 	}
 	if c.OnBoard() || c.BoardUnknown {
 		for _, h := range c.History {
-			out.History = append(out.History, showChange{
+			out.History = append(out.History, changeJSON{
 				At: jsonTime(h.At), From: render.OrNull(h.From), To: render.OrNull(h.To), Actor: cardLogin(h.Actor),
 				Automated: h.Automated || projectAutomation[h.Actor],
 			})
 		}
 	}
 	body := cleanText(c.Body, true)
-	out.Body = textJSON(body, v.bodyRunes)
+	out.Body = toTextJSON(body, v.bodyRunes)
 	shown, bodies, limit := v.shownComments(c)
 	for i, cm := range shown {
-		out.Comments = append(out.Comments, showComment{
-			Author: cardLogin(cm.Author), CreatedAt: jsonTime(cm.CreatedAt), showText: *textJSON(bodies[i], limit),
+		out.Comments = append(out.Comments, commentJSON{
+			Author: cardLogin(cm.Author), CreatedAt: jsonTime(cm.CreatedAt), textJSON: *toTextJSON(bodies[i], limit),
 		})
 	}
 	return out
 }
 
-// textJSON is text cut at limit runes (0: whole) as show cuts it.
-func textJSON(text string, limit int) *showText {
+// toTextJSON is text cut at limit runes (0: whole) as show cuts it.
+func toTextJSON(text string, limit int) *textJSON {
 	cut, note := fold(text, limit)
-	return &showText{Text: cut, Cut: note != "", Length: render.RuneLen(text)}
+	return &textJSON{Text: cut, Cut: note != "", Length: render.RuneLen(text)}
 }
 
-// boardJSON is the card's place on the board.
-func (v cardView) boardJSON(c *issue.Card) showBoard {
-	b := showBoard{
+// toBoardJSON is the card's place on the board.
+func (v cardView) toBoardJSON(c *issue.Card) boardJSON {
+	b := boardJSON{
 		OnBoard:       c.OnBoard(),
 		UnknownReason: render.OrNull(c.BoardUnknownReason),
 		Status:        render.OrNull(c.Status()),
 		StatusUnknown: c.StatusUnknown(),
 		Archived:      c.Archived(),
-		Fields:        []showField{},
+		Fields:        []fieldJSON{},
 	}
 	if c.BoardUnknown && b.UnknownReason == nil {
 		b.UnknownReason = render.OrNull("GitHub did not return all of its projects")
@@ -280,7 +280,7 @@ func (v cardView) boardJSON(c *issue.Card) showBoard {
 	if c.Item != nil {
 		for _, val := range c.Item.Values {
 			if val.Field != v.statusField && !v.isSprint(val) {
-				b.Fields = append(b.Fields, showField{Name: render.SingleLine(val.Field), Value: render.SingleLine(val.Text)})
+				b.Fields = append(b.Fields, fieldJSON{Name: render.SingleLine(val.Field), Value: render.SingleLine(val.Text)})
 			}
 		}
 		b.FieldsTruncated = c.Item.ValuesTruncated
@@ -288,20 +288,20 @@ func (v cardView) boardJSON(c *issue.Card) showBoard {
 	return b
 }
 
-// linksJSON is linked issues in GitHub's order.
-func (v cardView) linksJSON(c *issue.Card, links []issue.Link) []showLink {
-	out := []showLink{}
+// toLinksJSON is linked issues in GitHub's order.
+func (v cardView) toLinksJSON(c *issue.Card, links []issue.Link) []linkJSON {
+	out := []linkJSON{}
 	for _, l := range links {
-		out = append(out, v.linkJSON(c, l))
+		out = append(out, v.toLinkJSON(c, l))
 	}
 	return out
 }
 
-// linkJSON is a linked issue of the card.
-func (v cardView) linkJSON(c *issue.Card, l issue.Link) showLink {
+// toLinkJSON is a linked issue of the card.
+func (v cardView) toLinkJSON(c *issue.Card, l issue.Link) linkJSON {
 	// The default repository as the config spells it.
 	repo := issue.Ref{Repo: l.Repo, Number: l.Number}.In(c.Repo).In(v.def).Repo
-	return showLink{
+	return linkJSON{
 		Ref: fullRef(issue.Ref{Repo: repo, Number: l.Number}), Repo: repo.String(), Number: l.Number, Title: render.SingleLine(l.Title),
 		State: strings.ToLower(l.State), OnBoard: l.OnBoard, Status: render.OrNull(l.Status), Archived: l.Archived,
 		StatusUnknownReason: render.OrNull(l.StatusUnknown), Resolved: l.Resolved(v.resolved),

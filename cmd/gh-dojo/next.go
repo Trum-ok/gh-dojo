@@ -272,7 +272,7 @@ func (n *next) blockersText(ni nextIssue, repo string) string {
 type nextResult struct {
 	// SprintFilter and Sprint are list's: null without --sprint.
 	SprintFilter *string         `json:"sprint_filter"`
-	Sprint       *jsonIteration  `json:"sprint"`
+	Sprint       *iterationJSON  `json:"sprint"`
 	Issues       []nextIssueJSON `json:"issues"`
 	Matched      int             `json:"matched"` // issues to show; more than len(issues) when cut by --limit
 	// Unchecked counts issues listed though a --label may be among their
@@ -290,7 +290,7 @@ type nextResult struct {
 // nextIssueJSON is list's issue with its unresolved blockers, which only
 // --all shows.
 type nextIssueJSON struct {
-	listIssue
+	listIssueJSON
 	UnresolvedBlockers []nextBlockerJSON `json:"unresolved_blockers"`
 	UnreadBlockers     int               `json:"unread_blockers"` // withheld from the token: unresolved
 }
@@ -310,12 +310,12 @@ type nextBlockerJSON struct {
 // result is the issues as JSON, cut to o.limit as write cuts them.
 func (n *next) result(o *listOpts) nextResult {
 	r := nextResult{
-		SprintFilter: sprintFilterJSON(o), Sprint: iterationJSON(o.sprintIt), Issues: []nextIssueJSON{}, Matched: len(n.issues),
-		Unchecked: n.unchecked, Hidden: n.hidden, Filtered: n.filtered, Skipped: n.skippedJSON(),
+		SprintFilter: sprintFilterJSON(o), Sprint: toIterationJSON(o.sprintIt), Issues: []nextIssueJSON{}, Matched: len(n.issues),
+		Unchecked: n.unchecked, Hidden: n.hidden, Filtered: n.filtered, Skipped: n.toSkippedJSON(),
 		Incomplete: n.incomplete, Warnings: []string{},
 	}
 	for _, ni := range n.issues[:min(len(n.issues), o.limit)] {
-		j := nextIssueJSON{listIssue: listIssueOf(ni.Item), UnresolvedBlockers: []nextBlockerJSON{}, UnreadBlockers: ni.unread}
+		j := nextIssueJSON{listIssueJSON: listIssueOf(ni.Item), UnresolvedBlockers: []nextBlockerJSON{}, UnreadBlockers: ni.unread}
 		for _, b := range ni.blockers {
 			j.UnresolvedBlockers = append(j.UnresolvedBlockers, nextBlockerJSON{
 				Ref: b.Repo + "#" + strconv.Itoa(b.Number), Repo: b.Repo, Number: b.Number,

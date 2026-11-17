@@ -25,7 +25,7 @@ type agentDoc struct {
 	// p is describe's process of cfg without what rules explains (the
 	// blockers and sub-issues checks, the link, confirm, release), so a
 	// verb's line does not say it twice.
-	p     *process
+	p     *describeResult
 	cmds  []string // the built-in commands, for hasCommand
 	notes string   // "" or markdown ending in a newline
 }
@@ -289,7 +289,7 @@ func (d *agentDoc) confirmExample() string {
 // in place of its first characters.
 // A template that is only {comment}, which is optional, says so instead:
 // "comments only with --comment".
-func (d *agentDoc) facts(v config.Verb, pv processVerb) string {
+func (d *agentDoc) facts(v config.Verb, pv processVerbJSON) string {
 	pv.Effects = slices.Clone(pv.Effects)
 	only := commentOnly(v)
 	for i, e := range pv.Effects {

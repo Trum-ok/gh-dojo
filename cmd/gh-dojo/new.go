@@ -503,7 +503,7 @@ type newResult struct {
 	Unarchived bool    `json:"unarchived"`
 	// Milestone is the issue's milestone, nil for none; MilestoneSet says
 	// this run set it. A resumed issue keeps a different milestone it had.
-	Milestone    *jsonMilestone `json:"milestone"`
+	Milestone    *milestoneJSON `json:"milestone"`
 	MilestoneSet bool           `json:"milestone_set"`
 	// BlockedBy are the blocked-by links added now, AlreadyBlockedBy those
 	// a resumed issue had.
@@ -544,7 +544,7 @@ func (r *newRun) result() newResult {
 	return newResult{
 		Number: number, Repo: r.repo.String(), Title: render.SingleLine(r.issueTitle()), DryRun: r.opts.DryRun, Created: !r.resumed,
 		Labels: render.OrEmpty(r.labels), Status: render.OrNull(r.status), StatusSet: r.statusSet, Unarchived: r.unarchived,
-		Milestone: milestoneJSON(r.milestone), MilestoneSet: r.milestoneSet,
+		Milestone: toMilestoneJSON(r.milestone), MilestoneSet: r.milestoneSet,
 		BlockedBy: refList(r.linked, r.def), AlreadyBlockedBy: refList(r.linkedFound, r.def),
 		Parent: r.parentJSON(), ParentSet: r.parentSet,
 		Assigned: render.OrEmpty(r.assigned), AlreadyAssigned: render.OrEmpty(r.assignedFound),
@@ -1474,12 +1474,12 @@ func (r *newRun) partial(err error) error {
 	return render.Partial("%s %s, but %s\n%s", r.name(), what, step, why).WithFix(fix).WithCause(err)
 }
 
-// milestoneJSON is the milestone in new's JSON result, nil for none.
-func milestoneJSON(m *issue.OpenMilestone) *jsonMilestone {
+// toMilestoneJSON is the milestone in new's JSON result, nil for none.
+func toMilestoneJSON(m *issue.OpenMilestone) *milestoneJSON {
 	if m == nil {
 		return nil
 	}
-	out := &jsonMilestone{Title: render.SingleLine(m.Title)}
+	out := &milestoneJSON{Title: render.SingleLine(m.Title)}
 	if m.DueOn != nil {
 		if t, err := time.Parse(time.RFC3339, *m.DueOn); err == nil {
 			out.DueOn = render.OrNull(cardDay(t))

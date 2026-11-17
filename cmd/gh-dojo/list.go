@@ -260,9 +260,9 @@ type listResult struct {
 	SprintFilter *string `json:"sprint_filter"`
 	// Sprint is the iteration --sprint selects, null without --sprint or
 	// for --sprint none.
-	Sprint  *jsonIteration `json:"sprint"`
-	Issues  []listIssue    `json:"issues"`
-	Matched int            `json:"matched"` // issues that pass the filters; more than len(issues) when cut by --limit
+	Sprint  *iterationJSON  `json:"sprint"`
+	Issues  []listIssueJSON `json:"issues"`
+	Matched int             `json:"matched"` // issues that pass the filters; more than len(issues) when cut by --limit
 	// Unchecked counts issues listed though a --label may be among their
 	// labels not read.
 	Unchecked int         `json:"unchecked"`
@@ -295,7 +295,7 @@ func sprintFilterJSON(o *listOpts) *string {
 	return nil
 }
 
-type listIssue struct {
+type listIssueJSON struct {
 	Repo           string   `json:"repo"`
 	Number         int      `json:"number"`
 	Title          string   `json:"title"`
@@ -310,8 +310,8 @@ type listIssue struct {
 // result is the list as JSON, cut to o.limit as write cuts it.
 func (l *list) result(o *listOpts, items *board.Items) listResult {
 	r := listResult{
-		SprintFilter: sprintFilterJSON(o), Sprint: iterationJSON(o.sprintIt), Issues: []listIssue{}, Matched: l.shown,
-		Unchecked: l.unchecked, Hidden: l.hidden, Filtered: l.filtered, Skipped: l.skippedJSON(),
+		SprintFilter: sprintFilterJSON(o), Sprint: toIterationJSON(o.sprintIt), Issues: []listIssueJSON{}, Matched: l.shown,
+		Unchecked: l.unchecked, Hidden: l.hidden, Filtered: l.filtered, Skipped: l.toSkippedJSON(),
 		Incomplete: items.Incomplete, Warnings: []string{},
 	}
 	for _, g := range l.groups {
@@ -326,8 +326,8 @@ func (l *list) result(o *listOpts, items *board.Items) listResult {
 }
 
 // listIssueOf is an issue of the board as list's JSON has it.
-func listIssueOf(it board.Item) listIssue {
-	return listIssue{
+func listIssueOf(it board.Item) listIssueJSON {
+	return listIssueJSON{
 		Repo: it.Repo, Number: it.Number, Title: render.SingleLine(it.Title), State: strings.ToLower(it.State),
 		Status: render.OrNull(it.Status), Labels: render.OrEmpty(it.Labels.Nodes), LabelsTotal: max(it.Labels.TotalCount, len(it.Labels.Nodes)),
 		Assignees: render.OrEmpty(it.Assignees.Nodes), AssigneesTotal: max(it.Assignees.TotalCount, len(it.Assignees.Nodes)),
@@ -451,7 +451,7 @@ func (c *leftOut) skip(it board.Item) bool {
 	return true
 }
 
-func (c *leftOut) skippedJSON() skippedJSON {
+func (c *leftOut) toSkippedJSON() skippedJSON {
 	return skippedJSON{DraftIssues: c.drafts, PullRequests: c.pulls, Unseen: c.unseen}
 }
 

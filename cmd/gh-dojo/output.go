@@ -34,7 +34,7 @@ import (
 // the JSON says what was done, its "error" what was not.
 //
 // The JSON is an object with "schema_version" (schemaVersion) first and
-// "error" second: null, or the error that ended the command (jsonError),
+// "error" second: null, or the error that ended the command (errorJSON),
 // then the result's fields, snake_case and never a GitHub node ID. Every
 // key is always there: lists are [] when empty, an absent value is null,
 // never "".
@@ -296,7 +296,7 @@ func writeErrorJSON(w io.Writer, o output, err error) {
 }
 
 // encodeResult encodes v as a JSON object with "schema_version" as its
-// first field and "error" (runErr as a jsonError, null for nil) as its
+// first field and "error" (runErr as an errorJSON, null for nil) as its
 // second. HTML characters are kept as they are (no <).
 func encodeResult(v any, runErr error) ([]byte, error) {
 	data, err := marshal(v)
@@ -306,7 +306,7 @@ func encodeResult(v any, runErr error) ([]byte, error) {
 	if len(data) < 2 || data[0] != '{' {
 		return nil, fmt.Errorf("result is not a JSON object: %.20s", data)
 	}
-	e, err := marshal(errorJSON(runErr))
+	e, err := marshal(toErrorJSON(runErr))
 	if err != nil {
 		return nil, err
 	}
@@ -349,23 +349,23 @@ func terminal(w io.Writer) (tty bool, width int, color bool) {
 	return true, width, t.IsColorEnabled()
 }
 
-// jsonError is an error in JSON: what ended a command, an issue a command
+// errorJSON is an error in JSON: what ended a command, an issue a command
 // could not show or apply, or what stopped a partial write. The fields
 // are those of the error block on stderr.
-type jsonError struct {
+type errorJSON struct {
 	ExitCode int      `json:"exit_code"`
 	Message  string   `json:"message"`
 	Allowed  []string `json:"allowed"`
 	Fix      *string  `json:"fix"` // null for none
 }
 
-// errorJSON is err as a jsonError; nil for nil.
-func errorJSON(err error) *jsonError {
+// toErrorJSON is err as an errorJSON; nil for nil.
+func toErrorJSON(err error) *errorJSON {
 	if err == nil {
 		return nil
 	}
 	e := render.FromError(err)
-	return &jsonError{ExitCode: int(e.Code), Message: e.What, Allowed: render.OrEmpty(e.Allowed), Fix: render.OrNull(strings.TrimSpace(e.Fix))}
+	return &errorJSON{ExitCode: int(e.Code), Message: e.What, Allowed: render.OrEmpty(e.Allowed), Fix: render.OrNull(strings.TrimSpace(e.Fix))}
 }
 
 // jsonTime is t in UTC for JSON, nil (null) for the zero time.

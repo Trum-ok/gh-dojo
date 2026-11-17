@@ -152,9 +152,9 @@ func listInitProjects(cmd *cobra.Command, a *App, o initOpts, current string) er
 		return render.NotFound("%s %s has no projects this token can see", kind, ps.Owner).
 			WithFix(fmt.Sprintf("gh project create --owner %s --title <title>", ps.Owner))
 	}
-	res := initProjects{Owner: ps.Owner, OwnerType: kind, Projects: []initProject{}}
+	res := initProjectsResult{Owner: ps.Owner, OwnerType: kind, Projects: []initProjectJSON{}}
 	for _, p := range ps.Projects {
-		res.Projects = append(res.Projects, initProject{Number: p.Number, Title: render.SingleLine(p.Title), Items: p.Items, Closed: p.Closed})
+		res.Projects = append(res.Projects, initProjectJSON{Number: p.Number, Title: render.SingleLine(p.Title), Items: p.Items, Closed: p.Closed})
 	}
 	project := "<number>"
 	if p := pickProject(ps.Projects, current); p != nil {
@@ -166,19 +166,19 @@ func listInitProjects(cmd *cobra.Command, a *App, o initOpts, current string) er
 		kind, ps.Owner, render.Plural(len(ps.Projects), "project", "projects")).WithFix(res.Command))
 }
 
-// initProjects is the owner's projects init lists without --project, and
+// initProjectsResult is the owner's projects init lists without --project, and
 // its JSON. The command still exits 1: --project is required.
-type initProjects struct {
-	Owner     string        `json:"owner"`
-	OwnerType string        `json:"owner_type"` // user or organization
-	Projects  []initProject `json:"projects"`
+type initProjectsResult struct {
+	Owner     string            `json:"owner"`
+	OwnerType string            `json:"owner_type"` // user or organization
+	Projects  []initProjectJSON `json:"projects"`
 	// Suggested is the project the command names, null when the choice is
 	// not clear; Command writes the config ("<number>" when not clear).
 	Suggested *int   `json:"suggested_project"`
 	Command   string `json:"command"`
 }
 
-type initProject struct {
+type initProjectJSON struct {
 	Number int    `json:"number"`
 	Title  string `json:"title"`
 	Items  int    `json:"items"`
@@ -189,7 +189,7 @@ type initProject struct {
 //
 //	4  IT Stupino Fall 2026 Kanban  (0 items)
 //	5  gh-dojo  (36 items)
-func (r initProjects) write(w io.Writer) {
+func (r initProjectsResult) write(w io.Writer) {
 	width := 0
 	for _, p := range r.Projects {
 		width = max(width, len(strconv.Itoa(p.Number)))
@@ -281,7 +281,7 @@ func writeInitConfig(cmd *cobra.Command, a *App, o initOpts, repo string) error 
 	if len(problems) == 0 {
 		effects = append(effects, "matches the board")
 	}
-	res := initWritten{
+	res := initResult{
 		Path: display, Written: !o.dryRun, Board: s.Ref().String(), BoardTitle: render.SingleLine(s.Title),
 		Preset: o.preset, Repos: []string{}, Matches: len(problems) == 0, Problems: []initProblemJSON{},
 		Content: string(data),
@@ -322,9 +322,9 @@ func writeInitConfig(cmd *cobra.Command, a *App, o initOpts, repo string) error 
 	return err
 }
 
-// initWritten is the config init wrote, or would write with --dry-run,
+// initResult is the config init wrote, or would write with --dry-run,
 // and its JSON. With problems the command exits 1; the file is kept.
-type initWritten struct {
+type initResult struct {
 	Path       string   `json:"path"`    // relative to the current directory
 	Written    bool     `json:"written"` // false for --dry-run
 	Board      string   `json:"board"`   // owner/number

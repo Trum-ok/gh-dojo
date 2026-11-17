@@ -585,23 +585,23 @@ func (r *releaseRun) sources(f release.Found) string {
 // releaseResult is release's JSON: the verb's batch (see verbResult) with
 // the range, how each issue was found, and the issues left out.
 type releaseResult struct {
-	Verb        string       `json:"verb"`
-	DefaultRepo *string      `json:"default_repo"`
-	DryRun      bool         `json:"dry_run"`
-	Release     releaseRange `json:"release"`
+	Verb        string           `json:"verb"`
+	DefaultRepo *string          `json:"default_repo"`
+	DryRun      bool             `json:"dry_run"`
+	Release     releaseRangeJSON `json:"release"`
 	// Issues are those found, in order (the default repository's first,
 	// by number), with how each was found.
-	Issues []releaseIssue `json:"issues"`
+	Issues []releaseIssueJSON `json:"issues"`
 	// Skipped are the issues found and left out: by --exclude, numbers
 	// only commit messages name that are no issue (a pull request, a
 	// missing issue or repository), issues closed in a final status and
 	// issues not ready for the verb.
-	Skipped  []releaseSkip `json:"skipped"`
-	Summary  verbSummary   `json:"summary"`
-	Warnings []string      `json:"warnings"`
+	Skipped  []releaseSkipJSON `json:"skipped"`
+	Summary  verbSummaryJSON   `json:"summary"`
+	Warnings []string          `json:"warnings"`
 }
 
-type releaseRange struct {
+type releaseRangeJSON struct {
 	Ref    string `json:"ref"`    // as given
 	Commit string `json:"commit"` // its commit's oid
 	// Since is where the range starts, as named: the previous version tag
@@ -616,22 +616,22 @@ type releaseRange struct {
 	Commits  int  `json:"commits"`
 }
 
-type releaseIssue struct {
-	verbIssue
-	FoundBy []releaseSource `json:"found_by"`
+type releaseIssueJSON struct {
+	verbIssueJSON
+	FoundBy []releaseSourceJSON `json:"found_by"`
 }
 
-// releaseSource is one way an issue was found: a merged pull request
+// releaseSourceJSON is one way an issue was found: a merged pull request
 // ("owner/name#12") that closes it, with its first commit in the release,
 // or a commit whose message names it (pull_request null). By says which:
 // pull_request, keyword or suffix.
-type releaseSource struct {
+type releaseSourceJSON struct {
 	By          string  `json:"by"`
 	PullRequest *string `json:"pull_request"`
 	Commit      string  `json:"commit"`
 }
 
-type releaseSkip struct {
+type releaseSkipJSON struct {
 	Number int    `json:"number"`
 	Repo   string `json:"repo"`
 	Ref    string `json:"ref"`
@@ -641,27 +641,27 @@ type releaseSkip struct {
 	// OnBoard and Status are where an issue closed or not ready stands:
 	// whether it is on the board and its status, null for none; both null
 	// for the other reasons.
-	OnBoard *bool           `json:"on_board"`
-	Status  *string         `json:"status"`
-	FoundBy []releaseSource `json:"found_by"`
+	OnBoard *bool               `json:"on_board"`
+	Status  *string             `json:"status"`
+	FoundBy []releaseSourceJSON `json:"found_by"`
 }
 
 func (r *releaseRun) json(verb, repo string, dry bool, items []*batch.Item, warnings []string) releaseResult {
 	v := verbJSON(verb, repo, dry, items)
 	out := releaseResult{
 		Verb: v.Verb, DefaultRepo: v.DefaultRepo, DryRun: dry,
-		Release: releaseRange{
+		Release: releaseRangeJSON{
 			Ref: r.rng.Head, Commit: r.rng.HeadCommit, Since: r.rng.Since, SincePicked: r.rng.Picked,
 			SinceCommit: r.rng.SinceCommit, Compared: r.rng.Compared, Commits: len(r.rng.Commits),
 		},
-		Issues: []releaseIssue{}, Skipped: []releaseSkip{}, Summary: v.Summary, Warnings: render.OrEmpty(warnings),
+		Issues: []releaseIssueJSON{}, Skipped: []releaseSkipJSON{}, Summary: v.Summary, Warnings: render.OrEmpty(warnings),
 	}
 	for i, it := range items {
-		out.Issues = append(out.Issues, releaseIssue{verbIssue: v.Issues[i], FoundBy: sourcesJSON(r.foundOf(it.Ref))})
+		out.Issues = append(out.Issues, releaseIssueJSON{verbIssueJSON: v.Issues[i], FoundBy: toReleaseSourcesJSON(r.foundOf(it.Ref))})
 	}
 	for _, s := range r.skipped {
-		skip := releaseSkip{Number: s.found.Ref.Number, Repo: s.found.Ref.Repo.String(), Ref: fullRef(s.found.Ref), Reason: s.reason,
-			FoundBy: sourcesJSON(s.found)}
+		skip := releaseSkipJSON{Number: s.found.Ref.Number, Repo: s.found.Ref.Repo.String(), Ref: fullRef(s.found.Ref), Reason: s.reason,
+			FoundBy: toReleaseSourcesJSON(s.found)}
 		if s.reason == skipClosed || s.reason == skipNotReady {
 			skip.OnBoard = &s.onBoard
 			if s.onBoard {
@@ -673,10 +673,10 @@ func (r *releaseRun) json(verb, repo string, dry bool, items []*batch.Item, warn
 	return out
 }
 
-func sourcesJSON(f release.Found) []releaseSource {
-	out := []releaseSource{}
+func toReleaseSourcesJSON(f release.Found) []releaseSourceJSON {
+	out := []releaseSourceJSON{}
 	for _, s := range f.Sources {
-		src := releaseSource{By: string(s.By), Commit: s.Commit}
+		src := releaseSourceJSON{By: string(s.By), Commit: s.Commit}
 		if s.Pull != nil {
 			src.PullRequest = render.OrNull(fullRef(*s.Pull))
 		}

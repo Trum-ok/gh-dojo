@@ -100,7 +100,7 @@ func (s *shownCard) json(r verbResult) verbResult {
 	if s == nil || len(r.Issues) != 1 {
 		return r
 	}
-	c := s.view.cardJSON(s.card, false)
+	c := s.view.toCardJSON(s.card, false)
 	r.Issues[0].Card = &c
 	return r
 }

@@ -15,13 +15,13 @@ type verbResult struct {
 	Verb string `json:"verb"`
 	// DefaultRepo is owner/name of the default repository, where a bare
 	// number is; null when not known. Each issue has its own repo.
-	DefaultRepo *string     `json:"default_repo"`
-	DryRun      bool        `json:"dry_run"`
-	Issues      []verbIssue `json:"issues"` // in the order of the arguments
-	Summary     verbSummary `json:"summary"`
+	DefaultRepo *string         `json:"default_repo"`
+	DryRun      bool            `json:"dry_run"`
+	Issues      []verbIssueJSON `json:"issues"` // in the order of the arguments
+	Summary     verbSummaryJSON `json:"summary"`
 }
 
-type verbSummary struct {
+type verbSummaryJSON struct {
 	Total int `json:"total"`
 	// Done counts the issues applied or found in place; in a dry run, the
 	// issues that can be applied. Written counts those of them that took
@@ -47,28 +47,28 @@ const (
 	outcomeNotAttempted = "not_attempted"
 )
 
-type verbIssue struct {
+type verbIssueJSON struct {
 	Number  int     `json:"number"`
 	Repo    string  `json:"repo"`  // owner/name of the issue, which may differ from the default one
 	Title   *string `json:"title"` // null when the issue was not read
 	Outcome string  `json:"outcome"`
 	// Planned are the ops to apply, Applied the ones GitHub confirmed (none
 	// in a dry run), InPlace the effects found done already.
-	Planned  []jsonOp `json:"planned"`
-	Applied  []jsonOp `json:"applied"`
-	InPlace  []jsonOp `json:"in_place"`
+	Planned  []opJSON `json:"planned"`
+	Applied  []opJSON `json:"applied"`
+	InPlace  []opJSON `json:"in_place"`
 	NeedsYes bool     `json:"needs_yes"` // confirm = "user": runs only with --yes
 	Warnings []string `json:"warnings"`  // also printed on stderr
 	// Error is why the issue failed, or what stopped a partial write.
-	Error *jsonError `json:"error"`
+	Error *errorJSON `json:"error"`
 	// Card is the issue as show --json has it, as read before the verb's
 	// changes; null without --show or when the issue was not read.
-	Card *showCard `json:"card"`
+	Card *cardJSON `json:"card"`
 }
 
-// jsonOp is one effect of a plan. Op names its kind; the other fields are
+// opJSON is one effect of a plan. Op names its kind; the other fields are
 // those of the kind (see MarshalJSON), each always there.
-type jsonOp struct {
+type opJSON struct {
 	// Op is add_to_board, unarchive, reopen, set_status, set_iteration,
 	// set_fields, set_milestone, add_labels, remove_labels, assign,
 	// unassign, add_blocked_by, add_comment or close.
@@ -78,7 +78,7 @@ type jsonOp struct {
 	// "" (null) for none.
 	From, To  string
 	StartDate string            // set_iteration: the start of To; "" (null) for none
-	Fields    []jsonFieldChange // set_fields
+	Fields    []fieldChangeJSON // set_fields
 	Labels    []string          // add_labels, remove_labels
 	Login     string            // assign
 	Logins    []string          // unassign; empty in place for unassign = "all" with nobody to remove
@@ -90,7 +90,7 @@ type jsonOp struct {
 }
 
 // MarshalJSON writes op and the fields of its kind, in this order.
-func (o jsonOp) MarshalJSON() ([]byte, error) {
+func (o opJSON) MarshalJSON() ([]byte, error) {
 	type kv struct {
 		k string
 		v any
@@ -136,57 +136,57 @@ func (o jsonOp) MarshalJSON() ([]byte, error) {
 	return append(b, '}'), nil
 }
 
-type jsonFieldChange struct {
+type fieldChangeJSON struct {
 	Field string  `json:"field"`
 	From  *string `json:"from"` // null for none
 	To    *string `json:"to"`   // null: cleared
 }
 
-// opJSON is op as JSON, its issue refs in full (def is the default
+// toOpJSON is op as JSON, its issue refs in full (def is the default
 // repository, owner/name, that a "#12" of the plan is in). The status of
 // an issue not on the board reads from null (no status).
-func opJSON(op workflow.Op, def string) jsonOp {
+func toOpJSON(op workflow.Op, def string) opJSON {
 	switch op := op.(type) {
 	case workflow.AddToBoard:
-		return jsonOp{Op: "add_to_board"}
+		return opJSON{Op: "add_to_board"}
 	case workflow.Unarchive:
-		return jsonOp{Op: "unarchive"}
+		return opJSON{Op: "unarchive"}
 	case workflow.Reopen:
-		return jsonOp{Op: "reopen"}
+		return opJSON{Op: "reopen"}
 	case workflow.SetStatus:
-		return jsonOp{Op: "set_status", From: op.From, To: op.To}
+		return opJSON{Op: "set_status", From: op.From, To: op.To}
 	case workflow.SetIteration:
-		return jsonOp{Op: "set_iteration", From: op.From, To: op.To, StartDate: op.Start}
+		return opJSON{Op: "set_iteration", From: op.From, To: op.To, StartDate: op.Start}
 	case workflow.SetFields:
-		out := jsonOp{Op: "set_fields", Fields: []jsonFieldChange{}}
+		out := opJSON{Op: "set_fields", Fields: []fieldChangeJSON{}}
 		for _, c := range op.Changes {
-			out.Fields = append(out.Fields, jsonFieldChange{Field: c.Field, From: render.OrNull(c.From), To: render.OrNull(c.To)})
+			out.Fields = append(out.Fields, fieldChangeJSON{Field: c.Field, From: render.OrNull(c.From), To: render.OrNull(c.To)})
 		}
 		return out
 	case workflow.SetMilestone:
-		return jsonOp{Op: "set_milestone", From: op.From, To: op.To}
+		return opJSON{Op: "set_milestone", From: op.From, To: op.To}
 	case workflow.AddLabels:
-		return jsonOp{Op: "add_labels", Labels: op.Names}
+		return opJSON{Op: "add_labels", Labels: op.Names}
 	case workflow.RemoveLabels:
-		return jsonOp{Op: "remove_labels", Labels: op.Names}
+		return opJSON{Op: "remove_labels", Labels: op.Names}
 	case workflow.Assign:
-		return jsonOp{Op: "assign", Login: op.Login}
+		return opJSON{Op: "assign", Login: op.Login}
 	case workflow.Unassign:
-		return jsonOp{Op: "unassign", Logins: op.Logins, Kept: op.Kept}
+		return opJSON{Op: "unassign", Logins: op.Logins, Kept: op.Kept}
 	case workflow.AddBlockedBy:
-		return jsonOp{Op: "add_blocked_by", Issue: fullText(op.Ref, def)}
+		return opJSON{Op: "add_blocked_by", Issue: fullText(op.Ref, def)}
 	case workflow.AddComment:
-		return jsonOp{Op: "add_comment", Body: op.Body}
+		return opJSON{Op: "add_comment", Body: op.Body}
 	case workflow.Close:
-		return jsonOp{Op: "close", Reason: op.Reason, Of: fullText(op.Of, def)}
+		return opJSON{Op: "close", Reason: op.Reason, Of: fullText(op.Of, def)}
 	}
-	return jsonOp{Op: "unknown"}
+	return opJSON{Op: "unknown"}
 }
 
-func opsJSON(ops []workflow.Op, def string) []jsonOp {
-	out := []jsonOp{}
+func toOpsJSON(ops []workflow.Op, def string) []opJSON {
+	out := []opJSON{}
 	for _, op := range ops {
-		out = append(out, opJSON(op, def))
+		out = append(out, toOpJSON(op, def))
 	}
 	return out
 }
@@ -194,7 +194,7 @@ func opsJSON(ops []workflow.Op, def string) []jsonOp {
 // inPlaceJSON is what p found in place, in the order of the plan's ops:
 // the status when unchanged, its InPlace ops, and the comment (without
 // its body) when already posted, before a close.
-func inPlaceJSON(p *workflow.Plan, def string) []jsonOp {
+func inPlaceJSON(p *workflow.Plan, def string) []opJSON {
 	var ops, closing []workflow.Op
 	if p.StatusUnchanged {
 		ops = append(ops, workflow.SetStatus{From: p.Target, To: p.Target})
@@ -209,15 +209,15 @@ func inPlaceJSON(p *workflow.Plan, def string) []jsonOp {
 	if p.CommentPresent {
 		ops = append(ops, workflow.AddComment{})
 	}
-	return opsJSON(append(ops, closing...), def)
+	return toOpsJSON(append(ops, closing...), def)
 }
 
 // verbJSON is the JSON of verb v run on items of repo ("" when not
 // known); dry for a dry run.
 func verbJSON(v, repo string, dry bool, items []*batch.Item) verbResult {
-	r := verbResult{Verb: v, DefaultRepo: render.OrNull(repo), DryRun: dry, Issues: []verbIssue{}, Summary: verbSummary{Total: len(items)}}
+	r := verbResult{Verb: v, DefaultRepo: render.OrNull(repo), DryRun: dry, Issues: []verbIssueJSON{}, Summary: verbSummaryJSON{Total: len(items)}}
 	for _, it := range items {
-		is := itemJSON(it, dry, repo)
+		is := toVerbIssueJSON(it, dry, repo)
 		switch is.Outcome {
 		case outcomePartial, outcomeFailed:
 			r.Summary.Failed++
@@ -234,12 +234,12 @@ func verbJSON(v, repo string, dry bool, items []*batch.Item) verbResult {
 	return r
 }
 
-// itemJSON is the issue's part of a verb's JSON; def is the default
+// toVerbIssueJSON is the issue's part of a verb's JSON; def is the default
 // repository.
-func itemJSON(it *batch.Item, dry bool, def string) verbIssue {
-	out := verbIssue{
-		Number: it.Ref.Number, Repo: it.Ref.Repo.String(), Outcome: outcomeFailed, Planned: []jsonOp{}, Applied: []jsonOp{}, InPlace: []jsonOp{},
-		Warnings: []string{}, Error: errorJSON(it.Err),
+func toVerbIssueJSON(it *batch.Item, dry bool, def string) verbIssueJSON {
+	out := verbIssueJSON{
+		Number: it.Ref.Number, Repo: it.Ref.Repo.String(), Outcome: outcomeFailed, Planned: []opJSON{}, Applied: []opJSON{}, InPlace: []opJSON{},
+		Warnings: []string{}, Error: toErrorJSON(it.Err),
 	}
 	if it.Issue != nil {
 		out.Title = render.OrNull(render.SingleLine(it.Issue.Title))
@@ -249,7 +249,7 @@ func itemJSON(it *batch.Item, dry bool, def string) verbIssue {
 	}
 	first := it.Writes.First
 	out.Title = render.OrNull(render.SingleLine(first.Issue.Title))
-	out.Planned = opsJSON(first.Ops, def)
+	out.Planned = toOpsJSON(first.Ops, def)
 	out.NeedsYes = first.NeedsYes
 	out.Warnings = render.OrEmpty(first.Warnings)
 	if dry {
@@ -264,7 +264,7 @@ func itemJSON(it *batch.Item, dry bool, def string) verbIssue {
 		return out
 	}
 	shown := it.Writes.Applied()
-	out.Applied = opsJSON(it.Writes.Done, def)
+	out.Applied = toOpsJSON(it.Writes.Done, def)
 	out.InPlace = inPlaceJSON(shown, def)
 	switch {
 	case it.Skipped:

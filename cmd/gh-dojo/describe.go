@@ -39,30 +39,30 @@ config is printed as an error (exit code 1). --json gives the same as data.`,
 	}, nil
 }
 
-// process is what describe prints, and its JSON.
-type process struct {
-	Config    string            `json:"config"`
-	Preset    *string           `json:"preset"` // null without one
-	Board     string            `json:"board"`  // owner/number
-	Repos     []string          `json:"repos"`  // the first is the default; none: the current repository
-	Verbs     []processVerb     `json:"verbs"`
-	Statuses  processStatuses   `json:"statuses"`
-	ExitCodes []processExitCode `json:"exit_codes"`
+// describeResult is what describe prints, and its JSON.
+type describeResult struct {
+	Config    string                `json:"config"`
+	Preset    *string               `json:"preset"` // null without one
+	Board     string                `json:"board"`  // owner/number
+	Repos     []string              `json:"repos"`  // the first is the default; none: the current repository
+	Verbs     []processVerbJSON     `json:"verbs"`
+	Statuses  processStatusesJSON   `json:"statuses"`
+	ExitCodes []processExitCodeJSON `json:"exit_codes"`
 
 	// sprint, fields and milestone say some verb sets the sprint, other
 	// board fields or the milestone, for the sentence on repeats.
 	sprint, fields, milestone bool
 }
 
-// processStatuses are the statuses with a role in the process.
-type processStatuses struct {
+// processStatusesJSON are the statuses with a role in the process.
+type processStatusesJSON struct {
 	Initial  *string  `json:"initial"`  // new issues; null for none
 	Final    []string `json:"final"`    // list hides them
 	Resolved []string `json:"resolved"` // a blocker in one no longer blocks
 }
 
-// processVerb is one verb as describe shows it.
-type processVerb struct {
+// processVerbJSON is one verb as describe shows it.
+type processVerbJSON struct {
 	Name          string   `json:"name"`
 	When          string   `json:"when"`
 	From          []string `json:"from"` // empty: any status
@@ -77,7 +77,7 @@ type processVerb struct {
 	release bool // describe points to gh dojo release for it: see releaseFinishes
 }
 
-type processExitCode struct {
+type processExitCodeJSON struct {
 	Code    int    `json:"code"`
 	Meaning string `json:"meaning"`
 	Next    string `json:"next"`
@@ -87,7 +87,7 @@ type processExitCode struct {
 // beyond its from → to and its arguments, as short phrases joined into its
 // describe line. Each returns "" when the verb does not have the key. A new
 // verb key that checks or does something (blockers, close) gets an entry
-// in one of them; batch and the arguments are processVerb.facts'.
+// in one of them; batch and the arguments are processVerbJSON.facts'.
 var (
 	verbChecks = []func(cfg *config.Config, v config.Verb) string{
 		func(cfg *config.Config, v config.Verb) string {
@@ -260,20 +260,20 @@ func wrapText(text string, width int) string {
 const maxTemplateRunes = 60
 
 // describeProcess collects what describe shows about cfg.
-func describeProcess(cfg *config.Config) *process {
-	p := &process{
+func describeProcess(cfg *config.Config) *describeResult {
+	p := &describeResult{
 		Config: cfg.Display,
 		Preset: render.OrNull(cfg.Preset),
 		Board:  fmt.Sprintf("%s/%d", cfg.Board.Owner, cfg.Board.Project),
 		Repos:  render.OrEmpty(cfg.Board.Repos),
-		Verbs:  []processVerb{},
-		Statuses: processStatuses{
+		Verbs:  []processVerbJSON{},
+		Statuses: processStatusesJSON{
 			Initial: render.OrNull(cfg.Statuses.Initial), Final: render.OrEmpty(cfg.Statuses.Final), Resolved: render.OrEmpty(cfg.Statuses.Resolved),
 		},
 	}
 	for _, v := range cfg.Verbs {
 		required, oneOf, optional := verbArgs(v)
-		pv := processVerb{
+		pv := processVerbJSON{
 			Name: v.Name, When: v.When, From: render.OrEmpty(v.From), To: render.OrNull(v.To), Batch: true,
 			release:  releaseFinishes(cfg, v),
 			Requires: render.OrEmpty(required), RequiresOneOf: render.OrEmpty(oneOf), Optional: render.OrEmpty(optional),
@@ -295,7 +295,7 @@ func describeProcess(cfg *config.Config) *process {
 		p.milestone = p.milestone || v.SetsMilestone()
 	}
 	for _, c := range render.ExitCodes {
-		p.ExitCodes = append(p.ExitCodes, processExitCode{int(c.Code), c.Meaning, c.Next})
+		p.ExitCodes = append(p.ExitCodes, processExitCodeJSON{int(c.Code), c.Meaning, c.Next})
 	}
 	return p
 }
@@ -315,7 +315,7 @@ func describeProcess(cfg *config.Config) *process {
 //
 //	Lifecycle (from → to):
 //	  ...
-func (p *process) text() string {
+func (p *describeResult) text() string {
 	head := "Process from " + p.Config
 	if p.Preset != nil {
 		head += " (preset " + *p.Preset + ")"
@@ -380,7 +380,7 @@ func (p *process) text() string {
 
 // facts is the second describe line of a verb: its arguments, checks and
 // effects, or "" when it has none.
-func (v processVerb) facts() string {
+func (v processVerbJSON) facts() string {
 	var parts []string
 	if v.release {
 		parts = append(parts, "release <tag> --verb "+v.Name+" runs it on a release's issues")

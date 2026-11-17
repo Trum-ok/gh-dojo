@@ -76,11 +76,11 @@ It never uses the network.`,
 
 // agentResult is what agent install did or found, and its JSON.
 type agentResult struct {
-	Check bool              `json:"check"`
-	Files []agentFileResult `json:"files"`
+	Check bool            `json:"check"`
+	Files []agentFileJSON `json:"files"`
 }
 
-type agentFileResult struct {
+type agentFileJSON struct {
 	Agent string `json:"agent"`
 	Path  string `json:"path"` // relative to the repository root
 	// State is agent.StateUpToDate, StateCreated or StateUpdated; with
@@ -134,10 +134,10 @@ func runAgentInstall(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
-	r := &agentResult{Check: check, Files: []agentFileResult{}}
+	r := &agentResult{Check: check, Files: []agentFileJSON{}}
 	stale, wrote, fix := 0, false, install
 	for _, f := range files {
-		res := agentFileResult{Agent: f.Agent, Path: f.Path, State: agent.StateUpToDate, Diff: []string{}}
+		res := agentFileJSON{Agent: f.Agent, Path: f.Path, State: agent.StateUpToDate, Diff: []string{}}
 		switch {
 		case f.UpToDate():
 		case check:

@@ -308,7 +308,7 @@ func TestUnassignJSON(t *testing.T) {
 		{workflow.Unassign{All: true}, `{"op":"unassign","logins":[],"kept":false}`},
 		{workflow.Unassign{Logins: []string{"carol"}, Kept: true}, `{"op":"unassign","logins":["carol"],"kept":true}`},
 	} {
-		got, err := json.Marshal(opJSON(tt.op, "Trum-ok/gh-dojo"))
+		got, err := json.Marshal(toOpJSON(tt.op, "Trum-ok/gh-dojo"))
 		if err != nil || string(got) != tt.want {
 			t.Errorf("%+v: %s, %v; want %s", tt.op, got, err, tt.want)
 		}
