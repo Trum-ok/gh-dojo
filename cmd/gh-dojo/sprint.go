@@ -67,7 +67,7 @@ func describeFields(_ *config.Config, v config.Verb) string {
 }
 
 // sprintHelp adds the verb help lines of the iteration and field effects.
-func sprintHelp(cfg *config.Config, v config.Verb, line func(label, format string, a ...any)) {
+func sprintHelp(cfg *config.Config, v config.Verb, line helpLine) {
 	zone := "UTC"
 	if z := cfg.Board.Zone(); z != "" {
 		zone = z
@@ -384,7 +384,7 @@ func (b *githubBackend) fieldIDs(s *board.Schema, ops []workflow.Op, ids *effect
 }
 
 // SchemaCached reports whether the board schema the backend reads and
-// writes with came from the cache (see readPlanFresh).
+// writes with came from the cache (see batch.ReadPlan).
 func (b *githubBackend) SchemaCached() bool { return b.app.SchemaCached() }
 
 // SchemaCached reports whether the schema the App keeps came from the

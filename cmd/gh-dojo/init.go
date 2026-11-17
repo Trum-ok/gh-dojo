@@ -67,7 +67,7 @@ func newInitCmd() (*cobra.Command, error) {
 	f.IntVar(&o.project, "project", 0, "project `number`, from its URL; without it the owner's projects are listed")
 	f.StringVar(&o.repo, "repo", "", "default repository `owner/name` for board.repos (default: the current repository)")
 	f.BoolVar(&o.force, "force", false, "overwrite an existing "+config.FileName)
-	f.BoolVar(&o.dryRun, "dry-run", false, "print the file instead of writing it")
+	f.BoolVar(&o.dryRun, dryRunFlag, false, "print the file instead of writing it")
 	return cmd, nil
 }
 
@@ -156,18 +156,14 @@ func listInitProjects(cmd *cobra.Command, a *App, o initOpts, current string) er
 	for _, p := range ps.Projects {
 		res.Projects = append(res.Projects, initProject{Number: p.Number, Title: render.SingleLine(p.Title), Items: p.Items, Closed: p.Closed})
 	}
-	noun := "projects"
-	if len(ps.Projects) == 1 {
-		noun = "project"
-	}
 	project := "<number>"
 	if p := pickProject(ps.Projects, current); p != nil {
 		project = strconv.Itoa(p.Number)
 		res.Suggested = &p.Number
 	}
 	res.Command = o.command(ps.Owner, project, "")
-	return emitResult(cmd, res, res.write, render.Usage("choose a project: --project is required (%s %s has %d %s, listed above)",
-		kind, ps.Owner, len(ps.Projects), noun).WithFix(res.Command))
+	return emitResult(cmd, res, res.write, render.Usage("choose a project: --project is required (%s %s has %s, listed above)",
+		kind, ps.Owner, render.Plural(len(ps.Projects), "project", "projects")).WithFix(res.Command))
 }
 
 // initProjects is the owner's projects init lists without --project, and
@@ -199,10 +195,7 @@ func (r initProjects) write(w io.Writer) {
 		width = max(width, len(strconv.Itoa(p.Number)))
 	}
 	for _, p := range r.Projects {
-		items := fmt.Sprintf("%d items", p.Items)
-		if p.Items == 1 {
-			items = "1 item"
-		}
+		items := render.Plural(p.Items, "item", "items")
 		if p.Closed {
 			items += ", closed"
 		}
@@ -524,14 +517,11 @@ func override(key string) string {
 // problemsError is the error that ends init when the config does not
 // match the board: exit code 1, the file kept.
 func problemsError(cfg *config.Config, s *board.Schema, problems []initProblem, dryRun bool, fix string) error {
-	noun := "problems"
-	if len(problems) == 1 {
-		noun = "problem"
-	}
-	what := fmt.Sprintf("%s does not match board %s: %d %s above; the file is kept, fix the board or the file",
-		cfg.Display, s.Ref(), len(problems), noun)
+	n := render.Plural(len(problems), "problem", "problems")
+	what := fmt.Sprintf("%s does not match board %s: %s above; the file is kept, fix the board or the file",
+		cfg.Display, s.Ref(), n)
 	if dryRun {
-		what = fmt.Sprintf("%s would not match board %s: %d %s above", cfg.Display, s.Ref(), len(problems), noun)
+		what = fmt.Sprintf("%s would not match board %s: %s above", cfg.Display, s.Ref(), n)
 	}
 	e := render.Usage("%s", what).WithFix(fix)
 	// The board's statuses, or its single-select fields when the status

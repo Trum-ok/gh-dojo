@@ -79,8 +79,9 @@ func TestBatchNetwork(t *testing.T) {
 }
 
 // TestBatchOtherRepo: issues of the default repository and of cli/cli are
-// read in one request, as for one repository (spec F12: the requests of a
-// verb do not grow). cli/cli#2 is not on the board, so done refuses it.
+// read in one request, as for one repository: the requests of a verb do
+// not grow with the repositories. cli/cli#2 is not on the board, so done
+// refuses it.
 func TestBatchOtherRepo(t *testing.T) {
 	srv, before := withWarmVerbApp(t, verbFixture("batch_done_repos"))
 	checkRuns(t, srv, before,
@@ -227,7 +228,7 @@ func TestBatchOutcomes(t *testing.T) {
 	}
 }
 
-// TestVerbsOtherRepo (spec F12): an issue of another repository goes by
+// TestVerbsOtherRepo: an issue of another repository goes by
 // owner/repo#N or its URL, alone or in a batch with the default
 // repository's (acme/shop, where a bare number is), and every line names
 // it so: the dry run, the confirmations, the summary, the warnings and

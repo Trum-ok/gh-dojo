@@ -17,14 +17,7 @@ import (
 // summary ends the run (see batch.Run for the output and exit codes). One
 // issue, as when 12 and owner/repo#12 name the same, runs as runVerb.
 func runBatch(cmd *cobra.Command, cfg *config.Config, v config.Verb, refs []issue.Ref, args workflow.Args, dryRun, show bool) error {
-	if err := workflow.CheckArgs(v, args, refArgs(refs, issue.Repo{})...); err != nil {
-		return err
-	}
-	be, err := newBackend(cfg)
-	if err != nil {
-		return err
-	}
-	def, err := be.Repo()
+	be, def, err := verbBackend(cfg, v, args, refArgs(refs, issue.Repo{})...)
 	if err != nil {
 		return err
 	}
@@ -52,13 +45,13 @@ func runBatch(cmd *cobra.Command, cfg *config.Config, v config.Verb, refs []issu
 // is be's default repository.
 func newBatchRun(cmd *cobra.Command, be Backend, cfg *config.Config, v config.Verb, args workflow.Args, def issue.Repo) *batch.Run {
 	b := batch.New(be, cfg, v, args, def)
-	b.Engine.Getenv = getenv
+	withGetenv(b.Engine)
 	b.Stdout, b.Stderr, b.JSON = cmd.OutOrStdout(), cmd.ErrOrStderr(), jsonMode(cmd)
 	return b
 }
 
 // batchHelp is the Batch section of the help of a verb with batch = true.
-func batchHelp(v config.Verb, line func(label, format string, a ...any)) {
+func batchHelp(v config.Verb, line helpLine) {
 	if !v.Batch {
 		return
 	}

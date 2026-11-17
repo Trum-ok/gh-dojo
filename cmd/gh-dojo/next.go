@@ -40,32 +40,19 @@ func newNextCmd() (*cobra.Command, error) {
   gh dojo next --label bug
   gh dojo next --sprint current
   gh dojo next --all`,
-		Args: nextArgs,
+		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error { return runNext(cmd, &o) },
 	}
 	f := cmd.Flags()
-	f.BoolVar(&o.mine, "mine", false, "only issues assigned to you")
-	f.StringVar(&o.sprint, "sprint", "", `only issues in this sprint (fields.sprint): "current" (today, in board.timezone), a title, or "none"`)
-	f.StringArrayVar(&o.labels, "label", nil, "only issues with this label; repeat to require several")
+	o.filterFlags(f)
 	f.BoolVar(&o.all, "all", false, "also show issues with unresolved blockers, naming them")
 	f.IntVar(&o.limit, "limit", defaultNextLimit, "print at most this many issues")
 	return cmd, nil
 }
 
-// nextArgs rejects arguments; an issue number points at show.
-func nextArgs(cmd *cobra.Command, args []string) error {
-	if len(args) == 0 {
-		return nil
-	}
-	if ref, ok := parseRef(args[0]); ok {
-		return render.Usage("next takes no arguments; to see one issue: gh dojo show %s", ref.Arg(issue.Repo{}))
-	}
-	return render.Usage("next takes no arguments").WithFix(cmd.CommandPath() + " --help")
-}
-
 func runNext(cmd *cobra.Command, o *listOpts) error {
-	if o.limit < 1 {
-		return render.Usage("invalid --limit %d: want 1 or greater", o.limit).WithFix(cmd.CommandPath() + " --help")
+	if err := checkLimit(cmd, o.limit); err != nil {
+		return err
 	}
 	cfg, err := loadConfig()
 	if err != nil {
@@ -93,11 +80,8 @@ func runNext(cmd *cobra.Command, o *listOpts) error {
 	}
 	n.resolve(cfg, o, places)
 	warnings := readWarnings(cmd, rb.items, n.incomplete)
-	repo := ""
-	if r, err := a.Repo(); err == nil { // only shortens refs; next works without it
-		repo = r.String()
-	}
-	res := n.result(o, repo)
+	repo := refRepo(a)
+	res := n.result(o)
 	res.Warnings = render.OrEmpty(warnings)
 	return emit(cmd, res, func(w io.Writer) { n.write(w, repo, cfg, o) })
 }
@@ -118,10 +102,9 @@ func (n nextIssue) blocked() bool { return len(n.blockers) > 0 || n.unread > 0 }
 // resolved status, or with a place that could not be read.
 type nextBlocker struct {
 	board.Blocker
-	onBoard  bool
-	archived bool
-	status   string // its status on the board; "" for none, not on the board, or unknown
-	unknown  string // why its place could not be read; "" when known
+	// link is its state and place on the board as show has a linked
+	// issue's: State, OnBoard, Archived, Status and StatusUnknown.
+	link issue.Link
 }
 
 // ref is "#12", or "owner/name#12" outside repo.
@@ -132,41 +115,17 @@ func (b nextBlocker) ref(repo string) string {
 	return "#" + strconv.Itoa(b.Number)
 }
 
-// place says where it stands on the board, as show's linkPlace does.
-func (b nextBlocker) place() string {
-	var s string
-	switch {
-	case b.unknown != "":
-		s = "status not read: " + b.unknown
-	case !b.onBoard:
-		return "not on the board"
-	case b.status == "":
-		s = "on the board, no status"
-	default:
-		s = b.status
-	}
-	if b.archived {
-		s += ", archived"
-	}
-	return s
-}
-
 // next is what next prints: the issues, in board order, and the counts of
 // what is left out. Every item in the initial status or without a status,
 // except closed issues, is in exactly one of candidates, filtered, drafts,
-// pulls and unseen, and every candidate in one of issues and hidden.
-// Closed issues and other statuses are not candidates, so not counted:
-// list shows them.
+// pulls and unseen, and every candidate in one of issues and hidden
+// (blocked). Closed issues and other statuses are not candidates, so not
+// counted: list shows them.
 type next struct {
-	candidates []nextIssue           // open issues that pass the filters
-	onBoard    map[string]board.Item // the board's issues by "owner/name#N"
-	issues     []nextIssue           // with --all, the blocked ones too
-	unchecked  int                   // shown, but a --label may be among labels not read
-	hidden     int                   // blocked: --all shows them
-	filtered   int                   // don't match the filters
-	drafts     int
-	pulls      int
-	unseen     int // items the token cannot see
+	leftOut
+	candidates []nextIssue                   // open issues that pass the filters
+	onBoard    map[board.IssueKey]board.Item // the board's issues
+	issues     []nextIssue                   // with --all, the blocked ones too
 	// incomplete: GitHub withheld part of a candidate or of its blockers.
 	incomplete bool
 }
@@ -174,26 +133,17 @@ type next struct {
 // selectNext picks the open issues in the initial status or without one
 // that pass the filters, in board order.
 func selectNext(cfg *config.Config, items *board.Items, o *listOpts) *next {
-	n := &next{onBoard: map[string]board.Item{}}
+	n := &next{onBoard: map[board.IssueKey]board.Item{}}
 	for _, it := range items.Items {
 		if it.Type == board.ContentIssue {
-			n.onBoard[board.IssueKey{Repo: it.Repo, Number: it.Number}.String()] = it
+			n.onBoard[board.IssueKey{Repo: it.Repo, Number: it.Number}] = it
 		}
 	}
 	for _, it := range items.Items {
 		if it.Status != "" && it.Status != cfg.Statuses.Initial {
 			continue
 		}
-		switch it.Type {
-		case board.ContentIssue:
-		case board.ContentDraftIssue:
-			n.drafts++
-			continue
-		case board.ContentPullRequest:
-			n.pulls++
-			continue
-		default:
-			n.unseen++
+		if n.skip(it) {
 			continue
 		}
 		if it.State == issue.StateClosed {
@@ -216,7 +166,7 @@ func (n *next) offBoard() []board.IssueKey {
 	for _, c := range n.candidates {
 		for _, b := range c.BlockedBy.Nodes {
 			k := board.IssueKey{Repo: b.Repo, Number: b.Number}
-			if _, on := n.onBoard[k.String()]; b.State != issue.StateClosed && !on && !slices.Contains(keys, k) {
+			if _, on := n.onBoard[k]; b.State != issue.StateClosed && !on && !slices.Contains(keys, k) {
 				keys = append(keys, k)
 			}
 		}
@@ -238,9 +188,9 @@ func (n *next) resolve(cfg *config.Config, o *listOpts, places map[board.IssueKe
 				continue
 			}
 			k := board.IssueKey{Repo: b.Repo, Number: b.Number}
-			nb := nextBlocker{Blocker: b}
-			if bi, on := n.onBoard[k.String()]; on {
-				nb.onBoard, nb.status = true, bi.Status
+			nb := nextBlocker{Blocker: b, link: issue.Link{State: b.State}}
+			if bi, on := n.onBoard[k]; on {
+				nb.link.OnBoard, nb.link.Status = true, bi.Status
 			} else {
 				p, read := places[k]
 				if !read {
@@ -249,10 +199,10 @@ func (n *next) resolve(cfg *config.Config, o *listOpts, places map[board.IssueKe
 				if p.State == issue.StateClosed {
 					continue
 				}
-				nb.onBoard, nb.archived, nb.status, nb.unknown = p.OnBoard, p.Archived, p.Status, p.Unknown
+				nb.link.OnBoard, nb.link.Archived, nb.link.Status, nb.link.StatusUnknown = p.OnBoard, p.Archived, p.Status, p.Unknown
 				n.incomplete = n.incomplete || p.Withheld
 			}
-			if nb.unknown == "" && nb.onBoard && nb.status != "" && slices.Contains(cfg.Statuses.Resolved, nb.status) {
+			if nb.link.Resolved(cfg.Statuses.Resolved) {
 				continue
 			}
 			c.blockers = append(c.blockers, nb)
@@ -271,13 +221,7 @@ func (n *next) resolve(cfg *config.Config, o *listOpts, places map[board.IssueKe
 // write prints the issues, cut to o.limit, then a line for each kind of
 // issue left out (principle 7).
 func (n *next) write(w io.Writer, repo string, cfg *config.Config, o *listOpts) {
-	switch {
-	case o.sprint == "":
-	case o.sprintIt == nil:
-		fmt.Fprintln(w, "sprint: none")
-	default:
-		fmt.Fprintln(w, "sprint: "+o.sprintIt.Span())
-	}
+	writeSprint(w, o)
 	shown := n.issues[:min(len(n.issues), o.limit)]
 	for _, ni := range shown {
 		line := itemLine(ni.Item, repo)
@@ -300,30 +244,7 @@ func (n *next) write(w io.Writer, repo string, cfg *config.Config, o *listOpts) 
 	if note := render.Shown(len(shown), len(n.issues), "use --limit "+strconv.Itoa(len(n.issues))); note != "" {
 		fmt.Fprintln(w, note)
 	}
-	if n.unchecked > 0 {
-		fmt.Fprintf(w, "%s not fully checked: more than %d labels\n",
-			render.Plural(n.unchecked, "issue", "issues"), board.LabelsWindow)
-	}
-	if n.hidden > 0 {
-		fmt.Fprintf(w, "hidden: %d blocked, use --all\n", n.hidden)
-	}
-	if n.filtered > 0 {
-		fmt.Fprintf(w, "filtered out: %s not matching %s\n",
-			render.Plural(n.filtered, "issue", "issues"), strings.Join(o.filterNames(), " "))
-	}
-	var skipped []string
-	if n.drafts > 0 {
-		skipped = append(skipped, render.Plural(n.drafts, "draft issue", "draft issues"))
-	}
-	if n.pulls > 0 {
-		skipped = append(skipped, render.Plural(n.pulls, "pull request", "pull requests"))
-	}
-	if n.unseen > 0 {
-		skipped = append(skipped, render.Plural(n.unseen, "item the token cannot see", "items the token cannot see"))
-	}
-	if len(skipped) > 0 {
-		fmt.Fprintf(w, "skipped: %s (next shows issues only)\n", strings.Join(skipped, ", "))
-	}
+	n.leftOut.write(w, "next", "blocked", o)
 }
 
 // maxNextBlockers is how many blockers a line of next --all names.
@@ -338,7 +259,7 @@ func (n *next) blockersText(ni nextIssue, repo string) string {
 			names = append(names, fmt.Sprintf("%d more", len(ni.blockers)-maxNextBlockers))
 			break
 		}
-		names = append(names, b.ref(repo)+" ("+b.place()+")")
+		names = append(names, b.ref(repo)+" ("+linkPlace(b.link)+")")
 	}
 	if ni.unread > 0 {
 		names = append(names, fmt.Sprintf("%d not read", ni.unread))
@@ -356,14 +277,10 @@ type nextResult struct {
 	Matched      int             `json:"matched"` // issues to show; more than len(issues) when cut by --limit
 	// Unchecked counts issues listed though a --label may be among their
 	// labels not read.
-	Unchecked int `json:"unchecked"`
-	Hidden    int `json:"hidden"`   // blocked: --all shows them
-	Filtered  int `json:"filtered"` // not matching the filters
-	Skipped   struct {
-		DraftIssues  int `json:"draft_issues"`
-		PullRequests int `json:"pull_requests"`
-		Unseen       int `json:"unseen"` // items the token cannot see
-	} `json:"skipped"`
+	Unchecked int         `json:"unchecked"`
+	Hidden    int         `json:"hidden"`   // blocked: --all shows them
+	Filtered  int         `json:"filtered"` // not matching the filters
+	Skipped   skippedJSON `json:"skipped"`
 	// Incomplete: GitHub withheld parts of some items (warned on stderr).
 	Incomplete bool `json:"incomplete"`
 	// Warnings are also printed on stderr.
@@ -391,25 +308,19 @@ type nextBlockerJSON struct {
 }
 
 // result is the issues as JSON, cut to o.limit as write cuts them.
-func (n *next) result(o *listOpts, repo string) nextResult {
+func (n *next) result(o *listOpts) nextResult {
 	r := nextResult{
-		Sprint: iterationJSON(o.sprintIt), Issues: []nextIssueJSON{}, Matched: len(n.issues),
-		Unchecked: n.unchecked, Hidden: n.hidden, Filtered: n.filtered, Incomplete: n.incomplete,
-		Warnings: []string{},
+		SprintFilter: sprintFilterJSON(o), Sprint: iterationJSON(o.sprintIt), Issues: []nextIssueJSON{}, Matched: len(n.issues),
+		Unchecked: n.unchecked, Hidden: n.hidden, Filtered: n.filtered, Skipped: n.skippedJSON(),
+		Incomplete: n.incomplete, Warnings: []string{},
 	}
-	switch {
-	case o.sprintIt != nil:
-		r.SprintFilter = render.OrNull("iteration")
-	case o.sprint != "":
-		r.SprintFilter = render.OrNull(sprintNone)
-	}
-	r.Skipped.DraftIssues, r.Skipped.PullRequests, r.Skipped.Unseen = n.drafts, n.pulls, n.unseen
 	for _, ni := range n.issues[:min(len(n.issues), o.limit)] {
 		j := nextIssueJSON{listIssue: listIssueOf(ni.Item), UnresolvedBlockers: []nextBlockerJSON{}, UnreadBlockers: ni.unread}
 		for _, b := range ni.blockers {
 			j.UnresolvedBlockers = append(j.UnresolvedBlockers, nextBlockerJSON{
-				Ref: b.Repo + "#" + strconv.Itoa(b.Number), Repo: b.Repo, Number: b.Number, OnBoard: b.onBoard, Status: render.OrNull(b.status),
-				Archived: b.archived, StatusUnknownReason: render.OrNull(b.unknown),
+				Ref: b.Repo + "#" + strconv.Itoa(b.Number), Repo: b.Repo, Number: b.Number,
+				OnBoard: b.link.OnBoard, Status: render.OrNull(b.link.Status), Archived: b.link.Archived,
+				StatusUnknownReason: render.OrNull(b.link.StatusUnknown),
 			})
 		}
 		r.Issues = append(r.Issues, j)

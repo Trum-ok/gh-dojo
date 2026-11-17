@@ -13,10 +13,11 @@ import (
 )
 
 // effectsDojoConfig is the recorded gh-dojo board with verbs that use the
-// effects close, reopen, labels and assign: the spec's drop as is,
-// kanban's done (closes as completed), review (labels and board.assignee
-// "@me"), revive (reopen), and verbs with a missing label and a user who
-// cannot be assigned. The fixtures are hand-crafted from card_3.json.
+// effects close, reopen, labels and assign: drop (closes as not planned,
+// the user's decision), kanban's done (closes as completed), review
+// (labels and board.assignee "@me"), revive (reopen), and verbs with a
+// missing label and a user who cannot be assigned. The fixtures are
+// hand-crafted from card_3.json.
 var effectsDojoConfig = strings.Replace(verbDojoConfig, "repos = [\"Trum-ok/gh-dojo\"]\n",
 	"repos = [\"Trum-ok/gh-dojo\"]\nassignee = \"@me\"\n", 1) + `
 [verbs.drop]
@@ -102,10 +103,10 @@ func withEffectsApp(t *testing.T, fixtures ...string) (*graphtest.Server, int) {
 	return srv, srv.Requests()
 }
 
-// TestVerbDrop is the spec's drop end to end: without --yes the user is
-// asked (exit 2) after one read and nothing is written; with --yes the
-// comment and the close go in one mutation; a repeat finds both in place
-// and needs no --yes.
+// TestVerbDrop runs drop end to end: without --yes the user is asked
+// (exit 2) after one read and nothing is written; with --yes the comment
+// and the close go in one mutation; a repeat finds both in place and
+// needs no --yes.
 func TestVerbDrop(t *testing.T) {
 	srv, before := withEffectsApp(t, verbFixture("drop_ok"))
 	checkRuns(t, srv, before,
@@ -283,10 +284,11 @@ func TestVerbUnassignAll(t *testing.T) {
 }
 
 // TestVerbEffectsHelp: the help of a verb says what it does besides the
-// status, and that a confirm verb needs the user and --yes.
+// status, that a confirm verb needs the user and --yes, and whom it
+// assigns and unassigns.
 func TestVerbEffectsHelp(t *testing.T) {
-	withConfig(t, effectsDojoConfig)
-	for _, verb := range []string{"drop", "review", "revive", "done"} {
+	withConfig(t, assignDojoConfig)
+	for _, verb := range []string{"drop", "review", "revive", "done", "pass", "hand-back"} {
 		code, out := runOut(verb, "--help")
 		if code != render.ExitOK {
 			t.Fatalf("%s --help = %d\n%s", verb, code, out)

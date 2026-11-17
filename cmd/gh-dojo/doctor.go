@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -93,18 +92,10 @@ func runDoctor(ctx context.Context, root *cobra.Command) *doctor.Report {
 	a := newApp()
 	r := doctor.Run(ctx, doctor.Env{
 		Version: version, Config: cfg, ConfigErr: err,
-		Client: a.Client, Boards: a.Loader, CurrentRepo: a.Repo, Now: doctorClock(a),
+		Client: a.Client, Boards: a.Loader, CurrentRepo: a.Repo, Now: a.Now,
 	})
 	if cfg != nil {
 		checkAgentFiles(r, cfg, root)
 	}
 	return r
-}
-
-// doctorClock is the App's clock: its loader's, else the system's.
-func doctorClock(a *App) func() time.Time {
-	if a.Loader != nil && a.Loader.Now != nil {
-		return a.Loader.Now
-	}
-	return time.Now
 }

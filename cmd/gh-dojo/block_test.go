@@ -124,7 +124,7 @@ func TestBlockArgs(t *testing.T) {
 	)
 }
 
-// blockersConfig is the spec's start: blockers = "warn".
+// blockersConfig is verbDojoConfig with blockers = "warn" on start.
 const blockersConfig = verbDojoConfig + `
 [verbs.start]
 blockers = "warn"

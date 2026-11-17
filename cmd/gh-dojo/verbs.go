@@ -66,13 +66,14 @@ var getenv = os.Getenv
 // schema ID, also dropping what Apply confirmed in case the re-read lags
 // behind it; after a partial failure the agent re-runs the command.
 type Backend interface {
-	// ReadIssue returns the state of issue ref for verb v, filled as workflow.Issue documents (comments with viewerDidAuthor,
-	// labels, assignees, and the viewer when v assigns or unassigns @me), with a render
-	// error on failure (render.NotFound for a missing issue; a config error
-	// for a label of v to add that is missing in the repo, a label spelled
-	// in another case than the repo's, or an assignee who cannot be
-	// assigned). The issue's repository is ref's, which a caller resolves
-	// with Repo for a bare number.
+	// ReadIssue returns the state of issue ref for verb v, filled as
+	// workflow.Issue documents (comments with viewerDidAuthor, labels,
+	// assignees, and the viewer when v assigns or unassigns @me), with a
+	// render error on failure (render.NotFound for a missing issue; a
+	// config error for a label of v to add that is missing in the repo, a
+	// label spelled in another case than the repo's, or an assignee who
+	// cannot be assigned). The issue's repository is ref's, which a caller
+	// resolves with Repo for a bare number.
 	//
 	// For a verb with blockers = "warn" or "deny" it fills the unresolved
 	// blockers; for blockers = "link" with --by naming issues (a), those
@@ -82,12 +83,13 @@ type Backend interface {
 	ReadIssue(ctx context.Context, v config.Verb, ref issue.Ref, a workflow.Args) (workflow.Issue, error)
 	// ReadIssues reads issues refs like ReadIssue, for a verb with batch =
 	// true: one request per issue.MaxBatch issues, of any repositories,
-	// with what v looks up read once in each. It returns one batch.Read per number, in order; an
-	// issue that fails alone (not found, a pull request, its board place
-	// or sprint not read, the issue --by names) has its own Err. err fails them all:
-	// a config error of v (a label to add missing in the repo) or a
-	// request that read nothing. A request that fails after earlier ones
-	// read their issues is the Err of each issue it did not read.
+	// with what v looks up read once in each. It returns one batch.Read
+	// per number, in order; an issue that fails alone (not found, a pull
+	// request, its board place or sprint not read, the issue --by names)
+	// has its own Err. err fails them all: a config error of v (a label to
+	// add missing in the repo) or a request that read nothing. A request
+	// that fails after earlier ones read their issues is the Err of each
+	// issue it did not read.
 	ReadIssues(ctx context.Context, v config.Verb, refs []issue.Ref, a workflow.Args) ([]batch.Read, error)
 	// Apply applies every op of a non-empty plan, finding the issue's node
 	// IDs in p.Issue.Ref. It returns the ops GitHub confirmed, also with an
@@ -174,27 +176,19 @@ func newVerbCmd(cfg *config.Config, v config.Verb) *cobra.Command {
 	return cmd
 }
 
-// runVerb runs verb v on issue n. An error that read nothing, such as
+// runVerb runs verb v on issue ref. An error that read nothing, such as
 // bad arguments or the network, is the command's alone; once the issue
 // was read (or found missing), its JSON is a verb result for it, as for
 // one issue of a batch, also when it is refused (outcome "failed").
 // show prints the issue's card too (see shownCard).
 func runVerb(cmd *cobra.Command, cfg *config.Config, v config.Verb, ref issue.Ref, args workflow.Args, dryRun, show bool) error {
-	if err := workflow.CheckArgs(v, args, ref.Arg(issue.Repo{})); err != nil {
-		return err
-	}
-	be, err := newBackend(cfg)
-	if err != nil {
-		return err
-	}
-	def, err := be.Repo()
+	be, def, err := verbBackend(cfg, v, args, ref.Arg(issue.Repo{}))
 	if err != nil {
 		return err
 	}
 	ref = ref.In(def)
 	ctx := cmd.Context()
-	engine := workflow.New(cfg)
-	engine.Getenv = getenv
+	engine := withGetenv(workflow.New(cfg))
 	it, err := batch.ReadPlan(ctx, be, engine, v, ref, args)
 	if err != nil {
 		return err
@@ -231,6 +225,30 @@ func runVerb(cmd *cobra.Command, cfg *config.Config, v config.Verb, ref issue.Re
 	}, it.Err, it.Wrote())
 }
 
+// verbBackend checks the arguments of verb v on the issues named, as
+// given, before anything is read, then returns the backend and its
+// default repository.
+func verbBackend(cfg *config.Config, v config.Verb, args workflow.Args, named ...string) (Backend, issue.Repo, error) {
+	if err := workflow.CheckArgs(v, args, named...); err != nil {
+		return nil, issue.Repo{}, err
+	}
+	be, err := newBackend(cfg)
+	if err != nil {
+		return nil, issue.Repo{}, err
+	}
+	def, err := be.Repo()
+	if err != nil {
+		return nil, issue.Repo{}, err
+	}
+	return be, def, nil
+}
+
+// withGetenv makes engine e read the session variables through getenv.
+func withGetenv(e *workflow.Engine) *workflow.Engine {
+	e.Getenv = getenv
+	return e
+}
+
 // backendRepo is the default repository of be, owner/name, for the JSON;
 // "" when not known.
 func backendRepo(be Backend) string {
@@ -253,17 +271,28 @@ func readPlan(ctx context.Context, be Backend, e *workflow.Engine, v config.Verb
 	return e.Plan(v, is, args)
 }
 
+// checkArgs checks issue arguments before anything is read: at least one,
+// else "<command> needs <need>", and each as checkArg does, what being the
+// example's noun.
+func checkArgs(cmd *cobra.Command, args []string, need, what string) error {
+	if len(args) == 0 {
+		return render.Usage("%s needs %s, like %s", cmd.Name(), need, issueExamples).WithFix(cmd.CommandPath() + " --help")
+	}
+	for _, a := range args {
+		if err := checkArg(cmd, a, what); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // issueArg accepts exactly one issue number.
 func issueArg(cmd *cobra.Command, args []string) error {
-	help := cmd.CommandPath() + " --help"
-	switch {
-	case len(args) == 0:
-		return render.Usage("%s needs an issue number, like %s", cmd.Name(), issueExamples).WithFix(help)
-	case len(args) > 1:
+	if len(args) > 1 {
 		return render.Usage("%s takes one issue number, got %d; several at once are not supported yet",
-			cmd.Name(), len(args)).WithFix(help)
+			cmd.Name(), len(args)).WithFix(cmd.CommandPath() + " --help")
 	}
-	return checkArg(cmd, args[0], "one")
+	return checkArgs(cmd, args, "an issue number", "one")
 }
 
 // issueArgs accepts the issue numbers of verb v: one, or with batch =
@@ -272,17 +301,12 @@ func issueArg(cmd *cobra.Command, args []string) error {
 // of the default repository, which is not known yet: runBatch tells.
 func issueArgs(cfg *config.Config, v config.Verb) cobra.PositionalArgs {
 	return func(cmd *cobra.Command, args []string) error {
-		help := cmd.CommandPath() + " --help"
-		switch {
-		case len(args) == 0 && v.Batch:
-			return render.Usage("%s needs one or more issue numbers, like %s", cmd.Name(), issueExamples).WithFix(help)
-		case len(args) == 0:
-			return render.Usage("%s needs an issue number, like %s", cmd.Name(), issueExamples).WithFix(help)
+		need := "an issue number"
+		if v.Batch {
+			need = "one or more issue numbers"
 		}
-		for _, a := range args {
-			if err := checkArg(cmd, a, "one"); err != nil {
-				return err
-			}
+		if err := checkArgs(cmd, args, need, "one"); err != nil {
+			return err
 		}
 		refs := argRefs(args, issue.Repo{})
 		numbers := map[int]bool{}
@@ -318,11 +342,14 @@ func batchVerbsNote(cfg *config.Config) string {
 	return "\nverbs that take several: " + strings.Join(names, ", ")
 }
 
+// helpLine adds a line to a verb's help: label (without its colon, "" to
+// continue the one above) in a column, then the text.
+type helpLine func(label, format string, a ...any)
+
 // labelVerbsHelp adds a help line per checked label that names the verbs
 // adding it (remove false, for from_labels) or removing it (for
 // refuse_labels): "resume removes it", "hold adds on-hold".
-func labelVerbsHelp(cfg *config.Config, v config.Verb, labels []string, remove bool,
-	line func(label, format string, a ...any)) {
+func labelVerbsHelp(cfg *config.Config, v config.Verb, labels []string, remove bool, line helpLine) {
 	does := "adds"
 	if remove {
 		does = "removes"
@@ -349,7 +376,27 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 		fmt.Fprintf(&b, "\n  %-10s %s", label, fmt.Sprintf(format, a...))
 	}
 	b.WriteString(v.When + "\n")
+	statusHelp(cfg, v, line)
+	argsHelp(v, line)
+	effectsHelp(cfg, v, line)
+	if v.Comment != "" {
+		line("Comment", "posted unless it renders empty or is already the latest gh-dojo comment:")
+		// The template as it will read in the issue, indented below the
+		// label; blank lines stay blank, without trailing spaces.
+		for _, l := range strings.Split(strings.Trim(v.Comment, "\r\n"), "\n") {
+			if l = strings.TrimRight(l, " \t\r"); l == "" {
+				b.WriteString("\n")
+			} else {
+				line("", "  %s", l)
+			}
+		}
+	}
+	return b.String()
+}
 
+// statusHelp adds the verb help lines of the statuses it moves an issue
+// from and to, and of the labels it needs or refuses.
+func statusHelp(cfg *config.Config, v config.Verb, line helpLine) {
 	from := "any status"
 	if len(v.From) > 0 {
 		from = strings.Join(v.From, ", ")
@@ -376,23 +423,13 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 		line("Refused", "while the issue has %s (exit code 2): ask the user", labelNames(v.RefuseLabels, "or", nil))
 		labelVerbsHelp(cfg, v, v.RefuseLabels, true, line)
 	}
+}
 
-	var required, optional []string
-	for _, arg := range config.Args() {
-		switch {
-		case slices.Contains(v.Require, arg):
-			required = append(required, "--"+arg)
-		case slices.Contains(v.RequireOneOf, arg):
-		case v.Takes(arg):
-			optional = append(optional, "--"+arg)
-		}
-	}
-	if len(v.RequireOneOf) > 0 {
-		names := make([]string, len(v.RequireOneOf))
-		for i, arg := range v.RequireOneOf {
-			names[i] = "--" + arg
-		}
-		required = append(required, "at least one of "+strings.Join(names, ", "))
+// argsHelp adds the verb help lines of its arguments, batch and confirm.
+func argsHelp(v config.Verb, line helpLine) {
+	required, oneOf, optional := verbArgs(v)
+	if len(oneOf) > 0 {
+		required = append(required, "at least one of "+strings.Join(oneOf, ", "))
 	}
 	if len(required) > 0 {
 		line("Requires", "%s", strings.Join(required, "; "))
@@ -408,7 +445,11 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 	if v.Confirm {
 		line("Confirm", "the user's decision: ask the user first; runs only with --yes")
 	}
+}
 
+// effectsHelp adds the verb help lines of what it does along the way,
+// except its comment.
+func effectsHelp(cfg *config.Config, v config.Verb, line helpLine) {
 	if v.OnlyClearsSprint() {
 		line("Board", "leaves an issue that is not there off the board")
 	} else {
@@ -428,42 +469,10 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 		line("Milestone", "%s (an open milestone, by title or a start only its title has);", v.Milestone)
 		line("", "an issue in it already keeps it, so a repeat is safe")
 	}
-	if len(v.AddLabels)+len(v.RemoveLabels) > 0 {
-		var signs []string
-		for _, l := range v.AddLabels {
-			signs = append(signs, "+"+l)
-		}
-		for _, l := range v.RemoveLabels {
-			signs = append(signs, "-"+l)
-		}
-		line("Labels", "%s (+ adds, - removes)", strings.Join(signs, " "))
+	if signs := labelSigns(v); signs != "" {
+		line("Labels", "%s (+ adds, - removes)", signs)
 	}
-	stay := "; other assignees stay"
-	if v.Unassign != "" {
-		stay = "" // see the Unassign line
-	}
-	switch {
-	case v.AssignArg:
-		line("Assign", "the --%s user (a login, or @me for you)%s", config.ArgAssignee, stay)
-		line("", "one who cannot be assigned issues in the repository is exit code 1, with who can")
-	case v.Assign == config.Me:
-		line("Assign", "you (the authenticated user)%s", stay)
-	case v.Assign != "":
-		line("Assign", "%s%s", v.Assign, stay)
-	}
-	switch v.Unassign {
-	case "":
-	case config.UnassignAll:
-		if v.Assigns() {
-			line("Unassign", "everyone else: the user it assigns stays the only assignee")
-		} else {
-			line("Unassign", "everyone: the issue is left with no assignees")
-		}
-	case config.Me:
-		line("Unassign", "you (the authenticated user); other assignees stay")
-	default:
-		line("Unassign", "%s; other assignees stay", v.Unassign)
-	}
+	assigneesHelp(v, line)
 	switch v.Blockers {
 	case config.BlockersWarn:
 		line("Blockers", "warns about unresolved blockers (%s), then runs", unresolvedMeaning(cfg))
@@ -488,32 +497,105 @@ func verbHelp(cfg *config.Config, v config.Verb) string {
 	case v.Close != "":
 		line("Close", "closes the issue as %s; an issue already closed stays as it is", workflow.ReasonText(v.Close))
 	}
-	if v.Comment != "" {
-		line("Comment", "posted unless it renders empty or is already the latest gh-dojo comment:")
-		// The template as it will read in the issue, indented below the
-		// label; blank lines stay blank, without trailing spaces.
-		for _, l := range strings.Split(strings.Trim(v.Comment, "\r\n"), "\n") {
-			if l = strings.TrimRight(l, " \t\r"); l == "" {
-				b.WriteString("\n")
-			} else {
-				line("", "  %s", l)
-			}
+}
+
+// assigneesHelp adds the verb help lines of whom it assigns and unassigns.
+func assigneesHelp(v config.Verb, line helpLine) {
+	stay := "; other assignees stay"
+	if v.Unassign != "" {
+		stay = "" // see the Unassign line
+	}
+	if who := assignWho(v); who != "" {
+		switch {
+		case v.AssignArg:
+			who += " (a login, or @me for you)"
+		case v.Assign == config.Me:
+			who += " (the authenticated user)"
+		}
+		line("Assign", "%s%s", who, stay)
+		if v.AssignArg {
+			line("", "one who cannot be assigned issues in the repository is exit code 1, with who can")
 		}
 	}
-	return b.String()
+	switch who := unassignWho(v); {
+	case who == "":
+	case v.Unassign == config.UnassignAll && v.Assigns():
+		line("Unassign", "%s: the user it assigns stays the only assignee", who)
+	case v.Unassign == config.UnassignAll:
+		line("Unassign", "%s: the issue is left with no assignees", who)
+	case v.Unassign == config.Me:
+		line("Unassign", "%s (the authenticated user); other assignees stay", who)
+	default:
+		line("Unassign", "%s; other assignees stay", who)
+	}
+}
+
+// verbArgs are the flags of the arguments v requires, needs at least one
+// of, and takes optionally, as "--comment". The required and optional
+// ones are in config.Args order, the one-of ones in config order.
+func verbArgs(v config.Verb) (required, oneOf, optional []string) {
+	for _, arg := range config.Args() {
+		switch {
+		case slices.Contains(v.Require, arg):
+			required = append(required, "--"+arg)
+		case slices.Contains(v.RequireOneOf, arg):
+		case v.Takes(arg):
+			optional = append(optional, "--"+arg)
+		}
+	}
+	for _, arg := range v.RequireOneOf {
+		oneOf = append(oneOf, "--"+arg)
+	}
+	return required, oneOf, optional
+}
+
+// labelSigns lists the labels v adds and removes: "+doing -blocked"; ""
+// for none.
+func labelSigns(v config.Verb) string {
+	var signs []string
+	for _, l := range v.AddLabels {
+		signs = append(signs, "+"+l)
+	}
+	for _, l := range v.RemoveLabels {
+		signs = append(signs, "-"+l)
+	}
+	return strings.Join(signs, " ")
+}
+
+// assignWho names whom v assigns: "the --assignee user", "you", a login;
+// "" for no one.
+func assignWho(v config.Verb) string {
+	switch {
+	case v.AssignArg:
+		return "the --" + config.ArgAssignee + " user"
+	case v.Assign == config.Me:
+		return "you"
+	}
+	return v.Assign
+}
+
+// unassignWho names whom v unassigns: "everyone else" (all but whom it
+// assigns), "everyone", "you", a login; "" for no one.
+func unassignWho(v config.Verb) string {
+	switch v.Unassign {
+	case config.UnassignAll:
+		if v.Assigns() {
+			return "everyone else"
+		}
+		return "everyone"
+	case config.Me:
+		return "you"
+	}
+	return v.Unassign
 }
 
 // unresolvedMeaning says when a blocker is unresolved under cfg's
 // statuses.resolved: "open and not in Ready or Done".
 func unresolvedMeaning(cfg *config.Config) string {
-	r := cfg.Statuses.Resolved
-	switch len(r) {
-	case 0:
+	if len(cfg.Statuses.Resolved) == 0 {
 		return "open"
-	case 1:
-		return "open and not in " + r[0]
 	}
-	return "open and not in " + strings.Join(r[:len(r)-1], ", ") + " or " + r[len(r)-1]
+	return "open and not in " + render.JoinWords(cfg.Statuses.Resolved, "or")
 }
 
 // configNote is appended to the root help when there is no config or it
@@ -529,6 +611,11 @@ func configNote() string {
 	text := strings.ReplaceAll(render.FromError(err).Text(), "\n", "\n  ")
 	return "\n\nNo process verbs: " + config.FileName + " could not be loaded:\n  " + text
 }
+
+// minNameWidth is the least width of the verb name column in the root
+// help's lifecycle and in describe: cobra's minimum, so the names line up
+// with the command list.
+const minNameWidth = 11
 
 // processHelp is the lifecycle section of the root help: the statuses each
 // verb moves an issue from and to, in config order, then the initial,
@@ -547,7 +634,7 @@ func processHelp() string {
 	if err != nil {
 		return ""
 	}
-	width := 11 // cobra's minimum, so the names line up with the command list
+	width := minNameWidth
 	for _, v := range cfg.Verbs {
 		width = max(width, len(v.Name))
 	}

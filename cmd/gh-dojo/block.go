@@ -121,11 +121,12 @@ func splitRefs(values []string, def issue.Repo) (refs []issue.Ref, text []string
 	return refs, text, nil
 }
 
-// parseBlockers parses the values of a flag (--by, --blocked-by) naming
-// blocking issues, a bare number in def: repeated, or comma-separated (see
-// splitRefs). target itself is refused: an issue cannot block itself (a
-// zero target skips that check). Errors are exit code 1 with help as the
-// fix; none means no issue was named.
+// parseBlockers parses the values of a flag naming issues only, a bare
+// number in def: repeated, or comma-separated (see splitRefs). Its flags
+// name blocking issues (--by, --blocked-by) or, for release, issues to
+// leave out (--exclude). target itself is refused: an issue cannot block
+// itself (a zero target skips that check). Errors are exit code 1 with
+// help as the fix; none means no issue was named.
 func parseBlockers(values []string, flag string, def issue.Repo, target issue.Ref, help string) ([]issue.Ref, error) {
 	refs, text, err := splitRefs(values, def)
 	if err != nil {
@@ -380,8 +381,5 @@ func joinRefs(links []*issue.Linked, repo issue.Repo) string {
 	for i, l := range links {
 		refs[i] = l.Ref.String(repo)
 	}
-	if len(refs) <= 1 {
-		return strings.Join(refs, "")
-	}
-	return strings.Join(refs[:len(refs)-1], ", ") + " and " + refs[len(refs)-1]
+	return render.JoinWords(refs, "and")
 }
