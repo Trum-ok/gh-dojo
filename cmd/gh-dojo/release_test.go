@@ -1,9 +1,13 @@
 package main
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/Trum-ok/gh-dojo/internal/config"
+	"github.com/Trum-ok/gh-dojo/internal/issue"
+	"github.com/Trum-ok/gh-dojo/internal/release"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/Trum-ok/gh-dojo/internal/testutil"
 	"github.com/Trum-ok/gh-dojo/internal/workflow"
@@ -287,5 +291,33 @@ func TestReleaseNoConfig(t *testing.T) {
 	code, out := runOut("release", "v0.2.0", "--verb", "done")
 	if code != render.ExitUsage || !strings.Contains(string(out), "dojo.toml") {
 		t.Errorf("exit code = %d\n%s", code, out)
+	}
+}
+
+// TestReleaseSkipPlace: a skipped issue's place in the JSON is its status
+// or null and whether it is on the board, both null for the reasons that
+// read no place; the text names "no status" and "not on the board".
+func TestReleaseSkipPlace(t *testing.T) {
+	r := &releaseRun{rng: &release.Range{}, skipped: []releaseSkipped{
+		{found: release.Found{Ref: issue.Ref{Number: 1}}, reason: skipNotReady, onBoard: true, status: "Backlog"},
+		{found: release.Found{Ref: issue.Ref{Number: 2}}, reason: skipNotReady, onBoard: true},
+		{found: release.Found{Ref: issue.Ref{Number: 3}}, reason: skipNotReady},
+		{found: release.Found{Ref: issue.Ref{Number: 4}}, reason: skipExcluded},
+	}}
+	type place struct {
+		OnBoard *bool
+		Status  *string
+	}
+	yes, no := true, false
+	want := []place{{&yes, render.OrNull("Backlog")}, {&yes, nil}, {&no, nil}, {nil, nil}}
+	for i, s := range r.json("done", "", false, nil, nil).Skipped {
+		if got := (place{s.OnBoard, s.Status}); !reflect.DeepEqual(got, want[i]) {
+			t.Errorf("#%d: on_board, status = %v, want %v", s.Number, got, want[i])
+		}
+	}
+	v := config.Verb{Name: "done", To: "Done", From: []string{"Ready"}}
+	want2 := "not ready (done starts only from Ready): #1 (Backlog), #2 (no status), #3 (not on the board)"
+	if got := r.notReadyLine(v); got != want2 {
+		t.Errorf("notReadyLine = %q, want %q", got, want2)
 	}
 }

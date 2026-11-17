@@ -18,7 +18,7 @@ import (
 	"github.com/Trum-ok/gh-dojo/internal/workflow"
 )
 
-// gh dojo release (spec F11): a verb applied to the issues a release
+// gh dojo release (docs/commands.md#release): a verb applied to the issues a release
 // includes, found through the API (internal/release) and applied as a
 // batch, the path of gh dojo done 12 13 14: the same plans, summary and
 // exit codes.
@@ -297,10 +297,14 @@ const (
 type releaseSkipped struct {
 	found  release.Found
 	reason string // one of the skip constants
-	// status is where an issue not ready or closed stands ("In progress",
-	// "Done", "no status", "not on the board").
-	status string
+	// onBoard and status are where an issue not ready or closed stands;
+	// unset for the other reasons.
+	onBoard bool
+	status  string
 }
+
+// place is where s stands, as the text says it (see placeOf).
+func (s releaseSkipped) place() string { return placeOf(s.onBoard, s.status) }
 
 // exclude leaves out of the issues found those --exclude names
 // (excluded, in the default repository when bare), and returns the rest
@@ -328,10 +332,17 @@ func (r *releaseRun) exclude(excluded []issue.Ref) (refs []issue.Ref, warnings [
 //
 //	excluded: acme/api#3 (commit de25f45)
 func (r *releaseRun) excludedLine() string {
+	return r.skippedLine("excluded", skipExcluded, func(s releaseSkipped) string { return r.sources(s.found) })
+}
+
+// skippedLine is label and the issues left out for reason, each with what
+// about says of it in parentheses, naming at most maxErrorRefs; "" for
+// none.
+func (r *releaseRun) skippedLine(label, reason string, about func(releaseSkipped) string) string {
 	var names []string
 	for _, s := range r.skipped {
-		if s.reason == skipExcluded {
-			names = append(names, s.found.Ref.String(r.def)+" ("+r.sources(s.found)+")")
+		if s.reason == reason {
+			names = append(names, s.found.Ref.String(r.def)+" ("+about(s)+")")
 		}
 	}
 	if len(names) == 0 {
@@ -340,7 +351,7 @@ func (r *releaseRun) excludedLine() string {
 	if len(names) > maxErrorRefs {
 		names = append(names[:maxErrorRefs], fmt.Sprintf("and %d more", len(names)-maxErrorRefs))
 	}
-	return "excluded: " + strings.Join(names, ", ")
+	return label + ": " + strings.Join(names, ", ")
 }
 
 // settled leaves out of items, with their reason, the issues closed in a
@@ -363,7 +374,7 @@ func (r *releaseRun) settled(items []*batch.Item) []*batch.Item {
 			out = append(out, it)
 			continue
 		}
-		r.skipped = append(r.skipped, releaseSkipped{found: r.foundOf(it.Ref), reason: skipClosed, status: is.Status})
+		r.skipped = append(r.skipped, releaseSkipped{found: r.foundOf(it.Ref), reason: skipClosed, onBoard: true, status: is.Status})
 	}
 	return out
 }
@@ -373,19 +384,7 @@ func (r *releaseRun) settled(items []*batch.Item) []*batch.Item {
 //
 //	already closed: #200 (Done), #201 (Done)
 func (r *releaseRun) closedLine() string {
-	var names []string
-	for _, s := range r.skipped {
-		if s.reason == skipClosed {
-			names = append(names, s.found.Ref.String(r.def)+" ("+s.status+")")
-		}
-	}
-	if len(names) == 0 {
-		return ""
-	}
-	if len(names) > maxErrorRefs {
-		names = append(names[:maxErrorRefs], fmt.Sprintf("and %d more", len(names)-maxErrorRefs))
-	}
-	return "already closed: " + strings.Join(names, ", ")
+	return r.skippedLine("already closed", skipClosed, releaseSkipped.place)
 }
 
 // ready leaves out of items, with their reason, the open issues verb v
@@ -407,10 +406,11 @@ func (r *releaseRun) ready(v config.Verb, items []*batch.Item) []*batch.Item {
 			out = append(out, it)
 			continue
 		}
-		where := placeOf(*it.Issue)
-		if it.Issue.Closed {
+		is := it.Issue
+		where := placeOf(is.OnBoard, is.Status)
+		if is.Closed {
 			in := "in " + where
-			if !it.Issue.OnBoard || it.Issue.Status == "" {
+			if !is.OnBoard || is.Status == "" {
 				in = where
 			}
 			it.Fail(render.Denied("%s is closed but %s; %s\nthis is a process rule: ask the user how to proceed",
@@ -418,30 +418,27 @@ func (r *releaseRun) ready(v config.Verb, items []*batch.Item) []*batch.Item {
 			out = append(out, it)
 			continue
 		}
-		r.skipped = append(r.skipped, releaseSkipped{found: r.foundOf(it.Ref), reason: skipNotReady, status: where})
+		r.skipped = append(r.skipped, releaseSkipped{found: r.foundOf(it.Ref), reason: skipNotReady, onBoard: is.OnBoard, status: is.Status})
 	}
 	return out
 }
 
-// placeOf is where is stands on the board: its status, "no status" or
-// "not on the board".
-func placeOf(is workflow.Issue) string {
+// placeOf is where an issue stands on the board: its status, "no status"
+// or "not on the board".
+func placeOf(onBoard bool, status string) string {
 	switch {
-	case !is.OnBoard:
+	case !onBoard:
 		return "not on the board"
-	case is.Status == "":
+	case status == "":
 		return "no status"
 	}
-	return is.Status
+	return status
 }
 
 // fromRule says where verb v runs: "done starts only from Ready or In
 // progress", "hold runs only in In review", as its refusal does.
 func fromRule(v config.Verb) string {
-	from := strings.Join(v.From, ", ")
-	if n := len(v.From); n > 1 {
-		from = strings.Join(v.From[:n-1], ", ") + " or " + v.From[n-1]
-	}
+	from := render.JoinWords(v.From, "or")
 	if v.To == "" {
 		return v.Name + " runs only in " + from
 	}
@@ -453,19 +450,7 @@ func fromRule(v config.Verb) string {
 //
 //	not ready (done starts only from Ready): #41 (In progress), #44 (Backlog)
 func (r *releaseRun) notReadyLine(v config.Verb) string {
-	var names []string
-	for _, s := range r.skipped {
-		if s.reason == skipNotReady {
-			names = append(names, s.found.Ref.String(r.def)+" ("+s.status+")")
-		}
-	}
-	if len(names) == 0 {
-		return ""
-	}
-	if len(names) > maxErrorRefs {
-		names = append(names[:maxErrorRefs], fmt.Sprintf("and %d more", len(names)-maxErrorRefs))
-	}
-	return fmt.Sprintf("not ready (%s): %s", fromRule(v), strings.Join(names, ", "))
+	return r.skippedLine("not ready ("+fromRule(v)+")", skipNotReady, releaseSkipped.place)
 }
 
 // foundOf is how ref was found.
@@ -655,8 +640,10 @@ type releaseSkip struct {
 	// Reason is excluded, pull_request, not_found, repo_not_found, closed
 	// or not_ready.
 	Reason string `json:"reason"`
-	// Status is where an issue closed or not ready stands: a status, "no
-	// status" or "not on the board"; null for the other reasons.
+	// OnBoard and Status are where an issue closed or not ready stands:
+	// whether it is on the board and its status, null for none; both null
+	// for the other reasons.
+	OnBoard *bool           `json:"on_board"`
 	Status  *string         `json:"status"`
 	FoundBy []releaseSource `json:"found_by"`
 }
@@ -675,8 +662,15 @@ func (r *releaseRun) json(verb, repo string, dry bool, items []*batch.Item, warn
 		out.Issues = append(out.Issues, releaseIssue{verbIssue: v.Issues[i], FoundBy: sourcesJSON(r.foundOf(it.Ref))})
 	}
 	for _, s := range r.skipped {
-		out.Skipped = append(out.Skipped, releaseSkip{Number: s.found.Ref.Number, Repo: s.found.Ref.Repo.String(), Ref: fullRef(s.found.Ref), Reason: s.reason, Status: render.OrNull(s.status),
-			FoundBy: sourcesJSON(s.found)})
+		skip := releaseSkip{Number: s.found.Ref.Number, Repo: s.found.Ref.Repo.String(), Ref: fullRef(s.found.Ref), Reason: s.reason,
+			FoundBy: sourcesJSON(s.found)}
+		if s.reason == skipClosed || s.reason == skipNotReady {
+			skip.OnBoard = &s.onBoard
+			if s.onBoard {
+				skip.Status = render.OrNull(s.status)
+			}
+		}
+		out.Skipped = append(out.Skipped, skip)
 	}
 	return out
 }
