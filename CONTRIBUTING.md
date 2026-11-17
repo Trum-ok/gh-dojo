@@ -6,10 +6,14 @@ Requires Go (the version in `go.mod`) and `gh`.
 
 ```sh
 make build    # ./gh-dojo, stamped with git describe
+make check    # what CI checks, offline (see below)
 make test     # go test ./...
-make vet      # go vet ./...
+make vet      # go vet, also for Windows, macOS and -tags e2e
 make lint     # staticcheck, also as Windows and macOS see the code
+make fmt      # files gofmt -l lists (gofmt -w . fixes them)
+make tidy     # go mod tidy -diff, tools/ too
 make vuln     # govulncheck: known vulnerabilities the code can reach
+make e2e      # end-to-end tests against the sandbox boards (see below)
 make dist     # release binaries for all platforms into dist/
 make agent    # regenerate the agent skill from .github/dojo.toml
 make install  # build and install as the gh dojo extension (see below)
@@ -23,8 +27,12 @@ CI (`.github/workflows/ci.yml`, on pushes to `main` and pull requests)
 checks once, on Linux, `gofmt -l .`, `go mod tidy -diff` (`tools/` too),
 `go vet` (also for Windows, macOS and `-tags e2e`), `make lint`, the release
 build and its `agent install --check` (see below); then runs `go test ./...`
-(`-race` on Ubuntu) and `go build ./...` on Ubuntu, macOS and Windows. Run
-the checks, `make lint` and `go test -race ./...` before sending a change.
+(`-race` on Ubuntu) and `go build ./...` on Ubuntu, macOS and Windows.
+`make check` runs all of it on your machine, the release build checked with
+your own system's binary and the tests on that system only; run it before
+sending a change. It leaves out `make vuln`, which needs the network and
+can fail on a newly published vulnerability with the code unchanged, and
+the end-to-end tests.
 
 The linters are pinned in `tools/go.mod`, a module of their own, so they add
 nothing to gh-dojo's dependencies; dependabot updates them with the rest.
@@ -81,11 +89,11 @@ issues it created. `.github/workflows/e2e.yml` runs it daily and by hand
 repository `Trum-ok/gh-dojo-sandbox` with boards `Trum-ok/6` (kanban) and
 `Trum-ok/7` (sprints), with the `E2E_TOKEN` secret: a classic token with
 the `project` and `public_repo` scopes of an admin of the sandbox. Locally,
-with gh's token:
+with gh's token, `make e2e` runs the same (the `GH_DOJO_E2E_*` variables
+override the sandbox and boards):
 
 ```sh
-GH_DOJO_E2E_REPO=Trum-ok/gh-dojo-sandbox GH_DOJO_E2E_KANBAN=6 GH_DOJO_E2E_SPRINTS=7 \
-  go test -tags e2e -count=1 -v -timeout 15m ./e2e
+make e2e   # go test -tags e2e -count=1 -v -timeout 15m ./e2e
 ```
 
 The sprints board's Sprint field has iterations up to November 2027: add
