@@ -29,9 +29,8 @@ const CreateIssueMutation = `mutation CreateIssue($repo: ID!, $title: String!, $
 }`
 
 // AddLabelsMutation adds labels a resumed issue lacks: $issue, $labels.
-const AddLabelsMutation = `mutation AddLabels($issue: ID!, $labels: [ID!]!) {
-  addLabelsToLabelable(input: {labelableId: $issue, labelIds: $labels}) { clientMutationId }
-}`
+const AddLabelsMutation = "mutation AddLabels($issue: ID!, $labels: [ID!]!) {\n  " +
+	addLabelsHead + "labels" + addLabelsTail + "\n}"
 
 // SetMilestoneMutation sets the milestone of a resumed issue that has
 // none: $issue, $milestone.
@@ -41,23 +40,16 @@ const SetMilestoneMutation = `mutation SetMilestone($issue: ID!, $milestone: ID!
 
 // UnarchiveMutation restores a resumed issue's archived board item:
 // $project, $item.
-const UnarchiveMutation = `mutation Unarchive($project: ID!, $item: ID!) {
-  unarchiveProjectV2Item(input: {projectId: $project, itemId: $item}) { item { id } }
-}`
+const UnarchiveMutation = "mutation Unarchive($project: ID!, $item: ID!) {\n  " + unarchiveField + "\n}"
 
 // AddToBoardMutation adds the issue to the board, or returns its item if
 // it is there already: $project, $issue.
-const AddToBoardMutation = `mutation AddToBoard($project: ID!, $issue: ID!) {
-  addProjectV2ItemById(input: {projectId: $project, contentId: $issue}) { item { id } }
-}`
+const AddToBoardMutation = "mutation AddToBoard($project: ID!, $issue: ID!) {\n  " + addToBoardField + "\n}"
 
 // SetStatusMutation sets the status of a board item: $project, $item,
 // $field, $option.
-const SetStatusMutation = `mutation SetStatus($project: ID!, $item: ID!, $field: ID!, $option: String!) {
-  updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field, value: {singleSelectOptionId: $option}}) {
-    projectV2Item { id }
-  }
-}`
+const SetStatusMutation = "mutation SetStatus($project: ID!, $item: ID!, $field: ID!, $option: String!) {\n  " +
+	setStatusInput + " {\n    projectV2Item { id }\n  }\n}"
 
 // AliasParent is the alias of the addSubIssue field of NewFinish.
 const AliasParent = "parent"
@@ -93,13 +85,12 @@ func (f NewFinish) Build(ids IDs) *Mutation {
 	if f.Status {
 		vars["project"], vars["item"], vars["field"], vars["option"] = ids.Project, ids.Item, ids.StatusField, ids.StatusOption
 		decls = append(decls, "$project: ID!", "$item: ID!", "$field: ID!", "$option: String!")
-		fields = append(fields, "  "+AliasStatus+": updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, "+
-			"fieldId: $field, value: {singleSelectOptionId: $option}}) { projectV2Item { id } }")
+		fields = append(fields, "  "+AliasStatus+": "+setStatusInput+" { projectV2Item { id } }")
 	}
 	if len(f.Assignees) > 0 {
 		vars["assignees"] = f.Assignees
 		decls = append(decls, "$assignees: [ID!]!")
-		fields = append(fields, "  "+AliasAssign+": addAssigneesToAssignable(input: {assignableId: $issue, assigneeIds: $assignees}) { clientMutationId }")
+		fields = append(fields, "  "+AliasAssign+": "+assignField)
 	}
 	for i, id := range f.Links {
 		a := LinkAlias(i)

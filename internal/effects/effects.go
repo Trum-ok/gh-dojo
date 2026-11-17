@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/Trum-ok/gh-dojo/internal/graph"
+	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/Trum-ok/gh-dojo/internal/workflow"
 )
 
@@ -194,17 +195,16 @@ func Build(ops []workflow.Op, ids IDs) (*Mutation, error) {
 		case workflow.AddToBoard:
 			alias = AliasBoard
 			err = firstErr(declare("project", "ID!", ids.Project), declare("issue", "ID!", ids.Issue))
-			field = "addProjectV2ItemById(input: {projectId: $project, contentId: $issue}) { item { id } }"
+			field = addToBoardField
 		case workflow.Unarchive:
 			alias = AliasUnarchive
 			err = firstErr(declare("project", "ID!", ids.Project), declare("item", "ID!", ids.Item))
-			field = "unarchiveProjectV2Item(input: {projectId: $project, itemId: $item}) { item { id } }"
+			field = unarchiveField
 		case workflow.SetStatus:
 			alias = AliasStatus
 			err = firstErr(declare("project", "ID!", ids.Project), declare("item", "ID!", ids.Item),
 				declare("field", "ID!", ids.StatusField), declare("option", "String!", ids.StatusOption))
-			field = "updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field, " +
-				"value: {singleSelectOptionId: $option}}) { projectV2Item { id } }"
+			field = setStatusInput + " { projectV2Item { id } }"
 		case workflow.Reopen:
 			alias = AliasReopen
 			err = declare("issue", "ID!", ids.Issue)
@@ -223,7 +223,7 @@ func Build(ops []workflow.Op, ids IDs) (*Mutation, error) {
 			var labels []string
 			labels, err = lookupAll("label", ids.Labels, op.Names)
 			err = firstErr(err, declare("issue", "ID!", ids.Issue), declare("addLabels", "[ID!]!", labels))
-			field = "addLabelsToLabelable(input: {labelableId: $issue, labelIds: $addLabels}) { clientMutationId }"
+			field = addLabelsField("addLabels")
 		case workflow.RemoveLabels:
 			alias = AliasRemoveLabels
 			var labels []string
@@ -235,7 +235,7 @@ func Build(ops []workflow.Op, ids IDs) (*Mutation, error) {
 			var users []string
 			users, err = lookupAll("user", ids.Users, []string{op.Login})
 			err = firstErr(err, declare("issue", "ID!", ids.Issue), declare("assignees", "[ID!]!", users))
-			field = "addAssigneesToAssignable(input: {assignableId: $issue, assigneeIds: $assignees}) { clientMutationId }"
+			field = assignField
 		case workflow.Unassign:
 			alias = AliasUnassign
 			var users []string
@@ -346,6 +346,26 @@ func BlockedByField(add bool, issue, blocker string) string {
 	return name + "(input: {issueId: $" + issue + ", blockingIssueId: $" + blocker + "}) { issue { id } }"
 }
 
+// The mutation fields both a verb's document (Build) and new's mutations
+// use, with their variables: $project, $issue, $item, $field, $option,
+// $assignees.
+const (
+	addToBoardField = "addProjectV2ItemById(input: {projectId: $project, contentId: $issue}) { item { id } }"
+	unarchiveField  = "unarchiveProjectV2Item(input: {projectId: $project, itemId: $item}) { item { id } }"
+	assignField     = "addAssigneesToAssignable(input: {assignableId: $issue, assigneeIds: $assignees}) { clientMutationId }"
+	// setStatusInput sets the status option; a selection of
+	// projectV2Item { id } follows it.
+	setStatusInput = "updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field, " +
+		"value: {singleSelectOptionId: $option}})"
+	// addLabelsHead and addLabelsTail are addLabelsField around the name
+	// of its variable, apart so a constant can hold them too.
+	addLabelsHead = "addLabelsToLabelable(input: {labelableId: $issue, labelIds: $"
+	addLabelsTail = "}) { clientMutationId }"
+)
+
+// addLabelsField adds the labels in $<labels> to the issue in $issue.
+func addLabelsField(labels string) string { return addLabelsHead + labels + addLabelsTail }
+
 // lookupAll returns the IDs of names in ids, ignoring case.
 func lookupAll(kind string, ids map[string]string, names []string) ([]string, error) {
 	out := make([]string, 0, len(names))
@@ -383,10 +403,6 @@ func firstErr(errs ...error) error {
 // SetFields with the fields set is done, one with the rest missed, so a
 // partial report names each field.
 func (m *Mutation) Outcome(data map[string]json.RawMessage) (done, missed []workflow.Op) {
-	answered := func(alias string) bool {
-		v, found := data[alias]
-		return found && !graph.IsNull(v)
-	}
 	for i, s := range m.Steps {
 		if i > 0 && m.Steps[i-1].op == s.op {
 			continue // judged with the op's first step
@@ -397,7 +413,7 @@ func (m *Mutation) Outcome(data map[string]json.RawMessage) (done, missed []work
 				if t.op != s.op {
 					break
 				}
-				if answered(t.Alias) {
+				if Answered(data, t.Alias) {
 					got = append(got, set.Changes[k])
 				} else {
 					lost = append(lost, set.Changes[k])
@@ -416,7 +432,7 @@ func (m *Mutation) Outcome(data map[string]json.RawMessage) (done, missed []work
 			if t.op != s.op {
 				break
 			}
-			if !answered(t.Alias) {
+			if !Answered(data, t.Alias) {
 				ok = false
 			}
 		}
@@ -492,10 +508,7 @@ func Missed(op workflow.Op) string {
 		for i, c := range op.Changes {
 			names[i] = c.Field
 		}
-		if n := len(names); n > 1 {
-			return strings.Join(names[:n-1], ", ") + " and " + names[n-1] + " not set"
-		}
-		return strings.Join(names, "") + " not set"
+		return render.JoinWords(names, "and") + " not set"
 	}
 	return op.Describe() + " not done"
 }
