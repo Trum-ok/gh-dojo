@@ -535,14 +535,14 @@ func (r *releaseRun) head(n int) string {
 	if !r.rng.Picked && len(since) > 7 && strings.HasPrefix(r.rng.SinceCommit, strings.ToLower(since)) {
 		since = release.Short(since) // a SHA, shortened as output names commits
 	}
-	commits := plural(len(r.rng.Commits), "commit", "commits")
+	commits := render.Plural(len(r.rng.Commits), "commit", "commits")
 	switch {
 	case len(r.rng.Commits) == 0:
 		return fmt.Sprintf("release %s: no commits since %s, no issues", r.rng.Head, since)
 	case len(r.found) == 0:
 		return fmt.Sprintf("release %s: %s since %s, no issues: %s", r.rng.Head, commits, since, r.noIssues())
 	default:
-		return fmt.Sprintf("release %s: %s since %s, %s", r.rng.Head, commits, since, plural(n, "issue", "issues"))
+		return fmt.Sprintf("release %s: %s since %s, %s", r.rng.Head, commits, since, render.Plural(n, "issue", "issues"))
 	}
 }
 
@@ -669,13 +669,13 @@ func (r *releaseRun) json(verb, repo string, dry bool, items []*batch.Item, warn
 			Ref: r.rng.Head, Commit: r.rng.HeadCommit, Since: r.rng.Since, SincePicked: r.rng.Picked,
 			SinceCommit: r.rng.SinceCommit, Compared: r.rng.Compared, Commits: len(r.rng.Commits),
 		},
-		Issues: []releaseIssue{}, Skipped: []releaseSkip{}, Summary: v.Summary, Warnings: orEmpty(warnings),
+		Issues: []releaseIssue{}, Skipped: []releaseSkip{}, Summary: v.Summary, Warnings: render.OrEmpty(warnings),
 	}
 	for i, it := range items {
 		out.Issues = append(out.Issues, releaseIssue{verbIssue: v.Issues[i], FoundBy: sourcesJSON(r.foundOf(it.Ref))})
 	}
 	for _, s := range r.skipped {
-		out.Skipped = append(out.Skipped, releaseSkip{Number: s.found.Ref.Number, Repo: s.found.Ref.Repo.String(), Ref: fullRef(s.found.Ref), Reason: s.reason, Status: orNull(s.status),
+		out.Skipped = append(out.Skipped, releaseSkip{Number: s.found.Ref.Number, Repo: s.found.Ref.Repo.String(), Ref: fullRef(s.found.Ref), Reason: s.reason, Status: render.OrNull(s.status),
 			FoundBy: sourcesJSON(s.found)})
 	}
 	return out
@@ -686,7 +686,7 @@ func sourcesJSON(f release.Found) []releaseSource {
 	for _, s := range f.Sources {
 		src := releaseSource{By: string(s.By), Commit: s.Commit}
 		if s.Pull != nil {
-			src.PullRequest = orNull(fullRef(*s.Pull))
+			src.PullRequest = render.OrNull(fullRef(*s.Pull))
 		}
 		out = append(out, src)
 	}

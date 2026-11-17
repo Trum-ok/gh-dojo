@@ -64,7 +64,7 @@ func CheckNewFlags(cfg *config.Config, l NewLabels) error {
 // prefix: prefix+value, or value itself when it already starts with the
 // prefix, so `--type "type: bug"` is `--type bug`.
 func groupLabel(prefix, value string) string {
-	if prefix != "" && hasPrefixFold(value, prefix) {
+	if prefix != "" && render.HasPrefixFold(value, prefix) {
 		return value
 	}
 	return prefix + value
@@ -105,8 +105,8 @@ func ResolveNewLabels(cfg *config.Config, want NewLabels, labels []string, compl
 			return nil, false, unknownNewLabel(cfg, repo, w.flag, w.value, labels)
 		}
 		name := labels[i]
-		if w.flag == "type" && cfg.Labels.TypePrefix == "" && prefix != "" && hasPrefixFold(name, prefix) {
-			return nil, false, render.Usage("--type %q is an area label; pass --area %s instead", w.value, name[len(prefix):]).
+		if area, ok := render.CutPrefixFold(name, prefix); w.flag == "type" && cfg.Labels.TypePrefix == "" && prefix != "" && ok {
+			return nil, false, render.Usage("--type %q is an area label; pass --area %s instead", w.value, area).
 				WithFix(newHelp)
 		}
 		if !slices.Contains(names, name) {
@@ -126,14 +126,14 @@ func unknownNewLabel(cfg *config.Config, repo, flag, value string, all []string)
 	case flag == "type" && prefix == "":
 		// Any label outside the areas is a type.
 		for _, l := range all {
-			if a := cfg.Labels.AreaPrefix; a == "" || !hasPrefixFold(l, a) {
+			if a := cfg.Labels.AreaPrefix; a == "" || !render.HasPrefixFold(l, a) {
 				allowed = append(allowed, l)
 			}
 		}
 	case prefix != "":
 		for _, l := range all {
-			if hasPrefixFold(l, prefix) {
-				allowed = append(allowed, l[len(prefix):])
+			if value, ok := render.CutPrefixFold(l, prefix); ok {
+				allowed = append(allowed, value)
 			}
 		}
 		if len(allowed) == 0 {
@@ -145,10 +145,6 @@ func unknownNewLabel(cfg *config.Config, repo, flag, value string, all []string)
 	}
 	return render.Usage("unknown %s %q: no such label in %s", flag, value, repo).WithAllowed(allowed...).
 		WithFix("gh label list -R " + repo)
-}
-
-func hasPrefixFold(s, prefix string) bool {
-	return len(s) >= len(prefix) && strings.EqualFold(s[:len(prefix)], prefix)
 }
 
 // NewRequest is what new is asked to do, resolved against the repository:
@@ -247,7 +243,7 @@ func CheckNew(req NewRequest, found *NewFound) error {
 	}
 	if missing, _ := found.missingAssignees(req.Assignees); len(missing) > 0 && found.AssigneesTotal+len(missing) > MaxAssignees {
 		return render.Usage("%s has %d assignees; assigning %s would make more than the %d GitHub allows",
-			found.Name, found.AssigneesTotal, join(missing, "and"), MaxAssignees).
+			found.Name, found.AssigneesTotal, render.JoinWords(missing, "and"), MaxAssignees).
 			WithFix(fmt.Sprintf("unassign someone first (gh issue edit %d -R %s --remove-assignee <login>), or drop --%s",
 				found.Number, req.Repo, NewAssigneeFlag))
 	}

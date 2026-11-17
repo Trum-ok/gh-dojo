@@ -23,6 +23,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/Trum-ok/gh-dojo/internal/graph"
 	"github.com/Trum-ok/gh-dojo/internal/workflow"
 )
 
@@ -384,7 +385,7 @@ func firstErr(errs ...error) error {
 func (m *Mutation) Outcome(data map[string]json.RawMessage) (done, missed []workflow.Op) {
 	answered := func(alias string) bool {
 		v, found := data[alias]
-		return found && !isNull(v)
+		return found && !graph.IsNull(v)
 	}
 	for i, s := range m.Steps {
 		if i > 0 && m.Steps[i-1].op == s.op {
@@ -432,7 +433,7 @@ func (m *Mutation) Outcome(data map[string]json.RawMessage) (done, missed []work
 // data, or item when m has no AddToBoard or it did not succeed.
 func (m *Mutation) ItemID(data map[string]json.RawMessage, item string) string {
 	raw, ok := data[AliasBoard]
-	if !ok || isNull(raw) {
+	if !ok || graph.IsNull(raw) {
 		return item
 	}
 	var out struct {
@@ -444,11 +445,6 @@ func (m *Mutation) ItemID(data map[string]json.RawMessage, item string) string {
 		return item
 	}
 	return out.Item.ID
-}
-
-func isNull(v json.RawMessage) bool {
-	s := strings.TrimSpace(string(v))
-	return s == "" || s == "null"
 }
 
 // Missed says that op did not take effect, for a partial report:

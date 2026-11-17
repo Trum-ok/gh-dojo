@@ -251,16 +251,11 @@ func parseAssignees(values []string, help string) ([]string, error) {
 		empty := true
 		for _, login := range strings.Split(v, ",") {
 			login = strings.TrimSpace(login)
-			switch {
-			case login == "":
+			if login == "" {
 				continue
-			case login == config.Me || config.IsLogin(login):
-			case strings.HasPrefix(login, "@"):
-				return nil, render.Usage("--%s %q: write the login without @, or %s for yourself", assigneeFlag, login, config.Me).
-					WithFix(help)
-			default:
-				return nil, render.Usage("--%s %q is not a GitHub login; pass a login, or %s for yourself", assigneeFlag, login, config.Me).
-					WithFix(help)
+			}
+			if err := config.AssigneeArgError(assigneeFlag, login); err != nil {
+				return nil, err.WithFix(help)
 			}
 			empty = false
 			if !slices.ContainsFunc(out, func(l string) bool { return strings.EqualFold(l, login) }) {
@@ -541,12 +536,12 @@ func (r *newRun) result() newResult {
 		number = &r.number
 	}
 	return newResult{
-		Number: number, Repo: r.repo.String(), Title: singleLine(title), DryRun: r.opts.DryRun, Created: !r.resumed,
-		Labels: orEmpty(r.labels), Status: orNull(r.status), StatusSet: r.statusSet, Unarchived: r.unarchived,
+		Number: number, Repo: r.repo.String(), Title: render.SingleLine(title), DryRun: r.opts.DryRun, Created: !r.resumed,
+		Labels: render.OrEmpty(r.labels), Status: render.OrNull(r.status), StatusSet: r.statusSet, Unarchived: r.unarchived,
 		Milestone: milestoneJSON(r.milestone), MilestoneSet: r.milestoneSet,
 		BlockedBy: refList(r.linked, r.def), AlreadyBlockedBy: refList(r.linkedFound, r.def),
 		Parent: r.parentJSON(), ParentSet: r.parentSet,
-		Assigned: orEmpty(r.assigned), AlreadyAssigned: orEmpty(r.assignedFound),
+		Assigned: render.OrEmpty(r.assigned), AlreadyAssigned: render.OrEmpty(r.assignedFound),
 	}
 }
 
@@ -555,7 +550,7 @@ func (r *newRun) parentJSON() *string {
 	if r.parent == nil {
 		return nil
 	}
-	return orNull(fullRef(r.parent.In(r.def)))
+	return render.OrNull(fullRef(r.parent.In(r.def)))
 }
 
 // newRun is one attempt of new; its fields after run say how far it got.
@@ -774,7 +769,7 @@ func (r *newRun) resolveAssignees(ctx context.Context, nc *issue.NewContext) ([]
 	if len(unknown) > 1 {
 		fix = "check the logins, or give them access to " + repo.String()
 	}
-	e := render.Usage("--%s: %s cannot be assigned issues in %s", assigneeFlag, joinWords(unknown, "and"), repo).WithFix(fix)
+	e := render.Usage("--%s: %s cannot be assigned issues in %s", assigneeFlag, render.JoinWords(unknown, "and"), repo).WithFix(fix)
 	if logins, err := assignableUsers(ctx, r.Client, repo); err == nil {
 		e = e.WithAllowed(logins...)
 	}
@@ -894,7 +889,7 @@ func (r *newRun) apply(ctx context.Context, s *board.Schema, statusField *board.
 	if !plan.Create && plan.Milestone != "" {
 		vars := map[string]any{"issue": r.id, "milestone": in.milestone.ID}
 		if err := r.Client.Mutate(ctx, effects.SetMilestoneMutation, vars, nil); err != nil {
-			return &newStepError{step: "setting milestone " + singleLine(in.milestone.Title) + " failed", err: err}
+			return &newStepError{step: "setting milestone " + render.SingleLine(in.milestone.Title) + " failed", err: err}
 		}
 		r.milestone, r.milestoneSet = in.milestone, true
 	}
@@ -976,7 +971,7 @@ func (r *newRun) finish(ctx context.Context, projectID, fieldID string, initial 
 		if effects.Answered(data, effects.AliasAssign) {
 			r.assigned = loginsOf(assign)
 		} else {
-			steps = append(steps, "assigning "+joinWords(loginsOf(assign), "and"))
+			steps = append(steps, "assigning "+render.JoinWords(loginsOf(assign), "and"))
 		}
 	}
 	var missed []*issue.Linked
@@ -1197,7 +1192,7 @@ func (r *newRun) create(ctx context.Context, repoID, body string, in newInput) e
 		if len(assignees) > 0 {
 			parts = append(parts, "assignees")
 		}
-		return &newStepError{step: "GitHub refused part of the request (" + joinWords(parts, "or") + ")", err: err}
+		return &newStepError{step: "GitHub refused part of the request (" + render.JoinWords(parts, "or") + ")", err: err}
 	}
 	r.milestone, r.milestoneSet = milestone, milestone != nil
 	if parent != nil {
@@ -1226,15 +1221,15 @@ func (r *newRun) confirm() string {
 		effects = append(effects, "labels "+strings.Join(r.labels, ", "))
 	}
 	if len(r.assigned) > 0 {
-		effects = append(effects, "assigned "+joinWords(r.assigned, "and"))
+		effects = append(effects, "assigned "+render.JoinWords(r.assigned, "and"))
 	}
 	if len(r.assignedFound) > 0 {
-		effects = append(effects, "already assigned "+joinWords(r.assignedFound, "and"))
+		effects = append(effects, "already assigned "+render.JoinWords(r.assignedFound, "and"))
 	}
 	if r.milestone != nil {
-		m := "milestone " + singleLine(r.milestone.Title)
+		m := "milestone " + render.SingleLine(r.milestone.Title)
 		if r.milestoneKept != "" {
-			m += " (kept, not " + singleLine(r.milestoneKept) + ")"
+			m += " (kept, not " + render.SingleLine(r.milestoneKept) + ")"
 		}
 		effects = append(effects, m)
 	}
@@ -1346,23 +1341,23 @@ func (r *newRun) dryRun() string {
 	}
 	switch {
 	case !r.resumed && len(r.assigned) > 0:
-		line("assignees: " + joinWords(r.assigned, "and"))
+		line("assignees: " + render.JoinWords(r.assigned, "and"))
 	case len(r.assigned) > 0 && len(r.assignedFound) > 0:
-		line("assignees: +" + strings.Join(r.assigned, " +") + " (" + joinWords(r.assignedFound, "and") + " already assigned)")
+		line("assignees: +" + strings.Join(r.assigned, " +") + " (" + render.JoinWords(r.assignedFound, "and") + " already assigned)")
 	case len(r.assigned) > 0:
 		line("assignees: +" + strings.Join(r.assigned, " +"))
 	case len(r.assignedFound) > 0:
-		line("assignees: " + joinWords(r.assignedFound, "and") + " already assigned")
+		line("assignees: " + render.JoinWords(r.assignedFound, "and") + " already assigned")
 	}
 	switch {
 	case r.milestoneKept != "" && r.milestone != nil:
-		line("milestone: " + singleLine(r.milestone.Title) + " kept, not " + singleLine(r.milestoneKept))
+		line("milestone: " + render.SingleLine(r.milestone.Title) + " kept, not " + render.SingleLine(r.milestoneKept))
 	case r.milestoneSet && r.resumed:
-		line("milestone: none → " + singleLine(r.milestone.Title))
+		line("milestone: none → " + render.SingleLine(r.milestone.Title))
 	case r.milestoneSet:
-		line("milestone: " + singleLine(r.milestone.Title))
+		line("milestone: " + render.SingleLine(r.milestone.Title))
 	case r.opts.Milestone != "" && r.milestone != nil:
-		line("milestone: " + singleLine(r.milestone.Title) + " already set")
+		line("milestone: " + render.SingleLine(r.milestone.Title) + " already set")
 	}
 	if r.added {
 		line(workflow.AddToBoard{}.Describe())
@@ -1447,7 +1442,7 @@ func (r *newRun) partial(err error) error {
 		var gqlErr *api.GraphQLError
 		forbidden := false
 		if errors.As(cause, &gqlErr) && gqlErr != nil && len(gqlErr.Errors) > 0 {
-			why = "GitHub: " + singleLine(gqlErr.Errors[0].Message)
+			why = "GitHub: " + render.SingleLine(gqlErr.Errors[0].Message)
 			forbidden = slices.ContainsFunc(gqlErr.Errors, func(i api.GraphQLErrorItem) bool { return i.Type == "FORBIDDEN" })
 		}
 		fix := "pass another --" + parentFlag + " to make it a sub-issue (gh issue edit " + strconv.Itoa(r.number) +
@@ -1482,10 +1477,10 @@ func milestoneJSON(m *issue.OpenMilestone) *jsonMilestone {
 	if m == nil {
 		return nil
 	}
-	out := &jsonMilestone{Title: singleLine(m.Title)}
+	out := &jsonMilestone{Title: render.SingleLine(m.Title)}
 	if m.DueOn != nil {
 		if t, err := time.Parse(time.RFC3339, *m.DueOn); err == nil {
-			out.DueOn = orNull(cardDay(t))
+			out.DueOn = render.OrNull(cardDay(t))
 		}
 	}
 	return out

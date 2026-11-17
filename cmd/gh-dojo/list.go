@@ -127,7 +127,7 @@ func runList(cmd *cobra.Command, o *listOpts) error {
 	}
 	l := buildList(cfg, field.OptionNames(), items, o)
 	res := l.result(o, items)
-	res.Warnings = orEmpty(warnings)
+	res.Warnings = render.OrEmpty(warnings)
 	return emit(cmd, res, func(w io.Writer) { l.write(w, repo, cfg, o) })
 }
 
@@ -277,9 +277,9 @@ func (l *list) result(o *listOpts, items *board.Items) listResult {
 	}
 	switch {
 	case o.sprintIt != nil:
-		r.SprintFilter = orNull("iteration")
+		r.SprintFilter = render.OrNull("iteration")
 	case o.sprint != "":
-		r.SprintFilter = orNull(sprintNone)
+		r.SprintFilter = render.OrNull(sprintNone)
 	}
 	r.Skipped.DraftIssues, r.Skipped.PullRequests, r.Skipped.Unseen = l.drafts, l.pulls, l.unseen
 	for _, g := range l.groups {
@@ -296,9 +296,9 @@ func (l *list) result(o *listOpts, items *board.Items) listResult {
 // listIssueOf is an issue of the board as list's JSON has it.
 func listIssueOf(it board.Item) listIssue {
 	return listIssue{
-		Repo: it.Repo, Number: it.Number, Title: singleLine(it.Title), State: strings.ToLower(it.State),
-		Status: orNull(it.Status), Labels: orEmpty(it.Labels.Nodes), LabelsTotal: max(it.Labels.TotalCount, len(it.Labels.Nodes)),
-		Assignees: orEmpty(it.Assignees.Nodes), AssigneesTotal: max(it.Assignees.TotalCount, len(it.Assignees.Nodes)),
+		Repo: it.Repo, Number: it.Number, Title: render.SingleLine(it.Title), State: strings.ToLower(it.State),
+		Status: render.OrNull(it.Status), Labels: render.OrEmpty(it.Labels.Nodes), LabelsTotal: max(it.Labels.TotalCount, len(it.Labels.Nodes)),
+		Assignees: render.OrEmpty(it.Assignees.Nodes), AssigneesTotal: max(it.Assignees.TotalCount, len(it.Assignees.Nodes)),
 	}
 }
 
@@ -533,7 +533,7 @@ func (l *list) write(w io.Writer, repo string, cfg *config.Config, o *listOpts) 
 	}
 	if l.unchecked > 0 {
 		fmt.Fprintf(w, "%s not fully checked: more than %d labels\n",
-			plural(l.unchecked, "issue", "issues"), board.LabelsWindow)
+			render.Plural(l.unchecked, "issue", "issues"), board.LabelsWindow)
 	}
 	if l.hidden > 0 {
 		// With --status, final statuses not asked for are filtered out, so
@@ -546,17 +546,17 @@ func (l *list) write(w io.Writer, repo string, cfg *config.Config, o *listOpts) 
 	}
 	if l.filtered > 0 {
 		fmt.Fprintf(w, "filtered out: %s not matching %s\n",
-			plural(l.filtered, "issue", "issues"), strings.Join(o.filterNames(), " "))
+			render.Plural(l.filtered, "issue", "issues"), strings.Join(o.filterNames(), " "))
 	}
 	var skipped []string
 	if l.drafts > 0 {
-		skipped = append(skipped, plural(l.drafts, "draft issue", "draft issues"))
+		skipped = append(skipped, render.Plural(l.drafts, "draft issue", "draft issues"))
 	}
 	if l.pulls > 0 {
-		skipped = append(skipped, plural(l.pulls, "pull request", "pull requests"))
+		skipped = append(skipped, render.Plural(l.pulls, "pull request", "pull requests"))
 	}
 	if l.unseen > 0 {
-		skipped = append(skipped, plural(l.unseen, "item the token cannot see", "items the token cannot see"))
+		skipped = append(skipped, render.Plural(l.unseen, "item the token cannot see", "items the token cannot see"))
 	}
 	if len(skipped) > 0 {
 		fmt.Fprintf(w, "skipped: %s (list shows issues only)\n", strings.Join(skipped, ", "))
@@ -592,7 +592,7 @@ func statusName(s string) string {
 func itemLine(it board.Item, repo string) string {
 	var b strings.Builder
 	b.WriteString(itemRef(it, repo) + " ")
-	b.WriteString(strings.Join(strings.Fields(it.Title), " "))
+	b.WriteString(render.SingleLine(it.Title))
 	if it.State == issue.StateClosed {
 		b.WriteString(" (closed)")
 	}
@@ -619,11 +619,4 @@ func itemRef(it board.Item, repo string) string {
 		return it.Repo + "#" + strconv.Itoa(it.Number)
 	}
 	return "#" + strconv.Itoa(it.Number)
-}
-
-func plural(n int, one, many string) string {
-	if n == 1 {
-		return "1 " + one
-	}
-	return strconv.Itoa(n) + " " + many
 }

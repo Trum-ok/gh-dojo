@@ -478,8 +478,8 @@ func TestSummaryFits(t *testing.T) {
 	}
 	b := &Run{def: shop, Stdout: &bytes.Buffer{}}
 	line, _, _ := strings.Cut(render.FromError(b.Summary(items, false)).What, "\n")
-	if runes(line) > MaxSummaryRunes {
-		t.Errorf("%d runes, want at most %d:\n%s", runes(line), MaxSummaryRunes, line)
+	if render.RuneLen(line) > MaxSummaryRunes {
+		t.Errorf("%d runes, want at most %d:\n%s", render.RuneLen(line), MaxSummaryRunes, line)
 	}
 	if !strings.HasPrefix(line, "0 of 40 done; #1: ") || !strings.Contains(line, "; also not done: #") || !strings.HasSuffix(line, " more") {
 		t.Errorf("line:\n%s", line)

@@ -263,13 +263,13 @@ func checkVerbs(ctx context.Context, r *Report, q graph.Querier, cfg *config.Con
 	if problems == 0 {
 		var found []string
 		if n := len(c.labels); n > 0 {
-			found = append(found, plural(n, "label exists", "labels exist"))
+			found = append(found, render.Plural(n, "label exists", "labels exist"))
 		}
 		if n := len(c.users); n > 0 {
-			found = append(found, plural(n, "assignee", "assignees")+" can be assigned")
+			found = append(found, render.Plural(n, "assignee", "assignees")+" can be assigned")
 		}
 		if matched > 0 {
-			found = append(found, plural(matched, "milestone is", "milestones are")+" open")
+			found = append(found, render.Plural(matched, "milestone is", "milestones are")+" open")
 		}
 		r.AddOK("verbs", "%s: %s", repoName, strings.Join(found, ", "))
 	}

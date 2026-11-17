@@ -16,6 +16,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/Trum-ok/gh-dojo/internal/render"
 )
 
 // Level 2: an agent, claude -p in a clean workspace of one condition, is
@@ -718,7 +720,7 @@ func (r *agentResult) consume(line []byte, st *streamState) bool {
 			Step: len(r.Steps) + 1, Turns: m.NumTurns, DurationMS: m.DurationMS,
 			ToolCalls: r.ToolCalls - st.calls, ToolErrors: r.ToolErrors - st.errors, Refusals: r.Refusals - st.refusals,
 			Tokens:  m.Usage.Input + m.Usage.CacheWrite + m.Usage.CacheRead + m.Usage.Output,
-			CostUSD: m.Cost - st.cost, Final: clip(m.Result, 500),
+			CostUSD: m.Cost - st.cost, Final: render.Clip(m.Result, 500),
 		}
 		if m.IsError || m.Subtype != "success" {
 			step.AgentError = m.Subtype
@@ -740,7 +742,7 @@ func (r *agentResult) consume(line []byte, st *streamState) bool {
 		r.CacheRead += m.Usage.CacheRead
 		r.OutputTokens += m.Usage.Output
 		r.CostUSD = m.Cost
-		r.Final = clip(m.Result, 2000)
+		r.Final = render.Clip(m.Result, 2000)
 		r.Denials = max(r.Denials, len(m.Denials))
 		if st.models == nil {
 			st.models = map[string]bool{}
@@ -788,11 +790,4 @@ func recount(transcript string) (errors, refusals int, err error) {
 		r.consume(line, &st)
 	}
 	return r.ToolErrors, r.Refusals, nil
-}
-
-func clip(s string, n int) string {
-	if len(s) > n {
-		return s[:n] + "…"
-	}
-	return s
 }

@@ -98,7 +98,7 @@ func runNext(cmd *cobra.Command, o *listOpts) error {
 		repo = r.String()
 	}
 	res := n.result(o, repo)
-	res.Warnings = orEmpty(warnings)
+	res.Warnings = render.OrEmpty(warnings)
 	return emit(cmd, res, func(w io.Writer) { n.write(w, repo, cfg, o) })
 }
 
@@ -302,24 +302,24 @@ func (n *next) write(w io.Writer, repo string, cfg *config.Config, o *listOpts) 
 	}
 	if n.unchecked > 0 {
 		fmt.Fprintf(w, "%s not fully checked: more than %d labels\n",
-			plural(n.unchecked, "issue", "issues"), board.LabelsWindow)
+			render.Plural(n.unchecked, "issue", "issues"), board.LabelsWindow)
 	}
 	if n.hidden > 0 {
 		fmt.Fprintf(w, "hidden: %d blocked, use --all\n", n.hidden)
 	}
 	if n.filtered > 0 {
 		fmt.Fprintf(w, "filtered out: %s not matching %s\n",
-			plural(n.filtered, "issue", "issues"), strings.Join(o.filterNames(), " "))
+			render.Plural(n.filtered, "issue", "issues"), strings.Join(o.filterNames(), " "))
 	}
 	var skipped []string
 	if n.drafts > 0 {
-		skipped = append(skipped, plural(n.drafts, "draft issue", "draft issues"))
+		skipped = append(skipped, render.Plural(n.drafts, "draft issue", "draft issues"))
 	}
 	if n.pulls > 0 {
-		skipped = append(skipped, plural(n.pulls, "pull request", "pull requests"))
+		skipped = append(skipped, render.Plural(n.pulls, "pull request", "pull requests"))
 	}
 	if n.unseen > 0 {
-		skipped = append(skipped, plural(n.unseen, "item the token cannot see", "items the token cannot see"))
+		skipped = append(skipped, render.Plural(n.unseen, "item the token cannot see", "items the token cannot see"))
 	}
 	if len(skipped) > 0 {
 		fmt.Fprintf(w, "skipped: %s (next shows issues only)\n", strings.Join(skipped, ", "))
@@ -399,17 +399,17 @@ func (n *next) result(o *listOpts, repo string) nextResult {
 	}
 	switch {
 	case o.sprintIt != nil:
-		r.SprintFilter = orNull("iteration")
+		r.SprintFilter = render.OrNull("iteration")
 	case o.sprint != "":
-		r.SprintFilter = orNull(sprintNone)
+		r.SprintFilter = render.OrNull(sprintNone)
 	}
 	r.Skipped.DraftIssues, r.Skipped.PullRequests, r.Skipped.Unseen = n.drafts, n.pulls, n.unseen
 	for _, ni := range n.issues[:min(len(n.issues), o.limit)] {
 		j := nextIssueJSON{listIssue: listIssueOf(ni.Item), UnresolvedBlockers: []nextBlockerJSON{}, UnreadBlockers: ni.unread}
 		for _, b := range ni.blockers {
 			j.UnresolvedBlockers = append(j.UnresolvedBlockers, nextBlockerJSON{
-				Ref: b.Repo + "#" + strconv.Itoa(b.Number), Repo: b.Repo, Number: b.Number, OnBoard: b.onBoard, Status: orNull(b.status),
-				Archived: b.archived, StatusUnknownReason: orNull(b.unknown),
+				Ref: b.Repo + "#" + strconv.Itoa(b.Number), Repo: b.Repo, Number: b.Number, OnBoard: b.onBoard, Status: render.OrNull(b.status),
+				Archived: b.archived, StatusUnknownReason: render.OrNull(b.unknown),
 			})
 		}
 		r.Issues = append(r.Issues, j)

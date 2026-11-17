@@ -6,6 +6,7 @@ import (
 
 	"github.com/Trum-ok/gh-dojo/internal/board"
 	"github.com/Trum-ok/gh-dojo/internal/issue"
+	"github.com/Trum-ok/gh-dojo/internal/render"
 )
 
 // The JSON of show: the cards printed, read with the same flags and cut
@@ -120,7 +121,7 @@ func iterationJSON(it *board.Iteration) *jsonIteration {
 	}
 	out := &jsonIteration{Title: it.Title, StartDate: it.StartDate, DurationDays: it.Duration}
 	if start, err := time.Parse(time.DateOnly, it.StartDate); err == nil && it.Duration > 0 {
-		out.EndDate = orNull(start.AddDate(0, 0, it.Duration-1).Format(time.DateOnly))
+		out.EndDate = render.OrNull(start.AddDate(0, 0, it.Duration-1).Format(time.DateOnly))
 	}
 	return out
 }
@@ -193,17 +194,17 @@ func (v cardView) cardJSON(c *issue.Card, brief bool) showCard {
 		Number:              c.Number,
 		Repo:                c.Repo.String(),
 		URL:                 c.URL,
-		Title:               singleLine(c.Title),
+		Title:               render.SingleLine(c.Title),
 		State:               strings.ToLower(c.State),
-		StateReason:         orNull(strings.ToLower(c.StateReason)),
+		StateReason:         render.OrNull(strings.ToLower(c.StateReason)),
 		Author:              cardLogin(c.Author),
 		CreatedAt:           jsonTime(c.CreatedAt),
 		ClosedAt:            jsonTime(c.ClosedAt),
 		Incomplete:          c.Incomplete,
 		Board:               v.boardJSON(c),
-		Labels:              orEmpty(c.Labels.Nodes),
+		Labels:              render.OrEmpty(c.Labels.Nodes),
 		LabelsTotal:         max(c.Labels.TotalCount, len(c.Labels.Nodes)),
-		Assignees:           orEmpty(c.Assignees.Nodes),
+		Assignees:           render.OrEmpty(c.Assignees.Nodes),
 		AssigneesTotal:      max(c.Assignees.TotalCount, len(c.Assignees.Nodes)),
 		BlockedBy:           v.linksJSON(c, c.BlockedBy.Nodes),
 		BlockedByTotal:      max(c.BlockedBy.TotalCount, len(c.BlockedBy.Nodes)),
@@ -227,12 +228,12 @@ func (v cardView) cardJSON(c *issue.Card, brief bool) showCard {
 	}
 	if v.sprintField != "" {
 		it, unknown := v.sprintOf(c)
-		out.Sprint = &sprintJSON{Field: v.sprintField, Iteration: iterationJSON(it), UnknownReason: orNull(unknown)}
+		out.Sprint = &sprintJSON{Field: v.sprintField, Iteration: iterationJSON(it), UnknownReason: render.OrNull(unknown)}
 	}
 	if m := c.Milestone; m != nil {
-		out.Milestone = &jsonMilestone{Title: singleLine(m.Title)}
+		out.Milestone = &jsonMilestone{Title: render.SingleLine(m.Title)}
 		if !m.DueOn.IsZero() {
-			out.Milestone.DueOn = orNull(cardDay(m.DueOn))
+			out.Milestone.DueOn = render.OrNull(cardDay(m.DueOn))
 		}
 	}
 	if brief {
@@ -241,7 +242,7 @@ func (v cardView) cardJSON(c *issue.Card, brief bool) showCard {
 	if c.OnBoard() || c.BoardUnknown {
 		for _, h := range c.History {
 			out.History = append(out.History, showChange{
-				At: jsonTime(h.At), From: orNull(h.From), To: orNull(h.To), Actor: cardLogin(h.Actor),
+				At: jsonTime(h.At), From: render.OrNull(h.From), To: render.OrNull(h.To), Actor: cardLogin(h.Actor),
 				Automated: h.Automated || projectAutomation[h.Actor],
 			})
 		}
@@ -264,26 +265,26 @@ func (v cardView) cardJSON(c *issue.Card, brief bool) showCard {
 // textJSON is text cut at limit runes (0: whole) as show cuts it.
 func textJSON(text string, limit int) *showText {
 	cut, note := fold(text, limit)
-	return &showText{Text: cut, Cut: note != "", Length: runes(text)}
+	return &showText{Text: cut, Cut: note != "", Length: render.RuneLen(text)}
 }
 
 // boardJSON is the card's place on the board.
 func (v cardView) boardJSON(c *issue.Card) showBoard {
 	b := showBoard{
 		OnBoard:       c.OnBoard(),
-		UnknownReason: orNull(c.BoardUnknownReason),
-		Status:        orNull(c.Status()),
+		UnknownReason: render.OrNull(c.BoardUnknownReason),
+		Status:        render.OrNull(c.Status()),
 		StatusUnknown: c.StatusUnknown(),
 		Archived:      c.Archived(),
 		Fields:        []showField{},
 	}
 	if c.BoardUnknown && b.UnknownReason == nil {
-		b.UnknownReason = orNull("GitHub did not return all of its projects")
+		b.UnknownReason = render.OrNull("GitHub did not return all of its projects")
 	}
 	if c.Item != nil {
 		for _, val := range c.Item.Values {
 			if val.Field != v.statusField && !v.isSprint(val) {
-				b.Fields = append(b.Fields, showField{Name: singleLine(val.Field), Value: singleLine(val.Text)})
+				b.Fields = append(b.Fields, showField{Name: render.SingleLine(val.Field), Value: render.SingleLine(val.Text)})
 			}
 		}
 		b.FieldsTruncated = c.Item.ValuesTruncated
@@ -305,8 +306,8 @@ func (v cardView) linkJSON(c *issue.Card, l issue.Link) showLink {
 	// The default repository as the config spells it.
 	repo := issue.Ref{Repo: l.Repo, Number: l.Number}.In(c.Repo).In(v.def).Repo
 	return showLink{
-		Ref: fullRef(issue.Ref{Repo: repo, Number: l.Number}), Repo: repo.String(), Number: l.Number, Title: singleLine(l.Title),
-		State: strings.ToLower(l.State), OnBoard: l.OnBoard, Status: orNull(l.Status), Archived: l.Archived,
-		StatusUnknownReason: orNull(l.StatusUnknown), Resolved: l.Resolved(v.resolved),
+		Ref: fullRef(issue.Ref{Repo: repo, Number: l.Number}), Repo: repo.String(), Number: l.Number, Title: render.SingleLine(l.Title),
+		State: strings.ToLower(l.State), OnBoard: l.OnBoard, Status: render.OrNull(l.Status), Archived: l.Archived,
+		StatusUnknownReason: render.OrNull(l.StatusUnknown), Resolved: l.Resolved(v.resolved),
 	}
 }

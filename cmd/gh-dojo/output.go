@@ -365,25 +365,7 @@ func errorJSON(err error) *jsonError {
 		return nil
 	}
 	e := render.FromError(err)
-	return &jsonError{ExitCode: int(e.Code), Message: e.What, Allowed: orEmpty(e.Allowed), Fix: orNull(strings.TrimSpace(e.Fix))}
-}
-
-// orEmpty returns s, or an empty slice for nil: JSON lists are [], never
-// null, so jq's .x[] works on them.
-func orEmpty[T any](s []T) []T {
-	if s == nil {
-		return []T{}
-	}
-	return s
-}
-
-// orNull returns &s, or nil (null) for "": an absent value is null in
-// JSON, never "".
-func orNull(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
+	return &jsonError{ExitCode: int(e.Code), Message: e.What, Allowed: render.OrEmpty(e.Allowed), Fix: render.OrNull(strings.TrimSpace(e.Fix))}
 }
 
 // jsonTime is t in UTC for JSON, nil (null) for the zero time.

@@ -163,7 +163,7 @@ func runAgentInstall(cmd *cobra.Command, _ []string) error {
 	var runErr error
 	if stale > 0 {
 		runErr = render.Usage("%d of %s not up to date with %s",
-			stale, plural(len(files), "agent file", "agent files"), config.FileName).WithFix(fix)
+			stale, render.Plural(len(files), "agent file", "agent files"), config.FileName).WithFix(fix)
 	}
 	return emitWrite(cmd, r, r.write, runErr, wrote)
 }

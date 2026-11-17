@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/Trum-ok/gh-dojo/internal/batch"
+	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/Trum-ok/gh-dojo/internal/workflow"
 )
 
@@ -97,25 +98,25 @@ func (o jsonOp) MarshalJSON() ([]byte, error) {
 	fields := []kv{{"op", o.Op}}
 	switch o.Op {
 	case "set_status":
-		fields = append(fields, kv{"from", orNull(o.From)}, kv{"to", orNull(o.To)})
+		fields = append(fields, kv{"from", render.OrNull(o.From)}, kv{"to", render.OrNull(o.To)})
 	case "set_iteration":
-		fields = append(fields, kv{"from", orNull(o.From)}, kv{"to", orNull(o.To)}, kv{"start_date", orNull(o.StartDate)})
+		fields = append(fields, kv{"from", render.OrNull(o.From)}, kv{"to", render.OrNull(o.To)}, kv{"start_date", render.OrNull(o.StartDate)})
 	case "set_fields":
-		fields = append(fields, kv{"fields", orEmpty(o.Fields)})
+		fields = append(fields, kv{"fields", render.OrEmpty(o.Fields)})
 	case "set_milestone":
-		fields = append(fields, kv{"from", orNull(o.From)}, kv{"to", orNull(o.To)})
+		fields = append(fields, kv{"from", render.OrNull(o.From)}, kv{"to", render.OrNull(o.To)})
 	case "add_labels", "remove_labels":
-		fields = append(fields, kv{"labels", orEmpty(o.Labels)})
+		fields = append(fields, kv{"labels", render.OrEmpty(o.Labels)})
 	case "assign":
 		fields = append(fields, kv{"login", o.Login})
 	case "unassign":
-		fields = append(fields, kv{"logins", orEmpty(o.Logins)}, kv{"kept", o.Kept})
+		fields = append(fields, kv{"logins", render.OrEmpty(o.Logins)}, kv{"kept", o.Kept})
 	case "add_blocked_by":
 		fields = append(fields, kv{"issue", o.Issue})
 	case "add_comment":
-		fields = append(fields, kv{"body", orNull(o.Body)})
+		fields = append(fields, kv{"body", render.OrNull(o.Body)})
 	case "close":
-		fields = append(fields, kv{"reason", o.Reason}, kv{"of", orNull(o.Of)})
+		fields = append(fields, kv{"reason", o.Reason}, kv{"of", render.OrNull(o.Of)})
 	}
 	b := []byte{'{'}
 	for i, f := range fields {
@@ -159,7 +160,7 @@ func opJSON(op workflow.Op, def string) jsonOp {
 	case workflow.SetFields:
 		out := jsonOp{Op: "set_fields", Fields: []jsonFieldChange{}}
 		for _, c := range op.Changes {
-			out.Fields = append(out.Fields, jsonFieldChange{Field: c.Field, From: orNull(c.From), To: orNull(c.To)})
+			out.Fields = append(out.Fields, jsonFieldChange{Field: c.Field, From: render.OrNull(c.From), To: render.OrNull(c.To)})
 		}
 		return out
 	case workflow.SetMilestone:
@@ -214,7 +215,7 @@ func inPlaceJSON(p *workflow.Plan, def string) []jsonOp {
 // verbJSON is the JSON of verb v run on items of repo ("" when not
 // known); dry for a dry run.
 func verbJSON(v, repo string, dry bool, items []*batch.Item) verbResult {
-	r := verbResult{Verb: v, DefaultRepo: orNull(repo), DryRun: dry, Issues: []verbIssue{}, Summary: verbSummary{Total: len(items)}}
+	r := verbResult{Verb: v, DefaultRepo: render.OrNull(repo), DryRun: dry, Issues: []verbIssue{}, Summary: verbSummary{Total: len(items)}}
 	for _, it := range items {
 		is := itemJSON(it, dry, repo)
 		switch is.Outcome {
@@ -241,16 +242,16 @@ func itemJSON(it *batch.Item, dry bool, def string) verbIssue {
 		Warnings: []string{}, Error: errorJSON(it.Err),
 	}
 	if it.Issue != nil {
-		out.Title = orNull(singleLine(it.Issue.Title))
+		out.Title = render.OrNull(render.SingleLine(it.Issue.Title))
 	}
 	if it.Writes == nil {
 		return out
 	}
 	first := it.Writes.First
-	out.Title = orNull(singleLine(first.Issue.Title))
+	out.Title = render.OrNull(render.SingleLine(first.Issue.Title))
 	out.Planned = opsJSON(first.Ops, def)
 	out.NeedsYes = first.NeedsYes
-	out.Warnings = orEmpty(first.Warnings)
+	out.Warnings = render.OrEmpty(first.Warnings)
 	if dry {
 		out.InPlace = inPlaceJSON(first, def)
 		switch {

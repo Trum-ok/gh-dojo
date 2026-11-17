@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/Trum-ok/gh-dojo/internal/graph"
 )
 
 // gh dojo new's mutations. Unlike a verb's, which go into one document
@@ -121,5 +123,5 @@ func (f NewFinish) Build(ids IDs) *Mutation {
 // it took effect.
 func Answered(data map[string]json.RawMessage, alias string) bool {
 	v, ok := data[alias]
-	return ok && !isNull(v)
+	return ok && !graph.IsNull(v)
 }

@@ -9,7 +9,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/Trum-ok/gh-dojo/internal/board"
@@ -52,7 +51,7 @@ func (r *Report) AddOK(name, format string, a ...any) {
 // AddWarn adds a warning with the command that fixes it.
 func (r *Report) AddWarn(name, fix, format string, a ...any) {
 	r.Checks = append(r.Checks, Check{
-		Name: name, Result: ResultWarn, Detail: fmt.Sprintf(format, a...), Allowed: []string{}, Fix: orNull(fix),
+		Name: name, Result: ResultWarn, Detail: fmt.Sprintf(format, a...), Allowed: []string{}, Fix: render.OrNull(fix),
 	})
 }
 
@@ -70,7 +69,7 @@ func (r *Report) AddProblem(name string, err error) {
 		code = render.ExitNetwork
 	}
 	r.Checks = append(r.Checks, Check{
-		Name: name, Result: ResultProblem, Detail: e.What, Allowed: orEmpty(e.Allowed), Fix: orNull(e.Fix), code: code,
+		Name: name, Result: ResultProblem, Detail: e.What, Allowed: render.OrEmpty(e.Allowed), Fix: render.OrNull(e.Fix), code: code,
 	})
 }
 
@@ -91,7 +90,7 @@ func (r *Report) Err() error {
 		return nil
 	}
 	return render.New(code, "doctor found %s; fix as shown above, then run gh dojo doctor again",
-		plural(n, "problem", "problems"))
+		render.Plural(n, "problem", "problems"))
 }
 
 // Boards reads board schemas through the cache; *board.Loader is one.
@@ -200,7 +199,7 @@ func configSummary(cfg *config.Config) string {
 	if cfg.Preset != "" {
 		s += "preset " + cfg.Preset + ", "
 	}
-	return s + plural(len(cfg.Verbs), "verb", "verbs")
+	return s + render.Plural(len(cfg.Verbs), "verb", "verbs")
 }
 
 // checkBoard checks the config against the board, from the cache when it
@@ -229,7 +228,7 @@ func checkBoard(ctx context.Context, r *Report, boards Boards, cfg *config.Confi
 			cached = " (cached)"
 		}
 		r.AddOK("board", "%s %q%s: field %s and %s match", s.Ref(), s.Title, cached, cfg.StatusField(),
-			plural(len(statuses), "status", "statuses"))
+			render.Plural(len(statuses), "status", "statuses"))
 	}
 	if s.Closed {
 		r.AddProblem("board", render.Usage("board %s %q is closed", s.Ref(), s.Title).
@@ -279,27 +278,4 @@ func CheckSprint(r *Report, cfg *config.Config, s *board.Schema, now time.Time, 
 func named(name string, err error) *render.Error {
 	e := render.FromError(err)
 	return render.New(e.Code, "%s: %s", name, e.What).WithFix(e.Fix).WithCause(err)
-}
-
-func plural(n int, one, many string) string {
-	if n == 1 {
-		return "1 " + one
-	}
-	return strconv.Itoa(n) + " " + many
-}
-
-// orEmpty returns s, or an empty slice for nil: JSON lists are [].
-func orEmpty[T any](s []T) []T {
-	if s == nil {
-		return []T{}
-	}
-	return s
-}
-
-// orNull returns &s, or nil (null) for "".
-func orNull(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
 }

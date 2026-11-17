@@ -179,7 +179,7 @@ func (a Assign) Describe() string       { return "assign: " + a.Login }
 func (a Assign) Effect() string         { return "assigned " + a.Login }
 func (Assign) op()                      {}
 func (u Unassign) Describe() string     { return "unassign: " + strings.Join(u.Logins, ", ") }
-func (u Unassign) Effect() string       { return "unassigned " + join(u.Logins, "and") }
+func (u Unassign) Effect() string       { return "unassigned " + render.JoinWords(u.Logins, "and") }
 func (Unassign) op()                    {}
 func (b AddBlockedBy) Describe() string { return "blocked by: " + b.Ref }
 func (b AddBlockedBy) Effect() string   { return "blocked by " + b.Ref }
@@ -393,10 +393,10 @@ func (p *Plan) lines(dry bool) []string {
 		case Assign:
 			assign = append(assign, key("assign", op.Login+" already assigned"))
 		case Unassign:
-			text := join(op.Logins, "and") + " already unassigned"
+			text := render.JoinWords(op.Logins, "and") + " already unassigned"
 			switch {
 			case op.Kept:
-				text = join(op.Logins, "and") + " kept: the verb assigns them"
+				text = render.JoinWords(op.Logins, "and") + " kept: the verb assigns them"
 			case op.All:
 				text = "no assignees"
 				if slices.ContainsFunc(append(slices.Clone(p.Ops), p.InPlace...), func(o Op) bool { _, ok := o.(Assign); return ok }) {
@@ -429,13 +429,13 @@ func (p *Plan) lines(dry bool) []string {
 		label = []string{"labels unchanged"}
 	}
 	if len(blockers) > 0 {
-		blocked = append(blocked, pick(AddBlockedBy{Ref: join(blockers, "and")}))
+		blocked = append(blocked, pick(AddBlockedBy{Ref: render.JoinWords(blockers, "and")}))
 	}
 	switch {
 	case len(blockersInPlace) > 0 && dry:
-		blocked = append(blocked, "blocked by: "+join(blockersInPlace, "and")+" already linked")
+		blocked = append(blocked, "blocked by: "+render.JoinWords(blockersInPlace, "and")+" already linked")
 	case len(blockersInPlace) > 0:
-		blocked = append(blocked, "already blocked by "+join(blockersInPlace, "and"))
+		blocked = append(blocked, "already blocked by "+render.JoinWords(blockersInPlace, "and"))
 	}
 	board = append(board, unarchive...)
 	var out []string

@@ -204,7 +204,7 @@ var (
 			if v.Comment == "" {
 				return ""
 			}
-			return `comments "` + clipRunes(singleLine(v.Comment), maxTemplateRunes) + `"`
+			return `comments "` + render.Clip(render.SingleLine(v.Comment), maxTemplateRunes) + `"`
 		},
 		func(_ *config.Config, v config.Verb) string {
 			switch {
@@ -231,7 +231,7 @@ func labelNames(names []string, conj string, wrap func(string) string) string {
 	if len(out) == 1 {
 		return "the label " + out[0]
 	}
-	return "the labels " + joinWords(out, conj)
+	return "the labels " + render.JoinWords(out, conj)
 }
 
 // labelVerbs are the verbs of cfg, other than v, that remove the label
@@ -282,17 +282,17 @@ const maxTemplateRunes = 60
 func describeProcess(cfg *config.Config) *process {
 	p := &process{
 		Config: cfg.Display,
-		Preset: orNull(cfg.Preset),
+		Preset: render.OrNull(cfg.Preset),
 		Board:  fmt.Sprintf("%s/%d", cfg.Board.Owner, cfg.Board.Project),
-		Repos:  orEmpty(cfg.Board.Repos),
+		Repos:  render.OrEmpty(cfg.Board.Repos),
 		Verbs:  []processVerb{},
 		Statuses: processStatuses{
-			Initial: orNull(cfg.Statuses.Initial), Final: orEmpty(cfg.Statuses.Final), Resolved: orEmpty(cfg.Statuses.Resolved),
+			Initial: render.OrNull(cfg.Statuses.Initial), Final: render.OrEmpty(cfg.Statuses.Final), Resolved: render.OrEmpty(cfg.Statuses.Resolved),
 		},
 	}
 	for _, v := range cfg.Verbs {
 		pv := processVerb{
-			Name: v.Name, When: v.When, From: orEmpty(v.From), To: orNull(v.To), Batch: v.Batch,
+			Name: v.Name, When: v.When, From: render.OrEmpty(v.From), To: render.OrNull(v.To), Batch: v.Batch,
 			release:  v.Batch && releaseLacks(v) == "",
 			Requires: []string{}, RequiresOneOf: []string{}, Optional: []string{}, Checks: []string{}, Effects: []string{},
 		}

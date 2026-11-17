@@ -224,7 +224,7 @@ func runLinks(cmd *cobra.Command, add bool, ref issue.Ref, bys []string, dryRun 
 	err = a.Client.Mutate(ctx, linksMutation(add, len(change)), vars, &data)
 	var done, missed []*issue.Linked
 	for i, l := range change {
-		if raw, ok := data[linkAlias(i)]; ok && !isJSONNull(raw) {
+		if raw, ok := data[linkAlias(i)]; ok && !graph.IsNull(raw) {
 			done = append(done, l)
 		} else {
 			missed = append(missed, l)
@@ -384,9 +384,4 @@ func joinRefs(links []*issue.Linked, repo issue.Repo) string {
 		return strings.Join(refs, "")
 	}
 	return strings.Join(refs[:len(refs)-1], ", ") + " and " + refs[len(refs)-1]
-}
-
-func isJSONNull(v json.RawMessage) bool {
-	s := strings.TrimSpace(string(v))
-	return s == "" || s == "null"
 }

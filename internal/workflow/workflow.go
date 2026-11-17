@@ -383,7 +383,7 @@ func CheckArgs(v config.Verb, a Args, issues ...string) error {
 	var what string
 	switch {
 	case len(missing) > 0:
-		what = fmt.Sprintf("%s needs %s", v.Name, join(missing, "and"))
+		what = fmt.Sprintf("%s needs %s", v.Name, render.JoinWords(missing, "and"))
 	case len(v.RequireOneOf) > 0 && !slices.ContainsFunc(v.RequireOneOf, func(arg string) bool { return a.value(arg) != "" }):
 		names := make([]string, len(v.RequireOneOf))
 		for i, arg := range v.RequireOneOf {
@@ -393,7 +393,7 @@ func CheckArgs(v config.Verb, a Args, issues ...string) error {
 		if len(names) == 1 {
 			what = fmt.Sprintf("%s needs %s", v.Name, names[0])
 		} else {
-			what = fmt.Sprintf("%s needs at least one of %s", v.Name, join(names, "or"))
+			what = fmt.Sprintf("%s needs at least one of %s", v.Name, render.JoinWords(names, "or"))
 		}
 	default:
 		return checkAssignee(v, a, issues)
@@ -408,15 +408,13 @@ func CheckArgs(v config.Verb, a Args, issues ...string) error {
 // GitHub login, as the config refuses one in assign.
 func checkAssignee(v config.Verb, a Args, issues []string) error {
 	login := a.value(config.ArgAssignee)
-	switch {
-	case !v.AssignArg || login == "" || login == config.Me || config.IsLogin(login):
+	if !v.AssignArg || login == "" {
 		return nil
-	case strings.HasPrefix(login, "@"):
-		return render.Usage("--%s %q: write the login without @, or %s for yourself", config.ArgAssignee, login, config.Me).
-			WithFix(Example(v, issues...))
 	}
-	return render.Usage("--%s %q is not a GitHub login; pass a login, or %s for yourself", config.ArgAssignee, login, config.Me).
-		WithFix(Example(v, issues...))
+	if err := config.AssigneeArgError(config.ArgAssignee, login); err != nil {
+		return err.WithFix(Example(v, issues...))
+	}
+	return nil
 }
 
 // Example returns a command that runs v on the issues, given as
@@ -451,14 +449,6 @@ func placeholder(arg string) string {
 }
 
 func flag(arg string) string { return "--" + arg }
-
-// join lists items as "a", "a or b", "a, b or c".
-func join(items []string, conj string) string {
-	if len(items) <= 1 {
-		return strings.Join(items, "")
-	}
-	return strings.Join(items[:len(items)-1], ", ") + " " + conj + " " + items[len(items)-1]
-}
 
 // Plan runs the checks of verb v against issue is and returns the effects to
 // apply. In order:
@@ -638,7 +628,7 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 		if noSession {
 			p.Warnings = append(p.Warnings, fmt.Sprintf(
 				"no agent session: %s is not set, so no comment is left",
-				join(e.Session.Env, "or")))
+				render.JoinWords(e.Session.Env, "or")))
 		}
 	case AlreadyPosted(is.Comments, Marker(v.Name, body)):
 		p.CommentPresent = true
@@ -647,7 +637,7 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 		if noSession {
 			p.Warnings = append(p.Warnings, fmt.Sprintf(
 				"no agent session: %s is not set, so the comment has no session link",
-				join(e.Session.Env, "or")))
+				render.JoinWords(e.Session.Env, "or")))
 		}
 	}
 	if v.Close != "" {
@@ -900,7 +890,7 @@ func (e *Engine) labelHint(v config.Verb, is Issue, labels []string, remove bool
 			if len(labels) > 1 {
 				what = strconv.Quote(name)
 			}
-			hints = append(hints, join(verbs, "or")+does+what)
+			hints = append(hints, render.JoinWords(verbs, "or")+does+what)
 		}
 	}
 	if len(hints) == 0 {
@@ -919,7 +909,7 @@ func labelsText(names []string, conj string) string {
 	if len(names) == 1 {
 		return "the label " + quoted[0]
 	}
-	return "the labels " + join(quoted, conj)
+	return "the labels " + render.JoinWords(quoted, conj)
 }
 
 // labelVerbs are the verbs of the config, other than v, that remove the
@@ -1080,7 +1070,7 @@ func (e *Engine) checkFrom(v config.Verb, is Issue) error {
 	// never with a command that works around the process.
 	return render.Denied("%s cannot %s %s%s; %s %s\n"+
 		"this is a process rule: ask the user how to proceed",
-		v.Name, action, name, from, allowed, join(v.From, "or")).WithCause(ErrFrom)
+		v.Name, action, name, from, allowed, render.JoinWords(v.From, "or")).WithCause(ErrFrom)
 }
 
 // ErrFrom is the cause of a refusal because the issue's status is not one

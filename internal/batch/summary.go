@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/Trum-ok/gh-dojo/internal/issue"
 	"github.com/Trum-ok/gh-dojo/internal/render"
@@ -29,8 +28,6 @@ func issueReason(err error) string {
 // error block cuts a line at 200 runes, "error: " included, and the
 // summary never relies on that cut, which would hide issues silently.
 const MaxSummaryRunes = 190
-
-func runes(s string) int { return utf8.RuneCountInString(s) }
 
 // issueRefRE matches an issue reference in a reason: "#9", "issue #9",
 // "acme/api#9".
@@ -143,7 +140,7 @@ func (b *Run) Summary(items []*Item, dry bool) error {
 	retryFix := ""
 	for _, g := range groups {
 		a, fix := g.next()
-		if a != "" && !slices.Contains(advice, a) && runes(strings.Join(append(advice, a), "; ")) <= MaxSummaryRunes {
+		if a != "" && !slices.Contains(advice, a) && render.RuneLen(strings.Join(append(advice, a), "; ")) <= MaxSummaryRunes {
 			advice = append(advice, a)
 		}
 		if out.Fix == "" {
@@ -169,7 +166,7 @@ func (b *Run) Summary(items []*Item, dry bool) error {
 		if !dry {
 			tail = ": it skips the issues done"
 		}
-		hint := lead + refsWithin(retry, MaxSummaryRunes-runes(lead+tail), b.def) + tail
+		hint := lead + refsWithin(retry, MaxSummaryRunes-render.RuneLen(lead+tail), b.def) + tail
 		if out.Code == render.ExitNetwork || out.Code == render.ExitPartial {
 			next = append([]string{hint}, next...) // the step of the code first
 		} else {
@@ -218,17 +215,17 @@ func summaryLine(head string, groups []*failGroup, def issue.Repo) string {
 	for i, g := range groups {
 		rest := groupRefs(groups[i+1:], def)
 		why := g.reason()
-		if entry := "; " + issue.RefNames(g.refs, def) + ": " + why; runes(line+entry) <= MaxSummaryRunes-tailRunes(rest, 1, def) {
+		if entry := "; " + issue.RefNames(g.refs, def) + ": " + why; render.RuneLen(line+entry) <= MaxSummaryRunes-tailRunes(rest, 1, def) {
 			line += entry
 			continue
 		}
 		if i > 0 {
-			return line + alsoNotDone(groupRefs(groups[i:], def), MaxSummaryRunes-runes(line), def)
+			return line + alsoNotDone(groupRefs(groups[i:], def), MaxSummaryRunes-render.RuneLen(line), def)
 		}
-		room := MaxSummaryRunes - runes(line) - tailRunes(rest, 3, def)
-		refs := refsWithin(g.refs, room-runes("; : "+why), def)
-		line += "; " + refs + ": " + clipRunes(why, max(room-runes("; "+refs+": "), 2))
-		return line + alsoNotDone(rest, MaxSummaryRunes-runes(line), def)
+		room := MaxSummaryRunes - render.RuneLen(line) - tailRunes(rest, 3, def)
+		refs := refsWithin(g.refs, room-render.RuneLen("; : "+why), def)
+		line += "; " + refs + ": " + render.Clip(why, max(room-render.RuneLen("; "+refs+": "), 2))
+		return line + alsoNotDone(rest, MaxSummaryRunes-render.RuneLen(line), def)
 	}
 	return line
 }
@@ -241,7 +238,7 @@ func alsoNotDone(refs []issue.Ref, budget int, def issue.Repo) string {
 	if len(refs) == 0 {
 		return ""
 	}
-	return alsoNotDonePrefix + refsWithin(refs, budget-runes(alsoNotDonePrefix), def)
+	return alsoNotDonePrefix + refsWithin(refs, budget-render.RuneLen(alsoNotDonePrefix), def)
 }
 
 // tailRunes is the length of alsoNotDone of refs naming up to k of them.
@@ -250,7 +247,7 @@ func tailRunes(refs []issue.Ref, k int, def issue.Repo) int {
 		return 0
 	}
 	k = min(k, len(refs))
-	return runes(alsoNotDonePrefix + refsText(refs[:k], len(refs)-k, def))
+	return render.RuneLen(alsoNotDonePrefix + refsText(refs[:k], len(refs)-k, def))
 }
 
 // groupRefs lists the issues of groups in order (see issue.CompareRefs).
@@ -267,7 +264,7 @@ func groupRefs(groups []*failGroup, def issue.Repo) []issue.Ref {
 // runes (at least one), the rest counted: "#4, #5 and 12 more".
 func refsWithin(refs []issue.Ref, budget int, def issue.Repo) string {
 	for k := min(len(refs), issue.MaxRefNames); k > 1; k-- {
-		if s := refsText(refs[:k], len(refs)-k, def); runes(s) <= budget {
+		if s := refsText(refs[:k], len(refs)-k, def); render.RuneLen(s) <= budget {
 			return s
 		}
 	}
@@ -319,12 +316,4 @@ func batchCode(failed []*Item, wrote bool) render.Code {
 		return c
 	}
 	return render.ExitPartial
-}
-
-// clipRunes cuts s to n runes, the last one an ellipsis.
-func clipRunes(s string, n int) string {
-	if runes(s) <= n {
-		return s
-	}
-	return strings.TrimRight(string([]rune(s)[:n-1]), " ") + "…"
 }

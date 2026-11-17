@@ -333,7 +333,7 @@ func labelVerbsHelp(cfg *config.Config, v config.Verb, labels []string, remove b
 			if len(labels) == 1 {
 				what = "it"
 			}
-			line("", "%s %s %s", joinWords(verbs, "or"), does, what)
+			line("", "%s %s %s", render.JoinWords(verbs, "or"), does, what)
 		}
 	}
 }

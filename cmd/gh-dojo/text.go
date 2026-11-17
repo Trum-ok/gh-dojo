@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/spf13/cobra"
@@ -60,14 +59,3 @@ func withMarker(text, marker string) string {
 	}
 	return fmt.Sprintf("%s\n\n%s", text, marker)
 }
-
-// joinWords lists words as "a", "a or b", "a, b or c".
-func joinWords(words []string, conj string) string {
-	if len(words) <= 1 {
-		return strings.Join(words, "")
-	}
-	return strings.Join(words[:len(words)-1], ", ") + " " + conj + " " + words[len(words)-1]
-}
-
-// runes is the length of s in runes.
-func runes(s string) int { return utf8.RuneCountInString(s) }

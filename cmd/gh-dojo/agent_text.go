@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"slices"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/Trum-ok/gh-dojo/internal/agent"
 	"github.com/Trum-ok/gh-dojo/internal/config"
@@ -64,7 +63,7 @@ func newAgentDoc(cfg *config.Config, root *cobra.Command, notes string) *agentDo
 // a longer one, with [agent] description, is an error.
 func (d *agentDoc) skill() (string, error) {
 	desc := d.description()
-	if n := utf8.RuneCountInString(desc); n > maxDescription {
+	if n := render.RuneLen(desc); n > maxDescription {
 		return "", render.Usage("%s: agent.description makes the skill's description %d characters, over %d",
 			d.cfg.Display, n, maxDescription).WithFix("shorten description in [agent] of " + d.cfg.Display)
 	}
@@ -293,7 +292,7 @@ func (d *agentDoc) facts(v config.Verb, pv processVerb) string {
 	only := commentOnly(v)
 	for i, e := range pv.Effects {
 		if strings.HasPrefix(e, `comments "`) {
-			pv.Effects[i] = `comments "` + singleLine(v.Comment) + `"`
+			pv.Effects[i] = `comments "` + render.SingleLine(v.Comment) + `"`
 			if only {
 				pv.Effects[i] = "comments only with --" + config.ArgComment
 			}
@@ -329,7 +328,7 @@ func (d *agentDoc) rules(v config.Verb) []string {
 		s := ""
 		for _, name := range labels {
 			if verbs := labelVerbs(d.cfg, v, name, remove); len(verbs) > 0 {
-				s += " " + joinWords(quoted(verbs), "or") + does + code(name) + "."
+				s += " " + render.JoinWords(quoted(verbs), "or") + does + code(name) + "."
 			}
 		}
 		return s

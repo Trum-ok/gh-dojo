@@ -302,7 +302,7 @@ func ReadNewContext(ctx context.Context, q graph.Querier, req NewRequest) (*NewC
 		nc.Links, nc.Parent = nc.Links[:n], nc.Links[n]
 	}
 	nc.Assignable = assignable
-	if raw, ok := data["viewer"]; ok && !isNull(raw) {
+	if raw, ok := data["viewer"]; ok && !graph.IsNull(raw) {
 		var v User
 		if err := json.Unmarshal(raw, &v); err != nil {
 			return nil, render.Internal("cannot decode GitHub's answer").WithCause(err)
@@ -312,11 +312,6 @@ func ReadNewContext(ctx context.Context, q graph.Querier, req NewRequest) (*NewC
 		}
 	}
 	return nc, nil
-}
-
-func isNull(v json.RawMessage) bool {
-	s := strings.TrimSpace(string(v))
-	return s == "" || s == "null"
 }
 
 // decodeAssignable decodes the n assignable-user lookups of a context
@@ -330,7 +325,7 @@ func decodeAssignable(raw json.RawMessage, n int) ([][]*User, error) {
 	out := make([][]*User, n)
 	for i := range n {
 		f, ok := fields[assigneeAlias(i)]
-		if !ok || isNull(f) {
+		if !ok || graph.IsNull(f) {
 			continue
 		}
 		var c struct {

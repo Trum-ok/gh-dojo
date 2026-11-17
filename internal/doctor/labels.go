@@ -170,7 +170,7 @@ func (c *labelsCheck) check(r *Report, cfg *config.Config, name string, f *label
 	for _, g := range c.groups {
 		n := 0
 		for _, l := range f.names {
-			if hasPrefixFold(l, g.prefix) {
+			if render.HasPrefixFold(l, g.prefix) {
 				n++
 			}
 		}
@@ -180,7 +180,7 @@ func (c *labelsCheck) check(r *Report, cfg *config.Config, name string, f *label
 			found = append(found, fmt.Sprintf("could not confirm %s (%s…): none among the first %d of %d labels or by search",
 				many, g.prefix, labelsPage, f.total))
 		case !f.complete:
-			found = append(found, fmt.Sprintf("at least %s (%s…)", plural(n, one, many), g.prefix))
+			found = append(found, fmt.Sprintf("at least %s (%s…)", render.Plural(n, one, many), g.prefix))
 		case n == 0 && cfg.FromPreset(g.key) != "":
 			found = append(found, fmt.Sprintf("no %s (%s…) yet: new --%s fails until one exists", many, g.prefix, g.flag))
 		case n == 0:
@@ -188,7 +188,7 @@ func (c *labelsCheck) check(r *Report, cfg *config.Config, name string, f *label
 				g.prefix+"<name>", name, g.key, cfg.Display),
 				"%s: no label starts with %s %q, so gh dojo new --%s finds nothing", name, g.key, g.prefix, g.flag)
 		default:
-			found = append(found, fmt.Sprintf("%s (%s…)", plural(n, one, many), g.prefix))
+			found = append(found, fmt.Sprintf("%s (%s…)", render.Plural(n, one, many), g.prefix))
 		}
 	}
 	if len(found) > 0 {
@@ -205,10 +205,4 @@ func spelling(name string, names []string) string {
 		}
 	}
 	return ""
-}
-
-// hasPrefixFold reports whether s starts with prefix regardless of case,
-// byte by byte.
-func hasPrefixFold(s, prefix string) bool {
-	return len(s) >= len(prefix) && strings.EqualFold(s[:len(prefix)], prefix)
 }

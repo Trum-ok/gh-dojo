@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"unicode/utf8"
 
 	"github.com/cli/go-gh/v2/pkg/api"
 
@@ -435,7 +434,7 @@ func checkSummaryCounts(t *testing.T, out string, lo, hi int) {
 	line, _, _ = strings.Cut(line, "\n")
 	// The error block cuts a line at 200 runes; the summary stays within
 	// batch.MaxSummaryRunes, so the cut never hides an issue.
-	if utf8.RuneCountInString(line) > batch.MaxSummaryRunes {
+	if render.RuneLen(line) > batch.MaxSummaryRunes {
 		t.Errorf("summary line over %d runes, the error block may cut it:\n%s", batch.MaxSummaryRunes, line)
 	}
 	named := map[int]bool{}

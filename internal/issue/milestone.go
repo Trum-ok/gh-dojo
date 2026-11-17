@@ -100,7 +100,7 @@ func MatchMilestone(title string, open []OpenMilestone, repo Repo) (*OpenMilesto
 			return &open[i], nil
 		case fold == nil && strings.EqualFold(t, title):
 			fold = &open[i]
-		case hasPrefixFold(t, title):
+		case render.HasPrefixFold(t, title):
 			prefix = append(prefix, i)
 		}
 	}
@@ -130,11 +130,4 @@ func MatchMilestone(title string, open []OpenMilestone, repo Repo) (*OpenMilesto
 		msg += fmt.Sprintf("; did you mean %q?", s)
 	}
 	return nil, render.Usage("%s", msg).WithAllowed(titles...).WithFix(create)
-}
-
-// hasPrefixFold reports whether s starts with prefix regardless of case,
-// rune by rune, as strings.EqualFold compares.
-func hasPrefixFold(s, prefix string) bool {
-	rs, n := []rune(s), len([]rune(prefix))
-	return len(rs) >= n && strings.EqualFold(string(rs[:n]), prefix)
 }

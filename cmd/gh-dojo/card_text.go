@@ -7,7 +7,6 @@ import (
 	"slices"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/Trum-ok/gh-dojo/internal/graph"
 	"github.com/Trum-ok/gh-dojo/internal/issue"
@@ -47,13 +46,6 @@ var cardMarkerRE = regexp.MustCompile(`(?:^|\n\n)<!-- gh-dojo:[a-z][a-z0-9-]*:[0
 
 // fenceRE matches a line that opens or closes a fenced code block.
 var fenceRE = regexp.MustCompile("(?m)^ {0,3}(```|~~~)")
-
-// bidiControls drops the Unicode embedding, override and isolate controls
-// (U+202A–202E, U+2066–2069), which make text read other than it is.
-var bidiControls = strings.NewReplacer(
-	"\u202a", "", "\u202b", "", "\u202c", "", "\u202d", "", "\u202e", "",
-	"\u2066", "", "\u2067", "", "\u2068", "", "\u2069", "",
-)
 
 // cardView renders cards with show's flags.
 type cardView struct {
@@ -110,7 +102,7 @@ func (v cardView) card(c *issue.Card) string {
 	var b strings.Builder
 	line := func(format string, a ...any) { fmt.Fprintf(&b, format+"\n", a...) }
 
-	line("%s %s", c.Ref().String(v.def), singleLine(c.Title))
+	line("%s %s", c.Ref().String(v.def), render.SingleLine(c.Title))
 	line("state: %s, opened %s by %s", cardState(c), cardDay(c.CreatedAt), cardLogin(c.Author))
 	line("board: %s", v.board(c, true))
 	if v.sprintField != "" {
@@ -158,7 +150,7 @@ func (v cardView) card(c *issue.Card) string {
 // A fourth line notes a partly hidden card.
 func (v cardView) brief(c *issue.Card) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "%s %s\n", c.Ref().String(v.def), singleLine(c.Title))
+	fmt.Fprintf(&b, "%s %s\n", c.Ref().String(v.def), render.SingleLine(c.Title))
 	fmt.Fprintf(&b, "%s · %s", cardState(c), v.board(c, false))
 	if v.sprintField != "" {
 		fmt.Fprintf(&b, " · sprint: %s", v.sprint(c))
@@ -281,7 +273,7 @@ func (v cardView) board(c *issue.Card, fields bool) string {
 	if fields {
 		for _, val := range c.Item.Values {
 			if val.Field != v.statusField && !v.isSprint(val) {
-				parts = append(parts, singleLine(val.Field)+": "+singleLine(val.Text))
+				parts = append(parts, render.SingleLine(val.Field)+": "+render.SingleLine(val.Text))
 			}
 		}
 		if c.Item.ValuesTruncated {
@@ -320,7 +312,7 @@ func cardNames(p graph.Page[string]) string {
 	}
 	names := make([]string, len(p.Nodes))
 	for i, n := range p.Nodes {
-		names[i] = singleLine(n)
+		names[i] = render.SingleLine(n)
 	}
 	s := strings.Join(names, ", ")
 	if note := render.Shown(len(p.Nodes), p.TotalCount, ""); note != "" {
@@ -334,7 +326,7 @@ func cardMilestone(m *issue.Milestone) string {
 	if m == nil {
 		return "none"
 	}
-	s := singleLine(m.Title)
+	s := render.SingleLine(m.Title)
 	if !m.DueOn.IsZero() {
 		s += " (due " + cardDay(m.DueOn) + ")"
 	}
@@ -418,7 +410,7 @@ func (v cardView) parent(c *issue.Card) string {
 	if !l.Closed() {
 		about = linkPlace(*l)
 	}
-	return linkRef(c, *l, v.def) + " " + clipRunes(singleLine(l.Title), maxLinkTitleRunes) + " (" + singleLine(about) + ")"
+	return linkRef(c, *l, v.def) + " " + render.Clip(render.SingleLine(l.Title), maxLinkTitleRunes) + " (" + render.SingleLine(about) + ")"
 }
 
 // writeSubIssues writes the issue's sub-issues, one per line, as
@@ -509,8 +501,8 @@ func writeLinks(b *strings.Builder, label string, p graph.Page[issue.Link], coun
 // writeLink writes a linked issue, named ref, on its own line, with what
 // to say about it (its board status, closed) in parentheses unless empty.
 func writeLink(b *strings.Builder, l issue.Link, ref, about string) {
-	fmt.Fprintf(b, "  %s %s", ref, clipRunes(singleLine(l.Title), maxLinkTitleRunes))
-	if about = singleLine(about); about != "" {
+	fmt.Fprintf(b, "  %s %s", ref, render.Clip(render.SingleLine(l.Title), maxLinkTitleRunes))
+	if about = render.SingleLine(about); about != "" {
 		fmt.Fprintf(b, " (%s)", about)
 	}
 	b.WriteString("\n")
@@ -567,7 +559,7 @@ func writeHistory(b *strings.Builder, c *issue.Card, full bool) {
 		last = name(h.To)
 		fmt.Fprintf(&chain, " → %s (%s, %s)", last, who, cardDay(h.At))
 	}
-	fmt.Fprintf(b, "%s: %s\n", head, singleLine(chain.String()))
+	fmt.Fprintf(b, "%s: %s\n", head, render.SingleLine(chain.String()))
 }
 
 // writeComments writes the last v.comments comments, oldest first.
@@ -616,7 +608,7 @@ func (v cardView) shownComments(c *issue.Card) (shown []issue.Comment, bodies []
 		if bodies[i] == "" {
 			bodies[i] = "(empty)"
 		}
-		lengths[i] = utf8.RuneCountInString(bodies[i])
+		lengths[i] = render.RuneLen(bodies[i])
 	}
 	return shown, bodies, v.commentLimit(lengths)
 }
@@ -645,7 +637,7 @@ func (v cardView) commentLimit(lengths []int) int {
 // fold cuts s to at most limit runes (0: no limit), preferring a line
 // end, and returns the note saying so ("" when s is whole).
 func fold(s string, limit int) (string, string) {
-	total := utf8.RuneCountInString(s)
+	total := render.RuneLen(s)
 	if limit <= 0 || total <= limit {
 		return s, ""
 	}
@@ -657,7 +649,7 @@ func fold(s string, limit int) (string, string) {
 	}
 	text := strings.TrimRight(string(cut), " \t\n")
 	return text + " …", fmt.Sprintf("[cut: %d of %d characters shown; --full prints all]",
-		utf8.RuneCountInString(text), total)
+		render.RuneLen(text), total)
 }
 
 func lastRune(rs []rune, r rune) int {
@@ -669,20 +661,12 @@ func lastRune(rs []rune, r rune) int {
 	return -1
 }
 
-// sanitize makes user text safe to print: every line end becomes \n
-// (a lone \r too) and bidi controls are dropped.
-func sanitize(s string) string {
-	s = strings.ReplaceAll(s, "\r\n", "\n")
-	s = strings.ReplaceAll(s, "\r", "\n")
-	return bidiControls.Replace(s)
-}
-
 // cleanText sanitizes a description or comment and trims it. With marker
 // set (descriptions, and comments the viewer wrote: the only ones gh-dojo
 // posts) it also drops the gh-dojo marker that ends the text, unless the
 // marker is inside a code block left open.
 func cleanText(s string, marker bool) string {
-	s = sanitize(s)
+	s = render.Sanitize(s)
 	if loc := cardMarkerRE.FindStringIndex(s); marker && loc != nil {
 		if len(fenceRE.FindAllStringIndex(s[:loc[0]], -1))%2 == 0 {
 			s = s[:loc[0]]
@@ -701,16 +685,6 @@ func indent(s string) string {
 		}
 	}
 	return strings.Join(lines, "\n")
-}
-
-func singleLine(s string) string { return strings.Join(strings.Fields(sanitize(s)), " ") }
-
-// clip cuts s to n runes, ending with "…" when cut.
-func clipRunes(s string, n int) string {
-	if utf8.RuneCountInString(s) <= n {
-		return s
-	}
-	return strings.TrimRight(string([]rune(s)[:n-1]), " ") + "…"
 }
 
 // login names an account; a deleted one is "ghost", as on GitHub.

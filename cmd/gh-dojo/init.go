@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
-	"unicode"
 
 	"github.com/spf13/cobra"
 
@@ -155,7 +154,7 @@ func listInitProjects(cmd *cobra.Command, a *App, o initOpts, current string) er
 	}
 	res := initProjects{Owner: ps.Owner, OwnerType: kind, Projects: []initProject{}}
 	for _, p := range ps.Projects {
-		res.Projects = append(res.Projects, initProject{Number: p.Number, Title: oneLineText(p.Title), Items: p.Items, Closed: p.Closed})
+		res.Projects = append(res.Projects, initProject{Number: p.Number, Title: render.SingleLine(p.Title), Items: p.Items, Closed: p.Closed})
 	}
 	noun := "projects"
 	if len(ps.Projects) == 1 {
@@ -290,7 +289,7 @@ func writeInitConfig(cmd *cobra.Command, a *App, o initOpts, repo string) error 
 		effects = append(effects, "matches the board")
 	}
 	res := initWritten{
-		Path: display, Written: !o.dryRun, Board: s.Ref().String(), BoardTitle: oneLineText(s.Title),
+		Path: display, Written: !o.dryRun, Board: s.Ref().String(), BoardTitle: render.SingleLine(s.Title),
 		Preset: o.preset, Repos: []string{}, Matches: len(problems) == 0, Problems: []initProblemJSON{},
 		Content: string(data),
 	}
@@ -405,21 +404,10 @@ func initConfig(preset, repo string, s *board.Schema) ([]byte, error) {
 		"Preset":  preset,
 		"Owner":   s.Owner,
 		"Project": s.Number,
-		"Title":   oneLineText(s.Title),
+		"Title":   render.SingleLine(s.Title),
 		"Repo":    repo,
 	})
 	return b.Bytes(), err
-}
-
-// oneLineText makes text safe for one line of output or a TOML comment:
-// control characters become spaces, runs of spaces one.
-func oneLineText(text string) string {
-	return strings.Join(strings.Fields(strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) {
-			return ' '
-		}
-		return r
-	}, text)), " ")
 }
 
 // initProblem is one mismatch between the written config and the board.
