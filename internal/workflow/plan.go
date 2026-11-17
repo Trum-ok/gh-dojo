@@ -490,10 +490,10 @@ func Marker(verb, body string) string {
 	return fmt.Sprintf("<!-- gh-dojo:%s:%s -->", verb, hex.EncodeToString(sum[:4]))
 }
 
-// LastMarker returns the marker of the most recent gh-dojo comment, of any
+// lastMarker returns the marker of the most recent gh-dojo comment, of any
 // verb; comments are oldest first. Only comments the viewer wrote count, and
 // only a marker that ends the comment (see markerRE).
-func LastMarker(comments []Comment) (string, bool) {
+func lastMarker(comments []Comment) (string, bool) {
 	for i := len(comments) - 1; i >= 0; i-- {
 		if !comments[i].ViewerDidAuthor {
 			continue
@@ -511,6 +511,6 @@ func LastMarker(comments []Comment) (string, bool) {
 // comments: after start, wait and start again, the second start's comment is
 // posted even if it equals the first.
 func AlreadyPosted(comments []Comment, marker string) bool {
-	last, ok := LastMarker(comments)
+	last, ok := lastMarker(comments)
 	return ok && last == marker
 }

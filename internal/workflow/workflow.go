@@ -93,7 +93,7 @@ type Issue struct {
 	// Comments are the issue's latest comments, oldest first (GraphQL
 	// comments(last: N) returns them in this order), each with its body
 	// verbatim and ViewerDidAuthor. They are only searched for gh-dojo
-	// markers (see LastMarker): the most recent marker must be in the window
+	// markers (see lastMarker): the most recent marker must be in the window
 	// for a retried verb not to post its comment twice. The last 20 comments
 	// are enough for an immediate retry; a marker outside the window only
 	// means the comment is posted again.
@@ -325,9 +325,9 @@ func New(c *config.Config) *Engine {
 // byNumberRE matches an issue reference given to --by: "12" or "#12".
 var byNumberRE = regexp.MustCompile(`^#?([1-9][0-9]*)$`)
 
-// NormalizeBy turns an issue number given to --by ("12" or "#12") into "#12",
+// normalizeBy turns an issue number given to --by ("12" or "#12") into "#12",
 // which GitHub links; anything else is free text and only trimmed.
-func NormalizeBy(s string) string {
+func normalizeBy(s string) string {
 	s = strings.TrimSpace(s)
 	if m := byNumberRE.FindStringSubmatch(s); m != nil {
 		return "#" + m[1]
@@ -577,7 +577,7 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 		return nil, err
 	}
 
-	by := NormalizeBy(a.By)
+	by := normalizeBy(a.By)
 	if is.DefaultRepo != "" && byNumberRE.MatchString(strings.TrimSpace(a.By)) {
 		by = is.DefaultRepo + by // "#12" would name an issue of the issue's own repository
 	}
@@ -995,7 +995,7 @@ func (p *Plan) checkLinks(v config.Verb, mode, what string, unresolved []Blocker
 // lands on an issue the verb would not close.
 //
 // The marker is looked for in the viewer's own comments only (see
-// LastMarker): with the reason not read, another user's repeat of a verb
+// lastMarker): with the reason not read, another user's repeat of a verb
 // someone else ran is no repeat and is refused. That is accepted: GitHub
 // reads the reason of nearly every closed issue, and the refusal asks the
 // user.
@@ -1006,7 +1006,7 @@ func closedRepeat(v config.Verb, is Issue) bool {
 	if is.StateReason != "" {
 		return is.StateReason == v.Close
 	}
-	last, ok := LastMarker(is.Comments) // see Marker
+	last, ok := lastMarker(is.Comments) // see Marker
 	return ok && strings.HasPrefix(last, "<!-- gh-dojo:"+v.Name+":")
 }
 

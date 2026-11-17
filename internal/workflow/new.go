@@ -15,8 +15,8 @@ import (
 // any, and PlanNew: what creating the issue, or finishing the one found,
 // takes. An executor applies the plan, and a dry run shows it.
 
-// NewMarkerVerb names new's marker: <!-- gh-dojo:new:<hash> -->.
-const NewMarkerVerb = "new"
+// newMarkerVerb names new's marker: <!-- gh-dojo:new:<hash> -->.
+const newMarkerVerb = "new"
 
 // The flags of new that its errors name.
 const (
@@ -40,7 +40,7 @@ func NewDedupKey(title string) string {
 // NewMarker is the hidden marker that ends the body of the issue new
 // creates with title: a repeat finds the issue by it, so filing the same
 // title again (ignoring case and spacing) resumes it.
-func NewMarker(title string) string { return Marker(NewMarkerVerb, NewDedupKey(title)) }
+func NewMarker(title string) string { return Marker(newMarkerVerb, NewDedupKey(title)) }
 
 // NewLabels are the label flags of new: --type, --area and --label, as
 // given.
@@ -291,9 +291,8 @@ type NewPlan struct {
 	// it to the board.
 	Resumed bool
 
-	Labels        []string // labels to add
-	LabelsInPlace []string // labels the issue found has already
-	Milestone     string   // the milestone to set, "" for none
+	Labels    []string // labels to add, but those the issue found has already
+	Milestone string   // the milestone to set, "" for none
 	// MilestoneKept is the --milestone not applied: the issue found has
 	// another milestone, which stays.
 	MilestoneKept string
@@ -336,9 +335,7 @@ func PlanNew(cfg *config.Config, req NewRequest, found *NewFound) *NewPlan {
 		return p
 	}
 	for _, l := range req.Labels {
-		if slices.ContainsFunc(found.Labels, func(n string) bool { return strings.EqualFold(n, l) }) {
-			p.LabelsInPlace = append(p.LabelsInPlace, l)
-		} else {
+		if !slices.ContainsFunc(found.Labels, func(n string) bool { return strings.EqualFold(n, l) }) {
 			p.Labels = append(p.Labels, l)
 		}
 	}
@@ -351,7 +348,7 @@ func PlanNew(cfg *config.Config, req NewRequest, found *NewFound) *NewPlan {
 		p.MilestoneKept = req.Milestone
 		p.Warnings = append(p.Warnings, fmt.Sprintf(
 			"#%d already has milestone %q; kept it, --milestone %q not applied (to change it: %s)",
-			found.Number, found.Milestone, req.Milestone, MilestoneFix(cfg, found, req.Repo, req.Milestone)))
+			found.Number, found.Milestone, req.Milestone, milestoneFix(cfg, found, req.Repo, req.Milestone)))
 	}
 	if par := req.Parent; par != nil {
 		switch {
@@ -387,11 +384,11 @@ func PlanNew(cfg *config.Config, req NewRequest, found *NewFound) *NewPlan {
 	return p
 }
 
-// MilestoneFix is the command that puts the issue found, of repo
+// milestoneFix is the command that puts the issue found, of repo
 // ("owner/name"), in the milestone title: a verb that only sets the
 // --milestone milestone (see OnlySetsMilestone) and starts from the
 // issue's status (statuses.initial without one), else gh issue edit.
-func MilestoneFix(cfg *config.Config, found *NewFound, repo, title string) string {
+func milestoneFix(cfg *config.Config, found *NewFound, repo, title string) string {
 	for _, v := range cfg.Verbs {
 		if OnlySetsMilestone(v) && v.StartsFrom(found.Status, cfg.Statuses.Initial) {
 			return fmt.Sprintf("gh dojo %s %s --%s %q", v.Name, found.Arg, config.ArgMilestone, title)

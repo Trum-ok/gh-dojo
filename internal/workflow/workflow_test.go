@@ -45,7 +45,7 @@ from = ["Backlog"]
 require = ["comment", "by"]
 comment = "Pairing with {by}: {comment}"
 
-# The spec's drop, as is: --comment is posted as the comment.
+# drop has no comment template: --comment is posted as the comment.
 [verbs.drop]
 when = "The issue is not needed or a duplicate"
 close = "not_planned"
@@ -821,8 +821,8 @@ func TestNormalizeBy(t *testing.T) {
 		"12 and 13":    "12 and 13",
 		"":             "",
 	} {
-		if got := NormalizeBy(in); got != want {
-			t.Errorf("NormalizeBy(%q) = %q, want %q", in, got, want)
+		if got := normalizeBy(in); got != want {
+			t.Errorf("normalizeBy(%q) = %q, want %q", in, got, want)
 		}
 	}
 }
@@ -853,9 +853,9 @@ func TestMarker(t *testing.T) {
 		{"two markers count by the last", []Comment{mine(text + "\n\n" + Marker("ready", "y"))}, Marker("ready", "y")},
 		{"no comments", nil, ""},
 	} {
-		got, ok := LastMarker(tt.comments)
+		got, ok := lastMarker(tt.comments)
 		if got != tt.want || ok != (tt.want != "") {
-			t.Errorf("%s: LastMarker = %q, %v; want %q", tt.name, got, ok, tt.want)
+			t.Errorf("%s: lastMarker = %q, %v; want %q", tt.name, got, ok, tt.want)
 		}
 	}
 }
