@@ -225,15 +225,9 @@ func (f SetFields) each(word func(FieldChange) string) []string {
 func (c FieldChange) describe() string { return "field: " + c.effect() }
 func (c FieldChange) effect() string   { return c.Field + " " + valueTransition(c.From, c.To) }
 
-// valueTransition is like render.Transition for a field value: an empty
-// value reads "none".
-func valueTransition(from, to string) string {
-	from, to = orNone(from), orNone(to)
-	if from == to {
-		return to + " (unchanged)"
-	}
-	return from + " → " + to
-}
+// valueTransition is render.Transition for a field value: an empty value
+// reads "none", not "no status" (render.Transition takes no word for it).
+func valueTransition(from, to string) string { return render.Transition(orNone(from), orNone(to)) }
 
 // orNone is a field value as output says it: "none" when empty.
 func orNone(value string) string {
@@ -273,7 +267,7 @@ func (c AddComment) Text() string { return c.Body + "\n\n" + c.Marker }
 // Wording shared by the dry run, the confirmation line and the from check.
 const (
 	noChanges  = "no changes"       // an empty list of effects
-	noStatus   = "no status"        // as render.Transition says it
+	noStatus   = "no status"        // as render.Transition says it; render exports no constant for it
 	notOnBoard = "not on the board" // the "status" of an issue not on the board
 )
 

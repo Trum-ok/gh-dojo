@@ -392,12 +392,8 @@ func PlanNew(cfg *config.Config, req NewRequest, found *NewFound) *NewPlan {
 // --milestone milestone (see OnlySetsMilestone) and starts from the
 // issue's status (statuses.initial without one), else gh issue edit.
 func MilestoneFix(cfg *config.Config, found *NewFound, repo, title string) string {
-	status := found.Status
-	if status == "" {
-		status = cfg.Statuses.Initial
-	}
 	for _, v := range cfg.Verbs {
-		if OnlySetsMilestone(v) && (len(v.From) == 0 || slices.Contains(v.From, status)) {
+		if OnlySetsMilestone(v) && v.StartsFrom(found.Status, cfg.Statuses.Initial) {
 			return fmt.Sprintf("gh dojo %s %s --%s %q", v.Name, found.Arg, config.ArgMilestone, title)
 		}
 	}

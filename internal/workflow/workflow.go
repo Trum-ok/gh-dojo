@@ -837,13 +837,9 @@ func (e *Engine) checkLabels(v config.Verb, is Issue) error {
 		}
 		return ""
 	}
-	action := "move"
-	if v.To == "" {
-		action = "run on"
-	}
 	refuse := func(format string, a ...any) error {
 		return render.Denied("%s cannot %s %s"+format+"\n"+
-			"this is a process rule: ask the user how to proceed", append([]any{v.Name, action, is.Name()}, a...)...)
+			"this is a process rule: ask the user how to proceed", append([]any{v.Name, action(v), is.Name()}, a...)...)
 	}
 	var missing, found, unknown []string
 	for _, name := range v.FromLabels {
@@ -914,14 +910,10 @@ func labelsText(names []string, conj string) string {
 
 // labelVerbs are the verbs of the config, other than v, that remove the
 // label name (remove true) or add it, and can run on is: from its status
-// (their from, as checkFrom reads it), and on a closed issue only those
-// that run on one (runsOnClosed), without closing it. They are the
-// process's way to take the label off, or put it on, so that v can run.
+// (config.Verb.StartsFrom), and on a closed issue only those that run on
+// one (runsOnClosed), without closing it. They are the process's way to
+// take the label off, or put it on, so that v can run.
 func (e *Engine) labelVerbs(v config.Verb, is Issue, name string, remove bool) []string {
-	current := is.Status
-	if current == "" {
-		current = e.Initial
-	}
 	var out []string
 	for _, o := range e.Verbs {
 		labels := o.AddLabels
@@ -931,7 +923,7 @@ func (e *Engine) labelVerbs(v config.Verb, is Issue, name string, remove bool) [
 		has := slices.ContainsFunc(labels, func(l string) bool { return strings.EqualFold(l, name) })
 		switch {
 		case o.Name == v.Name, !has, o.Close != "",
-			len(o.From) > 0 && !slices.Contains(o.From, current),
+			!o.StartsFrom(is.Status, e.Initial),
 			is.Closed && !e.runsOnClosed(o):
 			continue
 		}
@@ -988,12 +980,8 @@ func (p *Plan) checkLinks(v config.Verb, mode, what string, unresolved []Blocker
 		p.Warnings = append(p.Warnings, fmt.Sprintf("%s has unresolved %s: %s", is.Name(), what, list))
 		return nil
 	}
-	action := "move"
-	if v.To == "" {
-		action = "run on"
-	}
 	return render.Denied("%s cannot %s %s while it has unresolved %s: %s\n"+
-		"this is a process rule: ask the user how to proceed", v.Name, action, is.Name(), what, list)
+		"this is a process rule: ask the user how to proceed", v.Name, action(v), is.Name(), what, list)
 }
 
 // closedRepeat reports whether v, a verb without a target that closes the
@@ -1038,17 +1026,14 @@ func closedText(is Issue) string {
 //	ready cannot move #42 from Backlog; it starts only from In progress or Waiting
 //	hold cannot run on #42 in Backlog; it runs only in In progress or Changes requested
 func (e *Engine) checkFrom(v config.Verb, is Issue) error {
-	current := is.Status
-	if current == "" {
-		current = e.Initial
-	}
-	if len(v.From) == 0 || slices.Contains(v.From, current) {
+	if v.StartsFrom(is.Status, e.Initial) {
 		return nil
 	}
+	current := cmp.Or(is.Status, e.Initial)
 	// The same words as the dry run and confirmation line use.
-	action, in, allowed := "move", " from ", "it starts only from"
+	in, allowed := " from ", "it starts only from"
 	if v.To == "" {
-		action, in, allowed = "run on", " in ", "it runs only in"
+		in, allowed = " in ", "it runs only in"
 	}
 	var from string
 	switch {
@@ -1070,7 +1055,16 @@ func (e *Engine) checkFrom(v config.Verb, is Issue) error {
 	// never with a command that works around the process.
 	return render.Denied("%s cannot %s %s%s; %s %s\n"+
 		"this is a process rule: ask the user how to proceed",
-		v.Name, action, name, from, allowed, render.JoinWords(v.From, "or")).WithCause(ErrFrom)
+		v.Name, action(v), name, from, allowed, render.JoinWords(v.From, "or")).WithCause(ErrFrom)
+}
+
+// action is what a refusal of v says it does to the issue: "move" for a
+// verb with a target status, "run on" for one without.
+func action(v config.Verb) string {
+	if v.To == "" {
+		return "run on"
+	}
+	return "move"
 }
 
 // ErrFrom is the cause of a refusal because the issue's status is not one

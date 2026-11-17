@@ -9,6 +9,7 @@
 package config
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -382,6 +383,13 @@ func (v Verb) ChecksLabels() bool { return len(v.FromLabels)+len(v.RefuseLabels)
 // no sprint to clear.
 func (v Verb) OnlyClearsSprint() bool {
 	return v.Iteration == IterationClear && v.To == "" && len(v.Fields) == 0
+}
+
+// StartsFrom reports whether the verb runs on an issue in status: its from
+// is empty or lists the status. An issue with no status, or not on the
+// board (status ""), is in initial, statuses.initial.
+func (v Verb) StartsFrom(status, initial string) bool {
+	return len(v.From) == 0 || slices.Contains(v.From, cmp.Or(status, initial))
 }
 
 // verbEffects are a verb's effects by key, in documentation order, each
