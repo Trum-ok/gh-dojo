@@ -37,6 +37,9 @@ type githubBackend struct {
 	// once per repository, not once per issue; so are the open milestones
 	// of a repository with more than one card query reads ("milestones").
 	allowed map[string]readValue
+	// comments is how many of the latest comments a card is read with;
+	// 0 is issue.DefaultComments. A verb's --comments raises it.
+	comments int
 }
 
 // readValue is one read's answer, or why it failed.
@@ -124,7 +127,7 @@ func (b *githubBackend) ReadIssues(ctx context.Context, v config.Verb, refs []is
 	if len(read) == 0 {
 		return out, nil
 	}
-	results, err := b.app.cards(ctx, read, 0, lookup)
+	results, err := b.app.cards(ctx, read, b.comments, lookup)
 	if err != nil && len(results) == 0 {
 		return nil, err
 	}

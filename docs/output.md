@@ -217,9 +217,9 @@ The schemas, by command, after `schema_version` and `error`:
 - verbs: `verb`, `default_repo` (where a bare number is), `dry_run`,
   `issues`: `[{number, repo, title, outcome, planned, applied, in_place,
   needs_yes, warnings, error, card}]` in argument order (`title` `null`
-  when the issue was not read; `card`: with `--show`, the issue as read
-  before the verb, a card as in `show`, else `null`), `summary`: `{total,
-  done, written, failed, not_attempted}`.
+  when the issue was not read; `card`: with `--show`, `--comments` or
+  `--full`, the issue as read before the verb, a card as in `show`, else
+  `null`), `summary`: `{total, done, written, failed, not_attempted}`.
 - `release`: as verbs, with
   - `release`: `{ref, commit, since, since_picked, since_commit, compared,
     commits}` (`since_picked`: the previous version tag, not `--since`;

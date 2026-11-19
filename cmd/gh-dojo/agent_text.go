@@ -525,7 +525,7 @@ func (d *agentDoc) reading(w *mdWriter) {
 			"status history, description and the last "+strconv.Itoa(defaultShownComments)+" comments; a line left "+
 			"out means none. Several numbers, `gh dojo show 12 13`, print three lines per issue: read the one you "+
 			"take alone. `--comments all` prints the whole thread (up to "+strconv.Itoa(issue.MaxComments)+"), "+
-			"`--full` everything uncut.",
+			"`--full` everything uncut; a verb takes both too and prints the card with them, as with `--show`.",
 		"`gh dojo list`: an overview of the board, when the user asks for one: the open issues grouped by status; "+
 			"closed issues and final statuses are hidden and counted"+d.foldedList()+". Filters: "+listFilters+
 			", `--all`, `--limit 100`.")

@@ -73,8 +73,38 @@ func TestVerbShowJSON(t *testing.T) {
 }
 
 // TestVerbShowSeveral: --show is for one issue; a batch of several is
-// refused before anything is read.
+// refused before anything is read, naming the flag given.
 func TestVerbShowSeveral(t *testing.T) {
 	srv, before := withWarmVerbApp(t)
-	checkRuns(t, srv, before, runs{[]string{"done", "3", "4", "--show"}, render.ExitUsage, 0, "done_show_several"})
+	checkRuns(t, srv, before,
+		runs{[]string{"done", "3", "4", "--show"}, render.ExitUsage, 0, "done_show_several"},
+		runs{[]string{"done", "3", "4", "--full"}, render.ExitUsage, 0, "done_full_several"},
+	)
+}
+
+// TestVerbShowFolding: --full and --comments fold the card as show's flags
+// do and imply --show (#95); --comments all reads the last 100 comments in
+// the verb's own request, so the card costs no request more.
+func TestVerbShowFolding(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		fixture string
+		args    []string
+	}{
+		{"start_full_dry_run", "card_3_start", []string{"start", "3", "--full", "--dry-run"}},
+		{"start_comments_all_dry_run", "card_3_start_comments_all", []string{"start", "3", "--comments", "all", "--dry-run"}},
+		{"start_show_comments_dry_run", "card_3_start", []string{"start", "3", "--show", "--comments", "2", "--dry-run"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			srv, before := withWarmVerbApp(t, verbFixture(tt.fixture))
+			checkRuns(t, srv, before, runs{tt.args, render.ExitOK, 1, tt.name})
+		})
+	}
+}
+
+// TestVerbCommentsNotComment: --comments takes a count; text there is
+// most likely meant for --comment, and the error says so.
+func TestVerbCommentsNotComment(t *testing.T) {
+	srv, before := withWarmVerbApp(t)
+	checkRuns(t, srv, before, runs{[]string{"start", "3", "--comments", "Taking it"}, render.ExitUsage, 0, "start_comments_text"})
 }

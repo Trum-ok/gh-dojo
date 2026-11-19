@@ -21,7 +21,9 @@ Usage:
 
 Flags:
       --comment string   text for {comment} in the comment
+      --comments N|all   how many of the latest comments the card prints, or all (up to 100); implies --show (default 5)
       --dry-run          print the plan without changing anything
+      --full             print the card's description and comments without cutting them; implies --show
   -h, --help             help for done
       --show             also print the issue's card, as gh dojo show N does, from the same read
 

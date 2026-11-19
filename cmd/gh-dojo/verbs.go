@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -107,9 +108,10 @@ func newVerbCmds() ([]*cobra.Command, error) {
 
 func newVerbCmd(cfg *config.Config, v config.Verb) *cobra.Command {
 	var (
-		args         workflow.Args
-		dryRun, show bool
+		args               workflow.Args
+		dryRun, show, full bool
 	)
+	comments := verbCommentsFlag{commentsFlag(defaultShownComments)}
 	cmd := &cobra.Command{
 		GroupID: verbsGroup.ID,
 		Use:     v.Name + " <N>...",
@@ -123,10 +125,17 @@ func newVerbCmd(cfg *config.Config, v config.Verb) *cobra.Command {
 			args.HasMilestone = cmd.Flags().Changed(config.ArgMilestone)
 			args.HasOf = cmd.Flags().Changed(config.ArgOf)
 			refs := argRefs(posArgs, issue.Repo{}) // validated by issueArgs
-			if len(refs) == 1 {
-				return runVerb(cmd, cfg, v, refs[0], args, dryRun, show)
+			card := showOpts{comments: int(comments.commentsFlag), full: full}
+			for _, name := range []string{showFlag, "full", "comments"} {
+				if cmd.Flags().Changed(name) {
+					card.flag = name
+					break
+				}
 			}
-			return runBatch(cmd, cfg, v, refs, args, dryRun, show)
+			if len(refs) == 1 {
+				return runVerb(cmd, cfg, v, refs[0], args, dryRun, card)
+			}
+			return runBatch(cmd, cfg, v, refs, args, dryRun, card)
 		},
 	}
 	f := cmd.Flags()
@@ -141,6 +150,8 @@ func newVerbCmd(cfg *config.Config, v config.Verb) *cobra.Command {
 	f.StringVar(&args.Of, config.ArgOf, "", "the original issue this one duplicates (17, #17, owner/repo#17 or a URL): closed as its duplicate and linked to it")
 	f.BoolVar(&dryRun, dryRunFlag, false, "print the plan without changing anything")
 	f.BoolVar(&show, showFlag, false, "also print the issue's card, as gh dojo show N does, from the same read")
+	f.Var(&comments, "comments", "how many of the latest comments the card prints, or all (up to "+strconv.Itoa(issue.MaxComments)+"); implies --show")
+	f.BoolVar(&full, "full", false, "print the card's description and comments without cutting them; implies --show")
 	f.BoolVar(&args.Yes, "yes", false, "the user agreed: run a verb that is the user's decision")
 	// Flags the verb does not take stay registered but hidden, so passing
 	// one gets workflow's precise error instead of "unknown flag".
@@ -160,10 +171,13 @@ func newVerbCmd(cfg *config.Config, v config.Verb) *cobra.Command {
 // was read (or found missing), its JSON is a verb result for it, as for
 // one issue of a batch, also when it is refused (outcome "failed").
 // show prints the issue's card too (see shownCard).
-func runVerb(cmd *cobra.Command, cfg *config.Config, v config.Verb, ref issue.Ref, args workflow.Args, dryRun, show bool) error {
+func runVerb(cmd *cobra.Command, cfg *config.Config, v config.Verb, ref issue.Ref, args workflow.Args, dryRun bool, show showOpts) error {
 	be, def, err := verbBackend(cfg, v, args, ref.Arg(issue.Repo{}))
 	if err != nil {
 		return err
+	}
+	if gb, ok := be.(*githubBackend); ok && show.on() {
+		gb.comments = show.window() // --comments all reads them in the same request
 	}
 	ref = ref.In(def)
 	ctx := cmd.Context()

@@ -464,7 +464,7 @@ gh-dojo may be a different version than the one in CI.
 ## Process verbs
 
 ```sh
-gh dojo <verb> <N>... [--comment TEXT] [--by N|TEXT] [--assignee LOGIN] [--milestone TITLE] [--of N] [--yes] [--dry-run] [--show]
+gh dojo <verb> <N>... [--comment TEXT] [--by N|TEXT] [--assignee LOGIN] [--milestone TITLE] [--of N] [--yes] [--dry-run] [--show] [--comments N|all] [--full]
 ```
 
 Verbs come from [`[verbs]`](configuration.md#verbs) in the config, so each project has its
@@ -547,9 +547,16 @@ read before start:`, and the confirmation line says what changed. A verb
 that refuses the issue (exit code 2), needs `--yes` or writes it in part
 prints the card alone, its error on stderr, as long as the issue was read.
 
-`--show` takes one issue: a verb given several numbers refuses it, and
-`gh dojo show 12 13` reads them. In `--json` the issue's `card` is the
-card of [`show --json`](output.md#json-output), `null` without `--show`.
+`--comments N|all` and `--full` fold the card as [`show`](#show)'s flags
+do, and imply `--show`, as `--jq` implies `--json`: `gh dojo start 42
+--full` takes the issue and prints its card whole. The verb reads as many
+comments as the card prints, at least the 20 it reads anyway, in its own
+request: `--comments all` costs no request either.
+
+`--show`, `--comments` and `--full` take one issue: a verb given several
+numbers refuses them, and `gh dojo show 12 13` reads them. In `--json`
+the issue's `card` is the card of [`show --json`](output.md#json-output),
+`null` without these flags.
 
 ```console
 $ gh dojo start 42 --show

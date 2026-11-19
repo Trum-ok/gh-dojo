@@ -27,8 +27,38 @@ import (
 // line, the dry-run plan, or alone when the verb refused it (its error is
 // on stderr), since that is when the agent needs it most.
 
-// showFlag is the verb flag.
+// showFlag is the verb flag. --comments and --full fold the card as show's
+// flags do, and ask for it without --show (#95), as --jq asks for --json:
+// start 42 --full is the card whole.
 const showFlag = "show"
+
+// showOpts is the card a verb's --show, --comments and --full ask for.
+type showOpts struct {
+	flag     string // the flag that asked for the card, "" for none
+	comments int    // how many of the latest comments to print
+	full     bool
+}
+
+// on says the card was asked for.
+func (o showOpts) on() bool { return o.flag != "" }
+
+// window is how many of the latest comments the verb reads: what verbs
+// read anyway, or more for --comments; the window show reads for the same
+// flags.
+func (o showOpts) window() int {
+	return min(max(o.comments, issue.DefaultComments), issue.MaxComments)
+}
+
+// verbCommentsFlag is a verb's --comments, show's flag whose error points
+// at --comment: one letter apart, a verb takes both.
+type verbCommentsFlag struct{ commentsFlag }
+
+func (c *verbCommentsFlag) Set(s string) error {
+	if err := c.commentsFlag.Set(s); err != nil {
+		return fmt.Errorf("%w (the comment to post is --%s)", err, config.ArgComment)
+	}
+	return nil
+}
 
 // shownCard is the card --show prints; nil prints nothing.
 type shownCard struct {
@@ -39,15 +69,15 @@ type shownCard struct {
 
 // newShownCard is the card of it for --show, nil without the flag or when
 // the issue was not read.
-func newShownCard(ctx context.Context, cfg *config.Config, be Backend, def issue.Repo, v config.Verb, it *batch.Item, show bool) *shownCard {
-	if !show {
+func newShownCard(ctx context.Context, cfg *config.Config, be Backend, def issue.Repo, v config.Verb, it *batch.Item, show showOpts) *shownCard {
+	if !show.on() {
 		return nil
 	}
 	c := itemCard(it)
 	if c == nil {
 		return nil
 	}
-	view := newCardView(cfg, def, defaultShownComments, false)
+	view := newCardView(cfg, def, show.comments, show.full)
 	if gb, ok := be.(*githubBackend); ok {
 		view.sprintField, view.sprintFieldID = showSprint(ctx, gb.app, cfg) // the schema the read loaded
 	} else {
@@ -105,10 +135,11 @@ func (s *shownCard) json(r verbResult) verbResult {
 	return r
 }
 
-// showOne refuses --show on several issues: their cards are gh dojo show's.
-func showOne(n int) error {
-	return render.Usage("--%s prints the card of one issue, got %d issues", showFlag, n).
-		WithFix(fmt.Sprintf("drop --%s, then gh dojo show with the numbers", showFlag))
+// showOne refuses the card's flag, --show, --comments or --full, on
+// several issues: their cards are gh dojo show's.
+func showOne(flag string, n int) error {
+	return render.Usage("--%s prints the card of one issue, got %d issues", flag, n).
+		WithFix(fmt.Sprintf("drop --%s, then gh dojo show with the numbers", flag))
 }
 
 // newCardView renders cards as show does with comments and full.

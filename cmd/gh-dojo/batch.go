@@ -16,7 +16,7 @@ import (
 // is read, planned and applied on its own, a failed one is skipped, and a
 // summary ends the run (see batch.Run for the output and exit codes). One
 // issue, as when 12 and owner/repo#12 name the same, runs as runVerb.
-func runBatch(cmd *cobra.Command, cfg *config.Config, v config.Verb, refs []issue.Ref, args workflow.Args, dryRun, show bool) error {
+func runBatch(cmd *cobra.Command, cfg *config.Config, v config.Verb, refs []issue.Ref, args workflow.Args, dryRun bool, show showOpts) error {
 	be, def, err := verbBackend(cfg, v, args, refArgs(refs, issue.Repo{})...)
 	if err != nil {
 		return err
@@ -24,8 +24,8 @@ func runBatch(cmd *cobra.Command, cfg *config.Config, v config.Verb, refs []issu
 	if refs = inRepo(refs, def); len(refs) == 1 { // 12 and owner/repo#12 of the default repository
 		return runVerb(cmd, cfg, v, refs[0], args, dryRun, show)
 	}
-	if show {
-		return showOne(len(refs))
+	if show.on() {
+		return showOne(show.flag, len(refs))
 	}
 	b := newBatchRun(cmd, be, cfg, v, args, def)
 	items, err := b.Do(cmd.Context(), refs, dryRun)
