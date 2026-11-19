@@ -1,0 +1,6 @@
+code: 1
+--- stdout
+--- stderr
+error: unknown flag: --dry-run (a flag of block, comment, done, init and 7 more)
+allowed: --brief, --comments, --full
+fix: gh dojo show --help

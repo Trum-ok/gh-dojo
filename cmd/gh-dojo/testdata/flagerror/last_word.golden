@@ -1,0 +1,6 @@
+code: 1
+--- stdout
+--- stderr
+error: unknown flag: --blocked-by (a flag of new); did you mean --by?
+allowed: --by, --comment, --comments, --dry-run, --full, --show
+fix: gh dojo wait --help

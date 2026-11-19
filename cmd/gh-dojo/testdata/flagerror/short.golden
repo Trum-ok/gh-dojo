@@ -1,0 +1,6 @@
+code: 1
+--- stdout
+--- stderr
+error: unknown flag: --x
+allowed: --by, --dry-run
+fix: gh dojo block --help

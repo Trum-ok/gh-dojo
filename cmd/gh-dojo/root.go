@@ -97,7 +97,7 @@ func buildRoot(ctors []constructor) (*cobra.Command, error) {
 		if args := cmd.Flags().Args(); !cmd.HasParent() && len(args) > 0 {
 			return unknownCommand(cmd, args)
 		}
-		return render.Usage("%s", err).WithFix(cmd.CommandPath() + " --help")
+		return flagError(cmd, err)
 	})
 	// Added explicitly: cobra adds its help command only to a root that
 	// already has subcommands, so `gh dojo help` would fail without verbs.

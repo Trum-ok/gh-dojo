@@ -11,6 +11,17 @@ error: ready cannot move #42 from Backlog; it starts only from In progress or Wa
 this is a process rule: ask the user how to proceed
 ```
 
+An unknown flag lists the command's flags, names the other commands that
+take it and, when one flag of the command is clearly closest (a typo, or the
+same last word), suggests it:
+
+```console
+$ gh dojo wait 42 --blocked-by 12
+error: unknown flag: --blocked-by (a flag of new); did you mean --by?
+allowed: --by, --comment, --comments, --dry-run, --full, --show
+fix: gh dojo wait --help
+```
+
 ## Exit codes
 
 | Code | Meaning                     | What to do                                                   |

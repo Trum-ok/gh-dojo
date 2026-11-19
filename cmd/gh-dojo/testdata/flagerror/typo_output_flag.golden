@@ -1,0 +1,6 @@
+code: 1
+--- stdout
+--- stderr
+error: unknown flag: --josn; did you mean --json?
+allowed: --comment, --comments, --dry-run, --full, --show
+fix: gh dojo start --help

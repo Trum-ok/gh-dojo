@@ -290,6 +290,17 @@ into issues (verb `when` lines and comment templates) come from the config.
   ([#60](https://github.com/Trum-ok/gh-dojo/issues/60)). It reads and
   checks what the run does and prints the plan; its JSON has `dry_run`
   (`init`'s has `written`). A new command that writes gets it too.
+- **An unknown flag is answered from the commands, not a synonym table**
+  ([#63](https://github.com/Trum-ok/gh-dojo/issues/63)). In the bench
+  transcripts and our sessions every unknown flag was another gh-dojo
+  command's (`--show` on `show`, `--by` on `new`, `--dry-run`), none a typo.
+  So the error lists the command's flags (`allowed:`), names the commands
+  that take the flag, and suggests a flag of this command only when one is
+  clearly closest: edit distance 2 at most and at most half the name, else
+  the same last word (`--blocked-by` → `--by`); two equally close, none. A
+  flag agents keep carrying with the same meaning gets a hidden synonym
+  instead (`new --by`, [#61](https://github.com/Trum-ok/gh-dojo/issues/61)),
+  which costs no second call.
 - **`release` goes through pull requests**, so it works with any merge
   strategy (squash, merge, rebase); commit keywords are the fallback.
 - **The generated skill is loaded into every session, so it repeats

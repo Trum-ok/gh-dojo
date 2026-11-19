@@ -5,11 +5,19 @@ code: 1
   "error": {
     "exit_code": 1,
     "message": "unknown flag: --bogus",
-    "allowed": [],
+    "allowed": [
+      "--all",
+      "--label",
+      "--limit",
+      "--mine",
+      "--sprint",
+      "--status"
+    ],
     "fix": "gh dojo list --help"
   }
 }
 
 --- stderr
 error: unknown flag: --bogus
+allowed: --all, --label, --limit, --mine, --sprint, --status
 fix: gh dojo list --help

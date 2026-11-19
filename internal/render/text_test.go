@@ -2,6 +2,23 @@ package render
 
 import "testing"
 
+func TestEditDistance(t *testing.T) {
+	for _, tc := range []struct {
+		a, b string
+		want int
+	}{
+		{"", "", 0},
+		{"", "by", 2},
+		{"dryrun", "dry-run", 1},
+		{"josn", "json", 2},
+		{"статус", "статуc", 1}, // runes, not bytes
+	} {
+		if got := EditDistance(tc.a, tc.b); got != tc.want {
+			t.Errorf("EditDistance(%q, %q) = %d, want %d", tc.a, tc.b, got, tc.want)
+		}
+	}
+}
+
 func TestJoinWords(t *testing.T) {
 	for _, tc := range []struct {
 		words []string

@@ -26,6 +26,29 @@ func Plural(n int, one, many string) string {
 	return strconv.Itoa(n) + " " + many
 }
 
+// EditDistance is the Levenshtein distance between a and b, in runes:
+// how close a mistyped name is to an allowed one.
+func EditDistance(a, b string) int {
+	ra, rb := []rune(a), []rune(b)
+	prev := make([]int, len(rb)+1)
+	cur := make([]int, len(rb)+1)
+	for j := range prev {
+		prev[j] = j
+	}
+	for i := 1; i <= len(ra); i++ {
+		cur[0] = i
+		for j := 1; j <= len(rb); j++ {
+			cost := 1
+			if ra[i-1] == rb[j-1] {
+				cost = 0
+			}
+			cur[j] = min(prev[j]+1, cur[j-1]+1, prev[j-1]+cost)
+		}
+		prev, cur = cur, prev
+	}
+	return prev[len(rb)]
+}
+
 // RuneLen is the length of s in runes, the unit of all length limits.
 func RuneLen(s string) int { return utf8.RuneCountInString(s) }
 
