@@ -74,6 +74,10 @@ type Client struct {
 	token       string
 	tokenSource string // env var name, "oauth_token", "gh" or "" (Options.AuthToken)
 	err         error
+
+	scopesMu sync.Mutex
+	scopes   []string // the token's scopes, from the last response that listed them
+	listed   bool     // a response listed them: a classic token
 }
 
 // New returns a Client. It never touches the network or gh config; auth
@@ -152,10 +156,16 @@ func (c *Client) do(ctx context.Context, query string, vars map[string]any, out 
 	if err := ctx.Err(); err != nil {
 		return c.mapError(err, false) // nothing sent yet
 	}
+	h, _ := ctx.Value(headersKey{}).(*http.Header) // QueryHeaders' own, or ours
+	if h == nil {
+		h = new(http.Header)
+		ctx = context.WithValue(ctx, headersKey{}, h)
+	}
 	var waited time.Duration
 	for attempt := 1; ; attempt++ {
 		c.requests.Add(1)
 		err := c.gql.DoWithContext(ctx, query, vars, out)
+		c.noteScopes(*h)
 		if err == nil {
 			return nil
 		}

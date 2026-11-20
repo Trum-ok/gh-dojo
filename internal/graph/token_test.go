@@ -57,6 +57,43 @@ func TestScopes(t *testing.T) {
 	}
 }
 
+// TestCheckProjectScope: a classic token without project is refused from
+// the scopes of any answer read, as its first board write would fail; a
+// token with project, one whose scopes are not listed (fine-grained, app)
+// and a client that has read nothing yet are not.
+func TestCheckProjectScope(t *testing.T) {
+	tests := []struct {
+		fixture string
+		refused bool
+	}{
+		{"viewer_read_project", true},
+		{"viewer_scopes", false},
+		{"retry_502", false}, // no X-OAuth-Scopes: a fine-grained or app token
+	}
+	for _, tt := range tests {
+		t.Run(tt.fixture, func(t *testing.T) {
+			c := graphtest.New(t, fixture(tt.fixture)).Client()
+			if err := c.CheckProjectScope(); err != nil {
+				t.Fatalf("before any request: %v", err)
+			}
+			if err := c.Query(context.Background(), viewerQuery, nil, nil); err != nil {
+				t.Fatal(err)
+			}
+			err := c.CheckProjectScope()
+			if !tt.refused {
+				if err != nil {
+					t.Errorf("err = %v, want nil", err)
+				}
+				return
+			}
+			e := render.FromError(err)
+			if e.Code != render.ExitNetwork || e.What != "GitHub token is missing a required scope (project)" || e.Fix == "" {
+				t.Errorf("err = %+v, want the missing-scope error with a fix", e)
+			}
+		})
+	}
+}
+
 func TestTokenEnv(t *testing.T) {
 	t.Setenv("GH_TOKEN", graphtest.FakeToken)
 	c := graph.New(graph.Options{Host: "github.com"})

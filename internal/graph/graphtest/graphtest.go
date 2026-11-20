@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"os"
 	"regexp"
@@ -82,6 +83,20 @@ type Server struct {
 	recorded []*Interaction
 	token    string
 	client   *graph.Client
+	headers  map[string]string // SetHeader's, on every replayed answer
+}
+
+// SetHeader adds the response header name: value to every answer replayed
+// from now on, over the interaction's own: a header recordings do not
+// keep, such as the X-OAuth-Scopes of a classic token, without copying
+// the fixtures.
+func (s *Server) SetHeader(name, value string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.headers == nil {
+		s.headers = map[string]string{}
+	}
+	s.headers[name] = value
 }
 
 // New returns a Server replaying the interactions of the given fixture
@@ -236,7 +251,14 @@ func (s *Server) RoundTrip(req *http.Request) (*http.Response, error) {
 		s.t.Errorf("graphtest: %v", err)
 		return nil, err
 	}
-	return response(req, in.Status, in.Headers, in.Response), nil
+	s.mu.Lock()
+	headers := maps.Clone(in.Headers)
+	if len(s.headers) > 0 && headers == nil {
+		headers = map[string]string{}
+	}
+	maps.Copy(headers, s.headers)
+	s.mu.Unlock()
+	return response(req, in.Status, headers, in.Response), nil
 }
 
 func (s *Server) match(op, query, vars string) (*Interaction, error) {

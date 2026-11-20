@@ -128,6 +128,20 @@ func TestVerbDryRun(t *testing.T) {
 	checkRuns(t, srv, before, runs{[]string{"start", "3", "--dry-run"}, render.ExitOK, 1, "start_dry_run"})
 }
 
+// TestVerbScopeRefused: a classic token without project, told by the
+// X-OAuth-Scopes of the card's answer, is refused before the first write,
+// which would fail after the comment of the same mutation took effect:
+// exit 4 with the fix, no mutation, the dry run too (#65). A token whose
+// scopes are not listed (fine-grained, app) is not checked: TestVerbDryRun.
+func TestVerbScopeRefused(t *testing.T) {
+	srv, before := withWarmVerbApp(t, verbFixture("card_3_start"), verbFixture("card_3_start"))
+	srv.SetHeader("X-OAuth-Scopes", "repo, read:project")
+	checkRuns(t, srv, before,
+		runs{[]string{"start", "3"}, render.ExitNetwork, 1, "start_scope_refused"},
+		runs{[]string{"start", "3", "--dry-run"}, render.ExitNetwork, 1, "start_scope_refused"},
+	)
+}
+
 // TestVerbRefused: wait runs only from In progress; #3 is Ready. Exit 2, no
 // mutation.
 func TestVerbRefused(t *testing.T) {

@@ -575,6 +575,29 @@ func TestNewLabelGroups(t *testing.T) {
 	}
 }
 
+// TestNewScopeRefused: a classic token without project would create the
+// issue and then fail to add it to the board; new refuses after its read,
+// before createIssue, the dry run too (#65).
+func TestNewScopeRefused(t *testing.T) {
+	withConfig(t, dojoConfig)
+	for _, dry := range []bool{false, true} {
+		srv := withApp(t, boardFixture, newContextFixture)
+		srv.SetHeader("X-OAuth-Scopes", "repo, read:project")
+		args := []string{"new", "Fix login redirect", "--type", "bug"}
+		if dry {
+			args = append(args, "--dry-run")
+		}
+		code, out := runOut(args...)
+		testutil.Golden(t, "new/scope_refused", out)
+		if code != render.ExitNetwork {
+			t.Errorf("%q: code = %d, want %d", args, code, render.ExitNetwork)
+		}
+		if n := srv.Requests(); n != 2 {
+			t.Errorf("%q: %d requests, want 2: the schema and the read", args, n)
+		}
+	}
+}
+
 func TestNewUsage(t *testing.T) {
 	withConfig(t, dojoConfig)
 	tests := []struct {

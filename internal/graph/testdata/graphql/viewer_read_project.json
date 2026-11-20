@@ -1,0 +1,20 @@
+{
+  "comment": "Hand-crafted: the Viewer answer for a classic token with read:project but not project (X-OAuth-Scopes); recording keeps no such header.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "Viewer",
+      "query": "query Viewer { viewer { login } }",
+      "headers": {
+        "X-OAuth-Scopes": "repo, read:project"
+      },
+      "response": {
+        "data": {
+          "viewer": {
+            "login": "Trum-ok"
+          }
+        }
+      }
+    }
+  ]
+}

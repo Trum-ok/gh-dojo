@@ -295,6 +295,13 @@ func (r *Issue) run(ctx context.Context) error {
 	if err := workflow.CheckNew(req, state); err != nil {
 		return err
 	}
+	// A classic token without project would create the issue and then fail
+	// to add it to the board: refuse before createIssue, --dry-run too (#65).
+	if sc, ok := r.env.Client.(graph.ScopeChecker); ok {
+		if err := sc.CheckProjectScope(); err != nil {
+			return err
+		}
+	}
 	plan := workflow.PlanNew(cfg, req, state)
 	r.Resumed = plan.Resumed
 	if plan.Create && !r.opts.DryRun {

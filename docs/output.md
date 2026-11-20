@@ -41,7 +41,20 @@ what was done and what was not:
 
 ```console
 $ gh dojo review 42
-error: #42 labels +in-review, assigned octocat, comment left; status not changed: GitHub token is missing a required scope (project); gh auth refresh -s project, then re-run the same command
+error: #42 labels +in-review, assigned octocat, comment left; status not changed: GitHub API unavailable (HTTP 502); re-run the same command
+```
+
+A classic token without the `project` scope (`read:project` alone reads the
+board) is refused before the first write, with code 4 and the fix, rather
+than leaving a comment or labels behind when the board write fails: the
+verbs, `release --verb` and `new` read the token's scopes from the answers
+to their own reads (GitHub lists them in `X-OAuth-Scopes`), at no extra
+request, `--dry-run` too, so the plan never promises a run that would fail.
+Fine-grained and app tokens list no scopes and are not checked ahead.
+
+```console
+$ gh dojo start 42
+error: GitHub token is missing a required scope (project)
 fix: gh auth refresh -s project
 ```
 

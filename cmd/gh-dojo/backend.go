@@ -131,6 +131,9 @@ func (b *githubBackend) ReadIssues(ctx context.Context, v config.Verb, refs []is
 	if err != nil && len(results) == 0 {
 		return nil, err
 	}
+	if err := b.app.checkProjectScope(); err != nil {
+		return nil, err // before any write, --dry-run too (#65)
+	}
 	byRef := make(map[string]issue.Result, len(results))
 	for _, r := range results {
 		byRef[refKey(r.Ref())] = r

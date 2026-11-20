@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/cli/go-gh/v2/pkg/auth"
+
+	"github.com/Trum-ok/gh-dojo/internal/render"
 )
 
 // ScopeProject is the token scope gh-dojo needs to write to boards;
@@ -40,6 +42,50 @@ func Scopes(h http.Header) (scopes []string, listed bool) {
 	}
 	slices.Sort(scopes)
 	return scopes, true
+}
+
+// ScopeChecker tells ahead of a write whether the token may write to
+// boards. *Client implements it; a Doer that does not (a test fake) is not
+// checked.
+type ScopeChecker interface {
+	// CheckProjectScope returns the error a write to a board would fail
+	// with, nil when it may succeed or the client cannot tell.
+	CheckProjectScope() error
+}
+
+// CheckProjectScope returns an error when the last response that listed the
+// token's scopes listed no project scope: a classic token that can read
+// boards (read:project, or a public one) but whose first write to one would
+// fail with INSUFFICIENT_SCOPES, maybe after other writes of the same
+// mutation took effect (#65). It is the same error, with the same fix, as
+// that write's. nil when no response listed scopes: fine-grained and app
+// tokens have permissions instead, and their writes are not checked ahead.
+// The scopes come from the responses the command reads anyway, so the check
+// costs no request.
+func (c *Client) CheckProjectScope() error {
+	c.scopesMu.Lock()
+	scopes, listed := c.scopes, c.listed
+	c.scopesMu.Unlock()
+	if !listed || slices.Contains(scopes, ScopeProject) {
+		return nil
+	}
+	c.once.Do(c.init)
+	return render.Network("GitHub token is missing a required scope (%s)", ScopeProject).WithFix(c.authFix())
+}
+
+// noteScopes remembers the token's scopes from response headers h, if they
+// list them; nil h (no response) changes nothing.
+func (c *Client) noteScopes(h http.Header) {
+	if h == nil {
+		return
+	}
+	scopes, listed := Scopes(h)
+	if !listed {
+		return
+	}
+	c.scopesMu.Lock()
+	c.scopes, c.listed = scopes, true
+	c.scopesMu.Unlock()
 }
 
 // Host returns the GitHub host the client talks to.

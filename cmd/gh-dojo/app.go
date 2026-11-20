@@ -59,6 +59,19 @@ func gitRepo() (string, error) {
 // same one verbs are built from.
 func (a *App) Config() (*config.Config, error) { return loadConfig() }
 
+// checkProjectScope refuses, before the first write, a classic token whose
+// scopes, listed with the responses read so far, have no project: its
+// first write to the board would fail, maybe after a comment or labels
+// of the same mutation took effect (graph.Client.CheckProjectScope).
+// Commands that write to the board call it after their reads, --dry-run
+// too, so the plan does not promise a run that would fail.
+func (a *App) checkProjectScope() error {
+	if s, ok := a.Client.(graph.ScopeChecker); ok {
+		return s.CheckProjectScope()
+	}
+	return nil
+}
+
 // Schema returns the board schema, checked against the config: every
 // fields.* and every status the config names exist on the board. It comes
 // from the cache when fresh (no request); a mismatch on a cached schema

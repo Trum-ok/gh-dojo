@@ -250,6 +250,10 @@ assignee who cannot be assigned or a missing blocker fails the same way,
 and prints the plan instead of writing: the issue it would create, or, for
 one an earlier run created, what finishing it would do.
 
+A classic token without the `project` scope is refused after the read,
+before the issue is created, `--dry-run` too: exit code 4 with the fix
+(see [Exit codes](output.md#exit-codes)).
+
 ```console
 $ gh dojo new "Fix login redirect" --type bug --area cli --assignee @me --blocked-by 26 --dry-run
 dry run: new "Fix login redirect"
@@ -523,6 +527,11 @@ code 1, with the flags it takes. `--yes` is the exception: given to a verb
 without `confirm = "user"` it is ignored with a warning (`start needs no
 confirmation: --yes ignored`), since the agent cannot know which verbs of a
 project need the go-ahead, and one the verb does not need loses nothing.
+
+A classic token without the `project` scope is refused after the cards are
+read, before any write and for every issue, `--dry-run` too: exit code 4
+with the fix, rather than a comment left and the status not changed (see
+[Exit codes](output.md#exit-codes)).
 
 `--dry-run` prints the plan without changing anything:
 
