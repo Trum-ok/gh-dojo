@@ -368,7 +368,7 @@ func (p *describeResult) text() string {
 			"closed issue unless noted. A repeat is safe: an effect already in place ("+
 			strings.Join(effects, ", ")+") is skipped.", 72))
 	}
-	// The root help's sections, each starting with a blank line; the
+	// The lifecycle and the exit codes, each starting with a blank line; the
 	// lifecycle is empty without verbs and statuses.
 	for _, s := range []string{processHelp(), exitCodesHelp()} {
 		if s = strings.TrimLeft(s, "\n"); s != "" {

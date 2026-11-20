@@ -566,7 +566,7 @@ func configNote() string {
 // with the command list.
 const minNameWidth = 11
 
-// processHelp is the lifecycle section of the root help: the statuses each
+// processHelp is the lifecycle section of describe: the statuses each
 // verb moves an issue from and to, in config order, then the initial,
 // final and resolved statuses. A verb that closes or reopens the issue, or
 // asks the user first, says so after its target. It is empty when the

@@ -317,7 +317,16 @@ into issues (verb `when` lines and comment templates) come from the config.
   commands; of the exit codes it covers only what to do on 2, 4 and 5 (an
   error's `fix:` line covers the rest); other repositories get detail only
   with several `board.repos`, and `release` one line pointing to its
-  `--help`. Keep it that way when changing `internal/agent`.
+  `--help`. It does name `new`'s flags in one line: a flag beyond `--type`
+  and `--body` would otherwise cost a read of `new --help`, the longest help.
+  Keep it that way when changing `internal/agent`.
+- **Help says a thing once, since agents read it as tokens.** The lifecycle
+  and the exit codes are in `describe` only, and the root help points there
+  (it prints the exit codes itself only without a config, when `describe`
+  fails); a verb's `Batch:` is two lines, the batch's exit codes being in
+  `describe`; a subcommand names the global flags in one line, the root help
+  describes them. `new --help` and `release --help` state a rule once, not
+  per flag: the Flags section already says what each flag takes.
 - **Label groups are a prefix, not a list**
   ([#75](https://github.com/Trum-ok/gh-dojo/issues/75)).
   `labels.type_prefix` and `labels.area_prefix` work alike: the values are

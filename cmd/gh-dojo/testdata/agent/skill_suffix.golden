@@ -15,71 +15,46 @@ A bare `12` or `#12` is an issue of `Trum-ok/gh-dojo`; an issue of another repos
 
 ## Lifecycle
 
-`Backlog` → `In progress` → (`Waiting`) → (`Ready`) → `Done`, through `start`, `wait`, `ready`, `done`. A status in parentheses may be skipped. Each verb below says which statuses it moves from and to.
+`Backlog` → `In progress` → (`Waiting`) → (`Ready`) → `Done`, through `start`, `wait`, `ready`, `done`. A status in parentheses may be skipped.
 
 - `Backlog` is the initial status: `gh dojo new` puts new issues there, and an issue without a status or not on the board counts as `Backlog`.
 - Final: `Done`. `gh dojo list` hides issues there unless `--all`.
-- A blocker is resolved, no longer blocking, when it is closed or its board status is `Ready` or `Done`: its work is done though the issue may be open.
-- A blocker whose status could not be read (`status not read: …`) counts as unresolved.
+- A blocker is resolved, no longer blocking, when it is closed or in `Ready` or `Done`, though it may be open; one whose status could not be read (`status not read: …`) still blocks.
 
 ## Verbs
 
-Run a verb as `gh dojo <verb> N`; `--dry-run` prints its plan (status, links, the comment it would post) without changing anything, and `--show` also prints the issue's card, as `gh dojo show N` does. A verb adds the issue to the board if it is missing and refuses a closed issue unless noted. It confirms in one line, such as `#42 Backlog → In progress, comment left`: there is no need to read the issue again.
+Run a verb as `gh dojo <verb> N`; `--dry-run` prints its plan without changing anything, and `--show` also prints the issue's card, as `gh dojo show N` does. A verb adds the issue to the board if it is missing and refuses a closed issue unless noted. It confirms in one line, such as `#42 Backlog → In progress, comment left`: there is no need to read the issue again.
 
 `N…` takes several numbers at once: one that fails is skipped and named in the summary.
 
-### `start`
-
-**When:** You begin working on the issue
-
-`gh dojo start N…`: Backlog, Waiting, Ready → In progress; optional --comment; comments "Started. Session: {session} {comment}".
+**`start`** (You begin working on the issue): `gh dojo start N…`, Backlog, Waiting, Ready → In progress; optional --comment; comments "Started. Session: {session} {comment}".
 
 - With an unresolved blocker it warns on stderr and still runs: read the card (`--show`) and decide whether to keep the issue, or ask the user.
 
-### `wait`
-
-**When:** Work is stuck: waiting for another issue or an outside decision
-
-`gh dojo wait N…`: In progress → Waiting; needs --by or --comment; comments "Waiting for {by}. {comment}".
+**`wait`** (Work is stuck: waiting for another issue or an outside decision): `gh dojo wait N…`, In progress → Waiting; needs --by or --comment; comments "Waiting for {by}. {comment}".
 
 - `--by 12` also marks the issue blocked by #12; text (`--by "the user's decision"`) only goes into the comment.
 
-### `ready`
+**`ready`** (The work is done, verified and committed, but not released yet): `gh dojo ready N…`, In progress, Waiting → Ready; comments only with --comment.
 
-**When:** The work is done, verified and committed, but not released yet
-
-`gh dojo ready N…`: In progress, Waiting → Ready; comments only with --comment.
-
-### `done`
-
-**When:** The change is released
-
-`gh dojo done N…`: Ready, In progress → Done; also on closed issues; comments only with --comment; closes as completed.
+**`done`** (The change is released): `gh dojo done N…`, Ready, In progress → Done; also on closed issues; comments only with --comment; closes as completed.
 
 - For a release, `gh dojo release <tag> --verb done --dry-run` lists the issues the release includes and its plan; read `gh dojo release --help` before you run it.
 
 ## Reading
 
 - `gh dojo next`: what to take next, the open issues in `Backlog` or without a status, with no unresolved blocker, in board order, 5 by default (`--limit N`). The blocked ones are hidden and counted; `--all` shows them with their blockers. Filters: `--mine`, `--label <label>`. Once you pick one, `gh dojo start N --show`: it takes the issue and prints its card.
-- `gh dojo show N` before you work on an issue (to take it as well, `gh dojo start N --show` prints the same card): its status, milestone, labels, blockers both ways (unresolved first, each with its board status), its parent and sub-issues (the same way), status history, description and the last 5 comments; a line left out means none. Several numbers, `gh dojo show 12 13`, print three lines per issue: read the one you take alone. `--comments all` prints the whole thread (up to 100), `--full` everything uncut; a verb takes both too and prints the card with them, as with `--show`.
+- `gh dojo show N` before you work on an issue (to take it as well, `gh dojo start N --show` prints the same card): its status, blockers both ways, parent and sub-issues, history, description and the last 5 comments; `--comments all` prints the whole thread, `--full` everything uncut (a verb takes both too). Several numbers print three lines per issue.
 - `gh dojo list`: an overview of the board, when the user asks for one: the open issues grouped by status; closed issues and final statuses are hidden and counted; `Ready` is one line of numbers, `--status Ready` lists them with titles. Filters: `--status "<status>"`, `--status none`, `--mine`, `--label <label>`, `--all`, `--limit 100`.
 - `gh dojo next` and `gh dojo list` read the board a few seconds behind writes: an issue just created or moved may be missing or in its old status. To check one issue, `gh dojo show N`.
 
 ## Creating and linking issues
 
-- `gh dojo new "<title>" --type <label> --body "…"`: the issue, its labels, the board in `Backlog`, in one command; a long body: `--body-file <file>`, or `--body-file -` for stdin. More labels, assignees, a milestone, blockers or a parent: `gh dojo new --help`.
+- `gh dojo new "<title>" --type <label> --body "…"`: the issue, its labels, the board in `Backlog`, in one command; a long body: `--body-file <file>`, or `--body-file -` for stdin. Also `--area <area>`, `--label <label>`, `--assignee @me`, `--milestone <title>`, `--blocked-by N`, `--parent N`, each checked before anything is created.
 - `gh dojo comment N "text"`: a comment without changing the status.
 - `gh dojo block N --by M` / `gh dojo unblock N --by M`: add or remove a blocked-by link without changing the status. An existing issue becomes a sub-issue with `gh issue edit N --parent M`.
 - A commit for an issue names it in parentheses at the end of its first line, `fix: login limit (#12)`, several as `(#12, #13)`: that is how `gh dojo release` finds the issues a release includes.
 
-## Repeats are safe
+## Errors and repeats
 
-Run the same command again after an error: a verb does not set a status that is already set, nor post a comment that is already the latest from gh-dojo; `comment` does not post its last comment again; `block` and `unblock` skip links that are already as asked; `new` with the same title finishes the issue it created instead of creating another.
-
-## Exit codes
-
-On an error, read its `error:`, `allowed:` and `fix:` lines and do what `fix:` says. Exit code 2 is a process check refusing: never work around it (do not move the status another way); ask the user. On 4 (network, rate limit or auth) and 5 (partially applied), run the same command again, on 4 a bit later.
-
-## JSON
-
-Every command takes `--json`, `--jq` and `--template`, as gh does, for picking values out; for everyday work the text is shorter.
+On an error, do what its `fix:` line says. Exit code 2 is a process check refusing: never work around it (do not move the status another way); ask the user. On 4 (network, rate limit or auth) and 5 (partially applied), run the same command again, on 4 a bit later. A repeat is safe: what is already in place (a status, the latest comment, a link) is skipped, and `new` with the same title finishes the issue it created.

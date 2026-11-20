@@ -48,43 +48,28 @@ func newReleaseCmd() (*cobra.Command, error) {
 	cmd := &cobra.Command{
 		Use:   "release <ref> --verb <verb>",
 		Short: "Apply a verb to the issues a release includes, found through pull requests and commits",
-		Long: "Use it once a release is tagged: it finds the issues the release includes and\n" +
-			"applies a verb to them, as gh dojo <verb> 12 13 14 would.\n" +
-			"Before the tag, gh dojo release main --dry-run shows what the next one holds.\n\n" +
-			"The release is the commits of <ref> (a tag, branch or commit on GitHub) since\n" +
-			"the previous release: the highest version tag (v1.2.3) below <ref> when <ref>\n" +
-			"is one, else the highest; prereleases (v1.2.3-rc.1) only for a prerelease.\n" +
-			"--since names the start instead; the first release needs it. A tag or branch\n" +
-			"is compared with <ref> on GitHub; from a commit, <ref>'s history is read down\n" +
-			"to it. At most 1000 commits, read without a local checkout, so a branch is\n" +
-			"named as on GitHub: main, not origin/main.\n\n" +
-			"An issue is in the release when a merged pull request of a commit closes it\n" +
-			"(its closing keywords or linked issues; squash, merge and rebase alike), or\n" +
-			"when a commit message names it after a keyword of [release] keywords, by\n" +
-			"default GitHub's closing ones (closes, fixes, resolves); owner/repo#N names\n" +
-			"an issue of another repository. With [release] suffix = true, so do the\n" +
-			"parentheses that end a message's first line: \"fix: login limit (#12)\",\n" +
-			"\"(#12, #13)\"; without it, an issue only such parentheses name is left out\n" +
-			"with a warning. Code in a message (`Refs #12`, a ``` block)\n" +
-			"does not count: put examples of the syntax in backticks.\n\n" +
-			"A commit reverted later in the range (git revert, GitHub's Revert button)\n" +
-			"counts for nothing, nor does the quoted title of a revert (Revert \"Fixes #12\"):\n" +
-			"an issue only such commits name is listed as reverted and left out.\n\n" +
-			"A message names issues as text, so a number only messages name that is no\n" +
-			"issue (a pull request, a missing issue, or one of a repository outside\n" +
-			"board.repos that is not found or the token cannot see) is left out with a\n" +
-			"warning, not failed. --exclude leaves out any issue found, however it was\n" +
-			"found.\n\n" +
-			"An open issue whose status the verb's from does not allow (still in progress,\n" +
-			"say) is listed as not ready and left out, not failed; only a later release\n" +
-			"whose commits name it again picks it up. A closed one is refused (exit code 2),\n" +
-			"unless it is in a final status (statuses.final): then it is done with, listed as\n" +
-			"already closed and left out, and the verb does not touch it.\n\n" +
-			"For a verb that finishes issues (done), a warning names the issues in a status\n" +
-			"where finished work waits for a release (statuses.resolved but not final, that\n" +
-			"the verb starts from: Ready) that the release does not include, with the\n" +
-			"command for those it includes after all: work committed without a link.\n\n" +
-			"--dry-run lists each issue with how it was found and its plan.",
+		Long: "Use it once a release is tagged: it applies a verb to the issues the release\n" +
+			"includes, as gh dojo <verb> 12 13 14 would. Before the tag, gh dojo release\n" +
+			"main --dry-run shows what the next one holds; --dry-run lists each issue with\n" +
+			"how it was found and its plan.\n\n" +
+			"The release is the commits of <ref> (a tag, branch or commit as GitHub names\n" +
+			"it: main, not origin/main; up to 1000) since the previous version tag: the\n" +
+			"highest below <ref> when <ref> is one, else the highest; prereleases\n" +
+			"(v1.2.3-rc.1) only for a prerelease. --since names the start instead; the\n" +
+			"first release needs it.\n\n" +
+			"An issue is in it when a merged pull request of a commit closes it (squash,\n" +
+			"merge and rebase alike), or a commit message names it after a [release]\n" +
+			"keywords one, by default closes, fixes, resolves (owner/repo#N for another\n" +
+			"repository). With [release] suffix = true, so does \"(#12)\" ending a message's\n" +
+			"first line; else such an issue is left out with a warning. Code in a message\n" +
+			"(`Refs #12`) does not count.\n\n" +
+			"Listed and left out, not failed: an issue only reverted commits name, a number\n" +
+			"that is no issue the token can see, an open issue the verb's from does not\n" +
+			"allow (a later release naming it again picks it up), a closed one in a final\n" +
+			"status, and --exclude. Any other closed issue is refused (exit code 2).\n" +
+			"For a verb that finishes issues (done), a warning names the issues waiting\n" +
+			"for a release (statuses.resolved, not final) it does not include, with the\n" +
+			"command for those it includes after all.",
 		Example: `  gh dojo release main --verb done --dry-run
   gh dojo release v0.2.0 --verb done --dry-run
   gh dojo release v0.2.0 --verb done

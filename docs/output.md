@@ -33,7 +33,8 @@ fix: gh dojo wait --help
 | 4    | Network, rate limit or auth | Retry later, or `gh auth refresh -s project`                 |
 | 5    | Partially applied           | Re-run the same command; it finishes the rest                |
 
-`gh dojo --help` and `gh dojo describe` print this table too. Retries are
+`gh dojo describe` prints this table too, and so does `gh dojo --help`
+when there is no config to describe. Retries are
 safe for every command: verbs skip every effect already in place, `comment`
 skips its own repeated text, `block` and `unblock` skip links already as
 asked, and `new` resumes the issue it created. A partial write (code 5) names

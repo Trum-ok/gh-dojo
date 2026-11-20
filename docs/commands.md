@@ -429,8 +429,9 @@ read, so the rules are written once, in the config:
 The instructions are in English and say what `describe` says, with what an
 agent should do about it: use only `gh dojo` for issues, the lifecycle and
 the statuses, each verb with its rules (ask the user before `--yes`, don't
-work around a refused check), the commands to find, read and create issues,
-safe repeats, exit codes and JSON. This repository's own
+work around a refused check), the commands to find, read and create issues
+(with `new`'s flags, so one of them needs no `new --help`), and what to do
+on an error, with safe repeats. This repository's own
 [`.claude/skills/gh-dojo/SKILL.md`](../.claude/skills/gh-dojo/SKILL.md) is
 an example.
 
@@ -482,9 +483,12 @@ gh dojo <verb> <N>... [--comment TEXT] [--by N|TEXT] [--assignee LOGIN] [--miles
 Verbs come from [`[verbs]`](configuration.md#verbs) in the config, so each project has its
 own; the [kanban](configuration.md#kanban-preset) and [sprints](configuration.md#sprints-preset) presets
 define `start`, `wait`, `ready` and `done`. `gh dojo --help` lists them with
-their `when` line and the lifecycle; `gh dojo <verb> --help` shows the
-allowed starting statuses, the target status, the required arguments, the
-other effects and the comment template.
+their `when` line and points to `gh dojo describe` for the lifecycle and the
+exit codes, so an agent that reads both reads them once; `gh dojo <verb>
+--help` shows the allowed starting statuses, the target status, the required
+arguments, the other effects and the comment template. A subcommand's help
+names the global flags (`--json`, `--jq`, `--template`) in one line; the
+root help describes them.
 
 A verb takes one issue number or several (see
 [Several issues at once](output.md#several-issues-at-once)) and, for each

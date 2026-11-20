@@ -77,7 +77,7 @@ func buildRoot(ctors []constructor) (*cobra.Command, error) {
 			configNote(),
 		Annotations: map[string]string{
 			cobra.CommandDisplayNameAnnotation: "gh dojo",
-			rootSectionsAnnotation:             processHelp() + exitCodesHelp(),
+			rootSectionsAnnotation:             rootSections(),
 		},
 		SilenceUsage:               true,
 		SilenceErrors:              true,
@@ -89,6 +89,7 @@ func buildRoot(ctors []constructor) (*cobra.Command, error) {
 	// --version is gh-dojo's own, not cobra's, so it prints JSON too.
 	root.Flags().BoolP("version", "v", false, "version for gh dojo")
 	cobra.AddTemplateFunc("flagUsages", flagUsages)
+	cobra.AddTemplateFunc("flagNames", flagNames)
 	root.SetUsageTemplate(rootUsageTemplate(root.UsageTemplate()))
 	addOutputFlags(root)
 	root.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
@@ -147,18 +148,42 @@ func runRoot(cmd *cobra.Command, _ []string) error {
 }
 
 // rootSectionsAnnotation holds the root help sections that follow the
-// command list: the process (see processHelp) and the exit codes.
+// command list, see rootSections.
 const rootSectionsAnnotation = "gh-dojo:sections"
+
+// rootSections is what the root help says after the command list: a line
+// pointing to describe, which prints the lifecycle and the exit codes, so
+// that an agent reading both does not read them twice. Without a loadable
+// config describe fails, so the root help prints the exit codes itself.
+func rootSections() string {
+	if processHelp() == "" {
+		return exitCodesHelp()
+	}
+	return "\n\nThe lifecycle (each verb's statuses, from → to) and the exit codes:\n  gh dojo describe"
+}
 
 // rootUsageTemplate adds the root help sections to cobra's usage template,
 // right before the flags. Subcommands inherit the template, so it prints
-// them only for the root. The flag lists go through flagUsages.
+// them only for the root. The flag lists go through flagUsages, and the
+// global flags, which the root help describes, are one line of names.
 func rootUsageTemplate(tmpl string) string {
 	const flags = "{{if .HasAvailableLocalFlags}}"
 	sections := `{{if not .HasParent}}{{index .Annotations "` + rootSectionsAnnotation + `"}}{{end}}`
 	tmpl = strings.Replace(tmpl, flags, sections+flags, 1)
 	tmpl = strings.ReplaceAll(tmpl, ".LocalFlags.FlagUsages", "flagUsages .LocalFlags")
-	return strings.ReplaceAll(tmpl, ".InheritedFlags.FlagUsages", "flagUsages .InheritedFlags")
+	return strings.Replace(tmpl, "Global Flags:\n{{.InheritedFlags.FlagUsages | trimTrailingWhitespaces}}",
+		"Global flags: {{flagNames .InheritedFlags}} (see gh dojo --help)", 1)
+}
+
+// flagNames lists the flags of fs as "--jq, --json, --template".
+func flagNames(fs *pflag.FlagSet) string {
+	var names []string
+	fs.VisitAll(func(f *pflag.Flag) {
+		if !f.Hidden {
+			names = append(names, "--"+f.Name)
+		}
+	})
+	return strings.Join(names, ", ")
 }
 
 // flagUsages is fs.FlagUsages with a boolean flag shown as --json, not as
@@ -182,8 +207,8 @@ func flagUsages(fs *pflag.FlagSet) string {
 // plainBool is a boolean flag value without IsBoolFlag, see flagUsages.
 type plainBool struct{ pflag.Value }
 
-// exitCodesHelp lists the exit codes with what to do next, for the root
-// help.
+// exitCodesHelp lists the exit codes with what to do next, for describe,
+// and for the root help when there is no config.
 func exitCodesHelp() string {
 	var b strings.Builder
 	b.WriteString("\n\nExit codes:")

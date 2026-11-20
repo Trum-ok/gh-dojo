@@ -47,11 +47,9 @@ func newBatchRun(cmd *cobra.Command, be Backend, cfg *config.Config, v config.Ve
 	return b
 }
 
-// batchHelp is the Batch section of the help of verb v.
+// batchHelp is the Batch section of the help of verb v: two lines, since
+// every verb's help has it; the exit codes of a batch are in describe.
 func batchHelp(v config.Verb, line helpLine) {
-	line("Batch", "several numbers at once: gh dojo %s 12 13 14; each issue is applied", v.Name)
-	line("", "on its own, a failed one is skipped, and a summary ends the run:")
-	line("", "\"3 of 4 done; #17: <reason>\"; a re-run skips what is done")
-	line("", "exit code: 0 all done; 5 some written and a re-run may finish the rest;")
-	line("", "else the failures' code, 2 first, then 1, 4, 3")
+	line("Batch", "gh dojo %s 12 13 14: each issue on its own, a failed one skipped;", v.Name)
+	line("", "exit code 5 when some were written: a re-run finishes the rest")
 }

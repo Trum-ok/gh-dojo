@@ -6,11 +6,8 @@ You want to leave a note without moving the issue
   To:        the status is not changed
   Requires:  nothing besides the issue numbers
   Optional:  --comment
-  Batch:     several numbers at once: gh dojo note 12 13 14; each issue is applied
-             on its own, a failed one is skipped, and a summary ends the run:
-             "3 of 4 done; #17: <reason>"; a re-run skips what is done
-             exit code: 0 all done; 5 some written and a re-run may finish the rest;
-             else the failures' code, 2 first, then 1, 4, 3
+  Batch:     gh dojo note 12 13 14: each issue on its own, a failed one skipped;
+             exit code 5 when some were written: a re-run finishes the rest
   Board:     adds the issue if it is not there
   Comment:   posted unless it renders empty or is already the latest gh-dojo comment:
                Note:
@@ -28,8 +25,5 @@ Flags:
   -h, --help             help for note
       --show             also print the issue's card, as gh dojo show N does, from the same read
 
-Global Flags:
-  -q, --jq expression       filter the JSON with a jq expression (implies --json)
-      --json                print the result as JSON (schema_version 1), errors too
-  -t, --template template   format the JSON with a Go template (implies --json)
+Global flags: --jq, --json, --template (see gh dojo --help)
 --- stderr

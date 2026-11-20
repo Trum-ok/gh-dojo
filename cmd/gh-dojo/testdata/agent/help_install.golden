@@ -45,8 +45,5 @@ Flags:
       --check         write nothing; exit 1 when a file is not up to date
   -h, --help          help for install
 
-Global Flags:
-  -q, --jq expression       filter the JSON with a jq expression (implies --json)
-      --json                print the result as JSON (schema_version 1), errors too
-  -t, --template template   format the JSON with a Go template (implies --json)
+Global flags: --jq, --json, --template (see gh dojo --help)
 --- stderr

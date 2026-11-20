@@ -9,7 +9,6 @@ import (
 
 	"github.com/Trum-ok/gh-dojo/internal/agent"
 	"github.com/Trum-ok/gh-dojo/internal/config"
-	"github.com/Trum-ok/gh-dojo/internal/issue"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/Trum-ok/gh-dojo/internal/workflow"
 	"github.com/spf13/cobra"
@@ -201,9 +200,7 @@ func (d *agentDoc) body(level int) string {
 	d.verbs(w)
 	d.reading(w)
 	d.writing(w)
-	d.repeats(w)
-	d.exitCodes(w)
-	d.json(w)
+	d.errors(w)
 	return w.b.String()
 }
 
@@ -241,19 +238,18 @@ func (d *agentDoc) verbs(w *mdWriter) {
 		w.para("This project has no verbs: they are added under `[verbs]` in %s.", code(config.FileName))
 		return
 	}
-	intro := "Run a verb as `gh dojo <verb> N`; `--dry-run` prints its plan (status, links, " +
-		"the comment it would post) without changing anything, and `--show` also prints the issue's card, " +
-		"as `gh dojo show N` does. A verb adds the issue to the board if it " +
+	intro := "Run a verb as `gh dojo <verb> N`; `--dry-run` prints its plan without changing anything, " +
+		"and `--show` also prints the issue's card, as `gh dojo show N` does. A verb adds the issue to the board if it " +
 		"is missing and refuses a closed issue unless noted. It confirms in one line"
 	if ex := d.confirmExample(); ex != "" {
 		intro += ", such as " + code(ex)
 	}
 	w.para("%s: there is no need to read the issue again.", intro)
 	w.para("`N…` takes several numbers at once: one that fails is skipped and named in the summary.")
+	// One paragraph per verb, not a heading and a When line: the skill is
+	// loaded into every session.
 	for i, pv := range d.p.Verbs {
 		v := d.cfg.Verbs[i]
-		w.heading(2, code(v.Name))
-		w.para("**When:** %s", v.When)
 		from, to := "any status", "status unchanged"
 		if len(pv.From) > 0 {
 			from = strings.Join(pv.From, ", ")
@@ -261,7 +257,7 @@ func (d *agentDoc) verbs(w *mdWriter) {
 		if pv.To != nil {
 			to = *pv.To
 		}
-		line := code("gh dojo "+v.Name+" N…") + ": " + from + " → " + to
+		line := "**" + code(v.Name) + "** (" + v.When + "): " + code("gh dojo "+v.Name+" N…") + ", " + from + " → " + to
 		if facts := d.facts(v, pv); facts != "" {
 			line += "; " + facts
 		}
@@ -414,13 +410,13 @@ func (d *agentDoc) statuses(w *mdWriter) {
 	if len(st.Final) > 0 {
 		items = append(items, fmt.Sprintf("Final: %s. `gh dojo list` hides issues there unless `--all`.", codes(st.Final)))
 	}
+	unread := "; one whose status could not be read (`status not read: …`) still blocks."
 	if len(st.Resolved) > 0 {
-		items = append(items, fmt.Sprintf("A blocker is resolved, no longer blocking, when it is closed or its board "+
-			"status is %s: its work is done though the issue may be open.", strings.Join(codeEach(st.Resolved), " or ")))
+		items = append(items, fmt.Sprintf("A blocker is resolved, no longer blocking, when it is closed or in %s, "+
+			"though it may be open%s", strings.Join(codeEach(st.Resolved), " or "), unread))
 	} else {
-		items = append(items, "A blocker is resolved, no longer blocking, only when it is closed.")
+		items = append(items, "A blocker is resolved, no longer blocking, only when it is closed"+unread)
 	}
-	items = append(items, "A blocker whose status could not be read (`status not read: …`) counts as unresolved.")
 	if slices.ContainsFunc(d.cfg.Verbs, config.Verb.ChecksSubIssues) {
 		items = append(items, "A sub-issue is resolved, or not, by the same rule.")
 	}
@@ -437,7 +433,7 @@ func (d *agentDoc) statuses(w *mdWriter) {
 		if slices.Contains(skip, true) {
 			line += " A status in parentheses may be skipped."
 		}
-		w.para("%s Each verb below says which statuses it moves from and to.", line)
+		w.para("%s", line)
 	}
 	w.list(items)
 }
@@ -520,12 +516,10 @@ func (d *agentDoc) reading(w *mdWriter) {
 		items = append(items, d.nextItem())
 	}
 	items = append(items,
-		"`gh dojo show N` before you work on an issue"+d.takeNote()+": its status, "+sprint+"milestone, labels, blockers both "+
-			"ways (unresolved first, each with its board status), its parent and sub-issues (the same way), "+
-			"status history, description and the last "+strconv.Itoa(defaultShownComments)+" comments; a line left "+
-			"out means none. Several numbers, `gh dojo show 12 13`, print three lines per issue: read the one you "+
-			"take alone. `--comments all` prints the whole thread (up to "+strconv.Itoa(issue.MaxComments)+"), "+
-			"`--full` everything uncut; a verb takes both too and prints the card with them, as with `--show`.",
+		"`gh dojo show N` before you work on an issue"+d.takeNote()+": its status, "+sprint+"blockers both ways, "+
+			"parent and sub-issues, history, description and the last "+strconv.Itoa(defaultShownComments)+
+			" comments; `--comments all` prints the whole thread, `--full` everything uncut (a verb takes both too). "+
+			"Several numbers print three lines per issue.",
 		"`gh dojo list`: an overview of the board, when the user asks for one: the open issues grouped by status; "+
 			"closed issues and final statuses are hidden and counted"+d.foldedList()+". Filters: "+listFilters+
 			", `--all`, `--limit 100`.")
@@ -622,11 +616,17 @@ func (d *agentDoc) writing(w *mdWriter) {
 	if cfg.Statuses.Initial != "" {
 		status = " in " + code(cfg.Statuses.Initial)
 	}
+	// new's other flags are named here, so that one of them does not cost
+	// a read of new --help, the longest one.
+	more := "`--label <label>`, `--assignee @me`, `--milestone <title>`, `--blocked-by N`, `--parent N`"
+	if cfg.Labels.AreaPrefix != "" {
+		more = "`--area <area>`, " + more
+	}
 	w.heading(1, "Creating and linking issues")
 	items := []string{
 		"`gh dojo new \"<title>\" --type " + typ + " --body \"…\"`: the issue, its labels, the board" + status +
-			", in one command; a long body: `--body-file <file>`, or `--body-file -` for stdin. More labels, assignees, a " +
-			"milestone, blockers or a parent: `gh dojo new --help`." + types,
+			", in one command; a long body: `--body-file <file>`, or `--body-file -` for stdin. Also " + more +
+			", each checked before anything is created." + types,
 		"`gh dojo comment N \"text\"`: a comment without changing the status.",
 		"`gh dojo block N --by M` / `gh dojo unblock N --by M`: add or remove a blocked-by link without changing " +
 			"the status. An existing issue becomes a sub-issue with `gh issue edit N --parent M`.",
@@ -647,25 +647,14 @@ func (d *agentDoc) writing(w *mdWriter) {
 	w.list(items)
 }
 
-func (d *agentDoc) repeats(w *mdWriter) {
-	w.heading(1, "Repeats are safe")
-	w.para("Run the same command again after an error: a verb does not set a status that is already set, nor post " +
-		"a comment that is already the latest from gh-dojo; `comment` does not post its last comment again; " +
-		"`block` and `unblock` skip links that are already as asked; `new` with the same title finishes the " +
-		"issue it created instead of creating another.")
-}
-
-// exitCodes says what to do on an error in a few sentences: the error's
-// own fix: line covers the rest.
-func (d *agentDoc) exitCodes(w *mdWriter) {
-	w.heading(1, "Exit codes")
-	w.para("On an error, read its `error:`, `allowed:` and `fix:` lines and do what `fix:` says. Exit code 2 is a " +
-		"process check refusing: never work around it (do not move the status another way); ask the user. On 4 " +
-		"(network, rate limit or auth) and 5 (partially applied), run the same command again, on 4 a bit later.")
-}
-
-func (d *agentDoc) json(w *mdWriter) {
-	w.heading(1, "JSON")
-	w.para("Every command takes `--json`, `--jq` and `--template`, as gh does, for picking values out; " +
-		"for everyday work the text is shorter.")
+// errors says what to do on an error, and that a repeat is safe, in a few
+// sentences: the error's own fix: line covers the rest. JSON is left to
+// --help: for everyday work the text is shorter.
+func (d *agentDoc) errors(w *mdWriter) {
+	w.heading(1, "Errors and repeats")
+	w.para("On an error, do what its `fix:` line says. Exit code 2 is a process check refusing: never work " +
+		"around it (do not move the status another way); ask the user. On 4 (network, rate limit or auth) and 5 " +
+		"(partially applied), run the same command again, on 4 a bit later. A repeat is safe: what is already " +
+		"in place (a status, the latest comment, a link) is skipped, and `new` with the same title finishes the " +
+		"issue it created.")
 }

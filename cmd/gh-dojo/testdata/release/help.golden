@@ -1,49 +1,30 @@
 code: 0
 --- stdout
-Use it once a release is tagged: it finds the issues the release includes and
-applies a verb to them, as gh dojo <verb> 12 13 14 would.
-Before the tag, gh dojo release main --dry-run shows what the next one holds.
+Use it once a release is tagged: it applies a verb to the issues the release
+includes, as gh dojo <verb> 12 13 14 would. Before the tag, gh dojo release
+main --dry-run shows what the next one holds; --dry-run lists each issue with
+how it was found and its plan.
 
-The release is the commits of <ref> (a tag, branch or commit on GitHub) since
-the previous release: the highest version tag (v1.2.3) below <ref> when <ref>
-is one, else the highest; prereleases (v1.2.3-rc.1) only for a prerelease.
---since names the start instead; the first release needs it. A tag or branch
-is compared with <ref> on GitHub; from a commit, <ref>'s history is read down
-to it. At most 1000 commits, read without a local checkout, so a branch is
-named as on GitHub: main, not origin/main.
+The release is the commits of <ref> (a tag, branch or commit as GitHub names
+it: main, not origin/main; up to 1000) since the previous version tag: the
+highest below <ref> when <ref> is one, else the highest; prereleases
+(v1.2.3-rc.1) only for a prerelease. --since names the start instead; the
+first release needs it.
 
-An issue is in the release when a merged pull request of a commit closes it
-(its closing keywords or linked issues; squash, merge and rebase alike), or
-when a commit message names it after a keyword of [release] keywords, by
-default GitHub's closing ones (closes, fixes, resolves); owner/repo#N names
-an issue of another repository. With [release] suffix = true, so do the
-parentheses that end a message's first line: "fix: login limit (#12)",
-"(#12, #13)"; without it, an issue only such parentheses name is left out
-with a warning. Code in a message (`Refs #12`, a ``` block)
-does not count: put examples of the syntax in backticks.
+An issue is in it when a merged pull request of a commit closes it (squash,
+merge and rebase alike), or a commit message names it after a [release]
+keywords one, by default closes, fixes, resolves (owner/repo#N for another
+repository). With [release] suffix = true, so does "(#12)" ending a message's
+first line; else such an issue is left out with a warning. Code in a message
+(`Refs #12`) does not count.
 
-A commit reverted later in the range (git revert, GitHub's Revert button)
-counts for nothing, nor does the quoted title of a revert (Revert "Fixes #12"):
-an issue only such commits name is listed as reverted and left out.
-
-A message names issues as text, so a number only messages name that is no
-issue (a pull request, a missing issue, or one of a repository outside
-board.repos that is not found or the token cannot see) is left out with a
-warning, not failed. --exclude leaves out any issue found, however it was
-found.
-
-An open issue whose status the verb's from does not allow (still in progress,
-say) is listed as not ready and left out, not failed; only a later release
-whose commits name it again picks it up. A closed one is refused (exit code 2),
-unless it is in a final status (statuses.final): then it is done with, listed as
-already closed and left out, and the verb does not touch it.
-
-For a verb that finishes issues (done), a warning names the issues in a status
-where finished work waits for a release (statuses.resolved but not final, that
-the verb starts from: Ready) that the release does not include, with the
-command for those it includes after all: work committed without a link.
-
---dry-run lists each issue with how it was found and its plan.
+Listed and left out, not failed: an issue only reverted commits name, a number
+that is no issue the token can see, an open issue the verb's from does not
+allow (a later release naming it again picks it up), a closed one in a final
+status, and --exclude. Any other closed issue is refused (exit code 2).
+For a verb that finishes issues (done), a warning names the issues waiting
+for a release (statuses.resolved, not final) it does not include, with the
+command for those it includes after all.
 
 Usage:
   gh dojo release <ref> --verb <verb> [flags]
@@ -65,8 +46,5 @@ Flags:
       --verb string      the verb to apply to the release's issues: any without a required --assignee, --milestone or --of
       --yes              the user agreed: for a verb that is the user's decision
 
-Global Flags:
-  -q, --jq expression       filter the JSON with a jq expression (implies --json)
-      --json                print the result as JSON (schema_version 1), errors too
-  -t, --template template   format the JSON with a Go template (implies --json)
+Global flags: --jq, --json, --template (see gh dojo --help)
 --- stderr
