@@ -120,6 +120,12 @@ it leaves out, so closed and final issues piling up do not slow it down;
 `--all`, and `--status` naming a final status, read every item. So does a
 `--label` that no issue has, to suggest the label meant.
 
+GitHub lists a board's items a few seconds behind writes (1.5 to 3.5 s
+measured, [#54](https://github.com/Trum-ok/gh-dojo/issues/54)), filtered or
+not: an issue `new` or a verb has just created or moved may be missing from
+`list` and `next`, or show its old status. `show` reads the issue itself and
+is up to date at once, so check one issue with `show`.
+
 Issues in a status that is resolved but not final
 ([`statuses.resolved`](configuration.md#statuses), such as Ready: done and waiting for a
 release) pile up until a release, so their group is one line of numbers:

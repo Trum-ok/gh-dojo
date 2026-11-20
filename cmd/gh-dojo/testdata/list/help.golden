@@ -11,6 +11,10 @@ naming that status, or --all, lists them with their titles.
 Filters combine with AND; the issues they leave out are counted. Only
 issues are listed: draft issues and pull requests on the board are counted.
 
+GitHub lists a board's items a few seconds behind writes: an issue just
+created or moved may be missing or in its old status. gh dojo show N reads
+the issue itself and is up to date at once.
+
 Usage:
   gh dojo list [flags]
 

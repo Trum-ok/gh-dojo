@@ -11,6 +11,10 @@ The blocked issues are counted; --all shows them too, with their blockers.
 Filters combine with AND; the issues they leave out are counted. Only
 issues are listed. gh dojo list shows the rest of the board.
 
+GitHub lists a board's items a few seconds behind writes: an issue just
+created or moved may be missing or in its old status. gh dojo show N reads
+the issue itself and is up to date at once.
+
 Usage:
   gh dojo next [flags]
 

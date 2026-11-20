@@ -529,6 +529,14 @@ func (d *agentDoc) reading(w *mdWriter) {
 		"`gh dojo list`: an overview of the board, when the user asks for one: the open issues grouped by status; "+
 			"closed issues and final statuses are hidden and counted"+d.foldedList()+". Filters: "+listFilters+
 			", `--all`, `--limit 100`.")
+	// Measured on a sandbox board: items and items(query:) catch up 1.5 to
+	// 3.5 s after a write, the issue itself at once (#54).
+	lists := "`gh dojo list`"
+	if d.hasCommand("next") {
+		lists = "`gh dojo next` and " + lists
+	}
+	items = append(items, lists+" read the board a few seconds behind writes: an issue just created or moved may "+
+		"be missing or in its old status. To check one issue, `gh dojo show N`.")
 	w.heading(1, "Reading")
 	w.list(items)
 }

@@ -34,7 +34,10 @@ func newNextCmd() (*cobra.Command, error) {
 			"as unresolved.\n\n" +
 			"The blocked issues are counted; --all shows them too, with their blockers.\n" +
 			"Filters combine with AND; the issues they leave out are counted. Only\n" +
-			"issues are listed. gh dojo list shows the rest of the board.",
+			"issues are listed. gh dojo list shows the rest of the board.\n\n" +
+			"GitHub lists a board's items a few seconds behind writes: an issue just\n" +
+			"created or moved may be missing or in its old status. gh dojo show N reads\n" +
+			"the issue itself and is up to date at once.",
 		Example: `  gh dojo next
   gh dojo next --mine --limit 1
   gh dojo next --label bug

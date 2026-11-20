@@ -77,7 +77,10 @@ func newListCmd() (*cobra.Command, error) {
 			"Ready: done, waiting for a release) are one line of numbers; --status\n" +
 			"naming that status, or --all, lists them with their titles.\n" +
 			"Filters combine with AND; the issues they leave out are counted. Only\n" +
-			"issues are listed: draft issues and pull requests on the board are counted.",
+			"issues are listed: draft issues and pull requests on the board are counted.\n\n" +
+			"GitHub lists a board's items a few seconds behind writes: an issue just\n" +
+			"created or moved may be missing or in its old status. gh dojo show N reads\n" +
+			"the issue itself and is up to date at once.",
 		Example: `  gh dojo list
   gh dojo list --status "In progress" --mine
   gh dojo list --status none
