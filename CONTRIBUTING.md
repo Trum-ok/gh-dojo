@@ -356,11 +356,12 @@ the config or the notes and run `make agent`, which uses the build of your
 branch. So does CI's `agent install --check`, so a change to the generated
 text, the notes or the config needs `make agent` too.
 
-Issue tracking uses the installed `gh dojo`, the last `make install` from
-`main`, not a build of your branch: a broken branch must not break it.
-After a change is merged, run `make install` on `main` again. Unknown config
-keys are errors, so a change that adds a key to `.github/dojo.toml` (as
-`[agent]` did) breaks the installed `gh dojo` until that reinstall.
+Issue tracking uses the installed `gh dojo`, the latest release installed
+with `gh extension install` (`make release` does it), not a build of your
+branch: a broken branch must not break it. A merged change reaches it with
+the next release. Unknown config keys are errors, so a change that adds a
+key to `.github/dojo.toml` (as `[agent]` did) breaks the installed
+`gh dojo` until it is released: release it before the config uses the key.
 
 ## Releases
 
@@ -393,8 +394,10 @@ A release is one command, `make release TAG=vX.Y.Z`
 failure. It checks that `main` is checked out with nothing uncommitted, is
 the same as `origin/main` and that the tag is newer than every `v*` tag;
 tags `HEAD` and pushes the tag; waits for that tag's `release.yml` run and
-checks the release's assets; runs `make install` and checks that
-`gh dojo --version` prints the tag; and moves the release's issues to Done
+checks the release's assets; installs the release with
+`gh extension install` (removing the `gh dojo` installed before, a release
+or a `make install` build; a prerelease is pinned with `--pin`) and checks
+that `gh dojo --version` prints the tag; and moves the release's issues to Done
 with `gh dojo release vX.Y.Z --verb done --comment "vX.Y.Z"`. After a
 failure, run it again with the same tag: a tag already at `HEAD` is not
 created again, and the later steps are safe to repeat.

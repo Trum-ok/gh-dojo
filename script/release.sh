@@ -6,7 +6,8 @@
 #   2. tags HEAD (annotated) and pushes the tag;
 #   3. waits for the release.yml run of that tag, then checks the release's
 #      assets;
-#   4. make install, and gh dojo --version must print the tag;
+#   4. installs the release with gh extension install, and gh dojo --version
+#      must print the tag;
 #   5. gh dojo release <tag> --verb done --comment <tag>.
 #
 # Step 5 moves the release's issues to Done, so run the script only on the
@@ -169,13 +170,25 @@ echo "release $tag has its $(wc -l <<<"$want" | tr -d ' ') assets"
 
 # --- 4. install ------------------------------------------------------------
 
-step "make install"
+# The release as users get it, through gh, not a build of the working copy.
+# gh keeps one extension per name, so the dojo installed now (an earlier
+# release, or make install's source build) is removed first. A prerelease
+# is pinned, since gh otherwise installs the latest release.
+repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
+step "gh extension install $repo ($tag)"
 
-make install
+if [[ -n "$(gh extension list | awk -F'\t' '$1 == "gh dojo"')" ]]; then
+  gh extension remove dojo
+fi
+if [[ "$tag" == *-* ]]; then
+  gh extension install "$repo" --pin "$tag"
+else
+  gh extension install "$repo"
+fi
 installed="$(gh dojo --version)"
 [[ "$installed" == "gh dojo version $tag" ]] ||
   fail "the installed gh dojo prints \"$installed\", not \"gh dojo version $tag\"" \
-    "check make install's output, then run this script again"
+    "gh extension list; gh release view $tag, then run this script again"
 echo "$installed"
 
 # --- 5. Done ---------------------------------------------------------------

@@ -7,7 +7,7 @@
   "Releases" in `CONTRIBUTING.md` first: this project's rules for `gh dojo release` and what to do with its output.
 - A release is one command, not a sequence of your own: show the user `gh dojo release main --verb done --dry-run`,
   ask for the tag, and on their word run `make release TAG=vX.Y.Z` (`script/release.sh`: tag, push, wait for the
-  release run, `make install`, move the release's issues to Done). It takes several minutes: run it in the background.
+  release run, `gh extension install` of the release, move the release's issues to Done). It takes several minutes: run it in the background.
   After a failure, run it again with the same tag.
 - In `--comment` for `ready` and `done` it helps to give the commit or release: `--comment "5fc0e30"`.
 
@@ -29,5 +29,5 @@ or to reopen one, use `gh issue close N --reason "not planned"` / `gh issue reop
 
 ## Which version runs
 
-`gh dojo` is the build of the last `make install` on main (`gh dojo --version`): a branch's changes reach it only
-after the merge and a reinstall.
+`gh dojo` is the latest release, installed with `gh extension install` (`gh dojo --version`): a change reaches it
+only after the merge and a release.

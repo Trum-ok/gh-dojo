@@ -102,8 +102,8 @@ agent:
 dist:
 	script/build-release.sh $(VERSION)
 
-# Release TAG from main: tag, push, wait for release.yml, make install, then
-# move the release's issues to Done (script/release.sh; CONTRIBUTING.md,
+# Release TAG from main: tag, push, wait for release.yml, install the release
+# with gh extension install, then move the release's issues to Done (script/release.sh; CONTRIBUTING.md,
 # Releases). Only on the user's word for the tag and the issues.
 release:
 	@test -n "$(TAG)" || { echo "usage: make release TAG=vX.Y.Z" >&2; exit 1; }
