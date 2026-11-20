@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/Trum-ok/gh-dojo/internal/graph"
 	"github.com/Trum-ok/gh-dojo/internal/render"
@@ -56,8 +57,8 @@ func ReadAll(ctx context.Context, q graph.Querier, req Request, numbers []int) (
 // in the repository its ref names, req.Repo for a ref without one, with
 // the same windows as Read: one request per MaxBatch issues, the card
 // selection aliased once per issue below the field of its repository (see
-// batchQuery). A single ref is read with Read, so it sends exactly the
-// request Read sends.
+// batchQuery), up to ChunksAtOnce of them at once. A single ref is read
+// with Read, so it sends exactly the request Read sends.
 //
 // A Lookup is read once per request: labels and the assignable user once
 // per repository, the viewer and the links once. Every card of the request
@@ -73,7 +74,8 @@ func ReadAll(ctx context.Context, q graph.Querier, req Request, numbers []int) (
 // the others are still read. When a batch request fails as a whole (a
 // timeout, say), its issues are read once more one by one; the first of
 // those reads to fail that way is returned as err, together with the
-// results read before it. A missing req.Repo in a request that reads no
+// results before it, as if the batches were read one after another. A
+// missing req.Repo in a request that reads no
 // other repository is err at once: the config names it.
 func ReadRefs(ctx context.Context, q graph.Querier, req Request, refs []Ref) ([]Result, error) {
 	refs = slices.Clone(refs)
@@ -91,22 +93,91 @@ func ReadRefs(ctx context.Context, q graph.Querier, req Request, refs []Ref) ([]
 	if len(refs) == 1 {
 		return readEach(ctx, q, req, refs)
 	}
-	out := make([]Result, 0, len(refs))
+	var chunks [][]Ref
 	for start := 0; start < len(refs); start += MaxBatch {
-		chunk := refs[start:min(start+MaxBatch, len(refs))]
-		res, err := readBatch(ctx, q, req, chunk)
-		if errors.Is(err, errRepoMissing) {
-			return out, err
-		}
-		if err != nil {
-			res, err = readEach(ctx, q, req, chunk)
-		}
-		out = append(out, res...)
-		if err != nil {
-			return out, err
+		chunks = append(chunks, refs[start:min(start+MaxBatch, len(refs))])
+	}
+	out := make([]Result, 0, len(refs))
+	for _, c := range readChunks(ctx, q, req, chunks) {
+		out = append(out, c.res...)
+		if c.err != nil {
+			return out, c.err
 		}
 	}
 	return out, nil
+}
+
+// ChunksAtOnce is how many requests ReadRefs has in flight at once, one
+// per MaxBatch issues: GitHub asks for requests one at a time to stay
+// clear of its secondary rate limits, so a few, not one per chunk.
+const ChunksAtOnce = 4
+
+// chunkRead is what readChunk read of one chunk.
+type chunkRead struct {
+	res []Result
+	err error
+}
+
+// readChunk reads one chunk of ReadRefs: one batch request, or, when that
+// fails as a whole, its issues one by one. A missing repository that
+// fails the batch is err at once, with no results (see ReadRefs).
+func readChunk(ctx context.Context, q graph.Querier, req Request, chunk []Ref) chunkRead {
+	res, err := readBatch(ctx, q, req, chunk)
+	if errors.Is(err, errRepoMissing) {
+		return chunkRead{err: err}
+	}
+	if err != nil {
+		res, err = readEach(ctx, q, req, chunk)
+	}
+	return chunkRead{res, err}
+}
+
+// readChunks reads chunks at once, ChunksAtOnce at a time, and returns
+// what each read, in order. The reads are independent, so a run of 40
+// issues waits for the slower of two requests rather than for both. The
+// caller takes them in order, up to the first error, as if read one after
+// another: a chunk that fails cancels the chunks after it, whose results
+// it never takes, and leaves those before it to finish.
+func readChunks(ctx context.Context, q graph.Querier, req Request, chunks [][]Ref) []chunkRead {
+	out := make([]chunkRead, len(chunks))
+	if len(chunks) == 1 {
+		out[0] = readChunk(ctx, q, req, chunks[0])
+		return out
+	}
+	ctxs := make([]context.Context, len(chunks))
+	cancels := make([]context.CancelFunc, len(chunks))
+	for i := range chunks {
+		ctxs[i], cancels[i] = context.WithCancel(ctx)
+		defer cancels[i]()
+	}
+	slots := make(chan struct{}, ChunksAtOnce)
+	var wg sync.WaitGroup
+	for i, chunk := range chunks {
+		wg.Go(func() {
+			// A panic here would crash the process past main's recover.
+			defer func() {
+				if r := recover(); r != nil {
+					msg, _, _ := strings.Cut(fmt.Sprint(r), "\n")
+					out[i] = chunkRead{err: render.Internal("%s", msg)}
+				}
+				if out[i].err != nil {
+					for _, cancel := range cancels[i+1:] {
+						cancel()
+					}
+				}
+			}()
+			select {
+			case slots <- struct{}{}:
+				defer func() { <-slots }()
+			case <-ctxs[i].Done():
+				out[i] = chunkRead{err: ctxs[i].Err()}
+				return
+			}
+			out[i] = readChunk(ctxs[i], q, req, chunk)
+		})
+	}
+	wg.Wait()
+	return out
 }
 
 // readEach reads refs one request each with Read, stopping at the first

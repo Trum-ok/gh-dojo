@@ -89,8 +89,8 @@ Long content is folded, always with a note saying what is hidden:
 
 It takes neither `--comments` nor `--full` (exit code 1).
 
-Several issues are read in one request (up to 20 issues per request), from
-any repositories: `gh dojo show 42 acme/api#7`. In text they are printed as
+Several issues are read in one request (up to 20 issues per request, up to 4
+such requests at once), from any repositories: `gh dojo show 42 acme/api#7`. In text they are printed as
 with `--brief`, since an agent usually takes one of them and reads it alone;
 `--comments N` or `--full` prints their whole cards, and `--json` has whole
 cards unless `--brief`. A missing issue, a pull
@@ -403,6 +403,8 @@ It sends:
   set;
 - one for the verbs' labels, assignees and milestones when a verb has them
   (plus the open milestones page by page past 100).
+
+The last three go at once, after the first: they need what it found.
 
 The exit code is 0 when no check is a problem (warnings included), 4 when
 one failed on auth or the network, else 1.

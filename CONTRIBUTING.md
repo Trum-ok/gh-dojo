@@ -262,6 +262,15 @@ into issues (verb `when` lines and comment templates) come from the config.
   `board.ReadItemsWith`, every filter a `board.Filter`. GitHub's filter
   lags behind writes for a moment, so what is read is checked again by the
   item's own fields.
+- Independent reads go in one request when they fit (aliases), else at
+  once ([#96](https://github.com/Trum-ok/gh-dojo/issues/96)): the
+  `issue.MaxBatch` chunks of a read of many issues, up to
+  `issue.ChunksAtOnce` in flight, taken in order as if read one after
+  another; doctor's labels and verbs queries, after the Doctor query they
+  need. Writes stay one after another: GitHub asks for requests one at a
+  time to stay clear of its secondary rate limits, which creating content
+  hits first, and a write that fails for every issue stops the rest. A
+  goroutine recovers its own panics (see `run` in `cmd/gh-dojo/main.go`).
 - Queries are retried on 5xx and secondary rate limits with exponential
   backoff, at most `MaxAttempts` sends (`internal/graph/graph.go`).
   Mutations are sent once: re-running the command re-reads the state and

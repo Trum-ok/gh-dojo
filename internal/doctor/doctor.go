@@ -9,6 +9,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/Trum-ok/gh-dojo/internal/board"
@@ -140,11 +143,14 @@ type Env struct {
 	Now         func() time.Time // today, for the sprint check
 }
 
-// Run runs the checks in order. Requests: one Doctor query (token and
-// repositories), plus the board schema when it is not cached (or the
-// cached one has no iteration for today), plus one DoctorLabels query with
-// labels.type_prefix or labels.area_prefix set, plus one
-// DoctorVerbs query when a verb has labels or assigns someone.
+// Run runs the checks and reports them in order. Requests: one Doctor
+// query (token and repositories), plus the board schema when it is not
+// cached (or the cached one has no iteration for today), plus one
+// DoctorLabels query with labels.type_prefix or labels.area_prefix set,
+// plus one DoctorVerbs query when a verb has labels or assigns someone.
+// The labels and verbs checks need what the Doctor query found (whether
+// GitHub answered, the usable repositories, the viewer for "@me"), so
+// they wait for it; then they and the board check run at once.
 func Run(ctx context.Context, env Env) *Report {
 	r := &Report{}
 	r.AddOK("version", "gh dojo %s", env.Version)
@@ -164,6 +170,17 @@ func Run(ctx context.Context, env Env) *Report {
 	repos, repoErr := listRepos(cfg, env.CurrentRepo)
 	labels := newLabelsCheck(cfg)
 	reach, viewer := checkToken(ctx, r, env.Client, repos)
+
+	// The labels and verbs checks report into their own reports, appended
+	// after the board, repo and sprint lines are in.
+	var labelsReport, sprintReport, verbsReport Report
+	var wg sync.WaitGroup
+	if cfg != nil && repoErr == nil && reach && labels != nil {
+		goCheck(&wg, &labelsReport, "labels", func() { labels.run(ctx, &labelsReport, env.Client, cfg, repos) })
+	}
+	if cfg != nil {
+		goCheck(&wg, &verbsReport, "verbs", func() { checkVerbs(ctx, &verbsReport, env.Client, cfg, repos, reach, viewer) })
+	}
 
 	var schema *board.Schema
 	sprintReported := false
@@ -190,13 +207,10 @@ func Run(ctx context.Context, env Env) *Report {
 		for _, rp := range repos {
 			checkRepo(r, cfg, rp)
 		}
-		if labels != nil {
-			labels.run(ctx, r, env.Client, cfg, repos)
-		}
 	}
 
 	if cfg != nil && schema != nil && !sprintReported {
-		checkSprint(r, cfg, schema, env.Now(), func() (*board.Schema, error) {
+		checkSprint(&sprintReport, cfg, schema, env.Now(), func() (*board.Schema, error) {
 			ref := board.RefOf(cfg)
 			if err := env.Boards.Invalidate(ref); err != nil {
 				return nil, err
@@ -204,10 +218,24 @@ func Run(ctx context.Context, env Env) *Report {
 			return env.Boards.Fetch(ctx, ref)
 		})
 	}
-	if cfg != nil {
-		checkVerbs(ctx, r, env.Client, cfg, repos, reach, viewer)
-	}
+	wg.Wait()
+	r.Checks = slices.Concat(r.Checks, labelsReport.Checks, sprintReport.Checks, verbsReport.Checks)
 	return r
+}
+
+// goCheck runs check in a goroutine of wg. A panic in it, which would
+// crash the process past main's recover, is a problem of the check name
+// in rep instead.
+func goCheck(wg *sync.WaitGroup, rep *Report, name string, check func()) {
+	wg.Go(func() {
+		defer func() {
+			if p := recover(); p != nil {
+				msg, _, _ := strings.Cut(fmt.Sprint(p), "\n") // never a trace
+				rep.AddProblem(name, render.Internal("%s", msg))
+			}
+		}()
+		check()
+	})
 }
 
 // configSummary is the detail of a config that loads.

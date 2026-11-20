@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -32,12 +33,16 @@ type fakeGitHub struct {
 	scopes *string           // X-OAuth-Scopes; nil: not listed
 	sent   []string          // the operations, in order
 	vars   []map[string]any
+
+	mu sync.Mutex // DoctorLabels and DoctorVerbs are sent at once
 }
 
 func (f *fakeGitHub) Query(_ context.Context, query string, vars map[string]any, out any) error {
 	op := operation(query)
+	f.mu.Lock()
 	f.sent = append(f.sent, op)
 	f.vars = append(f.vars, vars)
+	f.mu.Unlock()
 	if data, ok := f.data[op]; ok {
 		if err := json.Unmarshal([]byte(data), out); err != nil {
 			return err
@@ -194,6 +199,60 @@ func TestRun(t *testing.T) {
 	}
 	if v := gh.vars[0]; v["owner0"] != "acme" || v["name0"] != "api" {
 		t.Errorf("Doctor vars = %v", v)
+	}
+}
+
+// atOnceToken is fakeToken holding the DoctorLabels and DoctorVerbs
+// queries until both are in flight (or a second passed, which the test
+// reports).
+type atOnceToken struct {
+	fakeToken
+	t       *testing.T
+	mu      sync.Mutex
+	n       int
+	arrived chan struct{}
+}
+
+func (f *atOnceToken) Query(ctx context.Context, query string, vars map[string]any, out any) error {
+	if op := operation(query); op == "DoctorLabels" || op == "DoctorVerbs" {
+		f.mu.Lock()
+		if f.n++; f.n == 2 {
+			close(f.arrived)
+		}
+		f.mu.Unlock()
+		select {
+		case <-f.arrived:
+		case <-time.After(time.Second):
+			f.t.Errorf("%s: DoctorLabels and DoctorVerbs not in flight at once", op)
+		}
+	}
+	return f.fakeToken.Query(ctx, query, vars, out)
+}
+
+// TestRunAtOnce: the DoctorLabels and DoctorVerbs queries are in flight
+// at once, after the Doctor query; the lines stay in order.
+func TestRunAtOnce(t *testing.T) {
+	gh := &fakeGitHub{scopes: scopes("project, repo"), data: map[string]string{
+		"Doctor": `{"viewer": {"login": "octocat"},
+			"repo0": {"nameWithOwner": "acme/api", "hasIssuesEnabled": true}}`,
+		"DoctorLabels": `{"repo0": {"labels": {"totalCount": 1, "nodes": [{"name": "bug"}]}, "area": {"nodes": []}}}`,
+		"DoctorVerbs":  `{"repository": {"labels": {"nodes": [{"name": "bug"}]}, "label0": {"name": "bug"}}}`,
+	}}
+	cfg := parse(t, kanbanConfig+"\n[verbs.tag]\nwhen = \"It is a bug\"\nlabels = [\"+bug\"]\n")
+	e := env(cfg, gh, &fakeBoards{schema: kanbanBoard()})
+	e.Client = &atOnceToken{fakeToken: fakeToken{gh}, t: t, arrived: make(chan struct{})}
+	r := Run(context.Background(), e)
+	wantLines(t, r,
+		"ok version: gh dojo v1.0.0",
+		"ok config: .github/dojo.toml: preset kanban, 5 verbs",
+		"ok token: github.com as octocat, with the project scope",
+		`ok board: acme/3 "Roadmap": field Status and 5 statuses match`,
+		"ok repo: acme/api (default): visible, issues enabled",
+		"ok labels: acme/api: no area labels (area:…) yet: new --area fails until one exists",
+		"ok verbs: acme/api: 1 label exists",
+	)
+	if gh.sent[0] != "Doctor" || len(gh.sent) != 3 {
+		t.Errorf("sent %v, want Doctor, then DoctorLabels and DoctorVerbs", gh.sent)
 	}
 }
 

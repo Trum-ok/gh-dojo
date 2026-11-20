@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/Trum-ok/gh-dojo/internal/graph/graphtest"
 	"github.com/Trum-ok/gh-dojo/internal/issue"
@@ -222,6 +224,93 @@ func TestReadAllLaterChunkFails(t *testing.T) {
 	// 1 batch + 3 attempts of the second batch + 3 attempts of #21 alone.
 	if n := srv.Requests(); n != 7 {
 		t.Errorf("requests = %d, want 7", n)
+	}
+}
+
+// chunkQuerier answers a batch request with a card for each number it
+// names, after holding it until want requests are in flight at once (or a
+// second passed, which the test reports), and fails every request whose
+// first number is in fail.
+type chunkQuerier struct {
+	t    *testing.T
+	want int
+	fail map[int]bool
+
+	mu       sync.Mutex
+	inFlight int
+	arrived  chan struct{} // closed once want requests are in flight
+}
+
+func (q *chunkQuerier) Query(ctx context.Context, _ string, vars map[string]any, out any) error {
+	q.mu.Lock()
+	q.inFlight++
+	if q.inFlight == q.want {
+		close(q.arrived)
+	}
+	q.mu.Unlock()
+	select {
+	case <-q.arrived:
+	case <-time.After(time.Second):
+		q.t.Errorf("fewer than %d requests in flight at once", q.want)
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	first, _ := vars["n0"].(int)
+	if first == 0 {
+		first, _ = vars["number"].(int) // Read's own request
+	}
+	if q.fail[first] {
+		return render.Network("down")
+	}
+	issues := map[string]json.RawMessage{}
+	for i := 0; ; i++ {
+		n, ok := vars[fmt.Sprintf("n%d", i)].(int)
+		if !ok {
+			break
+		}
+		issues[fmt.Sprintf("i%d", i)] = json.RawMessage(fmt.Sprintf(`{"__typename": "Issue", "id": "I_%d", "number": %d,
+			"title": "T", "state": "OPEN", "url": "https://github.com/Trum-ok/gh-dojo/issues/%d",
+			"labels": {"totalCount": 0, "nodes": []}, "assignees": {"totalCount": 0, "nodes": []},
+			"comments": {"totalCount": 0, "nodes": []}, "blockedBy": {"totalCount": 0, "nodes": []},
+			"blocking": {"totalCount": 0, "nodes": []}, "projectItems": {"totalCount": 0, "nodes": []},
+			"timelineItems": {"totalCount": 0, "nodes": []}}`, n, n, n))
+	}
+	data, err := json.Marshal(map[string]any{"repository": issues})
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, out)
+}
+
+// TestReadRefsChunksAtOnce: 41 issues are three batch requests, all in
+// flight at once, and the cards come back in the order of the numbers.
+func TestReadRefsChunksAtOnce(t *testing.T) {
+	q := &chunkQuerier{t: t, want: 3, arrived: make(chan struct{})}
+	res, err := issue.ReadAll(context.Background(), q, dojoStatus, numbers(1, 41))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res) != 41 {
+		t.Fatalf("%d results, want 41", len(res))
+	}
+	for i, r := range res {
+		if r.Err != nil || r.Card == nil || r.Card.Number != i+1 {
+			t.Errorf("result %d: %+v", i, r)
+		}
+	}
+}
+
+// TestReadRefsEarlierChunkFails: when the first batch and its single
+// reads fail, nothing after them is returned, though the second batch
+// was read at the same time; the error is the first batch's.
+func TestReadRefsEarlierChunkFails(t *testing.T) {
+	q := &chunkQuerier{t: t, want: 2, arrived: make(chan struct{}), fail: map[int]bool{1: true}}
+	res, err := issue.ReadAll(context.Background(), q, dojoStatus, numbers(1, 21))
+	if e := render.FromError(err); err == nil || e.Code != render.ExitNetwork || e.What != "down" {
+		t.Fatalf("err = %v, want the first batch's network error", err)
+	}
+	if len(res) != 0 {
+		t.Errorf("%d results, want none before the failed batch", len(res))
 	}
 }
 
