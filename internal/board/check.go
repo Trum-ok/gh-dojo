@@ -92,7 +92,10 @@ func Problems(c *config.Config, s *Schema) []Problem {
 			e = render.FromError(err)
 		}
 		fix := fmt.Sprintf("edit %s in %s", key, c.Display)
-		if c.KeyPath(key) != key { // set by the preset: override it in the file
+		switch {
+		case e.Fix != "": // only the board can fix it, e.g. an ambiguous status
+			fix = e.Fix
+		case c.KeyPath(key) != key: // set by the preset: override it in the file
 			fix = fmt.Sprintf("set %s in %s to override preset %s", key, c.Display, c.Preset)
 		}
 		problems = append(problems, Problem{Key: key, Err: c.Errorf("%s: %s", c.KeyPath(key), e.What).
@@ -165,7 +168,7 @@ func (s *Schema) FieldInput(v config.FieldValue, reserved ...string) (*Field, ma
 	}
 	switch f.Type {
 	case TypeSingleSelect:
-		opt, err := f.Option(v.Text)
+		opt, err := f.exactOption(v.Text)
 		if err != nil {
 			return nil, nil, err
 		}

@@ -78,7 +78,7 @@ func sprintHelp(cfg *config.Config, v config.Verb, line helpLine) {
 		line("Sprint", "clears %s; an issue without one stays as it is", cfg.SprintField())
 	case config.IterationByStatusDate:
 		also := ""
-		if v.To == v.IterationStatus {
+		if config.SameStatus(v.To, v.IterationStatus) {
 			also = " (today, when this verb moves it there)"
 		}
 		line("Sprint", "sets %s to %s%s; dates are in %s", cfg.SprintField(), iterationText(v), also, zone)

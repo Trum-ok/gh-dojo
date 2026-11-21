@@ -30,7 +30,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -304,7 +303,7 @@ func (l Link) Closed() bool { return l.State == StateClosed }
 // blocks: it is closed, or its board status is one of resolved (config
 // statuses.resolved), its work complete though the issue is still open.
 func (l Link) Resolved(resolved []string) bool {
-	return l.Closed() || l.StatusUnknown == "" && l.Status != "" && slices.Contains(resolved, l.Status)
+	return l.Closed() || l.StatusUnknown == "" && l.Status != "" && config.HasStatus(resolved, l.Status)
 }
 
 // Item is the issue's item on the configured board.

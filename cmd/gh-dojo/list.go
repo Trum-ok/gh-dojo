@@ -277,9 +277,10 @@ func listFilter(cfg *config.Config, o *listOpts) func(*board.Schema, *board.Fiel
 		return nil
 	}
 	return func(s *board.Schema, field *board.Field) *itemsFilter {
-		if slices.ContainsFunc(o.want, func(st string) bool { return st != "" && slices.Contains(final, st) }) {
+		if slices.ContainsFunc(o.want, func(st string) bool { return st != "" && config.HasStatus(final, st) }) {
 			return nil
 		}
+		final := field.Spell(final) // GitHub's filter gets the board's spelling
 		terms, labels, ok := o.userTerms(s, cfg)
 		if !ok {
 			return nil
@@ -448,14 +449,15 @@ func checkStatuses(s *board.Schema, cfg *config.Config, o *listOpts) (*board.Fie
 			o.want = append(o.want, "")
 			continue
 		}
-		if _, err := f.Option(st); err != nil {
+		opt, err := f.Option(st)
+		if err != nil {
 			var e *render.Error
 			if errors.As(err, &e) {
 				e.Allowed = append(slices.Clone(e.Allowed), noStatus)
 			}
 			return nil, err
 		}
-		o.want = append(o.want, st)
+		o.want = append(o.want, opt.Name) // the board's spelling, as items have it
 	}
 	return f, nil
 }
@@ -618,7 +620,7 @@ func buildList(cfg *config.Config, options []string, items *board.Items, o *list
 			l.filtered++
 			continue
 		}
-		final := slices.Contains(cfg.Statuses.Final, it.Status)
+		final := config.HasStatus(cfg.Statuses.Final, it.Status)
 		if !o.all && (it.State == issue.StateClosed || final) && !(final && slices.Contains(o.want, it.Status)) {
 			l.hidden++
 			continue
@@ -720,8 +722,8 @@ func (l *list) write(w io.Writer, repo string, cfg *config.Config, o *listOpts) 
 // is resolved but not final (done, its issues waiting for a release), and
 // neither --status nor --all asks for it.
 func (l *list) folded(g *listGroup, cfg *config.Config, o *listOpts) bool {
-	return g.status != "" && !o.all && slices.Contains(cfg.Statuses.Resolved, g.status) &&
-		!slices.Contains(cfg.Statuses.Final, g.status) && !slices.Contains(o.want, g.status)
+	return g.status != "" && !o.all && config.HasStatus(cfg.Statuses.Resolved, g.status) &&
+		!config.HasStatus(cfg.Statuses.Final, g.status) && !slices.Contains(o.want, g.status)
 }
 
 // statusArg is status s as a --status value, quoted when it has a space.

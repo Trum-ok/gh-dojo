@@ -109,7 +109,8 @@ status first.
 - Closed issues and issues in a final status
   ([`statuses.final`](configuration.md#statuses)) are hidden and counted;
   `--all` shows them, and so does `--status` naming a final status.
-- `--status none` selects issues without a status.
+- `--status` matches the board's statuses in any case (`--status ready`);
+  `--status none` selects issues without a status.
 - Filters combine with AND, and the issues they leave out are counted.
 - Only issues are listed: draft issues and pull requests on the board are
   counted.

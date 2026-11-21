@@ -185,7 +185,7 @@ func (b *Run) Do(ctx context.Context, refs []issue.Ref, dryRun bool) ([]*Item, e
 // sub-issue before its parent (planOrder), and a parent whose sub-issue
 // then fails to be written is refused (applyAll).
 func (b *Run) resolvesSubIssues() bool {
-	return b.v.ChecksSubIssues() && (b.v.Close != "" || b.v.To != "" && slices.Contains(b.resolved, b.v.To))
+	return b.v.ChecksSubIssues() && (b.v.Close != "" || b.v.To != "" && config.HasStatus(b.resolved, b.v.To))
 }
 
 // runKey is how the run matches an issue with a sub-issue a card names.

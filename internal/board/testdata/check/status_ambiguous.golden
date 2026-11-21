@@ -1,0 +1,4 @@
+error: .github/dojo.toml: statuses.final (from preset kanban): status "Done" is ambiguous: the board has "Done" and "done", which differ only in case
+and 2 more problems: statuses.resolved, verbs.done.to
+allowed: Backlog, Ready, In progress, In review, Waiting, Done, done
+fix: rename "Done" or "done" on the board

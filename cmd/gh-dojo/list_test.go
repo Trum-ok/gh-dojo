@@ -34,6 +34,9 @@ func TestList(t *testing.T) {
 		{name: "recorded", fixtures: []string{boardFixture, itemsFixture}, requests: 2},
 		{name: "recorded_status", fixtures: []string{boardFixture, itemsFixture},
 			args: []string{"--status", "In progress", "--status", "Backlog"}, requests: 2},
+		// Statuses match regardless of case: the same issues as recorded_status.
+		{name: "recorded_status_case", fixtures: []string{boardFixture, itemsFixture},
+			args: []string{"--status", "in PROGRESS", "--status", "backlog"}, requests: 2},
 		{name: "recorded_limit", fixtures: []string{boardFixture, itemsFixture}, args: []string{"--limit", "8"}, requests: 2},
 		// Ready is resolved: one line of numbers, cut by --limit like any group,
 		// and listed with titles when --status names it.

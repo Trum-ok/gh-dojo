@@ -270,7 +270,7 @@ func (d *agentDoc) verbs(w *mdWriter) {
 // issue between named statuses, "" when none does.
 func (d *agentDoc) confirmExample() string {
 	for _, v := range d.cfg.Verbs {
-		if v.To != "" && len(v.From) > 0 && v.From[0] != v.To {
+		if v.To != "" && len(v.From) > 0 && !config.SameStatus(v.From[0], v.To) {
 			ex := "#42 " + v.From[0] + " → " + v.To
 			if v.CommentsAlways() {
 				ex += ", comment left"
@@ -359,7 +359,7 @@ func (d *agentDoc) rules(v config.Verb) []string {
 		r = append(r, "It is refused (exit code 2) while a sub-issue is unresolved: `gh dojo show N` lists them. "+
 			"Finish them first, or ask the user; never move the status another way.")
 	}
-	if v.ChecksSubIssues() && (v.Close != "" || slices.Contains(d.cfg.Statuses.Resolved, v.To)) {
+	if v.ChecksSubIssues() && (v.Close != "" || config.HasStatus(d.cfg.Statuses.Resolved, v.To)) {
 		r = append(r, fmt.Sprintf("In one run with its sub-issues (`gh dojo %s 40 41 42`) the sub-issues it "+
 			"moves count as resolved: they go first, and the parent is refused only if one of them is.", v.Name))
 	}
@@ -393,7 +393,7 @@ func (d *agentDoc) releaseRule(v config.Verb) string {
 func (d *agentDoc) verbsFrom(s string) []string {
 	var names []string
 	for _, v := range d.cfg.Verbs {
-		if slices.Contains(v.From, s) {
+		if config.HasStatus(v.From, s) {
 			names = append(names, v.Name)
 		}
 	}
@@ -453,15 +453,18 @@ func (d *agentDoc) lifecycle() (path, verbs []string, skip []bool) {
 		return nil, nil, nil
 	}
 	type edge struct{ to, verb string }
-	next := map[string][]edge{}
+	next := map[string][]edge{} // by the status in lower case: statuses match regardless of case
 	for _, v := range cfg.Verbs {
 		for _, f := range v.From {
-			if v.To != "" && f != v.To {
-				next[f] = append(next[f], edge{v.To, v.Name})
+			if v.To != "" && !config.SameStatus(f, v.To) {
+				next[strings.ToLower(f)] = append(next[strings.ToLower(f)], edge{v.To, v.Name})
 			}
 		}
 	}
-	final := func(p []string) bool { return slices.Contains(cfg.Statuses.Final, p[len(p)-1]) }
+	index := func(p []string, s string) int {
+		return slices.IndexFunc(p, func(x string) bool { return config.SameStatus(x, s) })
+	}
+	final := func(p []string) bool { return config.HasStatus(cfg.Statuses.Final, p[len(p)-1]) }
 	better := func(p []string) bool {
 		switch {
 		case path == nil:
@@ -481,8 +484,8 @@ func (d *agentDoc) lifecycle() (path, verbs []string, skip []bool) {
 		if better(cur) {
 			path, verbs = slices.Clone(cur), slices.Clone(curVerbs)
 		}
-		for _, e := range next[cur[len(cur)-1]] {
-			if slices.Contains(cur, e.to) {
+		for _, e := range next[strings.ToLower(cur[len(cur)-1])] {
+			if index(cur, e.to) >= 0 {
 				continue
 			}
 			cur, curVerbs = append(cur, e.to), append(curVerbs, e.verb)
@@ -493,8 +496,8 @@ func (d *agentDoc) lifecycle() (path, verbs []string, skip []bool) {
 	walk()
 	skip = make([]bool, len(path))
 	for a := range path { // a verb from path[a] to path[b] skips what is between
-		for _, e := range next[path[a]] {
-			for i := a + 1; i < slices.Index(path, e.to); i++ {
+		for _, e := range next[strings.ToLower(path[a])] {
+			for i := a + 1; i < index(path, e.to); i++ {
 				skip[i] = true
 			}
 		}
@@ -540,7 +543,7 @@ func (d *agentDoc) reading(w *mdWriter) {
 func (d *agentDoc) foldedList() string {
 	var folded []string
 	for _, st := range d.cfg.Statuses.Resolved {
-		if !slices.Contains(d.cfg.Statuses.Final, st) {
+		if !config.HasStatus(d.cfg.Statuses.Final, st) {
 			folded = append(folded, st)
 		}
 	}

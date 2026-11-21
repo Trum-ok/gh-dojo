@@ -540,8 +540,13 @@ board:
   `fields.sprint` an iteration field;
 - every status the config names (`statuses.initial`, `statuses.final`,
   `statuses.resolved`, each verb's `to`, `from` and
-  `iteration = "by_status_date:<status>"`) must be one of its options;
-- every value of a verb's `field` table must fit its board field.
+  `iteration = "by_status_date:<status>"`) must be one of its options,
+  in any case: `In progress` is the board's `In Progress`, and gh-dojo
+  prints a status as the config spells it when the config names it. A
+  status that two options differing only in case match (`Done` and `done`)
+  is an error until one of them is renamed on the board;
+- every value of a verb's `field` table must fit its board field, an
+  option spelled as on the board, case included.
 
 A typo is an error with the board's statuses and a suggestion, not a silent
 skip. The board schema is cached for an hour in `~/.cache/gh-dojo` (or
@@ -575,7 +580,9 @@ Both presets set:
 
 ## Kanban preset
 
-The board's status field must have these options (other options are fine):
+The board's status field must have these options, in any case (other
+options are fine); a new GitHub board has Todo, In Progress and Done, so
+add Backlog, Waiting and Ready:
 
 | Status      | Meaning                                              |
 |-------------|------------------------------------------------------|

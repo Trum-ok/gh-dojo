@@ -92,7 +92,7 @@ var (
 	verbChecks = []func(cfg *config.Config, v config.Verb) string{
 		func(cfg *config.Config, v config.Verb) string {
 			switch {
-			case v.To != "" && slices.Contains(cfg.Statuses.Final, v.To) || v.Reopen:
+			case v.To != "" && config.HasStatus(cfg.Statuses.Final, v.To) || v.Reopen:
 				return "also on closed issues"
 			case v.Close != "" && v.To == "":
 				// workflow.Plan: a closed issue only as a repeat.

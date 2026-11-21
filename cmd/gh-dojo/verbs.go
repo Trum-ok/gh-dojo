@@ -351,7 +351,7 @@ func statusHelp(cfg *config.Config, v config.Verb, line helpLine) {
 	from := "any status"
 	if len(v.From) > 0 {
 		from = strings.Join(v.From, ", ")
-		if initial := cfg.Statuses.Initial; slices.Contains(v.From, initial) {
+		if initial := cfg.Statuses.Initial; config.HasStatus(v.From, initial) {
 			from += fmt.Sprintf(" (no status or not on the board counts as %s)", initial)
 		}
 	}

@@ -290,7 +290,7 @@ func releaseLacks(v config.Verb) string {
 // it to a final status). Release runs any verb it can; the others are
 // rarely what a release means.
 func releaseFinishes(cfg *config.Config, v config.Verb) bool {
-	return releaseLacks(v) == "" && (v.Close == config.CloseCompleted || slices.Contains(cfg.Statuses.Final, v.To))
+	return releaseLacks(v) == "" && (v.Close == config.CloseCompleted || config.HasStatus(cfg.Statuses.Final, v.To))
 }
 
 // releaseWaiting are the statuses where finished work waits for a release
@@ -304,7 +304,7 @@ func releaseWaiting(cfg *config.Config, v config.Verb) []string {
 	}
 	var out []string
 	for _, s := range cfg.Statuses.Resolved {
-		if s != v.To && !slices.Contains(cfg.Statuses.Final, s) && v.StartsFrom(s, cfg.Statuses.Initial) {
+		if !config.SameStatus(s, v.To) && !config.HasStatus(cfg.Statuses.Final, s) && v.StartsFrom(s, cfg.Statuses.Initial) {
 			out = append(out, s)
 		}
 	}
@@ -530,7 +530,7 @@ func (r *releaseRun) settled(items []*batch.Item) []*batch.Item {
 	var out []*batch.Item
 	for _, it := range items {
 		is := it.Issue
-		if is == nil || !is.Closed || !is.OnBoard || is.StatusAutomated || !slices.Contains(r.final, is.Status) {
+		if is == nil || !is.Closed || !is.OnBoard || is.StatusAutomated || !config.HasStatus(r.final, is.Status) {
 			out = append(out, it)
 			continue
 		}

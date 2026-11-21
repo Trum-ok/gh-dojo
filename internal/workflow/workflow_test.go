@@ -3,6 +3,7 @@ package workflow
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -872,6 +873,33 @@ func TestExample(t *testing.T) {
 		if got := Example(v, "7"); got != want {
 			t.Errorf("Example(%s) = %q, want %q", verb, got, want)
 		}
+	}
+}
+
+// TestPlanStatusCase: the board's statuses match the config's regardless
+// of case, so a board spelling them "IN PROGRESS" and "DONE" runs the
+// verbs as the kanban preset's "In progress" and "Done".
+func TestPlanStatusCase(t *testing.T) {
+	e, c := testEngine(t)
+	ready, _ := c.Verb("ready")
+	start, _ := c.Verb("start")
+	done, _ := c.Verb("done")
+	p, err := e.Plan(ready, onBoard("IN PROGRESS"), Args{})
+	if err != nil {
+		t.Fatalf("ready from IN PROGRESS: %v", err)
+	}
+	if !slices.ContainsFunc(p.Ops, func(op Op) bool { _, ok := op.(SetStatus); return ok }) {
+		t.Errorf("ready from IN PROGRESS: ops %v, want a status change", p.Ops)
+	}
+	if p, err = e.Plan(start, onBoard("IN PROGRESS"), Args{}); err != nil {
+		t.Fatalf("start in IN PROGRESS: %v", err)
+	}
+	if slices.ContainsFunc(p.Ops, func(op Op) bool { _, ok := op.(SetStatus); return ok }) {
+		t.Errorf("start in IN PROGRESS: ops %v, want the status in place", p.Ops)
+	}
+	closed := Issue{Number: 42, Closed: true, StateReason: "completed", OnBoard: true, Status: "DONE"}
+	if p, err = e.Plan(done, closed, Args{}); err != nil || len(p.Ops) != 0 {
+		t.Errorf("done on a closed issue in DONE: ops %v, %v; want nothing to do", p, err)
 	}
 }
 

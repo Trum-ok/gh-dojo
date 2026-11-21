@@ -2,8 +2,8 @@ package board
 
 import (
 	"context"
-	"slices"
 
+	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/graph"
 )
 
@@ -18,6 +18,9 @@ func ReadInStatus(ctx context.Context, q graph.Querier, s *Schema, statusField s
 	if len(statuses) == 0 {
 		return nil, nil
 	}
+	if f, err := s.Field(statusField); err == nil { // the filter gets the board's spelling
+		statuses = f.Spell(statuses)
+	}
 	var o ItemsOptions
 	if t, ok := FieldTerm(statusField, statuses, false); ok {
 		o.Filter = Filter{FilterIssues, t}.String()
@@ -28,7 +31,7 @@ func ReadInStatus(ctx context.Context, q graph.Querier, s *Schema, statusField s
 	}
 	var out []Item
 	for _, it := range items.Items {
-		if it.Type == ContentIssue && slices.Contains(statuses, it.Status) {
+		if it.Type == ContentIssue && config.HasStatus(statuses, it.Status) {
 			out = append(out, it)
 		}
 	}

@@ -69,6 +69,7 @@ func TestCheckErrors(t *testing.T) {
 		{"iteration_status", "[fields]\nsprint = \"Sprint\"\n[verbs.done]\niteration = \"by_status_date:Redy\"\n"},
 		{"field_unknown", "[verbs.done.field]\nPriorty = \"P1\"\n"},
 		{"field_option", "[verbs.done.field]\nPriority = \"p3\"\n"},
+		{"field_option_case", "[verbs.done.field]\nPriority = \"p1\"\n"},
 		{"field_number", "[verbs.done.field]\nEstimate = \"3\"\n"},
 		{"field_date", "[verbs.done.field]\n\"Target date\" = \"tomorrow\"\n"},
 		{"field_builtin", "[verbs.done.field]\nLabels = \"bug\"\n"},
@@ -84,6 +85,52 @@ func TestCheckErrors(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestCheckStatusCase: statuses match the board's options regardless of
+// case, so the kanban preset's "In progress" fits a board with GitHub's
+// "In Progress", and Option returns the board's spelling.
+func TestCheckStatusCase(t *testing.T) {
+	s := loadSchema(t)
+	status := statusField(t, s)
+	for i := range status.Options {
+		status.Options[i].Name = strings.ToUpper(status.Options[i].Name)
+	}
+	c := parseConfig(t, dojoBoard+"[statuses]\nresolved = [\"ready\", \"Done\"]\n")
+	if err := board.Check(c, s); err != nil {
+		t.Fatal(err)
+	}
+	o, err := status.Option("In progress")
+	if err != nil || o.Name != "IN PROGRESS" {
+		t.Errorf("Option(In progress) = %v, %v; want IN PROGRESS", o, err)
+	}
+	if got, want := status.Spell([]string{"ready", "Shipped"}), []string{"READY", "Shipped"}; !slices.Equal(got, want) {
+		t.Errorf("Spell = %q, want %q", got, want)
+	}
+}
+
+// TestCheckStatusAmbiguous: a status two options match, differing only in
+// case, is an error the board fixes, even when one is spelled exactly so.
+func TestCheckStatusAmbiguous(t *testing.T) {
+	s := loadSchema(t)
+	status := statusField(t, s)
+	status.Options = append(status.Options, board.Option{ID: "x", Name: "done"})
+	err := board.Check(parseConfig(t, dojoBoard), s)
+	assertError(t, err, render.ExitUsage, "check/status_ambiguous")
+	if !board.IsStale(err) {
+		t.Errorf("IsStale(%v) = false; Resolve would not re-read a board just fixed", err)
+	}
+}
+
+func statusField(t *testing.T, s *board.Schema) *board.Field {
+	t.Helper()
+	for i := range s.Fields {
+		if s.Fields[i].Name == "Status" {
+			return &s.Fields[i]
+		}
+	}
+	t.Fatal("no Status field")
+	return nil
 }
 
 // TestCheckPresetKey shows where a preset value is fixed: in the repo's

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/graph"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 )
@@ -178,8 +179,41 @@ func (s *Schema) Field(name string) (*Field, error) {
 	return nil, unknown(ErrUnknownField, fmt.Sprintf("field %q on board %s", name, s.Ref()), name, writable)
 }
 
-// Option returns the single-select option with exactly this name.
+// Option returns the single-select option named name regardless of case,
+// as a status is matched (config.SameStatus): "In progress" finds the
+// board's "In Progress". A name that two options differing only in case
+// match ("Done" and "done") is ambiguous, an error even when one of them
+// is spelled exactly so, since the statuses compared later could not tell
+// them apart.
 func (f *Field) Option(name string) (*Option, error) {
+	if f.Type != TypeSingleSelect {
+		return nil, f.typeError(TypeSingleSelect)
+	}
+	var found *Option
+	for i := range f.Options {
+		o := &f.Options[i]
+		if !config.SameStatus(o.Name, name) {
+			continue
+		}
+		if found != nil {
+			return nil, render.Usage("%s %q is ambiguous: the board has %q and %q, which differ only in case",
+				strings.ToLower(f.Name), name, found.Name, o.Name).
+				WithAllowed(f.OptionNames()...).
+				WithFix(fmt.Sprintf("rename %q or %q on the board", found.Name, o.Name)).
+				WithCause(ErrUnknownOption)
+		}
+		found = o
+	}
+	if found != nil {
+		return found, nil
+	}
+	return nil, unknown(ErrUnknownOption, fmt.Sprintf("%s %q", strings.ToLower(f.Name), name), name, f.OptionNames())
+}
+
+// exactOption returns the single-select option with exactly this name,
+// case included: a field effect's value, which planFields compares with
+// the field's value as text.
+func (f *Field) exactOption(name string) (*Option, error) {
 	if f.Type != TypeSingleSelect {
 		return nil, f.typeError(TypeSingleSelect)
 	}
@@ -189,6 +223,20 @@ func (f *Field) Option(name string) (*Option, error) {
 		}
 	}
 	return nil, unknown(ErrUnknownOption, fmt.Sprintf("%s %q", strings.ToLower(f.Name), name), name, f.OptionNames())
+}
+
+// Spell returns names as the field's options spell them (see Option), a
+// name it has no option for unchanged: a filter GitHub runs gets the
+// board's spelling of the config's statuses.
+func (f *Field) Spell(names []string) []string {
+	out := make([]string, len(names))
+	for i, n := range names {
+		out[i] = n
+		if o, err := f.Option(n); err == nil {
+			out[i] = o.Name
+		}
+	}
+	return out
 }
 
 // OptionNames lists single-select option names in board order.

@@ -359,6 +359,19 @@ into issues (verb `when` lines and comment templates) come from the config.
   loads, does nothing, is left out of the allowed keys of errors, and
   `gh dojo doctor` warns about it with the fix to remove it
   (`Config.Deprecated`).
+- **Statuses match regardless of case.** GitHub creates a board with
+  `In Progress`, the presets say `In progress`: matching exactly made the
+  user override four preset keys or rename the option for a capital letter.
+  A verb only picks an option by its ID and never creates one, so ignoring
+  case cannot make a second status, as it could a second label (`+label`
+  keeps the exact spelling). The config is not rewritten in the board's
+  spelling: each verb copies its `config.Verb` before the board is read. So
+  a status of the config is compared with another only through
+  `config.SameStatus` or `config.HasStatus`, never with `==` or
+  `slices.Contains`; `board.Field.Option` finds the option, refusing a name
+  that two options differing only in case match, and a filter GitHub runs
+  gets the board's spelling (`Field.Spell`). A field effect's option stays
+  exact: `planFields` compares its value as text.
 
 ## Working on gh-dojo with gh-dojo
 

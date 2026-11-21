@@ -147,7 +147,7 @@ func selectNext(cfg *config.Config, items *board.Items, o *listOpts) *next {
 		}
 	}
 	for _, it := range items.Items {
-		if it.Status != "" && it.Status != cfg.Statuses.Initial {
+		if it.Status != "" && !config.SameStatus(it.Status, cfg.Statuses.Initial) {
 			continue
 		}
 		if n.skip(it) {
@@ -181,7 +181,7 @@ func nextFilter(cfg *config.Config, o *listOpts) func(*board.Schema, *board.Fiel
 		}
 		var others []string
 		for _, st := range field.OptionNames() {
-			if st != cfg.Statuses.Initial {
+			if !config.SameStatus(st, cfg.Statuses.Initial) {
 				others = append(others, st)
 			}
 		}

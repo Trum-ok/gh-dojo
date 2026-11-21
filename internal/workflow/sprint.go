@@ -68,7 +68,7 @@ func (p *Plan) planIteration(v config.Verb, atTarget bool, loc *time.Location) e
 			return s.noIteration(sprintDay{at: today, when: "today"})
 		}
 	case config.IterationByStatusDate:
-		d, err := statusDate(v, is, today, !atTarget && v.To == v.IterationStatus)
+		d, err := statusDate(v, is, today, !atTarget && config.SameStatus(v.To, v.IterationStatus))
 		if err != nil {
 			return err
 		}
@@ -114,7 +114,7 @@ func enteredToday(v config.Verb, is Issue, today time.Time) bool {
 		return false
 	}
 	last := is.History[len(is.History)-1]
-	if last.To != v.To || !is.AddedAt.IsZero() && last.At.Before(is.AddedAt) {
+	if !config.SameStatus(last.To, v.To) || !is.AddedAt.IsZero() && last.At.Before(is.AddedAt) {
 		return false
 	}
 	return last.At.In(today.Location()).Format(time.DateOnly) == today.Format(time.DateOnly)
@@ -182,9 +182,9 @@ func statusDate(v config.Verb, is Issue, today time.Time, entersNow bool) (sprin
 	unknown := func(why string, a ...any) sprintDay {
 		return sprintDay{at: today, when: "today", warning: fmt.Sprintf(why, a...) + "; using today's sprint"}
 	}
-	if is.OnBoard && is.Status == status {
+	if is.OnBoard && config.SameStatus(is.Status, status) {
 		switch last := len(changes) - 1; {
-		case last >= 0 && changes[last].To == status:
+		case last >= 0 && config.SameStatus(changes[last].To, status):
 			return entered(changes[last].At, "the day %s entered %s"), nil
 		case last >= 0:
 			return unknown("%s is in %s, but its status history does not show it entering %s",
@@ -195,7 +195,7 @@ func statusDate(v config.Verb, is Issue, today time.Time, entersNow bool) (sprin
 		return unknown("%s entered %s before the status changes gh dojo reads", is.Name(), status), nil
 	}
 	for i := len(changes) - 1; i >= 0; i-- {
-		if changes[i].To == status {
+		if config.SameStatus(changes[i].To, status) {
 			return entered(changes[i].At, "the day %s entered %s"), nil
 		}
 	}

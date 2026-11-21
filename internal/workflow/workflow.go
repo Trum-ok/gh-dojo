@@ -526,7 +526,7 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 	if w := YesWarning(v, a); w != "" {
 		p.Warnings = append(p.Warnings, w)
 	}
-	atTarget := v.To != "" && is.Status == v.To
+	atTarget := v.To != "" && config.SameStatus(is.Status, v.To)
 	if !atTarget && !closedRepeat(v, is) {
 		if err := e.checkFrom(v, is); err != nil {
 			return nil, err
@@ -548,7 +548,7 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 		}
 	}
 	moves := v.To != "" && !atTarget
-	if is.Closed && moves && slices.Contains(e.Final, v.To) &&
+	if is.Closed && moves && config.HasStatus(e.Final, v.To) &&
 		(is.StateReason == config.CloseNotPlanned || is.StateReason == config.CloseDuplicate) {
 		p.Warnings = append(p.Warnings, fmt.Sprintf("%s is closed as %s; moving to %s anyway",
 			is.Name(), ReasonText(is.StateReason), v.To))
@@ -556,7 +556,7 @@ func (e *Engine) Plan(v config.Verb, is Issue, a Args) (*Plan, error) {
 	switch {
 	case !is.OnBoard && !v.OnlyClearsSprint():
 		p.Ops = append(p.Ops, AddToBoard{})
-	case is.Archived && moves && !slices.Contains(e.Final, v.To):
+	case is.Archived && moves && !config.HasStatus(e.Final, v.To):
 		p.Ops = append(p.Ops, Unarchive{})
 	}
 	if v.Reopen {
@@ -1085,5 +1085,5 @@ var ErrFrom = errors.New("status not in from")
 // runsOnClosed reports whether v may run on a closed issue: its target
 // status is final, or it closes (a repeat is safe) or reopens the issue.
 func (e *Engine) runsOnClosed(v config.Verb) bool {
-	return v.To != "" && slices.Contains(e.Final, v.To) || v.Close != "" || v.Reopen
+	return v.To != "" && config.HasStatus(e.Final, v.To) || v.Close != "" || v.Reopen
 }

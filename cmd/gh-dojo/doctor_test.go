@@ -46,7 +46,7 @@ func TestDoctor(t *testing.T) {
 to = "In progres"
 
 [verbs.wait]
-from = ["In Progress"]
+from = ["In Progress", "Blocked"]
 `, []string{doctorFixtures + "ok.json", boardFixture}, render.ExitUsage, 3},
 		{"board_not_found", strings.Replace(dojoConfig, "project = 5", "project = 99", 1),
 			[]string{doctorFixtures + "ok.json", boardFixtures + "board_not_found.json"}, render.ExitUsage, 3},

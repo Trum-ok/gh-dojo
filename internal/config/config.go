@@ -394,7 +394,19 @@ func (v Verb) OnlyClearsSprint() bool {
 // is empty or lists the status. An issue with no status, or not on the
 // board (status ""), is in initial, statuses.initial.
 func (v Verb) StartsFrom(status, initial string) bool {
-	return len(v.From) == 0 || slices.Contains(v.From, cmp.Or(status, initial))
+	return len(v.From) == 0 || HasStatus(v.From, cmp.Or(status, initial))
+}
+
+// SameStatus reports whether a and b name the same status. Statuses match
+// the board's options regardless of case (board.Field.Option), so the
+// config's "In progress" is the board's "In Progress": compare a status of
+// the config with one read from the board only through SameStatus or
+// HasStatus, never with ==.
+func SameStatus(a, b string) bool { return strings.EqualFold(a, b) }
+
+// HasStatus reports whether statuses has status, by SameStatus.
+func HasStatus(statuses []string, status string) bool {
+	return slices.ContainsFunc(statuses, func(s string) bool { return SameStatus(s, status) })
 }
 
 // FromRule says where the verb runs, in the words of its refusal and of
