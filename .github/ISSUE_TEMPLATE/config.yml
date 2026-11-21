@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Board
+    url: https://github.com/users/Trum-ok/projects/5
+    about: What is being worked on, waiting, or planned
+  - name: Open questions
+    url: https://github.com/Trum-ok/gh-dojo/issues?q=is%3Aopen+label%3Aquestion
+    about: Undecided ideas; comment on one before opening a new issue about it

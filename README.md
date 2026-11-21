@@ -197,9 +197,11 @@ the refusals are as useful to a human as to an agent.
 
 ## Status
 
-gh-dojo tracks its own development with gh-dojo. The board is private, but
-the comments its verbs leave are on the public
-[issues](https://github.com/Trum-ok/gh-dojo/issues?q=is%3Aissue). The
+gh-dojo tracks its own development with gh-dojo, on a public
+[board](https://github.com/users/Trum-ok/projects/5); the comments its verbs
+leave are on the
+[issues](https://github.com/Trum-ok/gh-dojo/issues?q=is%3Aissue), and
+[new ones](https://github.com/Trum-ok/gh-dojo/issues/new/choose) are welcome. The
 process is [`.github/dojo.toml`](.github/dojo.toml), and its agents read
 the skill [`agent install`](docs/commands.md#agent-install) generated from it,
 [`.claude/skills/gh-dojo/SKILL.md`](.claude/skills/gh-dojo/SKILL.md). The

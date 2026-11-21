@@ -1,0 +1,40 @@
+name: Bug
+description: gh dojo did something wrong, failed, or printed something misleading
+labels: ["type: bug"]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The `version` line of `gh dojo doctor`, or `gh extension list`
+      placeholder: gh dojo v0.3.0
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command and output
+      description: What you ran and what it printed, exit code included (`echo $?`)
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Config
+      description: The part of `.github/dojo.toml` that matters, if any
+      render: toml
+  - type: textarea
+    id: debug
+    attributes:
+      label: Debug log
+      description: >-
+        For a GitHub error: `GH_DEBUG=api gh dojo <command> 2> debug.log`.
+        The log has request and response bodies, so remove what you would not share.
+      render: text
