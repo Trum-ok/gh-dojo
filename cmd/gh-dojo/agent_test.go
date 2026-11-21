@@ -161,10 +161,12 @@ func TestAgentInstall(t *testing.T) {
 // TestAgentConfigs is the skill of other configs with no [agent]: the
 // default target, no notes. kanban is this repository's preset; custom
 // overrides it; no_preset has no statuses, so no lifecycle path; suffix
-// tells how a commit names its issue.
+// tells how a commit names its issue; shipped goes from Backlog straight
+// to Done, which skips no status of the lifecycle and is not for a release.
 func TestAgentConfigs(t *testing.T) {
 	for name, cfg := range map[string]string{"kanban": dojoConfig, "custom": customConfig, "no_preset": noPresetConfig,
-		"milestone": milestoneDojoConfig, "suffix": dojoConfig + "\n[release]\nsuffix = true\n"} {
+		"milestone": milestoneDojoConfig, "suffix": dojoConfig + "\n[release]\nsuffix = true\n",
+		"shipped": dojoConfig + "\n" + shippedVerb} {
 		t.Run(name, func(t *testing.T) {
 			dir := withRepo(t, cfg, nil)
 			if code, out := runOut("agent", "install"); code != render.ExitOK {
@@ -172,6 +174,32 @@ func TestAgentConfigs(t *testing.T) {
 			}
 			testutil.Golden(t, "agent/skill_"+name, []byte(readRepoFile(t, dir, skillPath)))
 		})
+	}
+}
+
+// shippedVerb is a verb for an issue opened for work already shipped:
+// Backlog → Done, as in this repository's own config.
+const shippedVerb = `[verbs.shipped]
+when = "the issue is for work already shipped in a release"
+from = ["Backlog"]
+to = "Done"
+close = "completed"
+require = ["comment"]
+`
+
+// TestReleaseFinishes: a verb only from the initial status finishes an
+// issue nobody took, so describe, the skill and release do not point to
+// release for it; with another status in from, they do.
+func TestReleaseFinishes(t *testing.T) {
+	cfg := &config.Config{Statuses: config.Statuses{Initial: "Backlog", Final: []string{"Done"}}}
+	for _, c := range []struct {
+		from []string
+		want bool
+	}{{[]string{"backlog"}, false}, {[]string{"Backlog", "Ready"}, true}, {[]string{"Ready"}, true}, {nil, true}} {
+		v := config.Verb{Name: "v", From: c.from, To: "Done"}
+		if got := releaseFinishes(cfg, v); got != c.want {
+			t.Errorf("from %q: releaseFinishes = %v, want %v", c.from, got, c.want)
+		}
 	}
 }
 

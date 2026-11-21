@@ -287,10 +287,22 @@ func releaseLacks(v config.Verb) string {
 // releaseFinishes reports whether describe, the agent doc and release's
 // own errors point to gh dojo release for verb v: release can run it, and
 // it finishes an issue as a release does (closes it as completed or moves
-// it to a final status). Release runs any verb it can; the others are
-// rarely what a release means.
+// it to a final status), and it starts from a status other than the
+// initial one. Release runs any verb it can; the others are rarely what a
+// release means: a release includes the issues someone worked on, and a
+// verb only from the initial status finishes an issue nobody took, such as
+// one opened for work already shipped (#98).
 func releaseFinishes(cfg *config.Config, v config.Verb) bool {
-	return releaseLacks(v) == "" && (v.Close == config.CloseCompleted || config.HasStatus(cfg.Statuses.Final, v.To))
+	return releaseLacks(v) == "" && (v.Close == config.CloseCompleted || config.HasStatus(cfg.Statuses.Final, v.To)) &&
+		!onlyFromInitial(cfg, v)
+}
+
+// onlyFromInitial reports whether verb v starts only from the initial
+// status (an issue without a status counts as one in it).
+func onlyFromInitial(cfg *config.Config, v config.Verb) bool {
+	initial := cfg.Statuses.Initial
+	return initial != "" && len(v.From) > 0 &&
+		!slices.ContainsFunc(v.From, func(s string) bool { return !config.SameStatus(s, initial) })
 }
 
 // releaseWaiting are the statuses where finished work waits for a release

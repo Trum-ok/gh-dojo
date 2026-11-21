@@ -15,7 +15,7 @@ A bare `12` or `#12` is an issue of `Trum-ok/gh-dojo`; an issue of another repos
 
 ## Lifecycle
 
-`Backlog` → (`In progress`) → (`Waiting`) → (`Ready`) → `Done`, through `start`, `wait`, `ready`, `done`. A status in parentheses may be skipped.
+`Backlog` → `In progress` → (`Waiting`) → `Ready` → `Done`, through `start`, `wait`, `ready`, `done`. A status in parentheses may be skipped.
 
 - `Backlog` is the initial status: `gh dojo new` puts new issues there, and an issue without a status or not on the board counts as `Backlog`.
 - Final: `Done`. `gh dojo list` hides issues there unless `--all`.
@@ -42,8 +42,6 @@ Run a verb as `gh dojo <verb> N`; `--dry-run` prints its plan without changing a
 - For a release, `gh dojo release <tag> --verb done --dry-run` lists the issues the release includes and its plan; read `gh dojo release --help` before you run it.
 
 **`shipped`** (the issue is for work already shipped in a release): `gh dojo shipped N…`, Backlog → Done; needs --comment; also on closed issues; assigns you; comments "Already shipped: {comment}"; closes as completed.
-
-- For a release, `gh dojo release <tag> --verb shipped --dry-run` lists the issues the release includes and its plan; read `gh dojo release --help` before you run it.
 
 **`plan`** (the issue moves to another stage): `gh dojo plan N…`, Backlog, In progress, Waiting, Ready → status unchanged; needs --milestone; sets the --milestone milestone.
 

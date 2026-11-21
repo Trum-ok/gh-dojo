@@ -444,7 +444,8 @@ const maxLifecycleSteps = 100_000
 // lifecycle is the longest way through the statuses, as describe's
 // from → to lines draw them: from the initial status, along verbs with a
 // from list and a target, preferably ending in a final status. skip marks
-// the statuses on it that a verb jumps over. Verbs from any status are
+// the statuses on it that a verb jumps over, but for a verb from the
+// initial status straight to a final one. Verbs from any status are
 // left out: they lead anywhere. Nil without an initial status.
 func (d *agentDoc) lifecycle() (path, verbs []string, skip []bool) {
 	cfg := d.cfg
@@ -497,6 +498,12 @@ func (d *agentDoc) lifecycle() (path, verbs []string, skip []bool) {
 	skip = make([]bool, len(path))
 	for a := range path { // a verb from path[a] to path[b] skips what is between
 		for _, e := range next[strings.ToLower(path[a])] {
+			if a == 0 && config.HasStatus(cfg.Statuses.Final, e.to) {
+				// From the initial status straight to a final one is a way
+				// around the work, such as an issue opened for work already
+				// shipped, not a step of it to skip (#98).
+				continue
+			}
 			for i := a + 1; i < index(path, e.to); i++ {
 				skip[i] = true
 			}
