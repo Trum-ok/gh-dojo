@@ -9,6 +9,9 @@
   and the notes, `script/release-notes.sh HEAD`, ask for the tag, and on their word run `make release TAG=vX.Y.Z` (`script/release.sh`: tag, push, wait for the
   release run, `gh extension install` of the release, move the release's issues to Done). It takes several minutes: run it in the background.
   After a failure, run it again with the same tag.
+- `shipped` only for an issue opened for work that has already shipped (sub-issues split off after the fact):
+  `gh dojo shipped N --comment "v0.4.1"`. Work done now goes through `start`, `ready` and `done`, and a
+  release moves its issues with `--verb done`, never `--verb shipped`.
 - In `--comment` for `ready` and `done` it helps to give the commit or release: `--comment "5fc0e30"`.
 - A commit with a change users would notice adds `Changelog: <kind>: <text>` to its message, kind `breaking`,
   `added`, `changed` or `fixed`, text in the user's words: the release notes are made of these lines

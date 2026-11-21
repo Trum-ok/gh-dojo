@@ -41,6 +41,17 @@ when = "the change has shipped in a release"
 # commit with Refs #N) as not ready instead of moving them.
 from = ["Ready"]
 
+# An issue opened for work that has already shipped (splitting a parent into
+# sub-issues after the fact): straight to Done, without start's "Taken" (#86).
+[verbs.shipped]
+when = "the issue is for work already shipped in a release"
+from = ["Backlog"]
+to = "Done"
+close = "completed"
+assign = "@me"
+require = ["comment"]
+comment = "Already shipped: {comment}"
+
 [verbs.plan]
 when = "the issue moves to another stage"
 from = ["Backlog", "In progress", "Waiting", "Ready"]
