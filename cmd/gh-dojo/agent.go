@@ -55,10 +55,14 @@ with CRLF line endings keeps them. A file is written whole through a
 temporary file; a relative symbolic link is written where it points, which
 must be inside the repository, and so must the notes; absolute links fail.
 
+The marker names the gh-dojo version that wrote the text; a file that
+differs only in that version is up to date and is not rewritten.
+
 A repeat with the same config changes nothing and says "up to date".
 --check writes nothing and exits 1 when a file is missing or differs from
-what install would write, showing the changed lines: run it in CI with a
-fixed gh-dojo version, since the text depends on the version too. Paths
+what install would write, showing the changed lines and the version that
+wrote it when another: run it in CI with a fixed gh-dojo version, since
+the text depends on the version too. Paths
 are relative to the repository root, the directory that holds .github.
 It never uses the network.`,
 		Example: `  gh dojo agent install
@@ -89,11 +93,15 @@ type agentFileJSON struct {
 	State string   `json:"state"`
 	Diff  []string `json:"diff"` // --check, out of date: the changed lines (agent.Diff)
 	Fix   *string  `json:"fix"`  // --check, not up to date: what brings it up to date; else null
+	// WrittenBy is the gh-dojo version the file's marker named before this
+	// run (agent.File.WrittenBy); null when it named none or there was no
+	// file.
+	WrittenBy *string `json:"written_by"`
 }
 
 func (r *agentResult) write(w io.Writer) {
 	for _, f := range r.Files {
-		fmt.Fprintf(w, "%s: %s\n", f.Path, stateText(f.State))
+		fmt.Fprintf(w, "%s: %s%s\n", f.Path, stateText(f.State), writtenByText(f.State, f.WrittenBy))
 		for _, l := range f.Diff {
 			fmt.Fprintf(w, "  %s\n", l)
 		}
@@ -103,6 +111,16 @@ func (r *agentResult) write(w io.Writer) {
 // stateText is a file's state (agent.StateOutOfDate, say) as the text
 // says it: "out of date".
 func stateText(state string) string { return strings.ReplaceAll(state, "_", " ") }
+
+// writtenByText tells, after a file out of date, that another gh-dojo
+// version wrote it, so a reader can tell an upgrade from a config change:
+// " (written by gh dojo v0.3.0, this is v0.4.0)". "" otherwise.
+func writtenByText(state string, writtenBy *string) string {
+	if state != agent.StateOutOfDate || writtenBy == nil || *writtenBy == version {
+		return ""
+	}
+	return fmt.Sprintf(" (written by gh dojo %s, this is %s)", *writtenBy, version)
+}
 
 func runAgentInstall(cmd *cobra.Command, _ []string) error {
 	cfg, err := loadConfig()
@@ -138,6 +156,9 @@ func runAgentInstall(cmd *cobra.Command, _ []string) error {
 	stale, wrote, fix := 0, false, install
 	for _, f := range files {
 		res := agentFileJSON{Agent: f.Agent, Path: f.Path, State: agent.StateUpToDate, Diff: []string{}}
+		if f.WrittenBy != "" {
+			res.WrittenBy = &f.WrittenBy
+		}
 		switch {
 		case f.UpToDate():
 		case check:
@@ -236,7 +257,7 @@ func prepareAgentFiles(cfg *config.Config, cmdRoot *cobra.Command, root *os.Root
 				return nil, err
 			}
 		}
-		f, err := agent.Prepare(root, t, body, config.FileName)
+		f, err := agent.Prepare(root, t, body, config.FileName, version)
 		if err != nil {
 			return nil, err
 		}
@@ -296,7 +317,11 @@ func checkAgentFiles(r *doctor.Report, cfg *config.Config, cmdRoot *cobra.Comman
 				WithFix(agent.HandWrittenFix(f.Target, config.FileName)))
 			return
 		default:
-			stale = append(stale, f.Path+" ("+stateText(f.State())+")")
+			by := ""
+			if f.WrittenBy != "" && f.WrittenBy != version && f.State() == agent.StateOutOfDate {
+				by = ", written by gh dojo " + f.WrittenBy
+			}
+			stale = append(stale, f.Path+" ("+stateText(f.State())+by+")")
 		}
 	}
 	if len(stale) > 0 {

@@ -25,10 +25,14 @@ with CRLF line endings keeps them. A file is written whole through a
 temporary file; a relative symbolic link is written where it points, which
 must be inside the repository, and so must the notes; absolute links fail.
 
+The marker names the gh-dojo version that wrote the text; a file that
+differs only in that version is up to date and is not rewritten.
+
 A repeat with the same config changes nothing and says "up to date".
 --check writes nothing and exits 1 when a file is missing or differs from
-what install would write, showing the changed lines: run it in CI with a
-fixed gh-dojo version, since the text depends on the version too. Paths
+what install would write, showing the changed lines and the version that
+wrote it when another: run it in CI with a fixed gh-dojo version, since
+the text depends on the version too. Paths
 are relative to the repository root, the directory that holds .github.
 It never uses the network.
 

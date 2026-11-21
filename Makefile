@@ -93,9 +93,9 @@ golden:
 
 # Regenerate the agent skill from .github/dojo.toml with this branch's
 # build, after changing the config, its notes or a command; CI runs
-# agent install --check.
+# agent install --check. Stamped with VERSION, which the marker names.
 agent:
-	go run ./cmd/gh-dojo agent install
+	go run -ldflags "$(LDFLAGS)" ./cmd/gh-dojo agent install
 
 # Cross-compile the release binaries into dist/ the way the release workflow
 # does (script/build-release.sh), stamped with VERSION.

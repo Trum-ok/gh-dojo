@@ -295,12 +295,13 @@ The schemas, by command, after `schema_version` and `error`:
 - `doctor`: `ok` (no check is a problem), `checks`: `[{name, result,
   detail, allowed, fix}]`, `result` one of `ok`, `problem`, `warn`,
   `skip`.
-- `agent install`: `check`, `files`: `[{agent, path, state, diff, fix}]`;
-  `state` is `created`, `updated` or `up_to_date`, with `--check`
-  `up_to_date`, `missing`, `out_of_date` or `hand_written`; `diff`
-  (`--check`, out of date) the changed lines as printed, else `[]`; `fix`
-  (`--check`, not up to date) the command or step that brings it up to
-  date, else `null`.
+- `agent install`: `check`, `files`: `[{agent, path, state, diff, fix,
+  written_by}]`; `state` is `created`, `updated` or `up_to_date`, with
+  `--check` `up_to_date`, `missing`, `out_of_date` or `hand_written`;
+  `diff` (`--check`, out of date) the changed lines as printed, else `[]`;
+  `fix` (`--check`, not up to date) the command or step that brings it up
+  to date, else `null`; `written_by` the gh-dojo version the file's marker
+  named before the run, `null` when it named none or there was no file.
 - `init`: without `--project` (exit code 1, the choice is yours): `owner`,
   `owner_type`, `projects`: `[{number, title, items, closed}]`,
   `suggested_project`, `command`; with it: `path`, `written`, `board`,

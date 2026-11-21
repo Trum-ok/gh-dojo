@@ -321,6 +321,13 @@ into issues (verb `when` lines and comment templates) come from the config.
   `--help`. It does name `new`'s flags in one line: a flag beyond `--type`
   and `--body` would otherwise cost a read of `new --help`, the longest help.
   Keep it that way when changing `internal/agent`.
+- **The marker names the version that last changed the text, and the
+  version alone is no change:** `install` does not rewrite a file that
+  differs only in it, and `--check` and `doctor` find such a file up to
+  date. Otherwise every upgrade would be a one-line commit, and a CI pinned
+  to the older version would fail on it. Once the text differs, `--check`
+  and `doctor` name the version that wrote it, so an upgrade is told from a
+  config change.
 - **Help says a thing once, since agents read it as tokens.** The lifecycle
   and the exit codes are in `describe` only, and the root help points there
   (it prints the exit codes itself only without a config, when `describe`

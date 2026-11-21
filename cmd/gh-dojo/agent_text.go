@@ -72,7 +72,7 @@ func (d *agentDoc) skill() (string, error) {
 	}
 	var b strings.Builder
 	b.WriteString("---\nname: gh-dojo\ndescription: " + yamlString(desc) + "\n---\n\n")
-	b.WriteString(agent.Generated(config.FileName) + "\n\n")
+	b.WriteString(agent.Generated(config.FileName, version) + "\n\n")
 	b.WriteString(d.body(1))
 	if d.notes != "" {
 		b.WriteString("\n" + d.notes)
