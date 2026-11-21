@@ -184,6 +184,7 @@ gh extension install .
 | `internal/testutil`        | Test helpers shared across packages: golden files                                     |
 | `bench`                    | The benchmark against plain gh ([docs/bench.md](docs/bench.md))                       |
 | `e2e`                      | Tests against real boards ([above](#end-to-end-tests))                                |
+| `script`                   | Build, release and test scripts; Go tests that run them on temporary repositories     |
 
 The plan is separate from its execution: the workflow engine returns the
 operations without touching the network, which is what `--dry-run`, the
@@ -401,9 +402,11 @@ Pushing a `v*` tag runs `.github/workflows/release.yml`: the tests, then
 darwin, linux and windows for amd64 and arm64 with the tag stamped into
 `gh dojo --version`, and publishes them as a GitHub release for
 `gh extension install`. A tag with a `-` (`v0.1.0-rc.1`) makes a prerelease.
-The release notes list the commits since the previous tag, merges left out
-(`script/release-notes.sh`), so a commit's first line is written for them
-too.
+The release is made as a draft, gets its [notes](#release-notes) and is
+published last. Releases are immutable (the repository's setting): once
+published, the tag cannot move and the assets cannot change, though the
+notes can still be edited. A tag whose release was deleted cannot be used
+again, so a broken release is fixed by the next tag, not by redoing it.
 
 Next to the binaries the release has `gh-dojo_<tag>_checksums.txt`, their
 SHA-256 sums, and every asset has a build provenance attestation: a
@@ -425,7 +428,8 @@ A release is one command, `make release TAG=vX.Y.Z`
 failure. It checks that `main` is checked out with nothing uncommitted, is
 the same as `origin/main` and that the tag is newer than every `v*` tag;
 tags `HEAD` and pushes the tag; waits for that tag's `release.yml` run and
-checks the release's assets; installs the release with
+checks the release's assets and that it is published (and warns if it is
+not immutable); installs the release with
 `gh extension install` (removing the `gh dojo` installed before, a release
 or a `make install` build; a prerelease is pinned with `--pin`) and checks
 that `gh dojo --version` prints the tag; and moves the release's issues to Done
@@ -442,8 +446,9 @@ release's issues and what its output means. This project's rules:
   tagging, `gh dojo release main --verb done --dry-run` shows what the next
   release holds.
 - An agent releases only on the user's word, since the release moves
-  issues to Done: it runs `gh dojo release main --verb done --dry-run`,
-  shows the list to the user and asks for the tag, and once they agree runs
+  issues to Done: it runs `gh dojo release main --verb done --dry-run` and
+  `script/release-notes.sh HEAD`, shows the list and the notes to the user
+  and asks for the tag, and once they agree runs
   `make release TAG=vX.Y.Z`. On its own, the same is
   `gh dojo release vX.Y.Z --verb done --dry-run`, then without `--dry-run`,
   with `--comment "vX.Y.Z"`.
@@ -468,3 +473,38 @@ release's issues and what its output means. This project's rules:
 - In a commit message, an issue reference that is not a link, such as an
   example of the syntax, goes in backticks (`` `Fixes #12` ``), or release
   takes it for one of the release's issues.
+
+### Release notes
+
+The notes are written for users deciding whether to upgrade, not from the
+commit subjects: a commit with a change they would notice says so in a
+`Changelog:` line of its message, `Changelog: <kind>: <text>`, one line per
+change:
+
+```text
+verbs: --comments N|all and --full fold the card as show's flags do (Refs #95)
+
+Changelog: added: `start`, `wait`, `ready` and `done` take `--comments N|all`
+  and `--full`, and print the card after the move
+```
+
+- The kinds, in the order the notes list them: `breaking` (a config, a
+  flag, an output or an exit code that worked before no longer does),
+  `added`, `changed`, `fixed`. Another kind goes under "Other" with a
+  warning, so a typo never fails a release.
+- The text says what changed for the user, in their words, not how: the
+  command, the flag, the behavior. An indented line continues it.
+- A line that names no issue gets the issues its commit names after a
+  keyword (`Refs #95`).
+- A commit without a `Changelog:` line is internal (refactoring, tests,
+  CI, docs that change no behavior): the notes count it, nothing more.
+- `script/release-notes.sh HEAD` prints the notes of the next release;
+  `script/release_notes_test.go` runs the script on a temporary repository.
+
+The script reads the lines itself rather than with git's `%(trailers)`:
+git takes the last paragraph for trailers only when every line of it is
+one, so a `Fixes #12` next to them would drop them without a word. A
+`CHANGELOG.md` was not chosen either: commits go to `main` from parallel
+worktrees, and one file all of them append to would conflict. A release
+worth a paragraph of its own gets it by hand: `gh release edit vX.Y.Z
+--notes-file …` after publishing.

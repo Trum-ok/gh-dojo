@@ -5,7 +5,7 @@
 #      is newer than every v* tag;
 #   2. tags HEAD (annotated) and pushes the tag;
 #   3. waits for the release.yml run of that tag, then checks the release's
-#      assets;
+#      assets and that it is published, warning if it is not immutable;
 #   4. installs the release with gh extension install, and gh dojo --version
 #      must print the tag;
 #   5. gh dojo release <tag> --verb done --comment <tag>.
@@ -83,6 +83,7 @@ branch="$(git symbolic-ref --quiet --short HEAD || true)"
   fail "uncommitted changes" "commit or drop them: git status"
 
 git fetch --quiet --tags origin
+repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
 head="$(git rev-parse HEAD)"
 [[ "$head" == "$(git rev-parse origin/main)" ]] ||
   fail "main is not origin/main: $(git rev-list --count origin/main..HEAD) ahead, $(git rev-list --count HEAD..origin/main) behind" \
@@ -168,13 +169,22 @@ got="$(gh release view "$tag" --json assets --jq '.assets[].name' | sort)"
     "gh release view $tag"
 echo "release $tag has its $(wc -l <<<"$want" | tr -d ' ') assets"
 
+# release.yml publishes the draft last; immutable releases are a setting of
+# the repository, so their absence only warns: the release is out already.
+state="$(gh release view "$tag" --json isDraft,isImmutable --jq '"\(.isDraft) \(.isImmutable)"')"
+[[ "$state" != true* ]] ||
+  fail "release $tag is still a draft" \
+    "gh run view $run --log; then gh release edit $tag --draft=false"
+if [[ "$state" != *true ]]; then
+  echo "warning: release $tag is not immutable; turn immutable releases on: gh api -X PUT repos/$repo/immutable-releases" >&2
+fi
+
 # --- 4. install ------------------------------------------------------------
 
 # The release as users get it, through gh, not a build of the working copy.
 # gh keeps one extension per name, so the dojo installed now (an earlier
 # release, or make install's source build) is removed first. A prerelease
 # is pinned, since gh otherwise installs the latest release.
-repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
 step "gh extension install $repo ($tag)"
 
 if [[ -n "$(gh extension list | awk -F'\t' '$1 == "gh dojo"')" ]]; then

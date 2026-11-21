@@ -12,9 +12,14 @@ name: Release
 # commit. `gh attestation verify <file> --repo Trum-ok/gh-dojo` checks it
 # (see CONTRIBUTING.md, Releases).
 #
-# The release notes are the commits since the previous tag
-# (script/release-notes.sh): GitHub's generated notes list merged pull
-# requests only, and most commits here go to main directly.
+# The release notes are the Changelog lines of the commits since the
+# previous tag (script/release-notes.sh): GitHub's generated notes list
+# merged pull requests only, and most commits here go to main directly.
+#
+# The release is made as a draft with its assets, gets its notes, and is
+# published last: releases are immutable, so once published its tag and
+# assets can no longer change. A failed run leaves the draft; running it
+# again uploads the assets to it.
 on:
   push:
     tags: ["v*"]
@@ -56,8 +61,13 @@ jobs:
           go_version_file: go.mod
           build_script_override: script/build-release.sh
           generate_attestations: true
+          draft_release: true
       - name: Release notes
         shell: bash # with pipefail: a failed script must not leave empty notes
         env:
           GH_TOKEN: ${{ github.token }}
         run: script/release-notes.sh "$GITHUB_REF_NAME" | gh release edit "$GITHUB_REF_NAME" --notes-file -
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "$GITHUB_REF_NAME" --draft=false
