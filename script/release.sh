@@ -2,7 +2,8 @@
 # Releases gh-dojo as <tag>, stopping at the first failure:
 #
 #   1. checks: on main, no uncommitted changes, main == origin/main, the tag
-#      is newer than every v* tag;
+#      is newer than every v* tag, and the ci.yml run of HEAD on main
+#      succeeded (waiting for it if it is still running);
 #   2. tags HEAD (annotated) and pushes the tag;
 #   3. waits for the release.yml run of that tag, then checks the release's
 #      assets and that it is published, warning if it is not immutable;
@@ -31,9 +32,11 @@ cd "$(dirname "$0")/.."
 # The assets build-release.sh writes, as release.yml uploads them.
 platforms=(darwin-amd64 darwin-arm64 linux-amd64 linux-arm64 windows-amd64 windows-arm64)
 
-# How long to wait for release.yml: for its run to appear, and to finish.
+# How long to wait for a run of ci.yml or release.yml: for it to appear, and
+# to finish (release.yml is CI's jobs, up to 15 minutes, then a release job of
+# up to 20).
 appear_timeout=120
-run_timeout=1800
+run_timeout=2400
 
 step() { printf '\n==> %s\n' "$*"; }
 
@@ -44,6 +47,41 @@ fail() {
     echo "fix: $2" >&2
   fi
   exit 1
+}
+
+# find_run <workflow> <branch>: sets run to the ID of the newest push run of
+# <workflow> for HEAD on <branch> and run_url to its URL, waiting up to
+# appear_timeout for it to appear.
+find_run() {
+  local waited=0
+  while :; do
+    run="$(gh run list --workflow "$1" --branch "$2" --commit "$head" --event push \
+      --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+    [[ -n "$run" ]] && break
+    ((waited >= appear_timeout)) &&
+      fail "no $1 run for $2 at $(git rev-parse --short HEAD) after ${appear_timeout}s" \
+        "check the Actions tab, then run this script again"
+    sleep 5
+    waited=$((waited + 5))
+  done
+  run_url="$(gh run view "$run" --json url --jq .url)"
+}
+
+# await_run: waits up to run_timeout for run to finish and sets conclusion.
+# A loop of our own rather than gh run watch, which redraws every step every
+# few seconds: one line when it finishes is enough.
+await_run() {
+  local waited=0 state
+  while :; do
+    state="$(gh run view "$run" --json status,conclusion --jq '.status + " " + .conclusion')"
+    [[ "$state" == completed* ]] && break
+    ((waited >= run_timeout)) &&
+      fail "run $run is still ${state% *} after ${run_timeout}s" \
+        "gh run watch $run, then run this script again"
+    sleep 15
+    waited=$((waited + 15))
+  done
+  conclusion="${state#completed }"
 }
 
 semver='^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
@@ -105,6 +143,16 @@ else
 fi
 echo "main is at $(git rev-parse --short HEAD), the same as origin/main"
 
+# release.yml runs CI on the tag too, but a red CI found there costs the tag:
+# the fix is released under a new one.
+find_run ci.yml main
+echo "CI run $run_url"
+await_run
+[[ "$conclusion" == success ]] ||
+  fail "CI of main at $(git rev-parse --short HEAD) ended with $conclusion: $run_url" \
+    "gh run view $run --log-failed; push a fix to main, then run this script again"
+echo "CI run $run: success"
+
 # --- 2. tag ----------------------------------------------------------------
 
 step "tag $tag"
@@ -119,34 +167,9 @@ echo "pushed $tag"
 
 step "release.yml for $tag"
 
-run=""
-waited=0
-while [[ -z "$run" ]]; do
-  run="$(gh run list --workflow release.yml --branch "$tag" --commit "$head" --event push \
-    --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
-  if [[ -z "$run" ]]; then
-    ((waited >= appear_timeout)) &&
-      fail "no release.yml run for $tag after ${appear_timeout}s" \
-        "check the Actions tab, then run this script again"
-    sleep 5
-    waited=$((waited + 5))
-  fi
-done
-echo "run $(gh run view "$run" --json url --jq .url)"
-
-# A loop of our own rather than gh run watch, which redraws every step every
-# few seconds: one line when it finishes is enough.
-waited=0
-while :; do
-  state="$(gh run view "$run" --json status,conclusion --jq '.status + " " + .conclusion')"
-  [[ "$state" == completed* ]] && break
-  ((waited >= run_timeout)) &&
-    fail "run $run is still ${state% *} after ${run_timeout}s" \
-      "gh run watch $run, then run this script again"
-  sleep 15
-  waited=$((waited + 15))
-done
-conclusion="${state#completed }"
+find_run release.yml "$tag"
+echo "run $run_url"
+await_run
 if [[ "$conclusion" != success ]]; then
   gh run view "$run" --log-failed | tail -n 40 >&2 || true
   fail "run $run ended with $conclusion" \

@@ -1,10 +1,12 @@
 name: CI
 
 # Pushes to main and pull requests only, so a PR branch is not built twice.
+# release.yml calls it on the tagged commit and releases only if it passes.
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_call:
 
 permissions:
   contents: read

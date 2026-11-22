@@ -404,10 +404,11 @@ key to `.github/dojo.toml` (as `[agent]` did) breaks the installed
 
 ## Releases
 
-Pushing a `v*` tag runs `.github/workflows/release.yml`: the tests, then
-`cli/gh-extension-precompile` with `script/build-release.sh`, which builds
-darwin, linux and windows for amd64 and arm64 with the tag stamped into
-`gh dojo --version`, and publishes them as a GitHub release for
+Pushing a `v*` tag runs `.github/workflows/release.yml`: the whole of CI
+(`ci.yml`, called as a reusable workflow) on the tagged commit, then, only
+if it passes, `cli/gh-extension-precompile` with `script/build-release.sh`,
+which builds darwin, linux and windows for amd64 and arm64 with the tag
+stamped into `gh dojo --version`, and publishes them as a GitHub release for
 `gh extension install`. A tag with a `-` (`v0.1.0-rc.1`) makes a prerelease.
 The release is made as a draft, gets its [notes](#release-notes) and is
 published last. Releases are immutable (the repository's setting): once
@@ -433,8 +434,10 @@ Dependabot updates the SHA and the comment together.
 A release is one command, `make release TAG=vX.Y.Z`
 ([`script/release.sh`](script/release.sh)), which stops at the first
 failure. It checks that `main` is checked out with nothing uncommitted, is
-the same as `origin/main` and that the tag is newer than every `v*` tag;
-tags `HEAD` and pushes the tag; waits for that tag's `release.yml` run and
+the same as `origin/main`, that the tag is newer than every `v*` tag and
+that the `ci.yml` run of `HEAD` on `main` passed, waiting for it if it is
+still running (a red CI found on the tag would cost the tag); tags `HEAD` and
+pushes the tag; waits for that tag's `release.yml` run and
 checks the release's assets and that it is published (and warns if it is
 not immutable); installs the release with
 `gh extension install` (removing the `gh dojo` installed before, a release

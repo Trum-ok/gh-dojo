@@ -31,23 +31,26 @@ concurrency:
   group: release-${{ github.ref }}
 
 jobs:
-  # The tests run in a job of their own: gh-extension-precompile sets up Go
-  # with its own actions/setup-go, which restores the module cache. After
-  # `go test` in the same job the modules are already on disk, and tar logs
-  # "Cannot open: File exists" for each of them.
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
-        with:
-          go-version-file: go.mod
-      - name: Test
-        run: go test ./...
+  # The whole of CI (ci.yml) on the tagged commit, and the release only once
+  # it passes: the same checks and tests on Linux, macOS and Windows as on
+  # main, not a subset that could let a red commit through. They stay out of
+  # the release job: gh-extension-precompile sets up Go with its own
+  # actions/setup-go, which restores the module cache; after `go test` in the
+  # same job the modules are already on disk, and tar logs "Cannot open: File
+  # exists" for each of them.
+  #
+  # ci.yml's concurrency group is evaluated with this run's context, so it is
+  # ci-refs/tags/<tag>: apart from this workflow's release-refs/tags/<tag>
+  # (a called workflow in its caller's group deadlocks) and from main's CI,
+  # and a push event does not cancel it. It gets this workflow's
+  # contents: read, all it asks for.
+  ci:
+    uses: ./.github/workflows/ci.yml
 
   release:
-    needs: test
+    needs: ci
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: write     # create the release and upload its assets
       id-token: write     # sign the attestations through Sigstore
