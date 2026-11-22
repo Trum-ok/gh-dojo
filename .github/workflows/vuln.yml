@@ -19,6 +19,7 @@ permissions:
 jobs:
   govulncheck:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # go.mod's go line picks the latest patch release, the one a release
@@ -27,5 +28,10 @@ jobs:
         with:
           go-version-file: go.mod
           check-latest: true
+          # govulncheck is built from tools/go.mod (make vuln): a version bump
+          # there must not reuse the old cache.
+          cache-dependency-path: |
+            go.sum
+            tools/go.sum
       - name: govulncheck
         run: make vuln
