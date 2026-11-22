@@ -2,22 +2,26 @@
 
 ## Build and test
 
-Requires Go (the version in `go.mod`) and `gh`.
+Requires Go (the version in `go.mod`) and `gh`; `make check` also needs
+[shellcheck](https://www.shellcheck.net/) (`brew install shellcheck`, or
+`apt install shellcheck`).
 
 ```sh
-make build    # ./gh-dojo, stamped with git describe
-make check    # what CI checks, offline (see below)
-make test     # go test ./...
-make vet      # go vet, also for Windows, macOS and -tags e2e
-make lint     # staticcheck, also as Windows and macOS see the code
-make fmt      # files gofmt -l lists (gofmt -w . fixes them)
-make tidy     # go mod tidy -diff, tools/ too
-make vuln     # govulncheck: known vulnerabilities the code can reach
-make e2e      # end-to-end tests against the sandbox boards (see below)
-make dist     # release binaries for all platforms into dist/
-make agent    # regenerate the agent skill from .github/dojo.toml
-make install  # build and install as the gh dojo extension (see below)
-make demo     # render the README animations (needs Node and ffmpeg)
+make build       # ./gh-dojo, stamped with git describe
+make check       # what CI checks, offline (see below)
+make test        # go test ./...
+make vet         # go vet, also for Windows, macOS and -tags e2e
+make lint        # staticcheck, also as Windows and macOS see the code
+make shellcheck  # shellcheck on script/*.sh
+make actionlint  # actionlint on the workflows, shellcheck on their run: blocks
+make fmt         # files gofmt -l lists (gofmt -w . fixes them)
+make tidy        # go mod tidy -diff, tools/ too
+make vuln        # govulncheck: known vulnerabilities the code can reach
+make e2e         # end-to-end tests against the sandbox boards (see below)
+make dist        # release binaries for all platforms into dist/
+make agent       # regenerate the agent skill from .github/dojo.toml
+make install     # build and install as the gh dojo extension (see below)
+make demo        # render the README animations (needs Node and ffmpeg)
 ```
 
 The animations in the README are [Remotion](https://www.remotion.dev/)
@@ -25,11 +29,13 @@ videos in [`docs/media/`](docs/media).
 
 CI (`.github/workflows/ci.yml`, on pushes to `main` and pull requests)
 checks once, on Linux, `gofmt -l .`, `go mod tidy -diff` (`tools/` too),
-`go vet` (also for Windows, macOS and `-tags e2e`), `make lint`, the release
-build and its `agent install --check` (see below), its `checks` job running
-Format, Tidy and Vet through `make fmt`, `make tidy` and `make vet` (like
-Staticcheck through `make lint`), so they match the local targets by
-construction; then runs `go test ./...`
+`go vet` (also for Windows, macOS and `-tags e2e`), `make lint`, shellcheck
+on the scripts in `script/` (which the release and these checks run),
+actionlint on the workflows, the release build and its
+`agent install --check` (see below), its `checks` job running Format, Tidy,
+Vet, Staticcheck, Shellcheck and Actionlint through `make fmt`, `make tidy`,
+`make vet`, `make lint`, `make shellcheck` and `make actionlint`, so they
+match the local targets by construction; then runs `go test ./...`
 and `go build ./...` on Ubuntu, macOS and Windows, on Ubuntu with `-race`
 through `script/unused-golden.sh`, which also fails on golden files no test
 reads.
@@ -41,9 +47,16 @@ the end-to-end tests.
 
 The linters are pinned in `tools/go.mod`, a module of their own, so they add
 nothing to gh-dojo's dependencies; dependabot updates them with the rest.
-`make lint` and `make vuln` build them into `.tools/`. A staticcheck finding
-is fixed, not silenced; if one is wrong, a `//lint:ignore <check> <reason>`
-on that line says why.
+`make lint`, `make actionlint` and `make vuln` build them into `.tools/`. A
+staticcheck finding is fixed, not silenced; if one is wrong, a
+`//lint:ignore <check> <reason>` on that line says why.
+
+shellcheck is no Go tool, so it is not pinned: CI uses the one on GitHub's
+`ubuntu-latest`, locally it is whatever you installed, and a newer version
+may find more. actionlint runs it on the workflows' `run:` blocks and would
+skip them silently without it, so `make shellcheck`, `make actionlint` and
+`make check` fail instead, saying how to install it. As with staticcheck, a
+finding is fixed; a `# shellcheck disable=<code>` needs a comment saying why.
 
 `.github/workflows/vuln.yml` runs `make vuln` on pushes, pull requests and
 daily, with Go's latest patch release, and fails only on a vulnerability the

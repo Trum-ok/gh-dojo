@@ -9,8 +9,8 @@ LDFLAGS := -X main.version=$(VERSION)
 # last path element must be gh-dojo.
 INSTALL_DIR ?= $(HOME)/.local/share/gh-dojo/$(BIN)
 
-.PHONY: build test vet lint vuln tools golden agent dist install demo \
-	check fmt tidy e2e release
+.PHONY: build test vet lint shellcheck actionlint vuln tools golden agent \
+	dist install demo check fmt tidy e2e release
 
 build:
 	go build -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/gh-dojo
@@ -40,12 +40,12 @@ tidy:
 	cd tools && go mod tidy -diff
 
 # The checks of CI (.github/workflows/ci.yml) on this machine: format, tidy,
-# vet, staticcheck, the release build and its agent install --check, then
-# go test -race (failing on golden files no test reads) and go build. Not
-# vuln, which needs the network, nor e2e, which needs a token and the
-# sandbox boards. The tests run on this system only; CI runs them on Linux,
-# macOS and Windows.
-check: fmt tidy vet lint dist
+# vet, staticcheck, shellcheck, actionlint, the release build and its agent
+# install --check, then go test -race (failing on golden files no test reads)
+# and go build. Not vuln, which needs the network, nor e2e, which needs a
+# token and the sandbox boards. The tests run on this system only; CI runs
+# them on Linux, macOS and Windows.
+check: fmt tidy vet lint shellcheck actionlint dist
 	@bin="dist/$(BIN)_$(VERSION)_$$(go env GOOS)-$$(go env GOARCH)"; \
 	sums="$(BIN)_$(VERSION)_checksums.txt"; set -ex; \
 	"$$bin" --version | grep -Fx "gh dojo version $(VERSION)"; \
@@ -61,7 +61,8 @@ TOOLS := $(CURDIR)/.tools
 
 tools:
 	go build -modfile=tools/go.mod -o $(TOOLS)/ \
-		honnef.co/go/tools/cmd/staticcheck golang.org/x/vuln/cmd/govulncheck
+		honnef.co/go/tools/cmd/staticcheck golang.org/x/vuln/cmd/govulncheck \
+		github.com/rhysd/actionlint/cmd/actionlint
 
 # staticcheck on every system CI vets, and on the e2e tests.
 lint: tools
@@ -69,6 +70,24 @@ lint: tools
 	GOOS=windows $(TOOLS)/staticcheck ./...
 	GOOS=darwin $(TOOLS)/staticcheck ./...
 	$(TOOLS)/staticcheck -tags e2e ./e2e
+
+# shellcheck is no Go tool, so it is not pinned in tools/go.mod: GitHub's
+# ubuntu-latest has it, elsewhere it is installed by hand. Without it
+# actionlint skips the run: blocks silently, so both targets fail instead.
+need-shellcheck = @command -v shellcheck >/dev/null || { \
+	echo "shellcheck not found: brew install shellcheck, or apt install shellcheck" \
+		"(CONTRIBUTING.md, Build and test)" >&2; \
+	exit 1; }
+
+# The scripts the release and the checks run.
+shellcheck:
+	$(need-shellcheck)
+	shellcheck script/*.sh
+
+# The workflows, and shellcheck on their run: blocks.
+actionlint: tools
+	$(need-shellcheck)
+	$(TOOLS)/actionlint
 
 # Known vulnerabilities in the code gh-dojo calls, its modules and the Go
 # standard library it is built with.

@@ -27,7 +27,7 @@ jobs:
       - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.mod
-          # tools/ (staticcheck) has its own modules: a version bump there
+          # tools/ (the linters) has its own modules: a version bump there
           # must not reuse the old cache.
           cache-dependency-path: |
             go.sum
@@ -44,6 +44,13 @@ jobs:
       # staticcheck, pinned in tools/go.mod, on the same systems as vet.
       - name: Staticcheck
         run: make lint
+      # The scripts in script/, with the runner's shellcheck.
+      - name: Shellcheck
+        run: make shellcheck
+      # actionlint, pinned in tools/go.mod, on the workflows and, through
+      # shellcheck, on their run: blocks.
+      - name: Actionlint
+        run: make actionlint
       # The same script the release workflow runs, so a broken release build
       # shows up before a tag is pushed.
       - name: Release build

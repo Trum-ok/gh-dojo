@@ -33,6 +33,10 @@ internal=0
 # refs <message>: the issues the message names after a keyword, as
 # "#12, #15". Text in backticks is an example, not a reference.
 refs() {
+  # The backticks are literal (SC2016). sed, not ${1//...} (SC2001): it works
+  # line by line, so an unpaired backtick never swallows the lines after it,
+  # and a bash pattern has no [^`]* without extglob.
+  # shellcheck disable=SC2016,SC2001
   sed 's/`[^`]*`//g' <<<"$1" |
     grep -oiE '\b(close[sd]?|fix(e[sd])?|resolve[sd]?|refs)[[:space:]]+#[0-9]+([[:space:]]*,[[:space:]]*#[0-9]+)*' |
     grep -oE '#[0-9]+' | awk '!seen[$0]++' | paste -sd, - | sed 's/,/, /g' || true
