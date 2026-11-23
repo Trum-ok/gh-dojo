@@ -92,9 +92,12 @@ actionlint: tools
 	$(TOOLS)/actionlint
 
 # Known vulnerabilities in the code gh-dojo calls, its modules and the Go
-# standard library it is built with.
+# standard library it is built with, on every system the release ships for: a
+# vulnerability may be reachable only on one (os/exec, path/filepath).
 vuln: tools
 	$(TOOLS)/govulncheck ./...
+	GOOS=windows $(TOOLS)/govulncheck ./...
+	GOOS=darwin $(TOOLS)/govulncheck ./...
 
 # The end-to-end tests against the sandbox boards (see e2e/doc.go), with
 # gh's token; .github/workflows/e2e.yml runs them daily.

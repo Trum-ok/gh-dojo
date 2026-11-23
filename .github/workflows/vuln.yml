@@ -22,12 +22,14 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # go.mod's go line picks the latest patch release, the one a release
-      # would be built with, so standard library fixes are checked too.
+      # go.mod's toolchain line is the exact Go release the release build
+      # (gh-extension-precompile, with go_version_file: go.mod) uses too, so
+      # the standard library checked here is the one shipped. No check-latest:
+      # it would check a newer patch release than the one released. A fix in a
+      # newer one shows as a finding; bump the toolchain line then.
       - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.mod
-          check-latest: true
           # govulncheck is built from tools/go.mod (make vuln): a version bump
           # there must not reuse the old cache.
           cache-dependency-path: |

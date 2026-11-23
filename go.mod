@@ -2,6 +2,11 @@ module github.com/Trum-ok/gh-dojo
 
 go 1.27
 
+// The Go release every build and check uses: the release (gh-extension-precompile
+// and ci.yml, through actions/setup-go) and vuln.yml read it from here. Bump it
+// by hand: dependabot is not relied on to update a toolchain line.
+toolchain go1.27.4
+
 require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/cli/go-gh/v2 v2.17.0

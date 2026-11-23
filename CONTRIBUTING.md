@@ -59,8 +59,14 @@ skip them silently without it, so `make shellcheck`, `make actionlint` and
 finding is fixed; a `# shellcheck disable=<code>` needs a comment saying why.
 
 `.github/workflows/vuln.yml` runs `make vuln` on pushes, pull requests and
-daily, with Go's latest patch release, and fails only on a vulnerability the
-code can reach.
+daily, and fails only on a vulnerability the code can reach. `make vuln`
+checks the Linux/host, Windows and macOS builds, as `make vet` does.
+
+The Go release is pinned once, by the `toolchain` line in `go.mod`: CI,
+vuln.yml and the release build (gh-extension-precompile) all set Go up from
+it, so the standard library checked is the one shipped. Dependabot's gomod
+ecosystem is not relied on to bump a `toolchain` line; raise it by hand when a new patch release fixes a
+vulnerability, which `make vuln` then reports.
 
 Code and tests must work on all three: build paths with `path/filepath`,
 show them to users with `filepath.ToSlash`, and keep OS error texts out of
