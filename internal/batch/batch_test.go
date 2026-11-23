@@ -210,6 +210,38 @@ func TestDoStops(t *testing.T) {
 	}
 }
 
+// TestDoForbidden (#111): done acme/api#3 12 13, where the token may not
+// write to acme/api: a FORBIDDEN on #3 fails #3 alone, and #12 and #13
+// are written. A missing scope still stops the writes.
+func TestDoForbidden(t *testing.T) {
+	gql := func(typ string) error {
+		err := &api.GraphQLError{Errors: []api.GraphQLErrorItem{{Type: typ, Message: "denied"}}}
+		return render.MapGraphQL(err, nil).WithCause(err)
+	}
+	api3 := issue.Ref{Repo: issue.Repo{Owner: "acme", Name: "api"}, Number: 3}
+	run := func(applyErr error) (*fakeBackend, []*Item) {
+		t.Helper()
+		be := &fakeBackend{issues: map[int]workflow.Issue{3: ready("Ready"), 12: ready("Ready"), 13: ready("Ready")},
+			applyErrs: map[int]error{3: applyErr}}
+		b, _, _ := newRun(t, be, "")
+		items, err := b.Do(context.Background(), append([]issue.Ref{api3}, refs(12, 13)...), false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return be, items
+	}
+
+	be, items := run(gql("FORBIDDEN"))
+	if !slices.Equal(be.applied, []int{3, 12, 13}) || items[0].Err == nil || items[1].Err != nil || items[2].Err != nil {
+		t.Errorf("FORBIDDEN: applied %v, errors %v, %v, %v; want #3 failed alone", be.applied, items[0].Err, items[1].Err, items[2].Err)
+	}
+
+	be, items = run(gql("INSUFFICIENT_SCOPES"))
+	if !slices.Equal(be.applied, []int{3}) || !items[1].Skipped || !items[2].Skipped {
+		t.Errorf("INSUFFICIENT_SCOPES: applied %v, skipped %v, %v; want #12 and #13 not attempted", be.applied, items[1].Skipped, items[2].Skipped)
+	}
+}
+
 // TestDoJSON: with JSON the run prints nothing on stdout; the command
 // emits the items.
 func TestDoJSON(t *testing.T) {

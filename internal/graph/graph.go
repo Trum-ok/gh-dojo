@@ -427,11 +427,16 @@ func IsCycle(err error) bool {
 }
 
 // AffectsAll reports whether err is about the token or the run rather than
-// the request: the token rejected or missing a scope, access denied (SSO,
+// the request: the token rejected (HTTP 401) or missing a scope
+// (INSUFFICIENT_SCOPES), an organization's policy denying it (SAML SSO,
 // OAuth app restrictions), a primary or secondary rate limit (the limit on
 // creating content too: it holds for the next issue's comment), or the run
 // interrupted. The same request for another issue would fail alike, so a
 // run over several issues stops sending.
+//
+// A plain FORBIDDEN or HTTP 403 is not: access can be denied in one
+// repository alone (a fine-grained or app token without write access
+// there), so it fails that issue and the run goes on.
 func AffectsAll(err error) bool {
 	var httpErr *api.HTTPError
 	var gqlErr *api.GraphQLError
@@ -439,16 +444,19 @@ func AffectsAll(err error) bool {
 	case errors.Is(err, context.Canceled):
 		return true
 	case errors.As(err, &httpErr) && httpErr != nil:
-		s := httpErr.StatusCode
-		return s == http.StatusUnauthorized || s == http.StatusForbidden || s == http.StatusTooManyRequests
+		switch httpErr.StatusCode {
+		case http.StatusUnauthorized, http.StatusTooManyRequests:
+			return true
+		case http.StatusForbidden:
+			return render.IsRateLimit(httpErr) || render.IsContentLimit(httpErr.Message) ||
+				orgDenial(api.GraphQLErrorItem{Message: httpErr.Message}) != nil
+		}
 	case errors.As(err, &gqlErr) && gqlErr != nil:
 		if render.GraphQLLimit(gqlErr) != nil {
 			return true
 		}
 		for _, item := range gqlErr.Errors {
-			switch {
-			case item.Type == "INSUFFICIENT_SCOPES", item.Type == "FORBIDDEN",
-				orgDenial(item) != nil:
+			if item.Type == "INSUFFICIENT_SCOPES" || orgDenial(item) != nil {
 				return true
 			}
 		}
