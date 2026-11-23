@@ -347,8 +347,8 @@ func PlanNew(cfg *config.Config, req NewRequest, found *NewFound) *NewPlan {
 	case found.Milestone != req.Milestone:
 		p.MilestoneKept = req.Milestone
 		p.Warnings = append(p.Warnings, fmt.Sprintf(
-			"#%d already has milestone %q; kept it, --milestone %q not applied (to change it: %s)",
-			found.Number, found.Milestone, req.Milestone, milestoneFix(cfg, found, req.Repo, req.Milestone)))
+			"%s already has milestone %q; kept it, --milestone %q not applied (to change it: %s)",
+			found.Name, found.Milestone, req.Milestone, milestoneFix(cfg, found, req.Repo, req.Milestone)))
 	}
 	if par := req.Parent; par != nil {
 		switch {

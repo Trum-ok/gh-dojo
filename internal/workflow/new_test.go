@@ -309,6 +309,19 @@ func TestPlanNewKept(t *testing.T) {
 	}
 }
 
+// TestPlanNewKeptOtherRepo: the milestone warning names the issue as
+// output does, with its repository when it is not the default one.
+func TestPlanNewKeptOtherRepo(t *testing.T) {
+	f := newFound()
+	f.Name, f.Milestone = "acme/other#57", "v1.1"
+	req := newRequest()
+	req.Repo = "acme/other"
+	p := PlanNew(parseNewConfig(t, ""), req, f)
+	if len(p.Warnings) == 0 || !strings.HasPrefix(p.Warnings[0], `acme/other#57 already has milestone "v1.1"`) {
+		t.Errorf("warnings = %q", p.Warnings)
+	}
+}
+
 // TestOnlySetsMilestone: a verb that sets the --milestone milestone and
 // nothing else; one that also comments, or needs --yes, is not.
 func TestOnlySetsMilestone(t *testing.T) {

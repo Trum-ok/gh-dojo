@@ -518,7 +518,7 @@ func (r *Issue) apply(ctx context.Context, s *board.Schema, statusField *board.F
 		}
 		vars := map[string]any{"issue": r.id, "labels": ids}
 		if err := r.env.Client.Mutate(ctx, effects.AddLabelsMutation, vars, nil); err != nil {
-			return &stepError{step: "adding labels " + strings.Join(r.Labels, ", ") + " failed", err: err}
+			return &stepError{step: "adding labels " + strings.Join(plan.Labels, ", ") + " failed", err: err}
 		}
 	}
 	if !plan.Create && plan.Milestone != "" {
