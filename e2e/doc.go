@@ -24,4 +24,8 @@
 // The repository is for the tests only: they create issues titled "e2e: …",
 // delete them when done, and first delete any "e2e: …" issue an earlier run
 // left behind. Deleting needs admin rights on the repository.
+//
+// The benchmark (bench/) uses the same repository and board and refuses to
+// start while "e2e: …" issues are there; the tests skip, with a message,
+// while "bench-…" issues are.
 package e2e

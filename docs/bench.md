@@ -64,6 +64,11 @@ they are counted apart from the *tool errors*.
 
 Tables: `go run ./bench report bench/out/agents-*/results.jsonl`.
 
+The board is shared: a run sweeps every `bench-` issue on it, so one run at a time. The lock is
+`gh-dojo-bench-<repo>-<board>.lock` in git's common directory (`git rev-parse --git-common-dir`), the same for all
+worktrees of the repository (outside a git repository, in `-out`). A run also refuses while `e2e: ` issues are on
+the board, and the e2e tests skip while `bench-` issues are.
+
 ### One message: no harm
 
 Six tasks of one message each: **start**; **next** (the first Backlog issue is blocked, the agent must take the

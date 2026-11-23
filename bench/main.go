@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -248,14 +249,22 @@ func (s *sandbox) levelOne(outDir string, repeat int) error {
 var errNoLock = errors.New("the benchmark runs only on Unix: it locks the board with flock")
 
 // lockBoard takes a lock on the board for this process, refusing when another
-// benchmark run from this working copy holds it. The lock is in the results'
-// directory, not the temporary one, which differs between sandboxes.
+// benchmark run holds it. Every run sweeps all "bench-" issues of the shared
+// board, so the lock is shared by all worktrees of the repository: it lies in
+// git's common directory. Outside a git repository it is in the results'
+// directory (the temporary one differs between sandboxes).
 func lockBoard(outDir, repo string, project int) (func(), error) {
-	if err := os.MkdirAll(outDir, 0o755); err != nil {
+	dir := outDir
+	if out, err := exec.Command("git", "rev-parse", "--path-format=absolute", "--git-common-dir").Output(); err == nil {
+		if d := strings.TrimSpace(string(out)); d != "" {
+			dir = d
+		}
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err
 	}
-	name := fmt.Sprintf(".lock-%s-%d", strings.ReplaceAll(repo, "/", "_"), project)
-	f, err := os.OpenFile(filepath.Join(outDir, name), os.O_CREATE|os.O_RDWR, 0o644)
+	name := fmt.Sprintf("gh-dojo-bench-%s-%d.lock", strings.ReplaceAll(repo, "/", "_"), project)
+	f, err := os.OpenFile(filepath.Join(dir, name), os.O_CREATE|os.O_RDWR, 0o644)
 	if err != nil {
 		return nil, err
 	}

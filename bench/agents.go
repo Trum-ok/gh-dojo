@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -220,6 +221,8 @@ type agentResult struct {
 	Final        string  `json:"final"`
 	Transcript   string  `json:"transcript"`
 	HarnessError string  `json:"harness_error,omitempty"`
+	// broken is set when the harness error is one every run would hit.
+	broken bool
 	// Steps are the answers to the user's messages: one for a task, one per
 	// message for a session.
 	Steps []stepResult `json:"steps,omitempty"`
@@ -330,8 +333,7 @@ func (s *sandbox) levelTwo(c levelTwoConfig) error {
 				b, _ := json.Marshal(r)
 				results.Write(append(b, '\n'))
 				done++
-				if strings.Contains(r.HarnessError, "Not logged in") || strings.Contains(r.HarnessError, "executable file not found") ||
-					strings.Contains(r.HarnessError, "sandbox") {
+				if stopsRun(r) {
 					stopErr = fmt.Errorf("stopped, every run would fail the same: %s", r.HarnessError)
 				}
 				verdict := "ok"
@@ -359,6 +361,17 @@ func (s *sandbox) levelTwo(c levelTwoConfig) error {
 	}
 	fmt.Fprintf(os.Stderr, "results: %s\n", results.Name())
 	return report([]string{results.Name()})
+}
+
+// errSandboxBroke marks gh failing inside Claude Code's sandbox: every run
+// would fail the same. It is matched with errors.Is, not by text: the default
+// repository's name has "sandbox" in it, and so does the URL of any HTTP error.
+var errSandboxBroke = errors.New("gh broke in Claude Code's sandbox")
+
+// stopsRun tells a harness error that every other run would share.
+func stopsRun(r agentResult) bool {
+	return r.broken || strings.Contains(r.HarnessError, "Not logged in") ||
+		strings.Contains(r.HarnessError, "executable file not found")
 }
 
 // runAgent seeds the task, runs the agent and grades the board.
@@ -426,6 +439,7 @@ func (s *sandbox) runAgent(t task, cond, model string, run, maxTurns int, dir st
 	r.Transcript = filepath.Join(dir, fmt.Sprintf("%s-%s-%s-%d.jsonl", t.name, model, cond, run))
 	if err := r.agent(w, prompts, model, maxTurns, afterStep); err != nil {
 		r.HarnessError = err.Error()
+		r.broken = errors.Is(err, errSandboxBroke)
 		return
 	}
 	settle()
@@ -621,7 +635,7 @@ func (r *agentResult) agent(w *workspace, prompts []string, model string, maxTur
 		// The sandbox breaking gh is the harness's failure, not the agent's.
 		for _, sign := range []string{"OSStatus -26276", "The token in keyring is invalid"} {
 			if bytes.Contains(line, []byte(sign)) {
-				stop(fmt.Errorf("gh broke in Claude Code's sandbox (%s), see %s", sign, r.Transcript))
+				stop(fmt.Errorf("%w (%s), see %s", errSandboxBroke, sign, r.Transcript))
 			}
 		}
 		if failed != nil || !r.consume(line, &st) {
