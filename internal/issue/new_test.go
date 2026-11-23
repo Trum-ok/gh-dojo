@@ -176,6 +176,52 @@ func TestNewContextHiddenParent(t *testing.T) {
 	}
 }
 
+// TestNewContextHiddenProject: a project GitHub withholds from the token on
+// a recent issue (FORBIDDEN at ...projectItems.nodes.<j>.project, as in
+// testdata/graphql/card_partial.json) is no error, so new neither fails nor
+// creates a second issue: the issue is found by its marker, its item on
+// another project unknown, so it is not on the board for Find. An error
+// elsewhere still fails, whatever else was withheld. The read is the same
+// for --dry-run.
+func TestNewContextHiddenProject(t *testing.T) {
+	// The marker issue's other item is withheld: its project comes back null.
+	data := strings.Replace(newContextData, `{"id": "IT0", "isArchived": false, "project": {"id": "PRJ_other"}, "fieldValueByName": {"name": "Done"}}`,
+		`{"id": "IT0", "isArchived": false, "project": null, "fieldValueByName": null}`, 1)
+	hidden := api.GraphQLErrorItem{Type: "FORBIDDEN", Message: "Resource not accessible by integration",
+		Path: []any{"repository", "issues", "nodes", float64(2), "projectItems", "nodes", float64(0), "project"}}
+	err := &api.GraphQLError{Errors: []api.GraphQLErrorItem{hidden}}
+
+	const marker = "<!-- gh-dojo:new:00000000 -->"
+	f := readNewContext(t, data, err).Find(marker, "PRJ")
+	if f == nil || f.Number != 57 || f.ItemID != "IT1" || f.ParentID != "P7" || f.ParentHidden {
+		t.Errorf("found %+v, want #57 with its item on the board", f)
+	}
+	if f := readNewContext(t, data, err).Find(marker, "PRJ_other"); f == nil || f.Number != 57 || f.ItemID != "" {
+		t.Errorf("on the withheld project: %+v, want #57 found, no item known", f)
+	}
+
+	// Withheld in the item itself, in a NOT_FOUND node, with a withheld parent.
+	err = &api.GraphQLError{Errors: []api.GraphQLErrorItem{hidden,
+		{Type: "NOT_FOUND", Message: "gone", Path: []any{"repository", "issues", "nodes", float64(0), "projectItems", "nodes", float64(1)}},
+		{Type: "FORBIDDEN", Message: "no access", Path: []any{"repository", "issues", "nodes", float64(2), "parent"}},
+	}}
+	if f := readNewContext(t, data, err).Find(marker, "PRJ"); f == nil || !f.ParentHidden {
+		t.Errorf("found %+v, want a hidden parent", f)
+	}
+
+	for name, items := range map[string][]api.GraphQLErrorItem{
+		"another path":   {hidden, {Type: "FORBIDDEN", Message: "no access", Path: []any{"repository", "labels"}}},
+		"another type":   {hidden, {Type: "INTERNAL", Message: "boom", Path: []any{"repository", "issues", "nodes", float64(2), "projectItems"}}},
+		"no path":        {hidden, {Type: "FORBIDDEN", Message: "no access"}},
+		"not an element": {hidden, {Type: "FORBIDDEN", Message: "no access", Path: []any{"repository", "issues", "nodes"}}},
+	} {
+		fq := &fakeQuerier{data: data, err: &api.GraphQLError{Errors: items}}
+		if _, err := issue.ReadNewContext(context.Background(), fq, issue.NewRequest{Repo: acmeAPI}); err == nil {
+			t.Errorf("%s: the error was dropped", name)
+		}
+	}
+}
+
 func TestNewContextRepoNotFound(t *testing.T) {
 	f := &fakeQuerier{data: `{"repository": null}`}
 	_, err := issue.ReadNewContext(context.Background(), f, issue.NewRequest{Repo: acmeAPI})
