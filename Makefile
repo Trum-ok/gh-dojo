@@ -26,9 +26,11 @@ vet:
 	GOOS=darwin go vet ./...
 	go vet -tags e2e ./e2e
 
-# Files gofmt would change; `gofmt -w .` fixes them.
+# Files gofmt would change; `gofmt -w` on them fixes them. Dot-directories are
+# skipped, as go vet and staticcheck do: .claude/worktrees holds other
+# sessions' checkouts.
 fmt:
-	@unformatted="$$(gofmt -l .)"; \
+	@unformatted="$$(find . -name '*.go' -not -path './.*' -exec gofmt -l {} +)"; \
 	if [ -n "$$unformatted" ]; then \
 		echo "gofmt needed on:"; echo "$$unformatted"; exit 1; \
 	fi
@@ -112,9 +114,13 @@ golden:
 
 # Regenerate the agent skill from .github/dojo.toml with this branch's
 # build, after changing the config, its notes or a command; CI runs
-# agent install --check. Stamped with VERSION, which the marker names.
+# agent install --check. The marker names the last release tag (dev without
+# one), not VERSION: this runs before the commit, so a describe would stamp a
+# -dirty build that never exists. A version-only difference is no change to
+# --check, so CI still agrees.
+AGENT_VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)
 agent:
-	go run -ldflags "$(LDFLAGS)" ./cmd/gh-dojo agent install
+	go run -ldflags "-X main.version=$(AGENT_VERSION)" ./cmd/gh-dojo agent install
 
 # Cross-compile the release binaries into dist/ the way the release workflow
 # does (script/build-release.sh), stamped with VERSION.

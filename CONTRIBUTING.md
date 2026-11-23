@@ -14,7 +14,7 @@ make vet         # go vet, also for Windows, macOS and -tags e2e
 make lint        # staticcheck, also as Windows and macOS see the code
 make shellcheck  # shellcheck on script/*.sh
 make actionlint  # actionlint on the workflows, shellcheck on their run: blocks
-make fmt         # files gofmt -l lists (gofmt -w . fixes them)
+make fmt         # files gofmt -l lists, outside dot-directories (gofmt -w fixes them)
 make tidy        # go mod tidy -diff, tools/ too
 make vuln        # govulncheck: known vulnerabilities the code can reach
 make e2e         # end-to-end tests against the sandbox boards (see below)
@@ -406,7 +406,9 @@ Agents load the rules from
 inconvenience as a `dogfood` issue right away. Never edit the skill: change
 the config or the notes and run `make agent`, which uses the build of your
 branch. So does CI's `agent install --check`, so a change to the generated
-text, the notes or the config needs `make agent` too.
+text, the notes or the config needs `make agent` too. The marker names the
+last release tag, not the `git describe` of your uncommitted build; a version
+alone never makes `--check` fail.
 
 Issue tracking uses the installed `gh dojo`, the latest release installed
 with `gh extension install` (`make release` does it), not a build of your
