@@ -190,6 +190,55 @@ func TestErrorTextLimits(t *testing.T) {
 	}
 }
 
+// TestAllowedLineKeepsCount (#121): a clipped allowed line drops whole values
+// and still says how many it hides.
+func TestAllowedLineKeepsCount(t *testing.T) {
+	labels := make([]string, 57) // 25 runes each: the first 20 alone are over 540
+	for i := range labels {
+		labels[i] = fmt.Sprintf("label-%02d-%s", i, strings.Repeat("x", 15))
+	}
+	line := func(e *Error) string {
+		t.Helper()
+		for l := range strings.SplitSeq(e.Text(), "\n") {
+			if strings.HasPrefix(l, "allowed: ") {
+				return l
+			}
+		}
+		t.Fatalf("no allowed line:\n%s", e.Text())
+		return ""
+	}
+	got := line(Usage("unknown label").WithAllowed(labels...))
+	if n := RuneLen(got); n > 2*MaxLineRunes {
+		t.Errorf("allowed line has %d runes, want at most %d", n, 2*MaxLineRunes)
+	}
+	i := strings.LastIndex(got, " and ")
+	if i < 0 || strings.Contains(got, "…") {
+		t.Fatalf("allowed line = %q, want whole values then \"and N more\"", got)
+	}
+	shown := strings.Split(strings.TrimPrefix(got[:i], "allowed: "), ", ")
+	if want := fmt.Sprintf(" and %d more", len(labels)-len(shown)); got[i:] != want {
+		t.Errorf("tail = %q, want %q", got[i:], want)
+	}
+	for j, v := range shown {
+		if v != labels[j] {
+			t.Errorf("shown[%d] = %q, want the whole value %q", j, v, labels[j])
+		}
+	}
+	// One value filling the line alone: clipped, the count kept.
+	long := []string{strings.Repeat("y", 600), "b", "c"}
+	got = line(Usage("unknown label").WithAllowed(long...))
+	if n := RuneLen(got); n > 2*MaxLineRunes || !strings.HasSuffix(got, "… and 2 more") {
+		t.Errorf("long first value: %d runes, %q", n, got)
+	}
+	// Values that fit are untouched, and AllowedAll is never cut.
+	if got := line(Usage("x").WithAllowed("a", "b")); got != "allowed: a, b" {
+		t.Errorf("short list = %q", got)
+	}
+	if got := line(Usage("x").WithAllowedAll(labels...)); !strings.HasSuffix(got, labels[56]) {
+		t.Errorf("AllowedAll cut: %q", got)
+	}
+}
+
 func TestClipGraphemes(t *testing.T) {
 	family := "\U0001F468\u200D\U0001F469\u200D\U0001F467" // one cluster, five runes
 	accent := "e\u0301"                                    // é as e + combining acute: one cluster, two runes

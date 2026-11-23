@@ -171,7 +171,8 @@ func (e *Error) Unwrap() error {
 //
 // Blank lines of What are dropped, then it is cut to 3 lines; each allowed
 // value is put on one line. The allowed line is cut after maxAllowed values
-// and 2×MaxLineRunes runes, unless AllowedAll. The fix line is never cut,
+// and 2×MaxLineRunes runes, unless AllowedAll; a cut drops whole values and
+// always ends in "and N more". The fix line is never cut,
 // since a cut command would be wrong; a fix longer than maxFixRunes is
 // dropped instead.
 func (e *Error) Text() string {
@@ -199,7 +200,7 @@ func (e *Error) Text() string {
 	case e.AllowedAll:
 		lines = append(lines, "allowed: "+joinAllowed(e.Allowed, len(e.Allowed)))
 	default:
-		lines = append(lines, Clip("allowed: "+joinAllowed(e.Allowed, maxAllowed), MaxLineRunes*2))
+		lines = append(lines, "allowed: "+joinAllowedWithin(e.Allowed, maxAllowed, MaxLineRunes*2))
 	}
 	if fix := SingleLine(e.Fix); fix != "" && RuneLen(fix) <= maxFixRunes {
 		lines = append(lines, "fix: "+fix)
@@ -209,15 +210,42 @@ func (e *Error) Text() string {
 
 // joinAllowed joins the first limit values, then "and N more" for the rest.
 func joinAllowed(values []string, limit int) string {
+	return joinAllowedWithin(values, limit, 0)
+}
+
+// joinAllowedWithin is joinAllowed for a line of at most maxRunes runes
+// (0: no bound), "allowed: " included: when the values do not fit, whole
+// values are dropped from the end until the rest and "and N more" do, so the
+// count of hidden values is never cut off. A first value too long to fit
+// even alone is clipped.
+func joinAllowedWithin(values []string, limit, maxRunes int) string {
 	shown := make([]string, 0, min(len(values), limit))
 	for _, v := range values[:min(len(values), limit)] {
 		shown = append(shown, SingleLine(v))
 	}
-	s := strings.Join(shown, ", ")
-	if n := len(values) - len(shown); n > 0 {
-		s += fmt.Sprintf(" and %d more", n)
+	build := func(shown []string) string {
+		s := strings.Join(shown, ", ")
+		if n := len(values) - len(shown); n > 0 {
+			s += fmt.Sprintf(" and %d more", n)
+		}
+		return s
 	}
-	return s
+	const prefix = len("allowed: ") // ASCII: bytes are runes
+	if maxRunes == 0 {
+		return build(shown)
+	}
+	for len(shown) > 1 && prefix+RuneLen(build(shown)) > maxRunes {
+		shown = shown[:len(shown)-1]
+	}
+	if s := build(shown); prefix+RuneLen(s) <= maxRunes || len(shown) == 0 {
+		return s
+	}
+	// One value, too long even alone: clip it and keep the count.
+	tail := ""
+	if n := len(values) - 1; n > 0 {
+		tail = fmt.Sprintf(" and %d more", n)
+	}
+	return Clip(shown[0], maxRunes-prefix-RuneLen(tail)) + tail
 }
 
 // Reason is the first clause of an error's message, for a line that
