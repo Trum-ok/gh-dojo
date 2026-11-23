@@ -105,6 +105,15 @@ func TestBlockPartial(t *testing.T) {
 	)
 }
 
+// TestBlockPartialContentLimit (#118): GitHub links one issue and refuses
+// the other with its limit on creating content: exit 5, and the wait with
+// "re-run the same command" once, as the verbs say it.
+func TestBlockPartialContentLimit(t *testing.T) {
+	srv, before := withLinksApp(t, verbFixture("links_block_content_limit"))
+	checkLinkRuns(t, srv, before,
+		runs{[]string{"block", "3", "--by", "2", "--by", "26"}, render.ExitPartial, 2, "block_partial_content_limit"})
+}
+
 // TestBlockNotFound: a missing blocker or issue is exit 3 after the one
 // read, before any write.
 func TestBlockNotFound(t *testing.T) {

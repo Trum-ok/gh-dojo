@@ -1,0 +1,100 @@
+{
+  "comment": "Hand-crafted from links_block_partial.json: gh dojo block 3 --by 2 --by 26 with neither linked: GitHub links #2 but refuses #26 with its limit on creating content (type UNPROCESSABLE, \"was submitted too quickly\", the field nulled; shape from https://github.com/cli/cli/issues/4801). Exit 5 with the wait, once. Never sent to GitHub.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "IssueLinks",
+      "query": "query IssueLinks($owner: String!, $repo: String!, $number: Int!, $link0Owner: String!, $link0Repo: String!, $link0Number: Int!, $link1Owner: String!, $link1Repo: String!, $link1Number: Int!) {\n  repository(owner: $owner, name: $repo) {\n    nameWithOwner\n    issueOrPullRequest(number: $number) { __typename ... on Issue { id title blockedBy(first: 50) { nodes { id } } } }\n  }\n  link0: repository(owner: $link0Owner, name: $link0Repo) {\n    nameWithOwner\n    issueOrPullRequest(number: $link0Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } } }\n  }\n  link1: repository(owner: $link1Owner, name: $link1Repo) {\n    nameWithOwner\n    issueOrPullRequest(number: $link1Number) { __typename ... on Issue { id title state blocking(first: 50) { nodes { id } } blockedBy(first: 50) { nodes { id } } } }\n  }\n}",
+      "variables": {
+        "link0Number": 2,
+        "link0Owner": "Trum-ok",
+        "link0Repo": "gh-dojo",
+        "link1Number": 26,
+        "link1Owner": "Trum-ok",
+        "link1Repo": "gh-dojo",
+        "number": 3,
+        "owner": "Trum-ok",
+        "repo": "gh-dojo"
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "nameWithOwner": "Trum-ok/gh-dojo",
+            "issueOrPullRequest": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8AAAABeZKr9A",
+              "title": "Конфиг: загрузка и валидация .github/dojo.toml (internal/config)",
+              "blockedBy": {
+                "nodes": []
+              }
+            }
+          },
+          "link0": {
+            "nameWithOwner": "Trum-ok/gh-dojo",
+            "issueOrPullRequest": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8AAAABeZKieQ",
+              "title": "Коды выхода и короткие ошибки (internal/render)",
+              "state": "OPEN",
+              "blocking": {
+                "nodes": []
+              },
+              "blockedBy": {
+                "nodes": []
+              }
+            }
+          },
+          "link1": {
+            "nameWithOwner": "Trum-ok/gh-dojo",
+            "issueOrPullRequest": {
+              "__typename": "Issue",
+              "id": "I_kwDOVq9iIs8AAAABeb-QYw",
+              "title": "Блокеры: block/unblock, new --blocked-by, проверка blockers, эффект blockers",
+              "state": "OPEN",
+              "blocking": {
+                "nodes": []
+              },
+              "blockedBy": {
+                "nodes": []
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "Block",
+      "query": "mutation Block($issue: ID!, $link0: ID!, $link1: ID!) {\n  link0: addBlockedBy(input: {issueId: $issue, blockingIssueId: $link0}) { issue { id } }\n  link1: addBlockedBy(input: {issueId: $issue, blockingIssueId: $link1}) { issue { id } }\n}",
+      "variables": {
+        "issue": "I_kwDOVq9iIs8AAAABeZKr9A",
+        "link0": "I_kwDOVq9iIs8AAAABeZKieQ",
+        "link1": "I_kwDOVq9iIs8AAAABeb-QYw"
+      },
+      "response": {
+        "data": {
+          "link0": {
+            "issue": {
+              "id": "I_kwDOVq9iIs8AAAABeZKr9A"
+            }
+          },
+          "link1": null
+        },
+        "errors": [
+          {
+            "type": "UNPROCESSABLE",
+            "path": [
+              "link1"
+            ],
+            "locations": [
+              {
+                "line": 3,
+                "column": 3
+              }
+            ],
+            "message": "was submitted too quickly"
+          }
+        ]
+      }
+    }
+  ]
+}

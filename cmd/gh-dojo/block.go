@@ -253,15 +253,12 @@ func runLinks(cmd *cobra.Command, add bool, ref issue.Ref, bys []string, dryRun 
 		if !add {
 			what = "still blocked by "
 		}
-		why, fix, next := "GitHub returned no result for it", "", "re-run the same command"
+		why, cause := "GitHub returned no result for it", render.Partial("") // no fix, no wait
 		if err != nil {
-			why, fix = render.Reason(err), strings.TrimSpace(render.FromError(err).Fix)
+			why, cause = render.Reason(err), render.FromError(err)
 		}
-		if fix != "" {
-			next = fix + ", then " + next
-		}
-		e := render.Partial("%s; %s%s: %s; %s", line(done), what, issue.JoinLinked(missed, repo), why, next).
-			WithFix(fix).WithCause(err)
+		e := render.Partial("%s; %s%s: %s; %s", line(done), what, issue.JoinLinked(missed, repo), why, render.RerunStep(cause)).
+			WithFix(strings.TrimSpace(cause.Fix)).WithCause(err)
 		return result(done, missed, e), e
 	}
 	return result(done, nil, nil), nil
