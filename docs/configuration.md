@@ -335,8 +335,13 @@ Rules across keys:
     or moves them to a resolved status, the sub-issues the same run moves
     count as resolved. They are planned and written before their parent, so
     the confirmation lines follow that order (the JSON keeps the order of
-    the arguments), and the parent is refused if one of them is refused or
-    fails to be written.
+    the arguments). A sub-issue the verb refuses counts as unresolved:
+    `"warn"` warns about it, `"deny"` refuses the parent. When a sub-issue
+    fails to be written, `"warn"` warns and writes the parent; `"deny"`
+    skips the parent as not attempted if a re-run may finish the sub-issue
+    (it failed on the network or partway, its outcome is unknown, or it was
+    not attempted), so the same re-run finishes both, and refuses the
+    parent on any other failure.
 - **confirm** `"user"`: without `--yes` the verb exits with code 2 and asks
   you to ask the user; re-run it with `--yes` only once they agree. A repeat
   with nothing left to do needs no `--yes`; a verb without `confirm` takes

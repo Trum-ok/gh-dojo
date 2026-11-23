@@ -183,8 +183,10 @@ func (b *Run) Do(ctx context.Context, refs []issue.Ref, dryRun bool) ([]*Item, e
 // sub-issues the same run plans, and so resolves, as resolved: gh dojo
 // done 40 41 42 on a parent and its sub-issues in In progress moves all
 // three, as running it twice would. The run plans and applies each
-// sub-issue before its parent (planOrder), and a parent whose sub-issue
-// then fails to be written is refused (applyAll).
+// sub-issue before its parent (planOrder). When a sub-issue then fails to
+// be written, under "deny" the parent is skipped for the re-run if that
+// may finish the sub-issue (retriedSubIssue), and refused otherwise; under
+// "warn" it is written with a warning (applyAll, failedSubIssues).
 func (b *Run) resolvesSubIssues() bool {
 	return b.v.ChecksSubIssues() && (b.v.Close != "" || b.v.To != "" && config.HasStatus(b.resolved, b.v.To))
 }
@@ -353,9 +355,10 @@ func (b *Run) applyAll(ctx context.Context, items []*Item) {
 			it.skip(b.stop)
 			continue
 		}
-		if s := retriedSubIssue(it); s != nil {
+		if s := retriedSubIssue(it); s != nil && b.v.SubIssues == config.BlockersDeny {
 			// A sub-issue failed on the network or was not attempted: the
-			// re-run that finishes it finishes the parent too.
+			// re-run that finishes it finishes the parent too. Under
+			// "warn" the parent runs, with failedSubIssues' warning.
 			it.skip(s.Err)
 			continue
 		}
@@ -401,8 +404,10 @@ func retriedSubIssue(it *Item) *Item {
 }
 
 // failedSubIssues refuses the plan p of it, as the sub_issues check would,
-// when a sub-issue of the run its plan counted as resolved failed: it
-// stays unresolved. A warning is enough for sub_issues = "warn".
+// when a sub-issue of the run its plan counted as resolved failed, for
+// any reason: it stays unresolved. A warning is enough for sub_issues =
+// "warn". Under "deny", a failure a re-run may finish skips the parent
+// first (retriedSubIssue).
 func (b *Run) failedSubIssues(it *Item, p *workflow.Plan) error {
 	var refs []string
 	for _, s := range it.relies {
