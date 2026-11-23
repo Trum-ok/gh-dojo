@@ -103,6 +103,21 @@ func Network(format string, args ...any) *Error { return New(ExitNetwork, format
 // should say what was done and what was not.
 func Partial(format string, args ...any) *Error { return New(ExitPartial, format, args...) }
 
+// RerunStep is the next step after a partial write that stopped with e: its
+// fix, then "re-run the same command". A rate limit (Wait) says to wait
+// first, its fix already ends in "then re-run the same command", so that is
+// not repeated.
+func RerunStep(e *Error) string {
+	const rerun = "re-run the same command"
+	switch fix := strings.TrimSpace(e.Fix); {
+	case e.Wait != "":
+		return "wait " + e.Wait + ", then " + rerun
+	case fix != "":
+		return fix + ", then " + rerun
+	}
+	return rerun
+}
+
 // Internal reports a bug in gh-dojo itself, such as a recovered panic
 // (exit code 1). The message makes clear the arguments are not at fault.
 func Internal(format string, args ...any) *Error {

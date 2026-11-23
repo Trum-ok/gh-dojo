@@ -218,14 +218,7 @@ func (w *Writes) Partial(missed []workflow.Op, cause, err error) error {
 			WithFix("gh dojo show " + strings.TrimPrefix(w.First.Issue.Name(), "#")).WithCause(err)
 	}
 	e := render.FromError(err)
-	next := "re-run the same command"
-	switch fix := strings.TrimSpace(e.Fix); {
-	case e.Wait != "": // a rate limit: its fix already says to wait, then re-run
-		next = "wait " + e.Wait + ", then " + next
-	case fix != "":
-		next = fix + ", then " + next
-	}
-	return render.Partial("%s; %s: %s; %s", w.Applied().Confirm(), missedText(missed, cause), render.Reason(err), next).
+	return render.Partial("%s; %s: %s; %s", w.Applied().Confirm(), missedText(missed, cause), render.Reason(err), render.RerunStep(e)).
 		WithFix(e.Fix).WithCause(err)
 }
 

@@ -79,6 +79,14 @@ func TestBlockDryRun(t *testing.T) {
 		runs{[]string{"unblock", "3", "--by", "2", "--by", "26", "--dry-run", "--json"}, render.ExitOK, 1, "unblock_dry_run_json"})
 }
 
+// TestBlockDryRunJQFails (#104): a dry run writes nothing, so a --jq that
+// fails on the result is exit code 1, not "applied" with exit 0.
+func TestBlockDryRunJQFails(t *testing.T) {
+	srv, before := withLinksApp(t, verbFixture("links_block_dry_run"))
+	checkLinkRuns(t, srv, before,
+		runs{[]string{"block", "3", "--by", "2,26", "--dry-run", "--jq", ".number[]"}, render.ExitUsage, 1, "block_dry_run_jq_fails"})
+}
+
 func TestUnblock(t *testing.T) {
 	srv, before := withLinksApp(t, verbFixture("links_unblock"))
 	checkLinkRuns(t, srv, before,
@@ -95,6 +103,15 @@ func TestBlockPartial(t *testing.T) {
 		runs{[]string{"block", "3", "--by", "2", "--by", "26"}, render.ExitPartial, 2, "block_partial"},
 		runs{[]string{"block", "3", "--by", "2", "--by", "26"}, render.ExitOK, 2, "block_partial_rerun"},
 	)
+}
+
+// TestBlockPartialContentLimit (#118): GitHub links one issue and refuses
+// the other with its limit on creating content: exit 5, and the wait with
+// "re-run the same command" once, as the verbs say it.
+func TestBlockPartialContentLimit(t *testing.T) {
+	srv, before := withLinksApp(t, verbFixture("links_block_content_limit"))
+	checkLinkRuns(t, srv, before,
+		runs{[]string{"block", "3", "--by", "2", "--by", "26"}, render.ExitPartial, 2, "block_partial_content_limit"})
 }
 
 // TestBlockNotFound: a missing blocker or issue is exit 3 after the one

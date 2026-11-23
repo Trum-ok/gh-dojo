@@ -61,6 +61,18 @@ func TestCommentDryRun(t *testing.T) {
 	}
 }
 
+// TestCommentDryRunJQFails (#104): a dry run writes nothing, so a --jq that
+// fails on the result is exit code 1, not "comment applied" with exit 0.
+func TestCommentDryRunJQFails(t *testing.T) {
+	withConfig(t, dojoConfig)
+	withApp(t, boardFixture, card3Fixture)
+	code, out := runOut("comment", "3", "Reproduced on main.", "--dry-run", "--jq", ".number[]")
+	testutil.Golden(t, "comment/dry_run_jq_fails", out)
+	if code != render.ExitUsage {
+		t.Errorf("code = %d, want %d", code, render.ExitUsage)
+	}
+}
+
 // TestCommentRepeat: the latest gh-dojo comment already has the text, so
 // nothing is posted (the fixtures have no AddComment to answer).
 func TestCommentRepeat(t *testing.T) {
