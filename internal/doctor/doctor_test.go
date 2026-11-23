@@ -346,6 +346,11 @@ func TestRunCurrentRepo(t *testing.T) {
 	if got := lines(r)[4]; got != "problem repo: the current repository is unknown" {
 		t.Errorf("repo: %q", got)
 	}
+	// kanbanConfig sets type_prefix, so the labels check is skipped, not
+	// left out.
+	if got := lines(r)[5]; got != "skip labels: needs the repository (see repo)" {
+		t.Errorf("labels: %q", got)
+	}
 }
 
 // TestCheckToken: the project scope is ok, read:project or none a problem

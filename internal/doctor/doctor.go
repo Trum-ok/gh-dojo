@@ -198,6 +198,9 @@ func Run(ctx context.Context, env Env) *Report {
 		r.AddSkip("repo", "needs a config that loads")
 	case repoErr != nil:
 		r.AddProblem("repo", repoErr)
+		if labels != nil {
+			r.AddSkip("labels", "needs the repository (see repo)")
+		}
 	case !reach:
 		r.AddSkip("repo", "needs GitHub access (see token)")
 		if labels != nil {
