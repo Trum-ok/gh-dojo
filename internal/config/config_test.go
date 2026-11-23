@@ -421,6 +421,7 @@ func TestLoadErrors(t *testing.T) {
 		{"iteration_by_status_date_custom_status", strings.Replace(presetOnly, `status = "Status"`, `status = "Stage"`, 1) +
 			"sprint = \"Sprint\"\n[verbs.done]\niteration = \"by_status_date:Ready\"\n"},
 		{"timezone_unknown", strings.Replace(presetOnly, "project = 1\n", "project = 1\ntimezone = \"Moscow\"\n", 1)},
+		{"timezone_wrong_case", strings.Replace(presetOnly, "project = 1\n", "project = 1\ntimezone = \"europe/moscow\"\n", 1)},
 		{"timezone_local", strings.Replace(presetOnly, "project = 1\n", "project = 1\ntimezone = \"Local\"\n", 1)},
 		{"timezone_blank", strings.Replace(presetOnly, "project = 1\n", "project = 1\ntimezone = \"\"\n", 1)},
 		{"field_empty_table", presetOnly + "[verbs.done.field]\n"},

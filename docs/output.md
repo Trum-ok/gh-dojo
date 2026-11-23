@@ -157,7 +157,9 @@ An expression that fails only on the data (iterating `null`, say) prints
 nothing: the output is buffered, so stdout never gets half of it. After a
 command that only read, that is an error (exit code 1), as in gh. After a
 write it is a warning that names what was applied (`warning: start applied;
---jq failed on its result: ...`) and the exit code stays the command's.
+--jq failed on its result: ...`) and the exit code stays the command's. When
+the command itself also failed, the `--jq` or `--template` failure is only a
+warning too, and the command's own exit code stays.
 
 **Errors are JSON too.** With `--json`, `--jq` or `--template`, every output
 has an `error`: `null` when the command succeeded, else the error that ended
