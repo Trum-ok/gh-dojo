@@ -1,6 +1,7 @@
 package config
 
 import (
+	_ "embed"
 	"fmt"
 	"maps"
 	"math"
@@ -109,17 +110,44 @@ func (c *Config) buildBoard(r rawBoard) error {
 // loadTimezone validates board.timezone: an IANA time zone name, such as
 // "Europe/Moscow" or "UTC". "Local" is refused: it would make "today"
 // depend on the machine a verb runs on. The time zone database is built
-// into the binary (time/tzdata), so a name loads on every OS.
+// into the binary (time/tzdata), so a name loads on every OS. Names are
+// case-sensitive on every OS: time.LoadLocation reads the OS zoneinfo
+// first, and on a case-insensitive file system (macOS) "europe/moscow"
+// loads and keeps that spelling, which Linux rejects. So a name that is
+// spelled in another case than a name of timezones.txt is refused too.
 func (c *Config) loadTimezone(name string) (*time.Location, error) {
 	fix := `write an IANA time zone name, like timezone = "Europe/Moscow", or remove it for UTC`
 	if strings.TrimSpace(name) == "" || name == "Local" {
 		return nil, c.Errorf("board.timezone: %q is not a time zone name", name).WithFix(fix)
 	}
 	loc, err := time.LoadLocation(name)
-	if err != nil {
+	if err != nil || miscasedZone(name) {
 		return nil, c.Errorf("board.timezone: unknown time zone %q", name).WithFix(fix)
 	}
 	return loc, nil
+}
+
+// zoneNames lists the names of Go's time zone database, one per line:
+// `unzip -Z1 "$(go env GOROOT)/lib/time/zoneinfo.zip"`. A name that a newer
+// database adds is missing here and still loads, only its wrong-case
+// spellings are not caught.
+//
+//go:embed timezones.txt
+var zoneNames string
+
+// miscasedZone reports whether name equals a zone name of zoneNames in
+// everything but letter case.
+func miscasedZone(name string) bool {
+	for z := range strings.Lines(zoneNames) {
+		z = strings.TrimSuffix(z, "\n")
+		if z == name {
+			return false
+		}
+		if strings.EqualFold(z, name) {
+			return true
+		}
+	}
+	return false
 }
 
 // RepoPattern matches "owner/name": an owner of letters, digits, dashes
