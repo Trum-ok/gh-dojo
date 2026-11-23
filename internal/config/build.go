@@ -19,7 +19,7 @@ import (
 var (
 	verbNameRE = regexp.MustCompile(`^[a-z][a-z0-9]*(-[a-z0-9]+)*$`)
 	repoRE     = regexp.MustCompile(`^` + RepoPattern + `$`)
-	loginRE    = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9-]{0,38}$`)
+	loginRE    = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$`)
 )
 
 // build validates the merged raw config and fills c. Checks run in file
@@ -129,7 +129,10 @@ func (c *Config) loadTimezone(name string) (*time.Location, error) {
 const RepoPattern = `[A-Za-z0-9][A-Za-z0-9_-]*/[A-Za-z0-9._-]+`
 
 // IsLogin reports whether s is spelled as a GitHub login: letters,
-// digits and dashes, not starting with a dash, at most 39 long.
+// digits, dashes and underscores (enterprise managed users carry an
+// "_shortcode" suffix), not starting with a dash or underscore, at most
+// 100 long. It is the one login check: the board's owner, the
+// assignees of the config and of the command line all use it.
 func IsLogin(s string) bool { return loginRE.MatchString(s) }
 
 // AssigneeArgError is why login, given to the command-line flag, cannot

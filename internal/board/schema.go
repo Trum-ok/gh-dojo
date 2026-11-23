@@ -6,7 +6,6 @@ package board
 import (
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
@@ -25,13 +24,9 @@ type Ref struct {
 
 func (r Ref) String() string { return fmt.Sprintf("%s/%d", r.Owner, r.Number) }
 
-// loginRE accepts GitHub logins, including Enterprise Managed User logins
-// with an "_shortcode" suffix.
-var loginRE = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$`)
-
 // Validate reports a malformed ref as a usage error (exit code 1).
 func (r Ref) Validate() error {
-	if !loginRE.MatchString(r.Owner) {
+	if !config.IsLogin(r.Owner) {
 		return render.Usage("invalid board owner %q: want a GitHub user or organization login", r.Owner)
 	}
 	if r.Number <= 0 {
