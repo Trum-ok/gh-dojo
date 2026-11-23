@@ -1,0 +1,12 @@
+code: 0
+--- stdout
+#3 Renamed status field
+state: open, opened 2026-11-11 by Trum-ok
+board: Ready · Size: M
+status history: none
+
+description:
+  The status field was renamed on the board.
+
+comments: none
+--- stderr

@@ -76,6 +76,7 @@ func TestShowJSON(t *testing.T) {
 		{"card_13_brief", issueFixtures + "card_13.json", []string{"13", "--brief"}, render.ExitOK},
 		{"blockers", "testdata/graphql/show_blockers.json", []string{"3"}, render.ExitOK},
 		{"sub_issues", "testdata/graphql/show_sub_issues.json", []string{"3"}, render.ExitOK},
+		{"status_renamed", "testdata/graphql/show_status_renamed.json", []string{"3"}, render.ExitOK},
 		{"not_on_board", issueFixtures + "card_not_on_board.json", []string{"3"}, render.ExitOK},
 		{"long_thread_3", "testdata/graphql/show_long_thread.json", []string{"42", "--comments", "3"}, render.ExitOK},
 		{"many", issueFixtures + "cards_3_7_9999.json", []string{"3", "7", "9999", "--brief"}, render.ExitNotFound},

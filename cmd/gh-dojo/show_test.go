@@ -36,6 +36,9 @@ func TestShow(t *testing.T) {
 		{"blockers", "testdata/graphql/show_blockers.json", []string{"3"}, render.ExitOK},
 		{"blockers_brief", "testdata/graphql/show_blockers.json", []string{"3", "--brief"}, render.ExitOK},
 		{"sub_issues", "testdata/graphql/show_sub_issues.json", []string{"3"}, render.ExitOK},
+		// The board's Status field renamed to Stage within the schema cache:
+		// the status is still Ready and Stage is not listed among the fields.
+		{"status_renamed", "testdata/graphql/show_status_renamed.json", []string{"3"}, render.ExitOK},
 		{"sub_issues_brief", "testdata/graphql/show_sub_issues.json", []string{"3", "--brief"}, render.ExitOK},
 		{"not_on_board", issueFixtures + "card_not_on_board.json", []string{"3"}, render.ExitOK},
 		{"partial", issueFixtures + "card_partial.json", []string{"42"}, render.ExitOK},
@@ -83,6 +86,30 @@ func TestShow(t *testing.T) {
 			}
 			testutil.Golden(t, "show/"+tt.name, out)
 		})
+	}
+}
+
+// TestShowStatusRenamed: a Status field renamed to Stage while the schema
+// cache still has the old name is the card's status, found by its ID, and
+// is not listed among the fields, in text or JSON.
+func TestShowStatusRenamed(t *testing.T) {
+	const fixture = "testdata/graphql/show_status_renamed.json"
+	for _, args := range [][]string{{"show", "3"}, {"show", "3", "--json"}} {
+		withConfig(t, dojoConfig)
+		warmApp(t, fixture)
+		code, out := runOut(args...)
+		if code != render.ExitOK {
+			t.Fatalf("%v: code %d: %s", args, code, out)
+		}
+		if !strings.Contains(string(out), "Ready") {
+			t.Errorf("%v: no status Ready in\n%s", args, out)
+		}
+		if strings.Contains(string(out), "Stage") {
+			t.Errorf("%v: lists the renamed status field Stage:\n%s", args, out)
+		}
+		if !strings.Contains(string(out), "Size") {
+			t.Errorf("%v: lost the other field Size:\n%s", args, out)
+		}
 	}
 }
 

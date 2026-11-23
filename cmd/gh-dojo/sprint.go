@@ -188,6 +188,26 @@ func showSprint(ctx context.Context, a *App, cfg *config.Config) (name, id strin
 	return cfg.SprintField(), ""
 }
 
+// showStatusID returns the status field's ID for show's cards, from the
+// schema the cards were read with (no request); "" when it is not known.
+func showStatusID(ctx context.Context, a *App, cfg *config.Config) string {
+	if s, err := a.Schema(ctx); err == nil {
+		if f, err := s.Field(cfg.StatusField()); err == nil {
+			return f.ID
+		}
+	}
+	return ""
+}
+
+// isStatus reports whether val is the item's value of the status field,
+// which the card shows as its status, not among the fields.
+func (v cardView) isStatus(val issue.Value) bool {
+	if v.statusFieldID != "" {
+		return val.FieldID == v.statusFieldID
+	}
+	return val.Field == v.statusField
+}
+
 // isSprint reports whether val is the item's value of the sprint field.
 func (v cardView) isSprint(val issue.Value) bool {
 	if v.sprintField == "" || val.Type != board.TypeIteration {

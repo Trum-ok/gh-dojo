@@ -279,7 +279,7 @@ func (v cardView) toBoardJSON(c *issue.Card) boardJSON {
 	}
 	if c.Item != nil {
 		for _, val := range c.Item.Values {
-			if val.Field != v.statusField && !v.isSprint(val) {
+			if !v.isStatus(val) && !v.isSprint(val) {
 				b.Fields = append(b.Fields, fieldJSON{Name: render.SingleLine(val.Field), Value: render.SingleLine(val.Text)})
 			}
 		}
