@@ -370,7 +370,17 @@ type StatusChange struct {
 	From      string // "" when the item had no status
 	To        string // "" when the status was cleared
 	Actor     string // login; "" for a deleted account
-	Automated bool   // set by a project workflow, not a person
+	Automated bool   // wasAutomated; false for workflow changes too: use ByAutomation
+}
+
+// projectAutomation are logins of GitHub's own project automation.
+var projectAutomation = map[string]bool{"github-project-automation": true}
+
+// ByAutomation reports whether a project workflow made the change, not a
+// person. GitHub's wasAutomated flag (Automated) is false for the board's
+// workflows, such as "Item closed", so the actor tells them apart too.
+func (h StatusChange) ByAutomation() bool {
+	return h.Automated || projectAutomation[h.Actor]
 }
 
 // Read fetches the card in one GraphQL request.

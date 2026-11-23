@@ -207,7 +207,7 @@ func statusAutomated(c *issue.Card) bool {
 	if c.Item != nil && !c.Item.CreatedAt.IsZero() && last.At.Before(c.Item.CreatedAt) {
 		return false
 	}
-	return last.Automated && last.To == c.Status()
+	return last.ByAutomation() && last.To == c.Status()
 }
 
 // workflowIssue is the state workflow plans with. Ref keeps the card, so an

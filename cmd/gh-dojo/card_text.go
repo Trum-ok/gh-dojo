@@ -34,11 +34,6 @@ const (
 	maxBriefRefs = 5
 )
 
-// projectAutomation are logins of GitHub's own project automation. The
-// event's wasAutomated flag is unreliable (false for workflow changes), so
-// the actor tells them apart too.
-var projectAutomation = map[string]bool{"github-project-automation": true}
-
 // cardMarkerRE matches the hidden marker gh-dojo ends its own comments and
 // descriptions with: the grammar workflow's dedup looks for, on its own
 // line after a blank one (or alone), at the very end. A marker quoted in
@@ -526,12 +521,11 @@ func writeHistory(b *strings.Builder, c *issue.Card, full bool) {
 	if c.HistoryTruncated {
 		head += " (latest changes only; older ones are not read)"
 	}
-	automated := func(h issue.StatusChange) bool { return h.Automated || projectAutomation[h.Actor] }
 	if full {
 		b.WriteString(head + ":\n")
 		for _, h := range c.History {
 			by := "by " + cardLogin(h.Actor)
-			if automated(h) {
+			if h.ByAutomation() {
 				by = "(automation)"
 			}
 			fmt.Fprintf(b, "  %s %s %s\n", cardMinute(h.At), render.Transition(h.From, h.To), by)
@@ -552,7 +546,7 @@ func writeHistory(b *strings.Builder, c *issue.Card, full bool) {
 			chain.WriteString(from)
 		}
 		who := cardLogin(h.Actor)
-		if automated(h) {
+		if h.ByAutomation() {
 			who = "automation"
 		}
 		last = name(h.To)
