@@ -86,6 +86,34 @@ func TestVerbUses(t *testing.T) {
 	}
 }
 
+// TestEnterpriseManagedLogins: an EMU login ("_shortcode" suffix) is a
+// login everywhere one is read: the config's assignees and the flag.
+func TestEnterpriseManagedLogins(t *testing.T) {
+	const emu = "mona-cat_octo"
+	for _, s := range []string{"octocat", "a", emu, "acme_ent", strings.Repeat("a", 39) + "_" + strings.Repeat("b", 20)} {
+		if !IsLogin(s) {
+			t.Errorf("IsLogin(%q) = false", s)
+		}
+		if err := AssigneeArgError("assignee", s); err != nil {
+			t.Errorf("AssigneeArgError(%q) = %v", s, err)
+		}
+	}
+	for _, s := range []string{"", "-octo", "_octo", "mona cat", "me@x", "@octo", strings.Repeat("a", 101)} {
+		if IsLogin(s) {
+			t.Errorf("IsLogin(%q) = true", s)
+		}
+		if AssigneeArgError("assignee", s) == nil {
+			t.Errorf("AssigneeArgError(%q) = nil", s)
+		}
+	}
+
+	cfg := strings.Replace(presetOnly, "owner = \"Trum-ok\"\n", "owner = \"acme_ent\"\nassignee = \""+emu+"\"\n", 1) +
+		"\n[verbs.start]\nassign = \"" + emu + "\"\nunassign = \"" + emu + "x\"\n"
+	if _, err := Parse([]byte(cfg), "emu test"); err != nil {
+		t.Errorf("EMU logins in the config: %v", err)
+	}
+}
+
 func TestSessionConfigured(t *testing.T) {
 	if (Session{}).Configured() {
 		t.Error("empty session is configured")
