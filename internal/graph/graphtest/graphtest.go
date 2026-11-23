@@ -330,7 +330,7 @@ func (s *Server) forward(req *http.Request, body []byte, kind, op, query, vars s
 	}
 	if resp.StatusCode != http.StatusOK {
 		in.Status = resp.StatusCode
-		for _, h := range []string{"Content-Type", "Retry-After", "X-RateLimit-Remaining"} {
+		for _, h := range []string{"Content-Type", "Retry-After", "X-RateLimit-Remaining", "X-RateLimit-Reset"} {
 			if v := resp.Header.Get(h); v != "" {
 				if in.Headers == nil {
 					in.Headers = map[string]string{}

@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 
 	"github.com/Trum-ok/gh-dojo/internal/testutil"
@@ -86,6 +88,62 @@ func TestErrorFormat(t *testing.T) {
 				t.Errorf("error block has %d lines, want at most 5", n)
 			}
 			testutil.Golden(t, "errors/"+tt.name, buf.Bytes())
+		})
+	}
+}
+
+// TestRateLimitWait checks that every rate limit names how long to wait, in
+// its fix and in the re-run step of a partial report (#108): Retry-After,
+// else X-RateLimit-Reset of the primary limit, else a few minutes.
+func TestRateLimitWait(t *testing.T) {
+	clock := time.Unix(1_800_000_000, 0)
+	old := now
+	now = func() time.Time { return clock }
+	t.Cleanup(func() { now = old })
+
+	hdr := func(kv ...string) http.Header {
+		h := http.Header{}
+		for i := 0; i < len(kv); i += 2 {
+			h.Set(kv[i], kv[i+1])
+		}
+		return h
+	}
+	reset := func(secs int) string { return strconv.FormatInt(clock.Unix()+int64(secs), 10) }
+	u := mustURL("https://api.github.com/graphql")
+	for _, tt := range []struct {
+		name string
+		err  error
+		wait string
+	}{
+		{"secondary_retry_after", &api.HTTPError{StatusCode: 403, Message: "You have exceeded a secondary rate limit.", Headers: hdr("Retry-After", "60"), RequestURL: u}, "60s"},
+		{"429_retry_after", &api.HTTPError{StatusCode: 429, Headers: hdr("Retry-After", "30"), RequestURL: u}, "30s"},
+		{"429_no_header", &api.HTTPError{StatusCode: 429, RequestURL: u}, "a few minutes"},
+		{"primary_reset_minutes", &api.HTTPError{StatusCode: 403, Message: "API rate limit exceeded", Headers: hdr("X-RateLimit-Remaining", "0", "X-RateLimit-Reset", reset(1500)), RequestURL: u}, "25m"},
+		{"primary_reset_rounds_up", &api.HTTPError{StatusCode: 403, Message: "API rate limit exceeded", Headers: hdr("X-RateLimit-Remaining", "0", "X-RateLimit-Reset", reset(121)), RequestURL: u}, "3m"},
+		{"primary_reset_seconds", &api.HTTPError{StatusCode: 403, Message: "API rate limit exceeded", Headers: hdr("X-RateLimit-Remaining", "0", "X-RateLimit-Reset", reset(45)), RequestURL: u}, "45s"},
+		{"primary_reset_past", &api.HTTPError{StatusCode: 403, Message: "API rate limit exceeded", Headers: hdr("X-RateLimit-Remaining", "0", "X-RateLimit-Reset", reset(-5)), RequestURL: u}, "a few minutes"},
+		{"primary_reset_garbage", &api.HTTPError{StatusCode: 403, Message: "API rate limit exceeded", Headers: hdr("X-RateLimit-Remaining", "0", "X-RateLimit-Reset", "soon"), RequestURL: u}, "a few minutes"},
+		{"primary_no_reset", &api.HTTPError{StatusCode: 403, Message: "API rate limit exceeded", Headers: hdr("X-RateLimit-Remaining", "0"), RequestURL: u}, "a few minutes"},
+		{"retry_after_beats_reset", &api.HTTPError{StatusCode: 403, Message: "API rate limit exceeded", Headers: hdr("Retry-After", "10", "X-RateLimit-Remaining", "0", "X-RateLimit-Reset", reset(1500)), RequestURL: u}, "10s"},
+		{"reset_ignored_with_requests_left", &api.HTTPError{StatusCode: 429, Headers: hdr("X-RateLimit-Remaining", "5", "X-RateLimit-Reset", reset(1500)), RequestURL: u}, "a few minutes"},
+		{"graphql_primary", &api.GraphQLError{Errors: []api.GraphQLErrorItem{{Type: "RATE_LIMITED", Message: "API rate limit exceeded"}}}, "a few minutes"},
+		{"graphql_secondary", &api.GraphQLError{Errors: []api.GraphQLErrorItem{{Message: "You have exceeded a secondary rate limit."}}}, "a few minutes"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			e := FromError(tt.err)
+			if e.Code != ExitNetwork || e.Wait != tt.wait {
+				t.Fatalf("code, wait = %d, %q; want %d, %q", e.Code, e.Wait, ExitNetwork, tt.wait)
+			}
+			want := "wait " + tt.wait + ", then re-run the same command"
+			if e.Fix != want {
+				t.Errorf("fix = %q, want %q", e.Fix, want)
+			}
+			if got := RerunStep(e); got != want {
+				t.Errorf("RerunStep = %q, want %q", got, want)
+			}
+			if strings.Contains(e.What, ";") {
+				t.Errorf("what = %q: the wait belongs in the fix", e.What)
+			}
 		})
 	}
 }

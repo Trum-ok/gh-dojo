@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cli/go-gh/v2/pkg/api"
 )
@@ -286,7 +287,7 @@ func fromHTTP(err *api.HTTPError) *Error {
 	case (s == http.StatusTooManyRequests || s == http.StatusForbidden) && IsContentLimit(err.Message):
 		return ContentLimited(err.Headers.Get("Retry-After"))
 	case s == http.StatusTooManyRequests, s == http.StatusForbidden && isRateLimit(err):
-		return rateLimited(err.Headers.Get("Retry-After"))
+		return rateLimited(err.Headers)
 	case s == http.StatusForbidden:
 		return Network("GitHub API: HTTP %d %s", s, msg).WithFix(AuthFix)
 	case s >= 500:
@@ -330,16 +331,45 @@ func RetryAfter(header string) int {
 	return 0
 }
 
-func rateLimited(retryAfter string) *Error {
-	if secs := RetryAfter(retryAfter); secs > 0 {
-		return Network("GitHub API rate limit exceeded; retry in %ds", secs)
+// now is the clock of rateLimited, replaced in tests.
+var now = time.Now
+
+// rateLimited reports a rate limit (primary or secondary) with how long to
+// wait: the Retry-After header in h, else, for the primary limit (no requests
+// left), the time until X-RateLimit-Reset, else a few minutes. h may be nil
+// (a GraphQL answer carries no headers here).
+func rateLimited(h http.Header) *Error {
+	wait := contentLimitWait
+	if secs := RetryAfter(h.Get("Retry-After")); secs > 0 {
+		wait = strconv.Itoa(secs) + "s"
+	} else if h.Get("X-RateLimit-Remaining") == "0" {
+		if reset, err := strconv.ParseInt(strings.TrimSpace(h.Get("X-RateLimit-Reset")), 10, 64); err == nil {
+			if secs := reset - now().Unix(); secs > 0 {
+				wait = formatWait(secs)
+			}
+		}
 	}
-	return Network("GitHub API rate limit exceeded; retry later")
+	return waitThenRerun(Network("GitHub API rate limit exceeded"), wait)
 }
 
-// contentLimitWait is how long to wait after GitHub's content creation
-// limit when it does not say: it gives no Retry-After inside a GraphQL
-// answer, and reports of the limit clearing range from a minute to several.
+// formatWait writes secs seconds as "45s", or in whole minutes (rounded up)
+// from two minutes on.
+func formatWait(secs int64) string {
+	if secs < 120 {
+		return strconv.FormatInt(secs, 10) + "s"
+	}
+	return strconv.FormatInt((secs+59)/60, 10) + "m"
+}
+
+// waitThenRerun sets the wait and the fix of a rate limit error e.
+func waitThenRerun(e *Error, wait string) *Error {
+	e.Wait = wait
+	return e.WithFix("wait " + wait + ", then re-run the same command")
+}
+
+// contentLimitWait is how long to wait after a rate limit when GitHub does
+// not say: it gives no Retry-After inside a GraphQL answer, and reports of
+// the limit clearing range from a minute to several.
 const contentLimitWait = "a few minutes"
 
 // ContentLimited reports GitHub's secondary rate limit on creating content
@@ -351,10 +381,7 @@ func ContentLimited(retryAfter string) *Error {
 	if secs := RetryAfter(retryAfter); secs > 0 {
 		wait = strconv.Itoa(secs) + "s"
 	}
-	e := Network("GitHub's limit on creating issues and comments was hit").
-		WithFix("wait " + wait + ", then re-run the same command")
-	e.Wait = wait
-	return e
+	return waitThenRerun(Network("GitHub's limit on creating issues and comments was hit"), wait)
 }
 
 // IsContentLimit reports whether msg, an error message from GitHub, is
@@ -379,7 +406,7 @@ func GraphQLLimit(err *api.GraphQLError) *Error {
 	}
 	for _, item := range err.Errors {
 		if item.Type == "RATE_LIMITED" {
-			return rateLimited("")
+			return rateLimited(nil)
 		}
 	}
 	for _, item := range err.Errors {
@@ -388,7 +415,7 @@ func GraphQLLimit(err *api.GraphQLError) *Error {
 		case IsContentLimit(msg):
 			return ContentLimited("")
 		case strings.Contains(msg, "secondary rate limit"), strings.Contains(msg, "abuse detection"):
-			return rateLimited("")
+			return rateLimited(nil)
 		}
 	}
 	return nil

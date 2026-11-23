@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"net/http"
+	"net/url"
 	"reflect"
 	"slices"
 	"strings"
@@ -380,6 +382,18 @@ func TestWrites(t *testing.T) {
 	be = &onlyBackend{done: plan.Ops[:1], err: render.Network("timeout")}
 	wantError(t, w.ApplyFresh(context.Background(), be, nil), render.ExitPartial,
 		"#7 comment left; the rest is unconfirmed: timeout; re-run the same command")
+
+	// #108: a rate limit names the wait, as the content limit does.
+	limit := &api.HTTPError{StatusCode: 403, Message: "You have exceeded a secondary rate limit.", Headers: http.Header{"Retry-After": {"60"}},
+		RequestURL: &url.URL{Scheme: "https", Host: "api.github.com", Path: "/graphql"}}
+	w = &Writes{First: plan}
+	be = &onlyBackend{done: plan.Ops[:1], err: limit}
+	err = w.ApplyFresh(context.Background(), be, nil)
+	wantError(t, err, render.ExitPartial,
+		"#7 comment left; the rest is unconfirmed: GitHub API rate limit exceeded; wait 60s, then re-run the same command")
+	if fix := render.FromError(err).Fix; fix != "wait 60s, then re-run the same command" {
+		t.Errorf("fix = %q", fix)
+	}
 }
 
 // onlyBackend answers every Apply with done and err.

@@ -62,7 +62,9 @@ fix: gh auth refresh -s project
 A rate limit says how long to wait before the re-run, in its `fix:` and in
 a partial write's message: GitHub's limit on creating issues and comments,
 hit after many of them in a short time, waits as long as GitHub's
-`Retry-After` says, else a few minutes:
+`Retry-After` says, else a few minutes. Any other rate limit does the same;
+GitHub's primary limit, with no request left, waits until the
+`X-RateLimit-Reset` time it gives:
 
 ```console
 $ gh dojo ready 66 --comment cc5ff46
