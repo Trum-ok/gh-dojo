@@ -1,0 +1,5 @@
+code: 1
+--- stdout
+--- stderr
+error: --jq: cannot iterate over: number (3)
+fix: gh dojo block --help

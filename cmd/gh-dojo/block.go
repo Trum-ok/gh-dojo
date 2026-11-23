@@ -82,7 +82,7 @@ anything.`
 			if res == nil { // nothing done
 				return err
 			}
-			return emitWrite(cmd, res, res.write, err, len(res.Changed) > 0) // err: done in part
+			return emitWrite(cmd, res, res.write, err, len(res.Changed) > 0 && !res.DryRun) // err: done in part
 		},
 	}
 	cmd.Flags().StringArrayVar(&bys, byFlag, nil, "the blocking `issue`: 12, \"#12\", owner/repo#12 or its URL; repeatable, or comma-separated")
