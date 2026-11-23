@@ -63,6 +63,7 @@ type fakeBackend struct {
 	issues    map[int]workflow.Issue
 	readErr   error         // fails every read
 	issueErrs map[int]error // the read error of one issue
+	cacheErrs map[int]error // the read error of one issue while the schema is cached
 	applyErrs map[int]error // the Apply error of one issue; nothing confirmed
 	cached    bool          // SchemaCached until Reset
 	reads     [][]int       // the numbers of each ReadIssues call
@@ -86,6 +87,8 @@ func (f *fakeBackend) ReadIssues(_ context.Context, _ config.Verb, refs []issue.
 		switch {
 		case f.issueErrs[r.Number] != nil:
 			out[i].Err = f.issueErrs[r.Number]
+		case f.cached && f.cacheErrs[r.Number] != nil:
+			out[i].Err = f.cacheErrs[r.Number]
 		case !ok:
 			out[i].Err, out[i].Cause = render.NotFound("issue #%d not found in %s", r.Number, shop), issue.CauseMissing
 		default:
@@ -327,6 +330,34 @@ func TestDoStale(t *testing.T) {
 		t.Errorf("resets %d, reads %v, applied %v; want #2 and #3 re-read, #2 applied again", be.resets, be.reads, be.applied)
 	}
 	if !strings.HasSuffix(out.String(), "3 of 3 done\n") {
+		t.Errorf("stdout:\n%s", out)
+	}
+}
+
+// TestDoStaleSubIssue (#103): with sub_issues = "deny", a sub-issue whose
+// read fails on the cached schema refuses its parent, planned after it;
+// the retry re-reads both, the sub-issue first, and both are done, as a
+// plain re-run would do them. A grandparent refused through the parent is
+// re-read too.
+func TestDoStaleSubIssue(t *testing.T) {
+	stale := render.Usage("no iteration for today").WithCause(board.ErrUnknownIteration)
+	parent, grand := ready("Ready"), ready("Ready")
+	parent.UnresolvedSubIssues = []workflow.Blocker{{Ref: "#2", Place: "Ready"}}
+	grand.UnresolvedSubIssues = []workflow.Blocker{{Ref: "#1", Place: "Ready"}}
+	be := &fakeBackend{issues: map[int]workflow.Issue{1: parent, 2: ready("Ready"), 3: grand, 4: ready("Ready")},
+		cacheErrs: map[int]error{2: stale}, cached: true}
+	b, out, _ := newRun(t, be, `sub_issues = "deny"`+"\n")
+	items, err := b.Do(context.Background(), refs(3, 4, 1, 2), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := b.Summary(items, false); err != nil {
+		t.Errorf("summary = %v, want every issue done", err)
+	}
+	if be.resets != 1 || len(be.reads) != 2 || !slices.Equal(be.reads[1], []int{2, 1, 3}) || !slices.Equal(be.applied, []int{2, 1, 3, 4}) {
+		t.Errorf("resets %d, reads %v, applied %v; want #2, #1 and #3 re-read and applied in that order", be.resets, be.reads, be.applied)
+	}
+	if !strings.HasSuffix(out.String(), "4 of 4 done\n") {
 		t.Errorf("stdout:\n%s", out)
 	}
 }
