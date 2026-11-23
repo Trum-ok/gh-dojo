@@ -46,7 +46,7 @@ func TestCutPrefixFold(t *testing.T) {
 		{"ТИП:баг", "тип:", "баг", true},
 		// The Kelvin sign (3 bytes) folds to "k" (1 byte): cutting by the
 		// prefix's length in bytes would split a rune.
-		{"\u212aind:x", "kind:", "x", true},
+		{"\xe2\x84\xaaind:x", "kind:", "x", true},
 	} {
 		rest, ok := CutPrefixFold(tc.s, tc.prefix)
 		if rest != tc.rest || ok != tc.ok {
@@ -56,8 +56,17 @@ func TestCutPrefixFold(t *testing.T) {
 }
 
 func TestSingleLine(t *testing.T) {
-	in := "a\u202e b\r\n\tc\x07d"
+	in := "a\xe2\x80\xae b\r\n\tc\x07d" // U+202E, a bidi control
 	if got, want := SingleLine(in), "a b c d"; got != want {
 		t.Errorf("SingleLine(%q) = %q, want %q", in, got, want)
+	}
+}
+
+func TestSanitize(t *testing.T) {
+	// U+202E is a bidi control, U+009B the 8-bit CSI.
+	in := "a\r\nb\rc\td\xe2\x80\xae\x1b[1A\x1b[2Kstate\x07\x08\xc2\x9b2Ke\x1b]52;c;eA==\x07"
+	want := "a\nb\nc\td[1A[2Kstate2Ke]52;c;eA=="
+	if got := Sanitize(in); got != want {
+		t.Errorf("Sanitize(%q) = %q, want %q", in, got, want)
 	}
 }

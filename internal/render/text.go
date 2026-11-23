@@ -83,11 +83,19 @@ var bidiControls = strings.NewReplacer(
 )
 
 // Sanitize makes text from GitHub safe to print as several lines: line
-// endings become "\n" and bidirectional controls are dropped.
+// endings become "\n", bidirectional controls are dropped, and so is every
+// other control character except tab: ESC, BEL, backspace and the 8-bit CSI
+// U+009B would let the text move the cursor, overwrite lines of the card or
+// write to the clipboard.
 func Sanitize(s string) string {
 	s = strings.ReplaceAll(s, "\r\n", "\n")
 	s = strings.ReplaceAll(s, "\r", "\n")
-	return bidiControls.Replace(s)
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) && r != '\n' && r != '\t' {
+			return -1
+		}
+		return r
+	}, bidiControls.Replace(s))
 }
 
 // SingleLine makes text safe to print on one line: bidirectional controls
