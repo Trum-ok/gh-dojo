@@ -48,7 +48,8 @@
 // allows gh, jq and a few readers, and refuses without asking the shell
 // plumbing plain gh needs (ITEM=$(gh …)), which biases against it. Runs go
 // -parallel at a time, 4 by default, except next, which reads the whole
-// board and runs alone on it; a lock in bench/out keeps a second benchmark
-// off the board. Both conditions use the installed gh dojo. Results and
+// board and runs alone on it; a lock in git's common directory (shared by
+// all worktrees; bench/out outside a repository) keeps a second benchmark
+// off the board, and e2e skips while "bench-" issues are on it. Both conditions use the installed gh dojo. Results and
 // transcripts go to bench/out.
 package main

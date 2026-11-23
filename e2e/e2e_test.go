@@ -77,6 +77,7 @@ func newSandbox(t *testing.T) *sandbox {
 
 func TestPresets(t *testing.T) {
 	s := newSandbox(t)
+	s.skipForBench(t)
 	s.sweep(t)
 	for _, p := range []struct {
 		preset, env string
@@ -282,6 +283,28 @@ func (s *sandbox) create(t *testing.T, d *dojo, title string, args ...string) in
 // sweep deletes the e2e issues an earlier run left behind.
 func (s *sandbox) sweep(t *testing.T) {
 	t.Helper()
+	left := s.withPrefix(t, titlePrefix)
+	if len(left) > 0 {
+		t.Logf("deleting %d issues an earlier run left: %v", len(left), left)
+	}
+	for _, n := range left {
+		s.delete(t, n)
+	}
+}
+
+// skipForBench skips the test while the benchmark's issues ("bench-…", the
+// titlePrefix of bench/main.go) are in the sandbox: the benchmark runs on the
+// same board and would be disturbed, and so would these tests by its issues.
+func (s *sandbox) skipForBench(t *testing.T) {
+	t.Helper()
+	if n := s.withPrefix(t, "bench-"); len(n) > 0 {
+		t.Skipf("the benchmark's issues (bench-…, #%d…) are in %s: wait for the benchmark to finish", n[0], s.repo)
+	}
+}
+
+// withPrefix lists the numbers of the issues whose titles start with prefix.
+func (s *sandbox) withPrefix(t *testing.T, prefix string) []int {
+	t.Helper()
 	owner, name, _ := strings.Cut(s.repo, "/")
 	var cursor *string
 	var left []int
@@ -309,7 +332,7 @@ func (s *sandbox) sweep(t *testing.T) {
 			t.Fatalf("list the issues of %s: %v", s.repo, err)
 		}
 		for _, n := range resp.Repository.Issues.Nodes {
-			if strings.HasPrefix(n.Title, titlePrefix) {
+			if strings.HasPrefix(n.Title, prefix) {
 				left = append(left, n.Number)
 			}
 		}
@@ -319,12 +342,7 @@ func (s *sandbox) sweep(t *testing.T) {
 		end := resp.Repository.Issues.PageInfo.EndCursor
 		cursor = &end
 	}
-	if len(left) > 0 {
-		t.Logf("deleting %d issues an earlier run left: %v", len(left), left)
-	}
-	for _, n := range left {
-		s.delete(t, n)
-	}
+	return left
 }
 
 // delete deletes issue n of the sandbox; a failure fails the test, so a

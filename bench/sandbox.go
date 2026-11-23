@@ -291,7 +291,8 @@ func (s *sandbox) sweep(prefix string) error {
 }
 
 // busy reports the e2e tests' issues, open or not yet deleted: the two must
-// not share the board at the same time.
+// not share the board at the same time (the e2e tests skip while "bench-"
+// issues are there, see e2e/e2e_test.go).
 func (s *sandbox) busy() error {
 	st, _, err := s.issues("e2e: ")
 	if err != nil {
