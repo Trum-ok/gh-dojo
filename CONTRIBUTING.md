@@ -406,7 +406,9 @@ Agents load the rules from
 inconvenience as a `dogfood` issue right away. Never edit the skill: change
 the config or the notes and run `make agent`, which uses the build of your
 branch. So does CI's `agent install --check`, so a change to the generated
-text, the notes or the config needs `make agent` too.
+text, the notes or the config needs `make agent` too. The marker names the
+last release tag, not the `git describe` of your uncommitted build; a version
+alone never makes `--check` fail.
 
 Issue tracking uses the installed `gh dojo`, the latest release installed
 with `gh extension install` (`make release` does it), not a build of your
