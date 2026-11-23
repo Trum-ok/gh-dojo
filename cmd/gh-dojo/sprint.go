@@ -17,9 +17,9 @@ import (
 )
 
 // The sprint (fields.sprint, an iteration field) and the field effect.
-// Dates are UTC: "today" is the UTC date of the moment a verb reads the
-// issue, and an iteration covers a day from its start date for its
-// duration in days.
+// Dates are in board.timezone, UTC by default: "today" is the date in that
+// zone of the moment a verb reads the issue, and an iteration covers a day
+// from its start date for its duration in days.
 
 // iterationText says what the iteration effect of v does, for describe
 // and the verb's help: "today's iteration", "the iteration of the day it
