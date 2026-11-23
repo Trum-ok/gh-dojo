@@ -3,7 +3,6 @@ package issue
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -336,21 +335,30 @@ func decodeAssignable(raw json.RawMessage, n int) ([][]*User, error) {
 
 // hiddenParents returns the indexes of the recent issues whose parent
 // GitHub withheld from the token (NOT_FOUND or FORBIDDEN at
-// repository.issues.nodes.<i>.parent), and err without those errors: nil
-// when they were all of them, or when err is not a GraphQL error.
+// repository.issues.nodes.<i>.parent), and err without the errors withheld
+// anywhere below repository.issues.nodes.<i> (such a parent, or the project
+// of a board item the token cannot see): nil when they were all of them, or
+// when err is not a GraphQL error.
+//
+// A withheld project leaves that item's Project nil, so Find skips it: the
+// issue is then not on the board as far as new knows. That is safe: the
+// configured board was read with this token, so what is withheld is another
+// project, and should it be the board's, adding the issue again returns the
+// item it has (addProjectV2ItemById does not make a second one).
 func hiddenParents(err error) (map[int]bool, error) {
-	var gqlErr *api.GraphQLError
-	if !errors.As(err, &gqlErr) || gqlErr == nil {
+	items := graph.ErrorItems(err)
+	if items == nil {
 		return nil, err
 	}
 	hidden := map[int]bool{}
 	var rest []api.GraphQLErrorItem
-	for _, item := range gqlErr.Errors {
+	for _, item := range items {
 		p := item.Path
-		if len(p) == 5 && p[0] == "repository" && p[1] == "issues" && p[2] == "nodes" && p[4] == "parent" &&
-			(item.Type == "NOT_FOUND" || item.Type == "FORBIDDEN") {
+		if len(p) >= 5 && p[0] == "repository" && p[1] == "issues" && p[2] == "nodes" && graph.Withheld(item) {
 			if i, ok := p[3].(float64); ok {
-				hidden[int(i)] = true
+				if len(p) == 5 && p[4] == "parent" {
+					hidden[int(i)] = true
+				}
 				continue
 			}
 		}
