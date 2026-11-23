@@ -29,7 +29,7 @@ func TestSplice(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := splice(tt.have, section, "\n")
+			got, err := splice(tt.have, section)
 			if tt.err != "" {
 				if err == nil || err.Error() != tt.err {
 					t.Fatalf("err = %v, want %q", err, tt.err)
@@ -161,6 +161,37 @@ func TestWriteCRLF(t *testing.T) {
 	prepareWrite(t, root, config.AgentClaude, "---\n---\n"+Generated(config.FileName, testVersion)+"\nnew\n")
 	if got := readFile(t, dir, ".claude/skills/gh-dojo/SKILL.md"); got != "---\r\n---\r\n"+Generated(config.FileName, testVersion)+"\r\nnew\r\n" {
 		t.Errorf("SKILL.md = %q", got)
+	}
+}
+
+// TestSectionLineEnding: the section takes the line ending of the section
+// it replaces, not of the rest of the file; appended, that of most lines.
+func TestSectionLineEnding(t *testing.T) {
+	dir, root := openRoot(t)
+	tg, _ := TargetOf(config.AgentAgentsMD)
+	sec := func(eol string) string {
+		return Begin(config.FileName, testVersion) + eol + "new" + eol + End + eol
+	}
+	// A CRLF line above an LF section leaves the section LF: up to date.
+	writeFile(t, dir, "AGENTS.md", "# Title\r\n\r\n"+sec("\n"))
+	if f, err := Prepare(root, tg, "new\n", config.FileName, testVersion); err != nil || !f.UpToDate() {
+		t.Errorf("CRLF above an LF section: %v, %+v", err, f)
+	}
+	// A CRLF section in an LF file stays CRLF.
+	writeFile(t, dir, "AGENTS.md", "# Title\n\n"+sec("\r\n"))
+	if f, err := Prepare(root, tg, "new\n", config.FileName, testVersion); err != nil || !f.UpToDate() {
+		t.Errorf("CRLF section in an LF file: %v, %+v", err, f)
+	}
+	// Appended: the majority of the file decides, not one line.
+	writeFile(t, dir, "AGENTS.md", "a\nb\nc\r\n")
+	f, err := Prepare(root, tg, "new\n", config.FileName, testVersion)
+	if err != nil || f.Want != "a\nb\nc\r\n\n"+sec("\n") {
+		t.Errorf("appended to a mostly LF file: %v, %q", err, f.Want)
+	}
+	writeFile(t, dir, "AGENTS.md", "a\r\nb\r\nc\n")
+	f, err = Prepare(root, tg, "new\n", config.FileName, testVersion)
+	if err != nil || f.Want != "a\r\nb\r\nc\n\r\n"+sec("\r\n") {
+		t.Errorf("appended to a mostly CRLF file: %v, %q", err, f.Want)
 	}
 }
 

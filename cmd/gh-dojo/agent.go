@@ -22,6 +22,10 @@ func init() { register(newAgentCmd) }
 // maxDiffLines is how many changed lines --check prints per file.
 const maxDiffLines = 20
 
+// onlyLineEndings is the diff of a file that differs from what install
+// would write in its line endings alone.
+const onlyLineEndings = "only line endings differ"
+
 func newAgentCmd() (*cobra.Command, error) {
 	cmd := &cobra.Command{
 		Use:   "agent",
@@ -167,7 +171,12 @@ func runAgentInstall(cmd *cobra.Command, _ []string) error {
 			res.Fix = &install
 			switch res.State {
 			case agent.StateOutOfDate:
-				res.Diff = agent.Diff(f.Have, f.Want, maxDiffLines)
+				// Diff ignores line endings: no lines when they are all that
+				// differs, which must not read as an empty diff.
+				res.Diff = render.OrEmpty(agent.Diff(f.Have, f.Want, maxDiffLines))
+				if len(res.Diff) == 0 {
+					res.Diff = []string{onlyLineEndings}
+				}
 			case agent.StateHandWritten:
 				hw := agent.HandWrittenFix(f.Target, config.FileName)
 				res.Fix, fix = &hw, hw

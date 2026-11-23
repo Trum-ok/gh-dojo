@@ -231,6 +231,31 @@ func TestAgentCheck(t *testing.T) {
 	}
 }
 
+// TestAgentLineEndings: a CRLF line above the section no longer makes the
+// file out of date. When line endings alone differ (one CRLF line inside
+// the section), --check says so in text and in JSON, where diff is never null.
+func TestAgentLineEndings(t *testing.T) {
+	dir := withRepo(t, dojoConfig, nil)
+	runOut("agent", "install", "--agent", "agents-md")
+	section := readRepoFile(t, dir, "AGENTS.md")
+
+	writeRepoFile(t, dir, "AGENTS.md", "# Title\r\n\r\n"+section)
+	code, out := runOut("agent", "install", "--check", "--agent", "agents-md")
+	if code != render.ExitOK || !strings.Contains(string(out), "AGENTS.md: up to date") {
+		t.Errorf("CRLF above the section: exit code %d\n%s", code, out)
+	}
+
+	writeRepoFile(t, dir, "AGENTS.md", strings.Replace(section, "\n", "\r\n", 1))
+	code, out = runOut("agent", "install", "--check", "--agent", "agents-md")
+	if code != render.ExitUsage || !strings.Contains(string(out), "AGENTS.md: out of date\n  only line endings differ\n") {
+		t.Errorf("one CRLF line in the section: exit code %d\n%s", code, out)
+	}
+	_, out = runOut("agent", "install", "--check", "--agent", "agents-md", "--json")
+	if !strings.Contains(string(out), `"diff":["only line endings differ"]`) || strings.Contains(string(out), `"diff":null`) {
+		t.Errorf("--json:\n%s", out)
+	}
+}
+
 // TestAgentVersion: the marker names the version that wrote the text. A
 // newer version with the same text finds the files up to date and leaves
 // them, marker included; once the text differs, --check and doctor name
