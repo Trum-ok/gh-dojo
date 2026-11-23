@@ -33,8 +33,9 @@
 // place and cost no write, so it touches only what is left (principle 5).
 //
 // A stale schema is retried once per run, as for one issue (see
-// ReadPlan): the schema is dropped and the issues it failed are re-read
-// in one request, then planned and applied afresh.
+// ReadPlan): the schema is dropped and the issues it failed (with the
+// parents those failures refused) are re-read in one request, then planned
+// and applied afresh.
 package batch
 
 import (
@@ -182,8 +183,10 @@ func (b *Run) Do(ctx context.Context, refs []issue.Ref, dryRun bool) ([]*Item, e
 // sub-issues the same run plans, and so resolves, as resolved: gh dojo
 // done 40 41 42 on a parent and its sub-issues in In progress moves all
 // three, as running it twice would. The run plans and applies each
-// sub-issue before its parent (planOrder), and a parent whose sub-issue
-// then fails to be written is refused (applyAll).
+// sub-issue before its parent (planOrder). When a sub-issue then fails to
+// be written, under "deny" the parent is skipped for the re-run if that
+// may finish the sub-issue (retriedSubIssue), and refused otherwise; under
+// "warn" it is written with a warning (applyAll, failedSubIssues).
 func (b *Run) resolvesSubIssues() bool {
 	return b.v.ChecksSubIssues() && (b.v.Close != "" || b.v.To != "" && config.HasStatus(b.resolved, b.v.To))
 }
@@ -290,13 +293,21 @@ func (b *Run) retryStale(err error, onWrite bool) bool {
 // for today, added since it was cached), as ReadPlan does for one issue.
 // Nothing was written yet, so a retry is safe; it costs the schema and
 // one read per issue.MaxBatch issues.
+//
+// A parent planned after such a sub-issue counted it as unresolved, and
+// so was refused under sub_issues = "deny": a failed issue with an
+// unresolved sub-issue among those re-planned is re-read and re-planned
+// with them, after them as in items (planOrder), so it counts the
+// sub-issue as resolved once that one plans.
 func (b *Run) replanStale(ctx context.Context, items []*Item) {
 	var stale []*Item
 	var refs []issue.Ref
+	replanned := map[string]bool{}
 	for _, it := range items {
-		if it.Err != nil && board.IsStale(it.Err) {
+		if it.Err != nil && (board.IsStale(it.Err) || b.namesSubIssue(it, replanned)) {
 			stale = append(stale, it)
 			refs = append(refs, it.Ref)
+			replanned[b.runKey(it.Ref.String(b.def))] = true
 		}
 	}
 	if len(stale) == 0 || !b.retryStale(stale[0].Err, false) {
@@ -311,6 +322,16 @@ func (b *Run) replanStale(ctx context.Context, items []*Item) {
 		it.Err, it.Why, it.Issue, it.Writes = nil, "", nil, nil
 		b.plan(it, r)
 	}
+}
+
+// namesSubIssue reports whether the issue of it, as planned, has an
+// unresolved sub-issue among keys (by runKey), when the run counts the
+// sub-issues it resolves (resolvesSubIssues).
+func (b *Run) namesSubIssue(it *Item, keys map[string]bool) bool {
+	if it.Issue == nil || len(keys) == 0 || !b.resolvesSubIssues() {
+		return false
+	}
+	return slices.ContainsFunc(it.Issue.UnresolvedSubIssues, func(s workflow.Blocker) bool { return keys[b.runKey(s.Ref)] })
 }
 
 // applyAll applies the plan of each issue in turn, printing the
@@ -334,9 +355,10 @@ func (b *Run) applyAll(ctx context.Context, items []*Item) {
 			it.skip(b.stop)
 			continue
 		}
-		if s := retriedSubIssue(it); s != nil {
+		if s := retriedSubIssue(it); s != nil && b.v.SubIssues == config.BlockersDeny {
 			// A sub-issue failed on the network or was not attempted: the
-			// re-run that finishes it finishes the parent too.
+			// re-run that finishes it finishes the parent too. Under
+			// "warn" the parent runs, with failedSubIssues' warning.
 			it.skip(s.Err)
 			continue
 		}
@@ -382,8 +404,10 @@ func retriedSubIssue(it *Item) *Item {
 }
 
 // failedSubIssues refuses the plan p of it, as the sub_issues check would,
-// when a sub-issue of the run its plan counted as resolved failed: it
-// stays unresolved. A warning is enough for sub_issues = "warn".
+// when a sub-issue of the run its plan counted as resolved failed, for
+// any reason: it stays unresolved. A warning is enough for sub_issues =
+// "warn". Under "deny", a failure a re-run may finish skips the parent
+// first (retriedSubIssue).
 func (b *Run) failedSubIssues(it *Item, p *workflow.Plan) error {
 	var refs []string
 	for _, s := range it.relies {

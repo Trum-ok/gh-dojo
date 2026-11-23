@@ -83,8 +83,10 @@ requests, from any repositories
 written on its own, with its own mutation, so a lost answer or a
 refusal touches that issue alone. An issue that fails is skipped and the
 others go on. An error that would fail every write alike (the token rejected
-or missing a scope, a rate limit, the run interrupted) stops the writes: the
-issues left are reported as not attempted. `--yes` counts for every issue;
+or missing a scope, an organization's SSO or OAuth app restrictions denying
+it, a rate limit, the run interrupted) stops the writes: the issues left are
+reported as not attempted. Access denied on its own (a token that cannot
+write to one repository) fails that issue alone. `--yes` counts for every issue;
 `--dry-run` prints the plan of each.
 
 Each issue done prints its confirmation line; then a summary. When every

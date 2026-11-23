@@ -314,7 +314,7 @@ func fromHTTP(err *api.HTTPError) *Error {
 		return Network("GitHub API: %s", msg).WithFix(AuthFix)
 	case (s == http.StatusTooManyRequests || s == http.StatusForbidden) && IsContentLimit(err.Message):
 		return ContentLimited(err.Headers.Get("Retry-After"))
-	case s == http.StatusTooManyRequests, s == http.StatusForbidden && isRateLimit(err):
+	case s == http.StatusTooManyRequests, s == http.StatusForbidden && IsRateLimit(err):
 		return rateLimited(err.Headers)
 	case s == http.StatusForbidden:
 		return Network("GitHub API: HTTP %d %s", s, msg).WithFix(AuthFix)
@@ -325,9 +325,9 @@ func fromHTTP(err *api.HTTPError) *Error {
 	}
 }
 
-// isRateLimit tells a primary or secondary rate limit from a permission
+// IsRateLimit tells a primary or secondary rate limit from a permission
 // problem: both come as HTTP 403.
-func isRateLimit(err *api.HTTPError) bool {
+func IsRateLimit(err *api.HTTPError) bool {
 	if err.Headers.Get("X-RateLimit-Remaining") == "0" || IsSecondaryRateLimit(err) {
 		return true
 	}

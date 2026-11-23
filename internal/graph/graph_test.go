@@ -475,7 +475,7 @@ func assertError(t *testing.T, err error, code render.Code, golden string) {
 
 // TestAffectsAll tells errors that would fail every issue of a batch alike
 // (the token, a rate limit, the run interrupted) from errors of one
-// request (a lost answer, a missing node, a stale ID).
+// request (a lost answer, a missing node, a stale ID, access denied).
 func TestAffectsAll(t *testing.T) {
 	gql := func(typ, msg string) error {
 		return &api.GraphQLError{Errors: []api.GraphQLErrorItem{{Type: typ, Message: msg}}}
@@ -486,13 +486,21 @@ func TestAffectsAll(t *testing.T) {
 		want bool
 	}{
 		{"401", &api.HTTPError{StatusCode: http.StatusUnauthorized}, true},
-		{"403", &api.HTTPError{StatusCode: http.StatusForbidden}, true},
+		// #111: a plain 403 or FORBIDDEN may be one repository's.
+		{"403", &api.HTTPError{StatusCode: http.StatusForbidden, Message: "Resource not accessible by integration"}, false},
+		{"403_primary_limit", &api.HTTPError{StatusCode: http.StatusForbidden, Message: "API rate limit exceeded",
+			Headers: http.Header{"X-Ratelimit-Remaining": {"0"}}}, true},
+		{"403_secondary_limit", &api.HTTPError{StatusCode: http.StatusForbidden, Message: "You have exceeded a secondary rate limit."}, true},
+		{"403_saml", &api.HTTPError{StatusCode: http.StatusForbidden, Message: "Resource protected by organization SAML enforcement."}, true},
+		{"403_oauth", &api.HTTPError{StatusCode: http.StatusForbidden,
+			Message: "Although you appear to have the correct authorization credentials, the `acme` organization has enabled OAuth App access restrictions"}, true},
 		{"429", &api.HTTPError{StatusCode: http.StatusTooManyRequests}, true},
 		{"rate_limited", gql("RATE_LIMITED", ""), true},
 		{"content_limit", gql("UNPROCESSABLE", "was submitted too quickly"), true},
 		{"unprocessable", gql("UNPROCESSABLE", "Title can't be blank"), false},
 		{"scopes", gql("INSUFFICIENT_SCOPES", ""), true},
-		{"forbidden", gql("FORBIDDEN", ""), true},
+		{"forbidden", gql("FORBIDDEN", "Resource not accessible by personal access token"), false},
+		{"forbidden_oauth", gql("FORBIDDEN", "the `acme` organization has enabled OAuth App access restrictions"), true},
 		{"saml", gql("", "Resource protected by organization SAML enforcement."), true},
 		{"canceled", render.Network("interrupted").WithCause(errors.Join(graph.ErrUnknownOutcome, context.Canceled)), true},
 		{"502", &api.HTTPError{StatusCode: http.StatusBadGateway}, false},

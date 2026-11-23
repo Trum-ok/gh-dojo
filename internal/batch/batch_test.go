@@ -63,6 +63,7 @@ type fakeBackend struct {
 	issues    map[int]workflow.Issue
 	readErr   error         // fails every read
 	issueErrs map[int]error // the read error of one issue
+	cacheErrs map[int]error // the read error of one issue while the schema is cached
 	applyErrs map[int]error // the Apply error of one issue; nothing confirmed
 	cached    bool          // SchemaCached until Reset
 	reads     [][]int       // the numbers of each ReadIssues call
@@ -86,6 +87,8 @@ func (f *fakeBackend) ReadIssues(_ context.Context, _ config.Verb, refs []issue.
 		switch {
 		case f.issueErrs[r.Number] != nil:
 			out[i].Err = f.issueErrs[r.Number]
+		case f.cached && f.cacheErrs[r.Number] != nil:
+			out[i].Err = f.cacheErrs[r.Number]
 		case !ok:
 			out[i].Err, out[i].Cause = render.NotFound("issue #%d not found in %s", r.Number, shop), issue.CauseMissing
 		default:
@@ -207,6 +210,38 @@ func TestDoStops(t *testing.T) {
 	}
 }
 
+// TestDoForbidden (#111): done acme/api#3 12 13, where the token may not
+// write to acme/api: a FORBIDDEN on #3 fails #3 alone, and #12 and #13
+// are written. A missing scope still stops the writes.
+func TestDoForbidden(t *testing.T) {
+	gql := func(typ string) error {
+		err := &api.GraphQLError{Errors: []api.GraphQLErrorItem{{Type: typ, Message: "denied"}}}
+		return render.MapGraphQL(err, nil).WithCause(err)
+	}
+	api3 := issue.Ref{Repo: issue.Repo{Owner: "acme", Name: "api"}, Number: 3}
+	run := func(applyErr error) (*fakeBackend, []*Item) {
+		t.Helper()
+		be := &fakeBackend{issues: map[int]workflow.Issue{3: ready("Ready"), 12: ready("Ready"), 13: ready("Ready")},
+			applyErrs: map[int]error{3: applyErr}}
+		b, _, _ := newRun(t, be, "")
+		items, err := b.Do(context.Background(), append([]issue.Ref{api3}, refs(12, 13)...), false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return be, items
+	}
+
+	be, items := run(gql("FORBIDDEN"))
+	if !slices.Equal(be.applied, []int{3, 12, 13}) || items[0].Err == nil || items[1].Err != nil || items[2].Err != nil {
+		t.Errorf("FORBIDDEN: applied %v, errors %v, %v, %v; want #3 failed alone", be.applied, items[0].Err, items[1].Err, items[2].Err)
+	}
+
+	be, items = run(gql("INSUFFICIENT_SCOPES"))
+	if !slices.Equal(be.applied, []int{3}) || !items[1].Skipped || !items[2].Skipped {
+		t.Errorf("INSUFFICIENT_SCOPES: applied %v, skipped %v, %v; want #12 and #13 not attempted", be.applied, items[1].Skipped, items[2].Skipped)
+	}
+}
+
 // TestDoJSON: with JSON the run prints nothing on stdout; the command
 // emits the items.
 func TestDoJSON(t *testing.T) {
@@ -298,6 +333,54 @@ func TestDoSubIssues(t *testing.T) {
 	}
 }
 
+// TestDoSubIssueFails (#112): done 1 2, #2 a sub-issue of #1, and the
+// write of #2 fails. Under "warn" the parent is written, with a warning,
+// whatever the failure; under "deny" a failure a re-run may finish skips
+// the parent for that re-run, and any other refuses it.
+func TestDoSubIssueFails(t *testing.T) {
+	rejected := render.Usage("GitHub rejected the change")
+	lost := render.Network("GitHub write failed (HTTP 502)").
+		WithCause(errors.Join(graph.ErrUnknownOutcome, &api.HTTPError{StatusCode: http.StatusBadGateway}))
+	network := render.Network("cannot reach GitHub")
+	for _, tt := range []struct {
+		name, mode string
+		err        error
+		applied    []int
+		code       render.Code // of the parent's error; 0 for none
+		skipped    bool
+	}{
+		{"warn_rejected", "warn", rejected, []int{2, 1}, 0, false},
+		{"warn_502", "warn", lost, []int{2, 1}, 0, false},
+		{"warn_network", "warn", network, []int{2, 1}, 0, false},
+		{"deny_rejected", "deny", rejected, []int{2}, render.ExitDenied, false},
+		{"deny_502", "deny", lost, []int{2}, render.ExitNetwork, true},
+		{"deny_network", "deny", network, []int{2}, render.ExitNetwork, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			parent := ready("Ready")
+			parent.UnresolvedSubIssues = []workflow.Blocker{{Ref: "#2", Place: "Ready"}}
+			be := &fakeBackend{issues: map[int]workflow.Issue{1: parent, 2: ready("Ready")}, applyErrs: map[int]error{2: tt.err}}
+			b, _, errOut := newRun(t, be, `sub_issues = "`+tt.mode+`"`+"\n")
+			items, err := b.Do(context.Background(), refs(1, 2), false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := render.Code(0)
+			if items[0].Err != nil {
+				got = render.FromError(items[0].Err).Code
+			}
+			if !slices.Equal(be.applied, tt.applied) || got != tt.code || items[0].Skipped != tt.skipped {
+				t.Errorf("applied %v, parent's code %d (skipped %v), err %v; want %v, %d (skipped %v)",
+					be.applied, got, items[0].Skipped, items[0].Err, tt.applied, tt.code, tt.skipped)
+			}
+			warned := strings.Contains(errOut.String(), "#1 has unresolved sub-issues: #2 (failed in this run)")
+			if warned != (tt.mode == "warn") {
+				t.Errorf("stderr:\n%s", errOut)
+			}
+		})
+	}
+}
+
 // TestDoStale: a read that fails on the cached schema is retried once
 // with a fresh one; a write GitHub refuses for a stale ID resets the
 // schema, re-reads the issues not applied yet and goes on, once per run.
@@ -327,6 +410,34 @@ func TestDoStale(t *testing.T) {
 		t.Errorf("resets %d, reads %v, applied %v; want #2 and #3 re-read, #2 applied again", be.resets, be.reads, be.applied)
 	}
 	if !strings.HasSuffix(out.String(), "3 of 3 done\n") {
+		t.Errorf("stdout:\n%s", out)
+	}
+}
+
+// TestDoStaleSubIssue (#103): with sub_issues = "deny", a sub-issue whose
+// read fails on the cached schema refuses its parent, planned after it;
+// the retry re-reads both, the sub-issue first, and both are done, as a
+// plain re-run would do them. A grandparent refused through the parent is
+// re-read too.
+func TestDoStaleSubIssue(t *testing.T) {
+	stale := render.Usage("no iteration for today").WithCause(board.ErrUnknownIteration)
+	parent, grand := ready("Ready"), ready("Ready")
+	parent.UnresolvedSubIssues = []workflow.Blocker{{Ref: "#2", Place: "Ready"}}
+	grand.UnresolvedSubIssues = []workflow.Blocker{{Ref: "#1", Place: "Ready"}}
+	be := &fakeBackend{issues: map[int]workflow.Issue{1: parent, 2: ready("Ready"), 3: grand, 4: ready("Ready")},
+		cacheErrs: map[int]error{2: stale}, cached: true}
+	b, out, _ := newRun(t, be, `sub_issues = "deny"`+"\n")
+	items, err := b.Do(context.Background(), refs(3, 4, 1, 2), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := b.Summary(items, false); err != nil {
+		t.Errorf("summary = %v, want every issue done", err)
+	}
+	if be.resets != 1 || len(be.reads) != 2 || !slices.Equal(be.reads[1], []int{2, 1, 3}) || !slices.Equal(be.applied, []int{2, 1, 3, 4}) {
+		t.Errorf("resets %d, reads %v, applied %v; want #2, #1 and #3 re-read and applied in that order", be.resets, be.reads, be.applied)
+	}
+	if !strings.HasSuffix(out.String(), "4 of 4 done\n") {
 		t.Errorf("stdout:\n%s", out)
 	}
 }
