@@ -80,6 +80,7 @@ func newShownCard(ctx context.Context, cfg *config.Config, be Backend, def issue
 	view := newCardView(cfg, def, show.comments, show.full)
 	if gb, ok := be.(*githubBackend); ok {
 		view.sprintField, view.sprintFieldID = showSprint(ctx, gb.app, cfg) // the schema the read loaded
+		view.statusFieldID = showStatusID(ctx, gb.app, cfg)
 	} else {
 		view.sprintField = cfg.SprintField()
 	}

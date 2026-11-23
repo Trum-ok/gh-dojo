@@ -51,6 +51,9 @@ var fenceRE = regexp.MustCompile("(?m)^ {0,3}(```|~~~)")
 // cardView renders cards with show's flags.
 type cardView struct {
 	statusField string // board name of the status field, left out of the field list
+	// statusFieldID is its node ID, which finds it even if the field was
+	// renamed; "" when unknown, then statusField is matched by name.
+	statusFieldID string
 	// sprintField is the board name of the sprint field (fields.sprint),
 	// shown on a line of its own; "" when not set. sprintFieldID is its
 	// node ID, which finds the value even if the field was renamed.
@@ -277,7 +280,7 @@ func (v cardView) board(c *issue.Card, fields bool) string {
 	}
 	if fields {
 		for _, val := range c.Item.Values {
-			if val.Field != v.statusField && !v.isSprint(val) {
+			if !v.isStatus(val) && !v.isSprint(val) {
 				parts = append(parts, render.SingleLine(val.Field)+": "+render.SingleLine(val.Text))
 			}
 		}

@@ -102,6 +102,7 @@ reported after the others are printed, with exit code 3.`,
 			textBrief := brief || briefByDefault
 			v := newCardView(cfg, repo, shown, full)
 			v.sprintField, v.sprintFieldID = showSprint(cmd.Context(), app, cfg)
+			v.statusFieldID = showStatusID(cmd.Context(), app, cfg)
 			var cards []*issue.Card
 			var failed []issue.Result
 			for _, r := range res {
