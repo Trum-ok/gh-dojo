@@ -95,6 +95,17 @@ func TestUnblock(t *testing.T) {
 	)
 }
 
+// TestBlockHiddenBlocker (#113): a blocker of the issue that the token
+// cannot see does not matter for the change; the link is written.
+func TestBlockHiddenBlocker(t *testing.T) {
+	srv, before := withLinksApp(t, verbFixture("links_block_hidden_blocker"))
+	checkLinkRuns(t, srv, before,
+		runs{[]string{"block", "3", "--by", "26"}, render.ExitOK, 2, "block_hidden_blocker"})
+	srv, before = withLinksApp(t, verbFixture("links_unblock_hidden_blocker"))
+	checkLinkRuns(t, srv, before,
+		runs{[]string{"unblock", "3", "--by", "2"}, render.ExitOK, 2, "unblock_hidden_blocker"})
+}
+
 // TestBlockPartial: GitHub links one issue and fails the other: exit 5
 // naming both; the re-run sends the missing link alone.
 func TestBlockPartial(t *testing.T) {

@@ -1,0 +1,4 @@
+code: 0
+--- stdout
+#3 blocked by #26
+--- stderr
