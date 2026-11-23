@@ -1,14 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/cli/go-gh/v2/pkg/api"
 
@@ -16,6 +19,7 @@ import (
 	"github.com/Trum-ok/gh-dojo/internal/board"
 	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/graph"
+	"github.com/Trum-ok/gh-dojo/internal/graph/graphtest"
 	"github.com/Trum-ok/gh-dojo/internal/issue"
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/Trum-ok/gh-dojo/internal/testutil"
@@ -76,6 +80,55 @@ func TestBatchNetwork(t *testing.T) {
 		runs{[]string{"done", "3", "7", "9"}, render.ExitOK, 2, "batch_network_rerun"},
 		runs{[]string{"done", "3", "7", "9"}, render.ExitOK, 1, "batch_network_repeat"},
 	)
+}
+
+// cancelAfterWrite cancels the run once a mutation has been answered, as
+// Ctrl-C does after the first write.
+type cancelAfterWrite struct {
+	next   http.RoundTripper
+	cancel context.CancelFunc
+}
+
+func (c cancelAfterWrite) RoundTrip(req *http.Request) (*http.Response, error) {
+	var body []byte
+	if req.Body != nil {
+		body, _ = io.ReadAll(req.Body)
+		req.Body = io.NopCloser(bytes.NewReader(body))
+	}
+	res, err := c.next.RoundTrip(req)
+	if err == nil && bytes.Contains(body, []byte("mutation ")) {
+		c.cancel()
+	}
+	return res, err
+}
+
+// TestBatchInterrupted: the run is cancelled (Ctrl-C, SIGTERM) after the
+// write of #3. The writes stop, #7 and #9 are not attempted, and the report
+// is complete: exit 5 with the JSON summary on stdout.
+func TestBatchInterrupted(t *testing.T) {
+	srv, before := withWarmVerbApp(t, verbFixture("batch_done_interrupted"))
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	cached := newApp
+	newApp = func() *App {
+		a := cached()
+		a.Client = graph.New(graph.Options{
+			Host: "github.com", AuthToken: graphtest.FakeToken,
+			Transport: cancelAfterWrite{next: srv, cancel: cancel},
+			Sleep:     func(context.Context, time.Duration) error { return nil },
+		})
+		return a
+	}
+	var stdout, stderr bytes.Buffer
+	code := runContext(ctx, newRootCmd, []string{"done", "3", "7", "9", "--json"}, &stdout, &stderr)
+	out := fmt.Appendf(nil, "code: %d\n--- stdout\n%s--- stderr\n%s", code, stdout.String(), stderr.String())
+	if code != render.ExitPartial {
+		t.Errorf("exit code = %d, want %d\n%s", code, render.ExitPartial, out)
+	}
+	if n := srv.Requests() - before; n != 2 {
+		t.Errorf("%d requests, want 2 (the cards, the write of #3)", n)
+	}
+	testutil.Golden(t, "backend/batch_interrupted", out)
 }
 
 // TestBatchOtherRepo: issues of the default repository and of cli/cli are
