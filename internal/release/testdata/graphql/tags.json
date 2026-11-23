@@ -103,7 +103,7 @@
     },
     {
       "operation": "ReleaseCompare",
-      "query": "query ReleaseCompare($owner: String!, $repo: String!, $base: String!, $head: String!, $cursor: String) {\n  repository(owner: $owner, name: $repo) {\n    ref(qualifiedName: $base) {\n      compare(headRef: $head) {\n        status\n        aheadBy\n        behindBy\n        commits(first: 100, after: $cursor) {\n          totalCount\n          pageInfo { hasNextPage endCursor }\n          nodes { ...releaseCommit }\n        }\n      }\n    }\n  }\n}\n\n\n\nfragment releaseCommit on Commit {\n  oid\n  message\n  associatedPullRequests(first: 5) {\n    totalCount\n    nodes {\n      number\n      merged\n      repository { nameWithOwner }\n      closingIssuesReferences(first: 25) {\n        totalCount\n        nodes { number repository { nameWithOwner } }\n      }\n    }\n  }\n}",
+      "query": "query ReleaseCompare($owner: String!, $repo: String!, $base: String!, $head: String!, $cursor: String) {\n  repository(owner: $owner, name: $repo) {\n    ref(qualifiedName: $base) {\n      compare(headRef: $head) {\n        status\n        aheadBy\n        behindBy\n        commits(first: 100, after: $cursor) {\n          totalCount\n          pageInfo { hasNextPage endCursor }\n          nodes { ...releaseCommit }\n        }\n      }\n    }\n  }\n}\n\n\n\nfragment releaseCommit on Commit {\n  oid\n  message\n  associatedPullRequests(first: 5) {\n    totalCount\n    nodes {\n      number\n      merged\n      repository { nameWithOwner }\n      mergeCommit { oid }\n      closingIssuesReferences(first: 25) {\n        totalCount\n        nodes { number repository { nameWithOwner } }\n      }\n    }\n  }\n}",
       "variables": {
         "base": "refs/tags/v0.1.0",
         "cursor": null,
@@ -135,6 +135,7 @@
                           {
                             "number": 50,
                             "merged": true,
+                            "mergeCommit": { "oid": "1111111111111111111111111111111111111111" },
                             "repository": {
                               "nameWithOwner": "Trum-ok/gh-dojo"
                             },
@@ -168,6 +169,7 @@
                           {
                             "number": 51,
                             "merged": true,
+                            "mergeCommit": { "oid": "1212121212121212121212121212121212121212" },
                             "repository": {
                               "nameWithOwner": "Trum-ok/gh-dojo"
                             },
@@ -186,6 +188,7 @@
                           {
                             "number": 52,
                             "merged": false,
+                            "mergeCommit": null,
                             "repository": {
                               "nameWithOwner": "Trum-ok/gh-dojo"
                             },
@@ -204,6 +207,7 @@
                           {
                             "number": 9,
                             "merged": true,
+                            "mergeCommit": { "oid": "9090909090909090909090909090909090909090" },
                             "repository": {
                               "nameWithOwner": "fork/gh-dojo"
                             },
@@ -222,6 +226,7 @@
                           {
                             "number": 53,
                             "merged": true,
+                            "mergeCommit": { "oid": "5353535353535353535353535353535353535353" },
                             "repository": {
                               "nameWithOwner": "Trum-ok/gh-dojo"
                             },
@@ -233,6 +238,7 @@
                           {
                             "number": 54,
                             "merged": true,
+                            "mergeCommit": { "oid": "5454545454545454545454545454545454545454" },
                             "repository": {
                               "nameWithOwner": "Trum-ok/gh-dojo"
                             },
@@ -254,7 +260,7 @@
     },
     {
       "operation": "ReleaseCompare",
-      "query": "query ReleaseCompare($owner: String!, $repo: String!, $base: String!, $head: String!, $cursor: String) {\n  repository(owner: $owner, name: $repo) {\n    ref(qualifiedName: $base) {\n      compare(headRef: $head) {\n        status\n        aheadBy\n        behindBy\n        commits(first: 100, after: $cursor) {\n          totalCount\n          pageInfo { hasNextPage endCursor }\n          nodes { ...releaseCommit }\n        }\n      }\n    }\n  }\n}\n\n\n\nfragment releaseCommit on Commit {\n  oid\n  message\n  associatedPullRequests(first: 5) {\n    totalCount\n    nodes {\n      number\n      merged\n      repository { nameWithOwner }\n      closingIssuesReferences(first: 25) {\n        totalCount\n        nodes { number repository { nameWithOwner } }\n      }\n    }\n  }\n}",
+      "query": "query ReleaseCompare($owner: String!, $repo: String!, $base: String!, $head: String!, $cursor: String) {\n  repository(owner: $owner, name: $repo) {\n    ref(qualifiedName: $base) {\n      compare(headRef: $head) {\n        status\n        aheadBy\n        behindBy\n        commits(first: 100, after: $cursor) {\n          totalCount\n          pageInfo { hasNextPage endCursor }\n          nodes { ...releaseCommit }\n        }\n      }\n    }\n  }\n}\n\n\n\nfragment releaseCommit on Commit {\n  oid\n  message\n  associatedPullRequests(first: 5) {\n    totalCount\n    nodes {\n      number\n      merged\n      repository { nameWithOwner }\n      mergeCommit { oid }\n      closingIssuesReferences(first: 25) {\n        totalCount\n        nodes { number repository { nameWithOwner } }\n      }\n    }\n  }\n}",
       "variables": {
         "base": "refs/tags/v0.1.0",
         "cursor": "Mg",

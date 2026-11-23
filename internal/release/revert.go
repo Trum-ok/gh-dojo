@@ -81,6 +81,24 @@ func parseReverts(message string, repo issue.Repo) reverts {
 	return rv
 }
 
+// mergedBy is the pull requests that merge commit c merged. A commit
+// belongs to every pull request that merged a branch containing it (a
+// feature's merge commit also belongs to the release pull request that
+// merges the feature into main), so c.Pulls holds more than c's own pull
+// request, and reverting c must not take the others with it. When none of
+// c's pull requests names c as its merge commit (GitHub did not say), all
+// of them are taken: the pull requests are known, which of them c merged
+// is not.
+func mergedBy(c Commit) []Pull {
+	own := slices.DeleteFunc(slices.Clone(c.Pulls), func(p Pull) bool {
+		return p.MergeCommit == "" || !strings.EqualFold(p.MergeCommit, c.OID)
+	})
+	if len(own) == 0 {
+		return c.Pulls
+	}
+	return own
+}
+
 // Reverted reports, for each commit of r, whether a later commit of the
 // range reverts it, and that revert is not reverted itself:
 //
@@ -110,7 +128,7 @@ func Reverted(r *Range) []bool {
 			}
 			dead[k] = true
 			if slices.ContainsFunc(rv.merges, func(sha string) bool { return strings.HasPrefix(strings.ToLower(c.OID), sha) }) {
-				for _, p := range c.Pulls {
+				for _, p := range mergedBy(c) {
 					pulls = append(pulls, p.Ref)
 				}
 			}

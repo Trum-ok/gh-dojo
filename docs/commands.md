@@ -754,7 +754,11 @@ pull requests, when the revert says so as git and GitHub write it:
 
 - `This reverts commit <sha>.`, which `git revert` and GitHub's Revert
   button write; a reverted merge commit (`…, reversing changes made to
-  <sha>.`) takes its pull request with it, all its commits;
+  <sha>.`) takes its pull request with it, all its commits. That is the
+  pull request it merged, not every pull request the commit belongs to: a
+  feature's merge commit also belongs to the release pull request that
+  merges the feature into `main`, and that one stays. When GitHub names no
+  pull request that this commit merged, all of its pull requests go;
 - `Reverts owner/repo#20` on a line of its own, the description of the pull
   request GitHub's Revert button opens, which a squash merge may put in the
   message: every commit of that pull request in the range is reverted.

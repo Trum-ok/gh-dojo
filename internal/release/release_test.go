@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -376,6 +377,47 @@ func TestCollectReverted(t *testing.T) {
 	}
 	if len(warnings) != 0 {
 		t.Errorf("warnings = %q", warnings)
+	}
+}
+
+// TestRevertedMergeCommitTakesOwnPull: gitflow, feature pull requests A and
+// B merged into develop, release pull request R merges develop into main
+// (#102). A's merge commit belongs to A and to R; reverting it takes A, the
+// pull request it merged, not R and with it B.
+func TestRevertedMergeCommitTakesOwnPull(t *testing.T) {
+	oid := func(s string) string { return strings.Repeat(s, 20) }
+	pull := func(n int, merge string) Pull {
+		return Pull{Ref: issue.Ref{Repo: dojo, Number: n}, MergeCommit: merge}
+	}
+	a, b, rel := 10, 11, 12
+	revert := func(merge string) string {
+		return "Revert \"Merge pull request #10\"\n\nThis reverts commit " + oid(merge) + ", reversing\nchanges made to " + oid("00") + "."
+	}
+	commits := func(pulls func(own Pull) []Pull) []Commit {
+		return []Commit{
+			{OID: oid("a1"), Message: "feature A", Pulls: pulls(pull(a, oid("a2")))},
+			{OID: oid("a2"), Message: "Merge pull request #10 from acme/a", Pulls: pulls(pull(a, oid("a2")))},
+			{OID: oid("b1"), Message: "feature B", Pulls: pulls(pull(b, oid("b2")))},
+			{OID: oid("b2"), Message: "Merge pull request #11 from acme/b", Pulls: pulls(pull(b, oid("b2")))},
+			{OID: oid("c1"), Message: revert("a2")},
+		}
+	}
+	// Every commit of A and B also belongs to R, merged by c9.
+	withRelease := func(own Pull) []Pull { return []Pull{own, pull(rel, oid("c9"))} }
+	got := Reverted(&Range{Repo: dojo, Commits: commits(withRelease)})
+	if want := []bool{true, true, false, false, false}; !slices.Equal(got, want) {
+		t.Errorf("reverted = %v, want %v", got, want)
+	}
+
+	// GitHub names no merge commit: which pull request the commit merged is
+	// not known, so every one it belongs to goes (the behavior before #102).
+	unknown := func(own Pull) []Pull {
+		own.MergeCommit = ""
+		return []Pull{own, {Ref: issue.Ref{Repo: dojo, Number: rel}}}
+	}
+	got = Reverted(&Range{Repo: dojo, Commits: commits(unknown)})
+	if want := []bool{true, true, true, true, false}; !slices.Equal(got, want) {
+		t.Errorf("no merge commit: reverted = %v, want %v", got, want)
 	}
 }
 

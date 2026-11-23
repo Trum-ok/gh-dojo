@@ -69,6 +69,11 @@ type Commit struct {
 type Pull struct {
 	Ref    issue.Ref
 	Closes []issue.Ref
+	// MergeCommit is the oid of the commit that merged the pull request;
+	// "" when GitHub does not say. A commit belongs to every pull request
+	// that merged a branch containing it, so Commit.Pulls tells which
+	// pull requests a commit is in, MergeCommit which one it merged.
+	MergeCommit string
 }
 
 // commitFragment is what a release reads of each commit.
@@ -81,6 +86,7 @@ var commitFragment = `fragment releaseCommit on Commit {
       number
       merged
       repository { nameWithOwner }
+      mergeCommit { oid }
       closingIssuesReferences(first: ` + strconv.Itoa(ClosingWindow) + `) {
         totalCount
         nodes { number repository { nameWithOwner } }
@@ -99,10 +105,13 @@ type commitNode struct {
 }
 
 type pullNode struct {
-	Number     int      `json:"number"`
-	Merged     bool     `json:"merged"`
-	Repository repoNode `json:"repository"`
-	Closing    struct {
+	Number      int      `json:"number"`
+	Merged      bool     `json:"merged"`
+	Repository  repoNode `json:"repository"`
+	MergeCommit *struct {
+		OID string `json:"oid"`
+	} `json:"mergeCommit"`
+	Closing struct {
 		TotalCount int          `json:"totalCount"`
 		Nodes      []*issueNode `json:"nodes"`
 	} `json:"closingIssuesReferences"`
@@ -447,6 +456,9 @@ func (r *Range) add(nodes []*commitNode) {
 				continue // a fork's pull request
 			}
 			pull := Pull{Ref: issue.Ref{Repo: r.Repo, Number: p.Number}}
+			if p.MergeCommit != nil {
+				pull.MergeCommit = p.MergeCommit.OID
+			}
 			for _, i := range p.Closing.Nodes {
 				if i == nil {
 					continue
