@@ -15,6 +15,7 @@ import (
 	"github.com/Trum-ok/gh-dojo/internal/graph"
 	"github.com/Trum-ok/gh-dojo/internal/issue"
 	"github.com/Trum-ok/gh-dojo/internal/render"
+	"github.com/Trum-ok/gh-dojo/internal/workflow"
 )
 
 const shopConfig = `
@@ -244,5 +245,30 @@ func TestText(t *testing.T) {
   sub-issue of: a parent not readable, kept, not #41`
 	if got := r.DryRunText(); got != want {
 		t.Errorf("DryRunText =\n%s\nwant\n%s", got, want)
+	}
+}
+
+// failMutate fails every mutation.
+type failMutate struct{ noClient }
+
+func (failMutate) Mutate(context.Context, string, map[string]any, any) error {
+	return errors.New("boom")
+}
+
+// TestApplyLabelsStepNamesMissing: the labels step error names the labels
+// the mutation sends, not those the resumed issue already has.
+func TestApplyLabelsStepNamesMissing(t *testing.T) {
+	e := env(t, &fakeBoard{})
+	e.Client = failMutate{}
+	r := &Issue{env: e, id: "I_1", Labels: []string{"bug", "area:cli"}}
+	plan := &workflow.NewPlan{Labels: []string{"area:cli"}}
+	in := input{labels: []issue.Label{{ID: "L1", Name: "bug"}, {ID: "L2", Name: "area:cli"}}}
+	err := r.apply(context.Background(), &board.Schema{}, &board.Field{}, plan, in)
+	var se *stepError
+	if !errors.As(err, &se) {
+		t.Fatalf("err = %v, want a stepError", err)
+	}
+	if want := "adding labels area:cli failed"; se.step != want {
+		t.Errorf("step = %q, want %q", se.step, want)
 	}
 }
