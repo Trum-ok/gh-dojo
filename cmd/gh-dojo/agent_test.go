@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Trum-ok/gh-dojo/internal/agent"
 	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/doctor"
 	"github.com/Trum-ok/gh-dojo/internal/render"
@@ -227,6 +228,31 @@ func TestAgentCheck(t *testing.T) {
 	testutil.Golden(t, "json/agent_install", out)
 	if code, out := runOut("agent", "install", "--check"); code != render.ExitUsage || !strings.Contains(string(out), "SKILL.md: out of date") {
 		t.Errorf("only AGENTS.md should be updated:\n%s", out)
+	}
+}
+
+// TestAgentLineEndings: a CRLF line above the section no longer makes the
+// file out of date. When line endings alone differ (one CRLF line inside
+// the section), --check says so in text and in JSON, where diff is never null.
+func TestAgentLineEndings(t *testing.T) {
+	dir := withRepo(t, dojoConfig, nil)
+	runOut("agent", "install", "--agent", "agents-md")
+	section := readRepoFile(t, dir, "AGENTS.md")
+
+	writeRepoFile(t, dir, "AGENTS.md", "# Title\r\n\r\n"+section)
+	code, out := runOut("agent", "install", "--check", "--agent", "agents-md")
+	if code != render.ExitOK || !strings.Contains(string(out), "AGENTS.md: up to date") {
+		t.Errorf("CRLF above the section: exit code %d\n%s", code, out)
+	}
+
+	writeRepoFile(t, dir, "AGENTS.md", strings.Replace(section, "\n", "\r\n", 1))
+	code, out = runOut("agent", "install", "--check", "--agent", "agents-md")
+	if code != render.ExitUsage || !strings.Contains(string(out), "AGENTS.md: out of date\n  only line endings differ\n") {
+		t.Errorf("one CRLF line in the section: exit code %d\n%s", code, out)
+	}
+	_, out = runOut("agent", "install", "--check", "--agent", "agents-md", "--json")
+	if !strings.Contains(string(out), `"diff":["only line endings differ"]`) || strings.Contains(string(out), `"diff":null`) {
+		t.Errorf("--json:\n%s", out)
 	}
 }
 
@@ -472,5 +498,42 @@ func TestDoctorAgent(t *testing.T) {
 	got = check()
 	if len(got) != 1 || got[0].Result != doctor.ResultProblem || got[0].Fix == nil || !strings.HasPrefix(*got[0].Fix, "move what is worth keeping") {
 		t.Errorf("hand-written: %+v", got)
+	}
+
+	// Without [agent], a marked file install cannot handle is a problem,
+	// not silence.
+	withRepo(t, dojoConfig, map[string]string{"AGENTS.md": "# Agents\n" + agent.End + "\n"})
+	got = check()
+	if len(got) != 1 || got[0].Result != doctor.ResultProblem ||
+		!strings.Contains(got[0].Detail, "a gh-dojo:end marker without a gh-dojo:begin before it") {
+		t.Errorf("stray end marker: %+v", got)
+	}
+}
+
+// TestDoctorAgentOneFileFails: without [agent], a file that cannot be
+// prepared does not hide the warning about another one.
+func TestDoctorAgentOneFileFails(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symbolic links need privileges on Windows")
+	}
+	dir := withRepo(t, dojoConfig, nil)
+	runOut("agent", "install", "--agent", "claude")
+	writeRepoFile(t, dir, skillPath, strings.Replace(readRepoFile(t, dir, skillPath), "Verbs", "Words", 1))
+	writeRepoFile(t, dir, "CLAUDE.md", "# Claude\n")
+	if err := os.Symlink(filepath.Join(dir, "CLAUDE.md"), filepath.Join(dir, "AGENTS.md")); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := newRootCmd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &doctor.Report{}
+	checkAgentFiles(r, cfg, root)
+	if got := r.Checks; len(got) != 1 || got[0].Result != doctor.ResultWarn || !strings.Contains(got[0].Detail, skillPath+" (out of date)") {
+		t.Errorf("unmarked AGENTS.md whose read fails: %+v", got)
 	}
 }

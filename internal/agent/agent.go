@@ -203,7 +203,8 @@ func HandWrittenFix(t Target, configFile string) string {
 // version) for a shared file. The wanted content keeps the file's line
 // endings: CRLF when the file has them. Markers of a shared file that are
 // out of order or repeated are an error (exit code 1): gh-dojo cannot tell
-// which text is its own.
+// which text is its own; the file read comes back with that error (nil for
+// any other).
 func Prepare(root *os.Root, t Target, body, configFile, version string) (*File, error) {
 	f := &File{Target: t}
 	data, err := ReadFile(root, t.Path)
@@ -216,21 +217,17 @@ func Prepare(root *os.Root, t Target, body, configFile, version string) (*File, 
 	default:
 		return nil, err
 	}
-	eol := "\n"
-	if strings.Contains(f.Have, "\r\n") {
-		eol = "\r\n"
-	}
 	if !t.Section {
 		f.Marked = hasMarker(f.Have, generatedPrefix)
 		f.HandWritten = f.Exists && !f.Marked
-		f.Want = withEOL(body, eol)
+		f.Want = withEOL(body, lineEnding(f.Have))
 		return f, nil
 	}
 	f.Marked = hasMarker(f.Have, beginPrefix) || hasMarker(f.Have, endPrefix)
-	section := withEOL(Begin(configFile, version)+"\n"+strings.TrimRight(body, "\n")+"\n"+End+"\n", eol)
-	want, err := splice(f.Have, section, eol)
+	section := Begin(configFile, version) + "\n" + strings.TrimRight(body, "\n") + "\n" + End + "\n"
+	want, err := splice(f.Have, section)
 	if err != nil {
-		return nil, render.Usage("%s: %v", t.Path, err).
+		return f, render.Usage("%s: %v", t.Path, err).
 			WithFix(fmt.Sprintf("keep one %s ... --> line and one %s line after it in %s, "+
 				"or remove both; then run gh dojo agent install", beginPrefix, End, t.Path))
 	}
@@ -258,6 +255,16 @@ func ReadFile(root *os.Root, name string) ([]byte, error) {
 	return data, err
 }
 
+// lineEnding is the line ending most lines of text end in: CRLF when more
+// lines end in it than in a bare LF, else LF (also for text without lines).
+func lineEnding(text string) string {
+	crlf := strings.Count(text, "\r\n")
+	if crlf > strings.Count(text, "\n")-crlf {
+		return "\r\n"
+	}
+	return "\n"
+}
+
 func withEOL(s, eol string) string {
 	if eol == "\n" {
 		return s
@@ -275,11 +282,13 @@ func hasMarker(text, prefix string) bool {
 	return false
 }
 
-// splice puts section, which ends with a line ending, in place of the
-// lines from the Begin marker to the End marker of have. A file without
-// markers gets the section appended after a blank line, its own bytes
-// kept as they are; an empty one is the section alone.
-func splice(have, section, eol string) (string, error) {
+// splice puts section, with LF line endings and ending in one, in place of
+// the lines from the Begin marker to the End marker of have. The section
+// gets the line ending of the lines it replaces, or of the whole file when
+// it is appended, so the CRLF of the text around it does not matter. A file
+// without markers gets the section appended after a blank line, its own
+// bytes kept as they are; an empty one is the section alone.
+func splice(have, section string) (string, error) {
 	lines := strings.SplitAfter(have, "\n")
 	begin, end := -1, -1
 	for i, l := range lines {
@@ -303,6 +312,8 @@ func splice(have, section, eol string) (string, error) {
 		if have == "" {
 			return section, nil
 		}
+		eol := lineEnding(have)
+		section = withEOL(section, eol)
 		out := have
 		if !strings.HasSuffix(out, "\n") {
 			out += eol
@@ -312,7 +323,8 @@ func splice(have, section, eol string) (string, error) {
 		}
 		return out + section, nil
 	}
-	return strings.Join(lines[:begin], "") + section + strings.Join(lines[end+1:], ""), nil
+	old := strings.Join(lines[begin:end+1], "")
+	return strings.Join(lines[:begin], "") + withEOL(section, lineEnding(old)) + strings.Join(lines[end+1:], ""), nil
 }
 
 // maxLinks is how many symbolic links Resolve follows.
