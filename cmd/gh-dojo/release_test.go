@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/issue"
@@ -207,6 +208,47 @@ func closedByAutomation(m map[int]workflow.Issue) {
 	is := m[43]
 	is.StatusAutomated = true
 	m[43] = is
+}
+
+// TestReleaseClosedByWorkflow (#101): #43 closed by "Fixes #43" and moved
+// to Done by the "Item closed" workflow (actor github-project-automation,
+// wasAutomated false, as GitHub records it) is read as automated, so the
+// verb gets it and release does not skip it as already closed.
+func TestReleaseClosedByWorkflow(t *testing.T) {
+	at := time.Date(2026, 11, 10, 12, 0, 0, 0, time.UTC)
+	card := &issue.Card{
+		Number: 43, Title: "Speed up checkout", State: issue.StateClosed,
+		Item: &issue.Item{Status: "Done", CreatedAt: at.Add(-24 * time.Hour)},
+		History: []issue.StatusChange{
+			{At: at, From: "In progress", To: "Done", Actor: "github-project-automation", Automated: false},
+		},
+	}
+	is := workflowIssue(card, issue.Repo{})
+	if !is.StatusAutomated {
+		t.Fatalf("StatusAutomated = false for %+v", card.History)
+	}
+	withConfig(t, verbsConfig)
+	withApp(t, verbFixture("release_shop"))
+	f := &fakeBackend{
+		issues: map[int]workflow.Issue{
+			42: {Number: 42, Title: "Fix login redirect", OnBoard: true, Status: "Ready"},
+			43: is,
+		},
+		pulls: map[int]bool{5: true},
+	}
+	withBackend(t, f)
+	code, out := runOut("release", "HEAD", "--since", "abc1234", "--verb", "done")
+	if code != render.ExitOK || len(f.applied) != 1 {
+		t.Errorf("exit code = %d, applied %d plans, want 0, 1\n%s", code, len(f.applied), out)
+	}
+	if strings.Contains(string(out), "already closed: #43") {
+		t.Errorf("#43 skipped as already closed:\n%s", out)
+	}
+	// ready refuses a closed issue: it reaches the verb, exit code 2.
+	f.applied = nil
+	if code, out := runOut("release", "HEAD", "--since", "abc1234", "--verb", "ready"); code != render.ExitDenied {
+		t.Errorf("ready: exit code = %d, want %d\n%s", code, render.ExitDenied, out)
+	}
 }
 
 // TestReleaseSuffix:with [release] suffix = true, #42 is found in the

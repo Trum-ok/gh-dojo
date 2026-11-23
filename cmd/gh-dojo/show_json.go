@@ -243,7 +243,7 @@ func (v cardView) toCardJSON(c *issue.Card, brief bool) cardJSON {
 		for _, h := range c.History {
 			out.History = append(out.History, changeJSON{
 				At: jsonTime(h.At), From: render.OrNull(h.From), To: render.OrNull(h.To), Actor: cardLogin(h.Actor),
-				Automated: h.Automated || projectAutomation[h.Actor],
+				Automated: h.ByAutomation(),
 			})
 		}
 	}

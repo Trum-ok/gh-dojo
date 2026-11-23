@@ -379,14 +379,19 @@ func TestStatusAutomated(t *testing.T) {
 	added := time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
 	day := func(d int) time.Time { return time.Date(2026, 11, d, 12, 0, 0, 0, time.UTC) }
 	byPerson := issue.StatusChange{At: day(3), From: "Backlog", To: "In progress", Actor: "alice"}
-	closed := issue.StatusChange{At: day(5), From: "In progress", To: "Done", Actor: "github-project-automation", Automated: true}
+	closed := issue.StatusChange{At: day(5), From: "In progress", To: "Done", Actor: "github-project-automation"}
+	flagged := issue.StatusChange{At: day(5), From: "In progress", To: "Done", Actor: "alice", Automated: true}
 	tests := []struct {
 		name    string
 		item    *issue.Item
 		history []issue.StatusChange
 		want    bool
 	}{
+		// GitHub sets wasAutomated false for "Item closed": the actor says.
 		{"closed by automation", &issue.Item{Status: "Done", CreatedAt: added}, []issue.StatusChange{byPerson, closed}, true},
+		{"wasAutomated set", &issue.Item{Status: "Done", CreatedAt: added}, []issue.StatusChange{byPerson, flagged}, true},
+		{"by a person", &issue.Item{Status: "Done", CreatedAt: added},
+			[]issue.StatusChange{{At: day(5), From: "In progress", To: "Done", Actor: "alice"}}, false},
 		{"moved by a person", &issue.Item{Status: "Done", CreatedAt: added},
 			[]issue.StatusChange{closed, {At: day(6), From: "Done", To: "Done", Actor: "alice"}}, false},
 		{"history behind the status", &issue.Item{Status: "Ready", CreatedAt: added}, []issue.StatusChange{closed}, false},
