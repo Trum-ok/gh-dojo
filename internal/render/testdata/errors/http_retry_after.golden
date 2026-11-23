@@ -1,1 +1,2 @@
-error: GitHub API rate limit exceeded; retry in 60s
+error: GitHub API rate limit exceeded
+fix: wait 60s, then re-run the same command

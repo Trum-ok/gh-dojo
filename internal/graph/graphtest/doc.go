@@ -61,7 +61,8 @@
 // has the same operation, else to the last file passed to New. Identical
 // repeated answers are stored once with "repeat": true (never for
 // mutations), and a "repeat" already in the file is kept. Only response
-// bodies and the Retry-After / X-RateLimit-Remaining headers are stored;
+// bodies and the Retry-After / X-RateLimit-Remaining / X-RateLimit-Reset
+// headers are stored;
 // request headers (and so the token) never are, and a file that would
 // contain the token is not written. Mutations are refused unless
 // GH_DOJO_RECORD_MUTATIONS=1 is also set; only record them against a

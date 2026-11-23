@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cli/go-gh/v2/pkg/api"
 )
@@ -170,7 +171,8 @@ func (e *Error) Unwrap() error {
 //
 // Blank lines of What are dropped, then it is cut to 3 lines; each allowed
 // value is put on one line. The allowed line is cut after maxAllowed values
-// and 2×MaxLineRunes runes, unless AllowedAll. The fix line is never cut,
+// and 2×MaxLineRunes runes, unless AllowedAll; a cut drops whole values and
+// always ends in "and N more". The fix line is never cut,
 // since a cut command would be wrong; a fix longer than maxFixRunes is
 // dropped instead.
 func (e *Error) Text() string {
@@ -198,7 +200,7 @@ func (e *Error) Text() string {
 	case e.AllowedAll:
 		lines = append(lines, "allowed: "+joinAllowed(e.Allowed, len(e.Allowed)))
 	default:
-		lines = append(lines, Clip("allowed: "+joinAllowed(e.Allowed, maxAllowed), MaxLineRunes*2))
+		lines = append(lines, "allowed: "+joinAllowedWithin(e.Allowed, maxAllowed, MaxLineRunes*2))
 	}
 	if fix := SingleLine(e.Fix); fix != "" && RuneLen(fix) <= maxFixRunes {
 		lines = append(lines, "fix: "+fix)
@@ -208,15 +210,42 @@ func (e *Error) Text() string {
 
 // joinAllowed joins the first limit values, then "and N more" for the rest.
 func joinAllowed(values []string, limit int) string {
+	return joinAllowedWithin(values, limit, 0)
+}
+
+// joinAllowedWithin is joinAllowed for a line of at most maxRunes runes
+// (0: no bound), "allowed: " included: when the values do not fit, whole
+// values are dropped from the end until the rest and "and N more" do, so the
+// count of hidden values is never cut off. A first value too long to fit
+// even alone is clipped.
+func joinAllowedWithin(values []string, limit, maxRunes int) string {
 	shown := make([]string, 0, min(len(values), limit))
 	for _, v := range values[:min(len(values), limit)] {
 		shown = append(shown, SingleLine(v))
 	}
-	s := strings.Join(shown, ", ")
-	if n := len(values) - len(shown); n > 0 {
-		s += fmt.Sprintf(" and %d more", n)
+	build := func(shown []string) string {
+		s := strings.Join(shown, ", ")
+		if n := len(values) - len(shown); n > 0 {
+			s += fmt.Sprintf(" and %d more", n)
+		}
+		return s
 	}
-	return s
+	const prefix = len("allowed: ") // ASCII: bytes are runes
+	if maxRunes == 0 {
+		return build(shown)
+	}
+	for len(shown) > 1 && prefix+RuneLen(build(shown)) > maxRunes {
+		shown = shown[:len(shown)-1]
+	}
+	if s := build(shown); prefix+RuneLen(s) <= maxRunes || len(shown) == 0 {
+		return s
+	}
+	// One value, too long even alone: clip it and keep the count.
+	tail := ""
+	if n := len(values) - 1; n > 0 {
+		tail = fmt.Sprintf(" and %d more", n)
+	}
+	return Clip(shown[0], maxRunes-prefix-RuneLen(tail)) + tail
 }
 
 // Reason is the first clause of an error's message, for a line that
@@ -286,7 +315,7 @@ func fromHTTP(err *api.HTTPError) *Error {
 	case (s == http.StatusTooManyRequests || s == http.StatusForbidden) && IsContentLimit(err.Message):
 		return ContentLimited(err.Headers.Get("Retry-After"))
 	case s == http.StatusTooManyRequests, s == http.StatusForbidden && isRateLimit(err):
-		return rateLimited(err.Headers.Get("Retry-After"))
+		return rateLimited(err.Headers)
 	case s == http.StatusForbidden:
 		return Network("GitHub API: HTTP %d %s", s, msg).WithFix(AuthFix)
 	case s >= 500:
@@ -330,16 +359,45 @@ func RetryAfter(header string) int {
 	return 0
 }
 
-func rateLimited(retryAfter string) *Error {
-	if secs := RetryAfter(retryAfter); secs > 0 {
-		return Network("GitHub API rate limit exceeded; retry in %ds", secs)
+// now is the clock of rateLimited, replaced in tests.
+var now = time.Now
+
+// rateLimited reports a rate limit (primary or secondary) with how long to
+// wait: the Retry-After header in h, else, for the primary limit (no requests
+// left), the time until X-RateLimit-Reset, else a few minutes. h may be nil
+// (a GraphQL answer carries no headers here).
+func rateLimited(h http.Header) *Error {
+	wait := contentLimitWait
+	if secs := RetryAfter(h.Get("Retry-After")); secs > 0 {
+		wait = strconv.Itoa(secs) + "s"
+	} else if h.Get("X-RateLimit-Remaining") == "0" {
+		if reset, err := strconv.ParseInt(strings.TrimSpace(h.Get("X-RateLimit-Reset")), 10, 64); err == nil {
+			if secs := reset - now().Unix(); secs > 0 {
+				wait = formatWait(secs)
+			}
+		}
 	}
-	return Network("GitHub API rate limit exceeded; retry later")
+	return waitThenRerun(Network("GitHub API rate limit exceeded"), wait)
 }
 
-// contentLimitWait is how long to wait after GitHub's content creation
-// limit when it does not say: it gives no Retry-After inside a GraphQL
-// answer, and reports of the limit clearing range from a minute to several.
+// formatWait writes secs seconds as "45s", or in whole minutes (rounded up)
+// from two minutes on.
+func formatWait(secs int64) string {
+	if secs < 120 {
+		return strconv.FormatInt(secs, 10) + "s"
+	}
+	return strconv.FormatInt((secs+59)/60, 10) + "m"
+}
+
+// waitThenRerun sets the wait and the fix of a rate limit error e.
+func waitThenRerun(e *Error, wait string) *Error {
+	e.Wait = wait
+	return e.WithFix("wait " + wait + ", then re-run the same command")
+}
+
+// contentLimitWait is how long to wait after a rate limit when GitHub does
+// not say: it gives no Retry-After inside a GraphQL answer, and reports of
+// the limit clearing range from a minute to several.
 const contentLimitWait = "a few minutes"
 
 // ContentLimited reports GitHub's secondary rate limit on creating content
@@ -351,10 +409,7 @@ func ContentLimited(retryAfter string) *Error {
 	if secs := RetryAfter(retryAfter); secs > 0 {
 		wait = strconv.Itoa(secs) + "s"
 	}
-	e := Network("GitHub's limit on creating issues and comments was hit").
-		WithFix("wait " + wait + ", then re-run the same command")
-	e.Wait = wait
-	return e
+	return waitThenRerun(Network("GitHub's limit on creating issues and comments was hit"), wait)
 }
 
 // IsContentLimit reports whether msg, an error message from GitHub, is
@@ -379,7 +434,7 @@ func GraphQLLimit(err *api.GraphQLError) *Error {
 	}
 	for _, item := range err.Errors {
 		if item.Type == "RATE_LIMITED" {
-			return rateLimited("")
+			return rateLimited(nil)
 		}
 	}
 	for _, item := range err.Errors {
@@ -388,7 +443,7 @@ func GraphQLLimit(err *api.GraphQLError) *Error {
 		case IsContentLimit(msg):
 			return ContentLimited("")
 		case strings.Contains(msg, "secondary rate limit"), strings.Contains(msg, "abuse detection"):
-			return rateLimited("")
+			return rateLimited(nil)
 		}
 	}
 	return nil

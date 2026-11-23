@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 
 	"github.com/Trum-ok/gh-dojo/internal/testutil"
@@ -90,6 +92,62 @@ func TestErrorFormat(t *testing.T) {
 	}
 }
 
+// TestRateLimitWait checks that every rate limit names how long to wait, in
+// its fix and in the re-run step of a partial report (#108): Retry-After,
+// else X-RateLimit-Reset of the primary limit, else a few minutes.
+func TestRateLimitWait(t *testing.T) {
+	clock := time.Unix(1_800_000_000, 0)
+	old := now
+	now = func() time.Time { return clock }
+	t.Cleanup(func() { now = old })
+
+	hdr := func(kv ...string) http.Header {
+		h := http.Header{}
+		for i := 0; i < len(kv); i += 2 {
+			h.Set(kv[i], kv[i+1])
+		}
+		return h
+	}
+	reset := func(secs int) string { return strconv.FormatInt(clock.Unix()+int64(secs), 10) }
+	u := mustURL("https://api.github.com/graphql")
+	for _, tt := range []struct {
+		name string
+		err  error
+		wait string
+	}{
+		{"secondary_retry_after", &api.HTTPError{StatusCode: 403, Message: "You have exceeded a secondary rate limit.", Headers: hdr("Retry-After", "60"), RequestURL: u}, "60s"},
+		{"429_retry_after", &api.HTTPError{StatusCode: 429, Headers: hdr("Retry-After", "30"), RequestURL: u}, "30s"},
+		{"429_no_header", &api.HTTPError{StatusCode: 429, RequestURL: u}, "a few minutes"},
+		{"primary_reset_minutes", &api.HTTPError{StatusCode: 403, Message: "API rate limit exceeded", Headers: hdr("X-RateLimit-Remaining", "0", "X-RateLimit-Reset", reset(1500)), RequestURL: u}, "25m"},
+		{"primary_reset_rounds_up", &api.HTTPError{StatusCode: 403, Message: "API rate limit exceeded", Headers: hdr("X-RateLimit-Remaining", "0", "X-RateLimit-Reset", reset(121)), RequestURL: u}, "3m"},
+		{"primary_reset_seconds", &api.HTTPError{StatusCode: 403, Message: "API rate limit exceeded", Headers: hdr("X-RateLimit-Remaining", "0", "X-RateLimit-Reset", reset(45)), RequestURL: u}, "45s"},
+		{"primary_reset_past", &api.HTTPError{StatusCode: 403, Message: "API rate limit exceeded", Headers: hdr("X-RateLimit-Remaining", "0", "X-RateLimit-Reset", reset(-5)), RequestURL: u}, "a few minutes"},
+		{"primary_reset_garbage", &api.HTTPError{StatusCode: 403, Message: "API rate limit exceeded", Headers: hdr("X-RateLimit-Remaining", "0", "X-RateLimit-Reset", "soon"), RequestURL: u}, "a few minutes"},
+		{"primary_no_reset", &api.HTTPError{StatusCode: 403, Message: "API rate limit exceeded", Headers: hdr("X-RateLimit-Remaining", "0"), RequestURL: u}, "a few minutes"},
+		{"retry_after_beats_reset", &api.HTTPError{StatusCode: 403, Message: "API rate limit exceeded", Headers: hdr("Retry-After", "10", "X-RateLimit-Remaining", "0", "X-RateLimit-Reset", reset(1500)), RequestURL: u}, "10s"},
+		{"reset_ignored_with_requests_left", &api.HTTPError{StatusCode: 429, Headers: hdr("X-RateLimit-Remaining", "5", "X-RateLimit-Reset", reset(1500)), RequestURL: u}, "a few minutes"},
+		{"graphql_primary", &api.GraphQLError{Errors: []api.GraphQLErrorItem{{Type: "RATE_LIMITED", Message: "API rate limit exceeded"}}}, "a few minutes"},
+		{"graphql_secondary", &api.GraphQLError{Errors: []api.GraphQLErrorItem{{Message: "You have exceeded a secondary rate limit."}}}, "a few minutes"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			e := FromError(tt.err)
+			if e.Code != ExitNetwork || e.Wait != tt.wait {
+				t.Fatalf("code, wait = %d, %q; want %d, %q", e.Code, e.Wait, ExitNetwork, tt.wait)
+			}
+			want := "wait " + tt.wait + ", then re-run the same command"
+			if e.Fix != want {
+				t.Errorf("fix = %q, want %q", e.Fix, want)
+			}
+			if got := RerunStep(e); got != want {
+				t.Errorf("RerunStep = %q, want %q", got, want)
+			}
+			if strings.Contains(e.What, ";") {
+				t.Errorf("what = %q: the wait belongs in the fix", e.What)
+			}
+		})
+	}
+}
+
 func TestWriteErrorNil(t *testing.T) {
 	var buf bytes.Buffer
 	if code := WriteError(&buf, nil); code != ExitOK || buf.Len() != 0 {
@@ -129,6 +187,55 @@ func TestErrorTextLimits(t *testing.T) {
 	}
 	if lines[3] != "allowed: a b, c d, e" {
 		t.Errorf("allowed line = %q", lines[3])
+	}
+}
+
+// TestAllowedLineKeepsCount (#121): a clipped allowed line drops whole values
+// and still says how many it hides.
+func TestAllowedLineKeepsCount(t *testing.T) {
+	labels := make([]string, 57) // 25 runes each: the first 20 alone are over 540
+	for i := range labels {
+		labels[i] = fmt.Sprintf("label-%02d-%s", i, strings.Repeat("x", 15))
+	}
+	line := func(e *Error) string {
+		t.Helper()
+		for l := range strings.SplitSeq(e.Text(), "\n") {
+			if strings.HasPrefix(l, "allowed: ") {
+				return l
+			}
+		}
+		t.Fatalf("no allowed line:\n%s", e.Text())
+		return ""
+	}
+	got := line(Usage("unknown label").WithAllowed(labels...))
+	if n := RuneLen(got); n > 2*MaxLineRunes {
+		t.Errorf("allowed line has %d runes, want at most %d", n, 2*MaxLineRunes)
+	}
+	i := strings.LastIndex(got, " and ")
+	if i < 0 || strings.Contains(got, "…") {
+		t.Fatalf("allowed line = %q, want whole values then \"and N more\"", got)
+	}
+	shown := strings.Split(strings.TrimPrefix(got[:i], "allowed: "), ", ")
+	if want := fmt.Sprintf(" and %d more", len(labels)-len(shown)); got[i:] != want {
+		t.Errorf("tail = %q, want %q", got[i:], want)
+	}
+	for j, v := range shown {
+		if v != labels[j] {
+			t.Errorf("shown[%d] = %q, want the whole value %q", j, v, labels[j])
+		}
+	}
+	// One value filling the line alone: clipped, the count kept.
+	long := []string{strings.Repeat("y", 600), "b", "c"}
+	got = line(Usage("unknown label").WithAllowed(long...))
+	if n := RuneLen(got); n > 2*MaxLineRunes || !strings.HasSuffix(got, "… and 2 more") {
+		t.Errorf("long first value: %d runes, %q", n, got)
+	}
+	// Values that fit are untouched, and AllowedAll is never cut.
+	if got := line(Usage("x").WithAllowed("a", "b")); got != "allowed: a, b" {
+		t.Errorf("short list = %q", got)
+	}
+	if got := line(Usage("x").WithAllowedAll(labels...)); !strings.HasSuffix(got, labels[56]) {
+		t.Errorf("AllowedAll cut: %q", got)
 	}
 }
 

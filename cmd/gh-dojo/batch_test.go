@@ -475,8 +475,7 @@ func TestBatchStopsOnAuth(t *testing.T) {
 	}{
 		{"auth", render.Network("GitHub rejected the token (HTTP 401)").WithFix(render.AuthFix).
 			WithCause(&api.HTTPError{StatusCode: http.StatusUnauthorized})},
-		{"rate_limit", render.Network("GitHub API rate limit exceeded; retry later").
-			WithCause(&api.GraphQLError{Errors: []api.GraphQLErrorItem{{Type: "RATE_LIMITED"}}})},
+		{"rate_limit", render.FromError(&api.GraphQLError{Errors: []api.GraphQLErrorItem{{Type: "RATE_LIMITED"}}})},
 		{"interrupted", render.Network("GitHub write failed (interrupted); it may have been applied, re-run the command to check").
 			WithCause(errors.Join(graph.ErrUnknownOutcome, context.Canceled))},
 	} {
