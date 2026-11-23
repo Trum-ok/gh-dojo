@@ -14,7 +14,7 @@ make vet         # go vet, also for Windows, macOS and -tags e2e
 make lint        # staticcheck, also as Windows and macOS see the code
 make shellcheck  # shellcheck on script/*.sh
 make actionlint  # actionlint on the workflows, shellcheck on their run: blocks
-make fmt         # files gofmt -l lists (gofmt -w . fixes them)
+make fmt         # files gofmt -l lists, outside dot-directories (gofmt -w fixes them)
 make tidy        # go mod tidy -diff, tools/ too
 make vuln        # govulncheck: known vulnerabilities the code can reach
 make e2e         # end-to-end tests against the sandbox boards (see below)

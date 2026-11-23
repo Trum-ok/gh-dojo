@@ -26,9 +26,11 @@ vet:
 	GOOS=darwin go vet ./...
 	go vet -tags e2e ./e2e
 
-# Files gofmt would change; `gofmt -w .` fixes them.
+# Files gofmt would change; `gofmt -w` on them fixes them. Dot-directories are
+# skipped, as go vet and staticcheck do: .claude/worktrees holds other
+# sessions' checkouts.
 fmt:
-	@unformatted="$$(gofmt -l .)"; \
+	@unformatted="$$(find . -name '*.go' -not -path './.*' -exec gofmt -l {} +)"; \
 	if [ -n "$$unformatted" ]; then \
 		echo "gofmt needed on:"; echo "$$unformatted"; exit 1; \
 	fi
