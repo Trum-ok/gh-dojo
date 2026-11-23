@@ -2,6 +2,7 @@ package release
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -29,7 +30,15 @@ const (
 	// left out with a warning.
 	PullWindow    = 5
 	ClosingWindow = 25
+	// MaxDivergedRetries is how many lower tags are compared after the
+	// picked previous release turns out to be on another branch: 3 more
+	// requests at most.
+	MaxDivergedRetries = 3
 )
+
+// errDiverged is a compare that found the start and the head each with
+// commits the other lacks: the start is on another branch.
+var errDiverged = errors.New("start and head have diverged")
 
 // Range is the commits of a release: those of Head that Since does not
 // have.
@@ -212,17 +221,19 @@ func commitOf(ref string) string { return ref + "^{commit}" }
 func Read(ctx context.Context, q graph.Querier, repo issue.Repo, head, since string) (*Range, error) {
 	r := &Range{Repo: repo, Head: head, Since: since}
 	vars := map[string]any{"owner": repo.Owner, "repo": repo.Name, "head": commitOf(head)}
-	base := "" // the qualified ref to compare with; "" walks the history
+	base := ""      // the qualified ref to compare with; "" walks the history
+	var cands []Tag // the tags Previous chooses from, when since is ""
 	if since == "" {
 		tags, headCommit, total, err := readTags(ctx, q, vars, r)
 		if err != nil {
 			return nil, err
 		}
 		r.HeadCommit = headCommit
-		prev, ok := Previous(tags, head, headCommit)
-		if !ok {
+		cands = Candidates(tags, head, headCommit)
+		if len(cands) == 0 {
 			return nil, noPrevious(r, len(tags), total)
 		}
+		prev := cands[0]
 		r.Since, r.SinceCommit, r.Picked, base = prev.Name, prev.Commit, true, "refs/tags/"+prev.Name
 	} else {
 		var resp struct {
@@ -263,6 +274,22 @@ func Read(ctx context.Context, q graph.Querier, repo issue.Repo, head, since str
 	if base != "" {
 		r.Compared = true
 		err = r.compare(ctx, q, base)
+		// A picked tag found diverged is on another branch (a backport on
+		// release-1.4): the next lower version is tried, a few times.
+		tried := 1
+		for errors.Is(err, errDiverged) && r.Picked && tried < len(cands) && tried <= MaxDivergedRetries {
+			next := cands[tried]
+			tried++
+			r.Since, r.SinceCommit = next.Name, next.Commit
+			err = r.compare(ctx, q, "refs/tags/"+next.Name)
+		}
+		if errors.Is(err, errDiverged) {
+			if r.Picked {
+				err = divergedPicked(r, cands[:tried], cands[tried:])
+			} else {
+				err = notInHistory(r, "is not in the history of")
+			}
+		}
 	} else {
 		err = r.walk(ctx, q)
 	}
@@ -374,7 +401,7 @@ func (r *Range) compare(ctx context.Context, q graph.Querier, base string) error
 		case "BEHIND":
 			return notInHistory(r, "is newer than")
 		case "DIVERGED":
-			return notInHistory(r, "is not in the history of")
+			return errDiverged
 		}
 		c := rp.Ref.Compare.Commits
 		if c.TotalCount > MaxCommits {
@@ -554,6 +581,26 @@ func tooMany(r *Range, n string) error {
 	}
 	return render.Usage("%s..%s has %s, more than gh dojo release reads (%d)%s", r.Since, r.Head, n, MaxCommits, or).
 		WithFix("pass a later --since, a tag, branch or commit closer to " + r.Head)
+}
+
+// divergedPicked is the error when the previous release and the lower tags
+// tried after it are all on other branches than r.Head: tried are the tags
+// compared, untried the candidates left. The fix names a concrete
+// --since: the next untried tag when there is one.
+func divergedPicked(r *Range, tried, untried []Tag) error {
+	names := make([]string, len(tried))
+	for i, t := range tried {
+		names[i] = t.Name
+	}
+	text := fmt.Sprintf("the previous release %s (the highest version tag) is not in the history of %s", names[0], r.Head)
+	if len(names) > 1 {
+		text += ", nor are " + strings.Join(names[1:], ", ")
+	}
+	fix := "pass --since <tag, branch or commit>, one that " + r.Head + " includes"
+	if len(untried) > 0 {
+		fix = fmt.Sprintf("pass --since %s (the next lower version tag, not tried), or another tag, branch or commit that %s includes", untried[0].Name, r.Head)
+	}
+	return render.Usage("%s", text).WithFix(fix)
 }
 
 // notInHistory is the error for a start of the range that how relates to

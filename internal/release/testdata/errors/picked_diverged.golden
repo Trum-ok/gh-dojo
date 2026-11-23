@@ -1,2 +1,2 @@
-error: the previous release v0.2.0 (the highest version tag) is not in the history of HEAD
-fix: pass --since, a tag, branch or commit that HEAD includes
+error: the previous release v0.5.0 (the highest version tag) is not in the history of HEAD, nor are v0.4.0, v0.3.0, v0.2.0
+fix: pass --since v0.1.0 (the next lower version tag, not tried), or another tag, branch or commit that HEAD includes

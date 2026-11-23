@@ -3,6 +3,7 @@ package release
 import (
 	"cmp"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -101,10 +102,23 @@ type Tag struct {
 // a verb in place costs no write, while a range too short would miss
 // issues.
 func Previous(tags []Tag, head, headCommit string) (Tag, bool) {
+	c := Candidates(tags, head, headCommit)
+	if len(c) == 0 {
+		return Tag{}, false
+	}
+	return c[0], true
+}
+
+// Candidates are the tags Previous chooses from, the highest version
+// first: the first is Previous. Which of them are in head's history is not
+// known here (a backport tagged on a release branch is not), see Read.
+func Candidates(tags []Tag, head, headCommit string) []Tag {
 	hv, headIsVersion := ParseVersion(head)
-	var best Tag
-	var bestV Version
-	found := false
+	type cand struct {
+		tag Tag
+		v   Version
+	}
+	var cands []cand
 	for _, t := range tags {
 		v, ok := ParseVersion(t.Name)
 		switch {
@@ -115,9 +129,13 @@ func Previous(tags []Tag, head, headCommit string) (Tag, bool) {
 		case !headIsVersion && v.Prerelease():
 			continue
 		}
-		if !found || v.Compare(bestV) > 0 {
-			best, bestV, found = t, v, true
-		}
+		cands = append(cands, cand{t, v})
 	}
-	return best, found
+	// Stable: of equal versions (v1.0.0 and 1.0.0) the first read stays first.
+	slices.SortStableFunc(cands, func(a, b cand) int { return b.v.Compare(a.v) })
+	out := make([]Tag, len(cands))
+	for i, c := range cands {
+		out[i] = c.tag
+	}
+	return out
 }

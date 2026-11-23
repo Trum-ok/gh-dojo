@@ -1,5 +1,5 @@
 {
-  "comment": "Hand-crafted: release HEAD on a branch picks the highest version tag, v0.2.0, made on another branch: DIVERGED.",
+  "comment": "Hand-crafted: release HEAD on a branch picks the highest version tag, v0.5.0, made on another branch: DIVERGED, and so are the next three lower tags (v0.4.0, v0.3.0, v0.2.0). v0.1.0 is left untried: the error names it.",
   "handcrafted": true,
   "interactions": [
     {
@@ -18,27 +18,123 @@
               "oid": "f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6"
             },
             "refs": {
-              "totalCount": 2,
+              "totalCount": 5,
               "pageInfo": {
                 "hasNextPage": false,
                 "endCursor": "end"
               },
               "nodes": [
-                {
-                  "name": "v0.2.0",
-                  "target": {
-                    "__typename": "Commit",
-                    "oid": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
-                  }
-                },
-                {
-                  "name": "v0.1.0",
-                  "target": {
-                    "__typename": "Commit",
-                    "oid": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"
-                  }
-                }
+                { "name": "v0.5.0", "target": { "__typename": "Commit", "oid": "a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5" } },
+                { "name": "v0.4.0", "target": { "__typename": "Commit", "oid": "a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4" } },
+                { "name": "v0.3.0", "target": { "__typename": "Commit", "oid": "a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3" } },
+                { "name": "v0.2.0", "target": { "__typename": "Commit", "oid": "a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2" } },
+                { "name": "v0.1.0", "target": { "__typename": "Commit", "oid": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2" } }
               ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "ReleaseCompare",
+      "query": "query ReleaseCompare($owner: String!, $repo: String!, $base: String!, $head: String!, $cursor: String) {\n  repository(owner: $owner, name: $repo) {\n    ref(qualifiedName: $base) {\n      compare(headRef: $head) {\n        status\n        aheadBy\n        behindBy\n        commits(first: 100, after: $cursor) {\n          totalCount\n          pageInfo { hasNextPage endCursor }\n          nodes { ...releaseCommit }\n        }\n      }\n    }\n  }\n}\n\n\n\nfragment releaseCommit on Commit {\n  oid\n  message\n  associatedPullRequests(first: 5) {\n    totalCount\n    nodes {\n      number\n      merged\n      repository { nameWithOwner }\n      mergeCommit { oid }\n      closingIssuesReferences(first: 25) {\n        totalCount\n        nodes { number repository { nameWithOwner } }\n      }\n    }\n  }\n}",
+      "variables": {
+        "base": "refs/tags/v0.5.0",
+        "cursor": null,
+        "head": "f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6",
+        "owner": "Trum-ok",
+        "repo": "gh-dojo"
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "ref": {
+              "compare": {
+                "status": "DIVERGED",
+                "aheadBy": 1,
+                "behindBy": 2,
+                "commits": {
+                  "totalCount": 1,
+                  "pageInfo": { "hasNextPage": false, "endCursor": "end" },
+                  "nodes": [
+                    {
+                      "oid": "f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6",
+                      "message": "Branch work",
+                      "associatedPullRequests": { "totalCount": 0, "nodes": [] }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "ReleaseCompare",
+      "query": "query ReleaseCompare($owner: String!, $repo: String!, $base: String!, $head: String!, $cursor: String) {\n  repository(owner: $owner, name: $repo) {\n    ref(qualifiedName: $base) {\n      compare(headRef: $head) {\n        status\n        aheadBy\n        behindBy\n        commits(first: 100, after: $cursor) {\n          totalCount\n          pageInfo { hasNextPage endCursor }\n          nodes { ...releaseCommit }\n        }\n      }\n    }\n  }\n}\n\n\n\nfragment releaseCommit on Commit {\n  oid\n  message\n  associatedPullRequests(first: 5) {\n    totalCount\n    nodes {\n      number\n      merged\n      repository { nameWithOwner }\n      mergeCommit { oid }\n      closingIssuesReferences(first: 25) {\n        totalCount\n        nodes { number repository { nameWithOwner } }\n      }\n    }\n  }\n}",
+      "variables": {
+        "base": "refs/tags/v0.4.0",
+        "cursor": null,
+        "head": "f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6",
+        "owner": "Trum-ok",
+        "repo": "gh-dojo"
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "ref": {
+              "compare": {
+                "status": "DIVERGED",
+                "aheadBy": 1,
+                "behindBy": 2,
+                "commits": {
+                  "totalCount": 1,
+                  "pageInfo": { "hasNextPage": false, "endCursor": "end" },
+                  "nodes": [
+                    {
+                      "oid": "f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6",
+                      "message": "Branch work",
+                      "associatedPullRequests": { "totalCount": 0, "nodes": [] }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "ReleaseCompare",
+      "query": "query ReleaseCompare($owner: String!, $repo: String!, $base: String!, $head: String!, $cursor: String) {\n  repository(owner: $owner, name: $repo) {\n    ref(qualifiedName: $base) {\n      compare(headRef: $head) {\n        status\n        aheadBy\n        behindBy\n        commits(first: 100, after: $cursor) {\n          totalCount\n          pageInfo { hasNextPage endCursor }\n          nodes { ...releaseCommit }\n        }\n      }\n    }\n  }\n}\n\n\n\nfragment releaseCommit on Commit {\n  oid\n  message\n  associatedPullRequests(first: 5) {\n    totalCount\n    nodes {\n      number\n      merged\n      repository { nameWithOwner }\n      mergeCommit { oid }\n      closingIssuesReferences(first: 25) {\n        totalCount\n        nodes { number repository { nameWithOwner } }\n      }\n    }\n  }\n}",
+      "variables": {
+        "base": "refs/tags/v0.3.0",
+        "cursor": null,
+        "head": "f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6",
+        "owner": "Trum-ok",
+        "repo": "gh-dojo"
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "ref": {
+              "compare": {
+                "status": "DIVERGED",
+                "aheadBy": 1,
+                "behindBy": 2,
+                "commits": {
+                  "totalCount": 1,
+                  "pageInfo": { "hasNextPage": false, "endCursor": "end" },
+                  "nodes": [
+                    {
+                      "oid": "f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6",
+                      "message": "Branch work",
+                      "associatedPullRequests": { "totalCount": 0, "nodes": [] }
+                    }
+                  ]
+                }
+              }
             }
           }
         }
@@ -64,18 +160,12 @@
                 "behindBy": 2,
                 "commits": {
                   "totalCount": 1,
-                  "pageInfo": {
-                    "hasNextPage": false,
-                    "endCursor": "end"
-                  },
+                  "pageInfo": { "hasNextPage": false, "endCursor": "end" },
                   "nodes": [
                     {
                       "oid": "f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6",
                       "message": "Branch work",
-                      "associatedPullRequests": {
-                        "totalCount": 0,
-                        "nodes": []
-                      }
+                      "associatedPullRequests": { "totalCount": 0, "nodes": [] }
                     }
                   ]
                 }

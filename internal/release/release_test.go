@@ -505,6 +505,24 @@ func TestReadTags(t *testing.T) {
 	}
 }
 
+// TestReadBackport: v1.4.1 was tagged on release-1.4, so the highest
+// version tag below v1.5.0 is on another branch (DIVERGED, #114): the next
+// lower one, v1.4.0, is compared and taken.
+func TestReadBackport(t *testing.T) {
+	srv := graphtest.New(t, "testdata/graphql/tags_backport.json")
+	r, err := Read(context.Background(), srv.Client(), dojo, "v1.5.0", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Since != "v1.4.0" || !r.Picked {
+		t.Errorf("since = %q (picked %v), want v1.4.0, picked", r.Since, r.Picked)
+	}
+	testutil.Golden(t, "read/tags_backport", dumpRange(r, []string{"fixes"}))
+	if n := srv.Requests(); n != 3 {
+		t.Errorf("requests = %d, want 3 (tags, the backport, v1.4.0)", n)
+	}
+}
+
 func TestReadErrors(t *testing.T) {
 	tests := []struct {
 		name, head, since string
@@ -526,8 +544,12 @@ func TestReadErrors(t *testing.T) {
 		// history is read; by GitHub's comparison for a ref.
 		{"since_newer", "v0.2.0", "abc1234", render.ExitUsage, 1},
 		{"since_behind", "v0.2.0", "main", render.ExitUsage, 2},
-		// The highest version tag of another branch: not "no issues".
-		{"picked_diverged", "HEAD", "", render.ExitUsage, 2},
+		// The highest version tags on other branches: not "no issues". The
+		// highest and 3 lower ones are compared, the error names the next.
+		{"picked_diverged", "HEAD", "", render.ExitUsage, 5},
+		// A given --since that diverges is an error, not replaced by a
+		// lower tag.
+		{"since_diverged", "v1.5.0", "v1.4.1", render.ExitUsage, 2},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
