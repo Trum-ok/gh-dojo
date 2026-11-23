@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Trum-ok/gh-dojo/internal/agent"
 	"github.com/Trum-ok/gh-dojo/internal/config"
 	"github.com/Trum-ok/gh-dojo/internal/doctor"
 	"github.com/Trum-ok/gh-dojo/internal/render"
@@ -472,5 +473,42 @@ func TestDoctorAgent(t *testing.T) {
 	got = check()
 	if len(got) != 1 || got[0].Result != doctor.ResultProblem || got[0].Fix == nil || !strings.HasPrefix(*got[0].Fix, "move what is worth keeping") {
 		t.Errorf("hand-written: %+v", got)
+	}
+
+	// Without [agent], a marked file install cannot handle is a problem,
+	// not silence.
+	withRepo(t, dojoConfig, map[string]string{"AGENTS.md": "# Agents\n" + agent.End + "\n"})
+	got = check()
+	if len(got) != 1 || got[0].Result != doctor.ResultProblem ||
+		!strings.Contains(got[0].Detail, "a gh-dojo:end marker without a gh-dojo:begin before it") {
+		t.Errorf("stray end marker: %+v", got)
+	}
+}
+
+// TestDoctorAgentOneFileFails: without [agent], a file that cannot be
+// prepared does not hide the warning about another one.
+func TestDoctorAgentOneFileFails(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symbolic links need privileges on Windows")
+	}
+	dir := withRepo(t, dojoConfig, nil)
+	runOut("agent", "install", "--agent", "claude")
+	writeRepoFile(t, dir, skillPath, strings.Replace(readRepoFile(t, dir, skillPath), "Verbs", "Words", 1))
+	writeRepoFile(t, dir, "CLAUDE.md", "# Claude\n")
+	if err := os.Symlink(filepath.Join(dir, "CLAUDE.md"), filepath.Join(dir, "AGENTS.md")); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := newRootCmd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &doctor.Report{}
+	checkAgentFiles(r, cfg, root)
+	if got := r.Checks; len(got) != 1 || got[0].Result != doctor.ResultWarn || !strings.Contains(got[0].Detail, skillPath+" (out of date)") {
+		t.Errorf("unmarked AGENTS.md whose read fails: %+v", got)
 	}
 }

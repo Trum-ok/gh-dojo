@@ -203,7 +203,8 @@ func HandWrittenFix(t Target, configFile string) string {
 // version) for a shared file. The wanted content keeps the file's line
 // endings: CRLF when the file has them. Markers of a shared file that are
 // out of order or repeated are an error (exit code 1): gh-dojo cannot tell
-// which text is its own.
+// which text is its own; the file read comes back with that error (nil for
+// any other).
 func Prepare(root *os.Root, t Target, body, configFile, version string) (*File, error) {
 	f := &File{Target: t}
 	data, err := ReadFile(root, t.Path)
@@ -230,7 +231,7 @@ func Prepare(root *os.Root, t Target, body, configFile, version string) (*File, 
 	section := withEOL(Begin(configFile, version)+"\n"+strings.TrimRight(body, "\n")+"\n"+End+"\n", eol)
 	want, err := splice(f.Have, section, eol)
 	if err != nil {
-		return nil, render.Usage("%s: %v", t.Path, err).
+		return f, render.Usage("%s: %v", t.Path, err).
 			WithFix(fmt.Sprintf("keep one %s ... --> line and one %s line after it in %s, "+
 				"or remove both; then run gh dojo agent install", beginPrefix, End, t.Path))
 	}

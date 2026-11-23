@@ -251,19 +251,27 @@ func prepareAgentFiles(cfg *config.Config, cmdRoot *cobra.Command, root *os.Root
 	doc := newAgentDoc(cfg, cmdRoot, notes)
 	var files []*agent.File
 	for _, t := range targets {
-		body := doc.section()
-		if !t.Section { // only the skill has a description, with its length limit
-			if body, err = doc.skill(); err != nil {
-				return nil, err
-			}
-		}
-		f, err := agent.Prepare(root, t, body, config.FileName, version)
+		f, err := prepareAgentFile(doc, root, t)
 		if err != nil {
 			return nil, err
 		}
 		files = append(files, f)
 	}
 	return files, nil
+}
+
+// prepareAgentFile works out what target t should hold. When it fails on a
+// file that was read, the file comes back too (agent.Prepare), so a caller
+// can tell a marked one.
+func prepareAgentFile(doc *agentDoc, root *os.Root, t agent.Target) (*agent.File, error) {
+	body := doc.section()
+	if !t.Section { // only the skill has a description, with its length limit
+		var err error
+		if body, err = doc.skill(); err != nil {
+			return nil, err
+		}
+	}
+	return agent.Prepare(root, t, body, config.FileName, version)
 }
 
 // checkAgentFiles is doctor's agent check, agent install --check without
@@ -294,18 +302,34 @@ func checkAgentFiles(r *doctor.Report, cfg *config.Config, cmdRoot *cobra.Comman
 			return
 		}
 	}
-	files, err := prepareAgentFiles(cfg, cmdRoot, root, targets)
+	notes, err := readAgentNotes(cfg, root)
 	if err != nil {
 		if cfg.Agent.Set {
 			r.AddProblem("agent", err)
 		}
 		return
 	}
-	if !cfg.Agent.Set {
-		files = slices.DeleteFunc(files, func(f *agent.File) bool { return !f.Marked })
-		if len(files) == 0 {
-			return
+	doc := newAgentDoc(cfg, cmdRoot, notes)
+	// Each target on its own: one that cannot be prepared must not hide the
+	// others. Without [agent], an unmarked file that fails (a read error) is
+	// not gh-dojo's business; a marked one, install cannot handle, is a problem.
+	var files []*agent.File
+	problems := false
+	for _, t := range targets {
+		f, err := prepareAgentFile(doc, root, t)
+		if err != nil {
+			if cfg.Agent.Set || (f != nil && f.Marked) {
+				r.AddProblem("agent", err)
+				problems = true
+			}
+			continue
 		}
+		if cfg.Agent.Set || f.Marked {
+			files = append(files, f)
+		}
+	}
+	if len(files) == 0 {
+		return
 	}
 	var ok, stale []string
 	for _, f := range files {
@@ -315,7 +339,7 @@ func checkAgentFiles(r *doctor.Report, cfg *config.Config, cmdRoot *cobra.Comman
 		case agent.StateHandWritten:
 			r.AddProblem("agent", render.Usage("%s was not written by gh dojo agent install", f.Path).
 				WithFix(agent.HandWrittenFix(f.Target, config.FileName)))
-			return
+			problems = true
 		default:
 			by := ""
 			if f.WrittenBy != "" && f.WrittenBy != version && f.State() == agent.StateOutOfDate {
@@ -327,6 +351,9 @@ func checkAgentFiles(r *doctor.Report, cfg *config.Config, cmdRoot *cobra.Comman
 	if len(stale) > 0 {
 		r.AddWarn("agent", "gh dojo agent install", "not up to date with %s or this gh-dojo version: %s",
 			config.FileName, strings.Join(stale, ", "))
+		return
+	}
+	if problems || len(ok) == 0 {
 		return
 	}
 	r.AddOK("agent", "%s: up to date", strings.Join(ok, ", "))
