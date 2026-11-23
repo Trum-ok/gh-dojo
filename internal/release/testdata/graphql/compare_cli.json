@@ -33,7 +33,7 @@
     },
     {
       "operation": "ReleaseCompare",
-      "query": "query ReleaseCompare($owner: String!, $repo: String!, $base: String!, $head: String!, $cursor: String) {\n  repository(owner: $owner, name: $repo) {\n    ref(qualifiedName: $base) {\n      compare(headRef: $head) {\n        status\n        aheadBy\n        behindBy\n        commits(first: 100, after: $cursor) {\n          totalCount\n          pageInfo { hasNextPage endCursor }\n          nodes { ...releaseCommit }\n        }\n      }\n    }\n  }\n}\n\n\n\nfragment releaseCommit on Commit {\n  oid\n  message\n  associatedPullRequests(first: 5) {\n    totalCount\n    nodes {\n      number\n      merged\n      repository { nameWithOwner }\n      closingIssuesReferences(first: 25) {\n        totalCount\n        nodes { number repository { nameWithOwner } }\n      }\n    }\n  }\n}",
+      "query": "query ReleaseCompare($owner: String!, $repo: String!, $base: String!, $head: String!, $cursor: String) {\n  repository(owner: $owner, name: $repo) {\n    ref(qualifiedName: $base) {\n      compare(headRef: $head) {\n        status\n        aheadBy\n        behindBy\n        commits(first: 100, after: $cursor) {\n          totalCount\n          pageInfo { hasNextPage endCursor }\n          nodes { ...releaseCommit }\n        }\n      }\n    }\n  }\n}\n\n\n\nfragment releaseCommit on Commit {\n  oid\n  message\n  associatedPullRequests(first: 5) {\n    totalCount\n    nodes {\n      number\n      merged\n      repository { nameWithOwner }\n      mergeCommit { oid }\n      closingIssuesReferences(first: 25) {\n        totalCount\n        nodes { number repository { nameWithOwner } }\n      }\n    }\n  }\n}",
       "variables": {
         "base": "refs/tags/v2.39.1",
         "cursor": null,
@@ -65,6 +65,7 @@
                           {
                             "number": 8345,
                             "merged": true,
+                            "mergeCommit": { "oid": "a74a71e0481a12047fd3b7d1a977ea1d4fcba272" },
                             "repository": {
                               "nameWithOwner": "cli/cli"
                             },
@@ -85,6 +86,7 @@
                           {
                             "number": 8229,
                             "merged": true,
+                            "mergeCommit": { "oid": "14a8e03bc3c8d7666940a23581d6ca674229f355" },
                             "repository": {
                               "nameWithOwner": "cli/cli"
                             },
@@ -112,6 +114,7 @@
                           {
                             "number": 8359,
                             "merged": true,
+                            "mergeCommit": { "oid": "06e438b4b4a63ce1ad7486fb7e93091e35906451" },
                             "repository": {
                               "nameWithOwner": "cli/cli"
                             },
@@ -139,6 +142,7 @@
                           {
                             "number": 8384,
                             "merged": true,
+                            "mergeCommit": { "oid": "63094461621f8e91217d9b89f513f53e21670bd9" },
                             "repository": {
                               "nameWithOwner": "cli/cli"
                             },
@@ -166,6 +170,7 @@
                           {
                             "number": 8384,
                             "merged": true,
+                            "mergeCommit": { "oid": "63094461621f8e91217d9b89f513f53e21670bd9" },
                             "repository": {
                               "nameWithOwner": "cli/cli"
                             },
@@ -193,6 +198,7 @@
                           {
                             "number": 8384,
                             "merged": true,
+                            "mergeCommit": { "oid": "63094461621f8e91217d9b89f513f53e21670bd9" },
                             "repository": {
                               "nameWithOwner": "cli/cli"
                             },
@@ -220,6 +226,7 @@
                           {
                             "number": 8384,
                             "merged": true,
+                            "mergeCommit": { "oid": "63094461621f8e91217d9b89f513f53e21670bd9" },
                             "repository": {
                               "nameWithOwner": "cli/cli"
                             },
@@ -247,6 +254,7 @@
                           {
                             "number": 8384,
                             "merged": true,
+                            "mergeCommit": { "oid": "63094461621f8e91217d9b89f513f53e21670bd9" },
                             "repository": {
                               "nameWithOwner": "cli/cli"
                             },
@@ -274,6 +282,7 @@
                           {
                             "number": 8384,
                             "merged": true,
+                            "mergeCommit": { "oid": "63094461621f8e91217d9b89f513f53e21670bd9" },
                             "repository": {
                               "nameWithOwner": "cli/cli"
                             },

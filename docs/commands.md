@@ -670,6 +670,14 @@ since the previous release:
   below `<ref>` when `<ref>` is one, else the highest not on `<ref>`'s
   commit. A start that is not in `<ref>`'s history, like a `--since` newer
   than `<ref>`, is exit code 1, not an empty release.
+- A tag on another branch is no previous release: a backport `v1.4.1` on
+  `release-1.4` is not in the history of `main`. When the highest tag
+  turns out to be on another branch (GitHub compares the two as
+  diverged), the next lower tag is tried, up to 3 more times, and the
+  first one in `<ref>`'s history is the previous release. If none is, it
+  is exit code 1, and the `fix:` line names the next tag not tried as a
+  `--since`. A `--since` on another branch is exit code 1 as before: it is
+  never replaced.
 - Prereleases count only for a prerelease, so `v0.2.0` starts from
   `v0.1.0`, past `v0.2.0-rc.1`: an issue already done costs no write, a
   range too short misses issues.
@@ -754,7 +762,11 @@ pull requests, when the revert says so as git and GitHub write it:
 
 - `This reverts commit <sha>.`, which `git revert` and GitHub's Revert
   button write; a reverted merge commit (`…, reversing changes made to
-  <sha>.`) takes its pull request with it, all its commits;
+  <sha>.`) takes its pull request with it, all its commits. That is the
+  pull request it merged, not every pull request the commit belongs to: a
+  feature's merge commit also belongs to the release pull request that
+  merges the feature into `main`, and that one stays. When GitHub names no
+  pull request that this commit merged, all of its pull requests go;
 - `Reverts owner/repo#20` on a line of its own, the description of the pull
   request GitHub's Revert button opens, which a squash merge may put in the
   message: every commit of that pull request in the range is reverted.

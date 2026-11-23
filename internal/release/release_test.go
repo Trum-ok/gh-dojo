@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -379,6 +380,47 @@ func TestCollectReverted(t *testing.T) {
 	}
 }
 
+// TestRevertedMergeCommitTakesOwnPull: gitflow, feature pull requests A and
+// B merged into develop, release pull request R merges develop into main
+// (#102). A's merge commit belongs to A and to R; reverting it takes A, the
+// pull request it merged, not R and with it B.
+func TestRevertedMergeCommitTakesOwnPull(t *testing.T) {
+	oid := func(s string) string { return strings.Repeat(s, 20) }
+	pull := func(n int, merge string) Pull {
+		return Pull{Ref: issue.Ref{Repo: dojo, Number: n}, MergeCommit: merge}
+	}
+	a, b, rel := 10, 11, 12
+	revert := func(merge string) string {
+		return "Revert \"Merge pull request #10\"\n\nThis reverts commit " + oid(merge) + ", reversing\nchanges made to " + oid("00") + "."
+	}
+	commits := func(pulls func(own Pull) []Pull) []Commit {
+		return []Commit{
+			{OID: oid("a1"), Message: "feature A", Pulls: pulls(pull(a, oid("a2")))},
+			{OID: oid("a2"), Message: "Merge pull request #10 from acme/a", Pulls: pulls(pull(a, oid("a2")))},
+			{OID: oid("b1"), Message: "feature B", Pulls: pulls(pull(b, oid("b2")))},
+			{OID: oid("b2"), Message: "Merge pull request #11 from acme/b", Pulls: pulls(pull(b, oid("b2")))},
+			{OID: oid("c1"), Message: revert("a2")},
+		}
+	}
+	// Every commit of A and B also belongs to R, merged by c9.
+	withRelease := func(own Pull) []Pull { return []Pull{own, pull(rel, oid("c9"))} }
+	got := Reverted(&Range{Repo: dojo, Commits: commits(withRelease)})
+	if want := []bool{true, true, false, false, false}; !slices.Equal(got, want) {
+		t.Errorf("reverted = %v, want %v", got, want)
+	}
+
+	// GitHub names no merge commit: which pull request the commit merged is
+	// not known, so every one it belongs to goes (the behavior before #102).
+	unknown := func(own Pull) []Pull {
+		own.MergeCommit = ""
+		return []Pull{own, {Ref: issue.Ref{Repo: dojo, Number: rel}}}
+	}
+	got = Reverted(&Range{Repo: dojo, Commits: commits(unknown)})
+	if want := []bool{true, true, true, true, false}; !slices.Equal(got, want) {
+		t.Errorf("no merge commit: reverted = %v, want %v", got, want)
+	}
+}
+
 // dumpRange prints r and what Collect finds in it, for golden files.
 func dumpRange(r *Range, keywords []string) []byte {
 	var b strings.Builder
@@ -463,6 +505,24 @@ func TestReadTags(t *testing.T) {
 	}
 }
 
+// TestReadBackport: v1.4.1 was tagged on release-1.4, so the highest
+// version tag below v1.5.0 is on another branch (DIVERGED, #114): the next
+// lower one, v1.4.0, is compared and taken.
+func TestReadBackport(t *testing.T) {
+	srv := graphtest.New(t, "testdata/graphql/tags_backport.json")
+	r, err := Read(context.Background(), srv.Client(), dojo, "v1.5.0", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Since != "v1.4.0" || !r.Picked {
+		t.Errorf("since = %q (picked %v), want v1.4.0, picked", r.Since, r.Picked)
+	}
+	testutil.Golden(t, "read/tags_backport", dumpRange(r, []string{"fixes"}))
+	if n := srv.Requests(); n != 3 {
+		t.Errorf("requests = %d, want 3 (tags, the backport, v1.4.0)", n)
+	}
+}
+
 func TestReadErrors(t *testing.T) {
 	tests := []struct {
 		name, head, since string
@@ -484,8 +544,12 @@ func TestReadErrors(t *testing.T) {
 		// history is read; by GitHub's comparison for a ref.
 		{"since_newer", "v0.2.0", "abc1234", render.ExitUsage, 1},
 		{"since_behind", "v0.2.0", "main", render.ExitUsage, 2},
-		// The highest version tag of another branch: not "no issues".
-		{"picked_diverged", "HEAD", "", render.ExitUsage, 2},
+		// The highest version tags on other branches: not "no issues". The
+		// highest and 3 lower ones are compared, the error names the next.
+		{"picked_diverged", "HEAD", "", render.ExitUsage, 5},
+		// A given --since that diverges is an error, not replaced by a
+		// lower tag.
+		{"since_diverged", "v1.5.0", "v1.4.1", render.ExitUsage, 2},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

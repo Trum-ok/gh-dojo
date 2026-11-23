@@ -31,7 +31,7 @@
     },
     {
       "operation": "ReleaseHistory",
-      "query": "query ReleaseHistory($owner: String!, $repo: String!, $head: GitObjectID!, $cursor: String) {\n  repository(owner: $owner, name: $repo) {\n    object(oid: $head) {\n      ... on Commit {\n        history(first: 100, after: $cursor) {\n          pageInfo { hasNextPage endCursor }\n          nodes { ...releaseCommit }\n        }\n      }\n    }\n  }\n}\n\n\n\nfragment releaseCommit on Commit {\n  oid\n  message\n  associatedPullRequests(first: 5) {\n    totalCount\n    nodes {\n      number\n      merged\n      repository { nameWithOwner }\n      closingIssuesReferences(first: 25) {\n        totalCount\n        nodes { number repository { nameWithOwner } }\n      }\n    }\n  }\n}",
+      "query": "query ReleaseHistory($owner: String!, $repo: String!, $head: GitObjectID!, $cursor: String) {\n  repository(owner: $owner, name: $repo) {\n    object(oid: $head) {\n      ... on Commit {\n        history(first: 100, after: $cursor) {\n          pageInfo { hasNextPage endCursor }\n          nodes { ...releaseCommit }\n        }\n      }\n    }\n  }\n}\n\n\n\nfragment releaseCommit on Commit {\n  oid\n  message\n  associatedPullRequests(first: 5) {\n    totalCount\n    nodes {\n      number\n      merged\n      repository { nameWithOwner }\n      mergeCommit { oid }\n      closingIssuesReferences(first: 25) {\n        totalCount\n        nodes { number repository { nameWithOwner } }\n      }\n    }\n  }\n}",
       "variables": {
         "cursor": null,
         "head": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",

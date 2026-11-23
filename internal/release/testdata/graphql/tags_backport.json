@@ -1,0 +1,113 @@
+{
+  "comment": "Hand-crafted: v1.4.1 is tagged on release-1.4 after v1.4.0, then v1.5.0 is released from main. The highest version tag, v1.4.1, is DIVERGED from v1.5.0, so the next lower one, v1.4.0, is compared and taken.",
+  "handcrafted": true,
+  "interactions": [
+    {
+      "operation": "ReleaseTags",
+      "query": "query ReleaseTags($owner: String!, $repo: String!, $head: String!, $cursor: String) {\n  repository(owner: $owner, name: $repo) {\n    head: object(expression: $head) { oid }\n    refs(refPrefix: \"refs/tags/\", first: 100, after: $cursor, orderBy: {field: TAG_COMMIT_DATE, direction: DESC}) {\n      totalCount\n      pageInfo { hasNextPage endCursor }\n      nodes {\n        name\n        target { __typename oid ... on Tag { target { __typename oid } } }\n      }\n    }\n  }\n}",
+      "variables": {
+        "cursor": null,
+        "head": "v1.5.0^{commit}",
+        "owner": "Trum-ok",
+        "repo": "gh-dojo"
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "head": {
+              "oid": "f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6"
+            },
+            "refs": {
+              "totalCount": 2,
+              "pageInfo": { "hasNextPage": false, "endCursor": "end" },
+              "nodes": [
+                { "name": "v1.4.1", "target": { "__typename": "Commit", "oid": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1" } },
+                { "name": "v1.4.0", "target": { "__typename": "Commit", "oid": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2" } }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "ReleaseCompare",
+      "query": "query ReleaseCompare($owner: String!, $repo: String!, $base: String!, $head: String!, $cursor: String) {\n  repository(owner: $owner, name: $repo) {\n    ref(qualifiedName: $base) {\n      compare(headRef: $head) {\n        status\n        aheadBy\n        behindBy\n        commits(first: 100, after: $cursor) {\n          totalCount\n          pageInfo { hasNextPage endCursor }\n          nodes { ...releaseCommit }\n        }\n      }\n    }\n  }\n}\n\n\n\nfragment releaseCommit on Commit {\n  oid\n  message\n  associatedPullRequests(first: 5) {\n    totalCount\n    nodes {\n      number\n      merged\n      repository { nameWithOwner }\n      mergeCommit { oid }\n      closingIssuesReferences(first: 25) {\n        totalCount\n        nodes { number repository { nameWithOwner } }\n      }\n    }\n  }\n}",
+      "variables": {
+        "base": "refs/tags/v1.4.1",
+        "cursor": null,
+        "head": "f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6",
+        "owner": "Trum-ok",
+        "repo": "gh-dojo"
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "ref": {
+              "compare": {
+                "status": "DIVERGED",
+                "aheadBy": 2,
+                "behindBy": 1,
+                "commits": {
+                  "totalCount": 2,
+                  "pageInfo": { "hasNextPage": false, "endCursor": "end" },
+                  "nodes": [
+                    {
+                      "oid": "f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5",
+                      "message": "Fix the cart\n\nFixes #7",
+                      "associatedPullRequests": { "totalCount": 0, "nodes": [] }
+                    },
+                    {
+                      "oid": "f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6",
+                      "message": "Add the checkout\n\nFixes #8",
+                      "associatedPullRequests": { "totalCount": 0, "nodes": [] }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "operation": "ReleaseCompare",
+      "query": "query ReleaseCompare($owner: String!, $repo: String!, $base: String!, $head: String!, $cursor: String) {\n  repository(owner: $owner, name: $repo) {\n    ref(qualifiedName: $base) {\n      compare(headRef: $head) {\n        status\n        aheadBy\n        behindBy\n        commits(first: 100, after: $cursor) {\n          totalCount\n          pageInfo { hasNextPage endCursor }\n          nodes { ...releaseCommit }\n        }\n      }\n    }\n  }\n}\n\n\n\nfragment releaseCommit on Commit {\n  oid\n  message\n  associatedPullRequests(first: 5) {\n    totalCount\n    nodes {\n      number\n      merged\n      repository { nameWithOwner }\n      mergeCommit { oid }\n      closingIssuesReferences(first: 25) {\n        totalCount\n        nodes { number repository { nameWithOwner } }\n      }\n    }\n  }\n}",
+      "variables": {
+        "base": "refs/tags/v1.4.0",
+        "cursor": null,
+        "head": "f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6",
+        "owner": "Trum-ok",
+        "repo": "gh-dojo"
+      },
+      "response": {
+        "data": {
+          "repository": {
+            "ref": {
+              "compare": {
+                "status": "AHEAD",
+                "aheadBy": 2,
+                "behindBy": 0,
+                "commits": {
+                  "totalCount": 2,
+                  "pageInfo": { "hasNextPage": false, "endCursor": "end" },
+                  "nodes": [
+                    {
+                      "oid": "f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5",
+                      "message": "Fix the cart\n\nFixes #7",
+                      "associatedPullRequests": { "totalCount": 0, "nodes": [] }
+                    },
+                    {
+                      "oid": "f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6",
+                      "message": "Add the checkout\n\nFixes #8",
+                      "associatedPullRequests": { "totalCount": 0, "nodes": [] }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -34,7 +34,7 @@
     },
     {
       "operation": "ReleaseCompare",
-      "query": "query ReleaseCompare($owner: String!, $repo: String!, $base: String!, $head: String!, $cursor: String) {\n  repository(owner: $owner, name: $repo) {\n    ref(qualifiedName: $base) {\n      compare(headRef: $head) {\n        status\n        aheadBy\n        behindBy\n        commits(first: 100, after: $cursor) {\n          totalCount\n          pageInfo { hasNextPage endCursor }\n          nodes { ...releaseCommit }\n        }\n      }\n    }\n  }\n}\n\n\n\nfragment releaseCommit on Commit {\n  oid\n  message\n  associatedPullRequests(first: 5) {\n    totalCount\n    nodes {\n      number\n      merged\n      repository { nameWithOwner }\n      closingIssuesReferences(first: 25) {\n        totalCount\n        nodes { number repository { nameWithOwner } }\n      }\n    }\n  }\n}",
+      "query": "query ReleaseCompare($owner: String!, $repo: String!, $base: String!, $head: String!, $cursor: String) {\n  repository(owner: $owner, name: $repo) {\n    ref(qualifiedName: $base) {\n      compare(headRef: $head) {\n        status\n        aheadBy\n        behindBy\n        commits(first: 100, after: $cursor) {\n          totalCount\n          pageInfo { hasNextPage endCursor }\n          nodes { ...releaseCommit }\n        }\n      }\n    }\n  }\n}\n\n\n\nfragment releaseCommit on Commit {\n  oid\n  message\n  associatedPullRequests(first: 5) {\n    totalCount\n    nodes {\n      number\n      merged\n      repository { nameWithOwner }\n      mergeCommit { oid }\n      closingIssuesReferences(first: 25) {\n        totalCount\n        nodes { number repository { nameWithOwner } }\n      }\n    }\n  }\n}",
       "variables": {
         "base": "refs/tags/v0.9.0",
         "cursor": null,
