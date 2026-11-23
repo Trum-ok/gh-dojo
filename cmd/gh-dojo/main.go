@@ -3,11 +3,14 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/Trum-ok/gh-dojo/internal/render"
 	"github.com/spf13/cobra"
@@ -18,7 +21,19 @@ import (
 var version = "dev"
 
 func main() {
-	os.Exit(int(run(newRootCmd, os.Args[1:], os.Stdout, os.Stderr)))
+	// Ctrl-C and SIGTERM cancel the context of the command instead of
+	// killing the process, so it reports what it did (render.FromError,
+	// graph.AffectsAll: the writes stop, the rest is not attempted). Once
+	// the context is cancelled the handler is removed, so a second signal
+	// kills the process as usual.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-ctx.Done()
+		stop()
+	}()
+	code := runContext(ctx, newRootCmd, os.Args[1:], os.Stdout, os.Stderr)
+	stop()
+	os.Exit(int(code))
 }
 
 // run builds the root command with newRoot, executes it with args and returns
@@ -30,7 +45,13 @@ func main() {
 // internal error. Only panics on this goroutine are caught: a panic in a
 // goroutine started by a command still crashes the process with a trace, so
 // such goroutines must recover themselves and return an error.
-func run(newRoot func() (*cobra.Command, error), args []string, stdout, stderr io.Writer) (code render.Code) {
+func run(newRoot func() (*cobra.Command, error), args []string, stdout, stderr io.Writer) render.Code {
+	return runContext(context.Background(), newRoot, args, stdout, stderr)
+}
+
+// runContext is run with the context the commands get as cmd.Context():
+// cancelling it interrupts the run.
+func runContext(ctx context.Context, newRoot func() (*cobra.Command, error), args []string, stdout, stderr io.Writer) (code render.Code) {
 	o := rawOutput(args) // until cobra parsed the flags
 	defer func() {
 		if r := recover(); r != nil {
@@ -57,7 +78,7 @@ func run(newRoot func() (*cobra.Command, error), args []string, stdout, stderr i
 	root.SetArgs(args)
 	root.SetOut(stdout)
 	root.SetErr(stderr)
-	cmd, err := root.ExecuteC()
+	cmd, err := root.ExecuteContextC(ctx)
 	if cmd != nil {
 		if co := outputOf(cmd); co.json {
 			o = co
