@@ -368,6 +368,29 @@ func onlyLinkErrors(err error) bool {
 	return true
 }
 
+// onlyLinkOrBlockerErrors is onlyLinkErrors that also accepts the target's
+// own blockers withheld from the token (repository.issueOrPullRequest.
+// blockedBy...): ReadLinks needs only the blockers it can see, the hidden
+// ones do not matter for the change (the nodes come back null and are
+// dropped, see idNodes.ids).
+func onlyLinkOrBlockerErrors(err error) bool {
+	items := graph.ErrorItems(err)
+	if len(items) == 0 {
+		return false
+	}
+	for _, item := range items {
+		if !graph.Withheld(item) {
+			return false
+		}
+		blocker := len(item.Path) >= 3 && item.Path[0] == "repository" &&
+			item.Path[1] == "issueOrPullRequest" && item.Path[2] == "blockedBy"
+		if !blocker && !isLinkPath(item.Path) {
+			return false
+		}
+	}
+	return true
+}
+
 // LinksError is the error for linked issues that cannot be blocked by,
 // with exit code 3: missing ones and pull requests, all named at once by
 // what (such as "--by"); nil when there are none. def is the default
@@ -479,7 +502,7 @@ func ReadLinks(ctx context.Context, q graph.Querier, repo Repo, number int, def 
 	}
 	req := Request{Repo: repo, Number: number}
 	switch {
-	case err == nil, resp.Repository != nil && resp.Repository.Issue != nil && onlyLinkErrors(err):
+	case err == nil, resp.Repository != nil && resp.Repository.Issue != nil && onlyLinkOrBlockerErrors(err):
 	case resp.Repository == nil && render.FromError(err).Code == render.ExitNotFound:
 		return nil, nil, repoNotFound(repo, err)
 	case render.FromError(err).Code == render.ExitNotFound && onlyTargetOrLinks(err):
